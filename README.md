@@ -1,12 +1,12 @@
 <div align="center">
 
-# **Omron Subnet**
+# **Omron SN2 (𝜏, β)**
 
 [![Discord Chat](https://img.shields.io/discord/308323056592486420.svg?logo=discord)](https://discord.gg/bittensor)
 
 ### Proof of Inference
 
-[Discord](https://discord.gg/bittensor) • [Explorer](https://taostats.io/) • [Research](https://bittensor.com/whitepaper)
+[Discord](https://discord.gg/bittensor) • [X](https://twitter.com/omron_ai) • [Inference Labs](https://twitter.com/inference_labs) • [Explorer](https://taostats.io/) • [Research](https://bittensor.com/whitepaper)
 
 </div>
 
