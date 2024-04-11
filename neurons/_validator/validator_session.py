@@ -5,6 +5,7 @@ import traceback
 import bittensor as bt
 import protocol
 import torch
+from _validator.reward import reward
 from execution_layer.VerifiedModelSession import VerifiedModelSession
 from rich.console import Console
 from rich.table import Table
@@ -124,14 +125,6 @@ class ValidatorSession:
             max_score = 1
 
         min_score = 0
-        recover_rate = 0.2
-        decent_rate = 0.8
-
-        def update_score(score, value):
-            if value == True:
-                return score + recover_rate * (max_score - score)
-            else:
-                return score - decent_rate * (score - min_score)
 
         all_uids = set(range(len(self.scores)))
         response_uids = set(uid for uid, _, _ in responses)
@@ -140,7 +133,7 @@ class ValidatorSession:
         responses.extend((uid, False, 1) for uid in missing_uids)
 
         for uid, response, factor in responses:
-            new_scores[uid] = update_score(self.scores[uid], response) * factor
+            new_scores[uid] = reward(max_score, self.scores[uid], response, factor)
 
         if torch.sum(self.scores).item() != 0:
             self.scores = self.scores / torch.sum(self.scores)
@@ -267,7 +260,7 @@ class ValidatorSession:
                 protocol.QueryZkProof(query_input=query_input),
                 # All responses have the deserialize function called on them before returning.
                 deserialize=True,
-                # Timeout set to 60s since this is a decently large proof
+                # Timeout set to 60 since this is a decently large proof
                 timeout=60,
             )
             ip_array = [axon.ip for axon in filtered_axons]
