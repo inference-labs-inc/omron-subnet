@@ -26,6 +26,7 @@ def reward(max_score, score, value, factor):
         bt.logging.trace(f"Recovering score {score}")
         rate = RATE_OF_RECOVERY
         distance = max_score - score
+        return score + rate * distance * factor
     else:
         bt.logging.trace(f"Decaying score {score}")
-    return score + rate * distance * factor
+        return score - rate * distance * factor
