@@ -1,22 +1,4 @@
-"""
-The MIT License (MIT)
-Copyright © 2023 Chris Wilson
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
-documentation files (the “Software”), to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
-and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of
-the Software.
-
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-"""
-
+import hashlib
 import os
 import subprocess
 import sys
@@ -27,135 +9,198 @@ import requests
 
 from __init__ import __version__
 
-
-def version2number(version):
-    return int(version.replace(".", "").replace("-", "").replace("_", ""))
-
-
-def get_remote_version():
-    url = "https://raw.githubusercontent.com/inference-labs-inc/omron-subnet/main/neurons/__init__.py"
-    response = requests.get(url)
-
-    if response.status_code == 200:
-        lines = response.text.split("\n")
-        for line in lines:
-            if line.startswith("__version__"):
-                version_info = line.split("=")[1].strip(" \"'").replace('"', "")
-                return version_info
-    else:
-        bt.logging.error("Failed to get remote file content for version check")
-
-
-def get_local_version():
-    return __version__
-
-
-def check_version_updated():
-    remote_version = get_remote_version()
-    local_version = get_local_version()
-    bt.logging.info(
-        f"Version check - remote_version: {remote_version}, local_version: {local_version}"
-    )
-
-    if version2number(remote_version) > version2number(local_version):
-        bt.logging.info(
-            f"Remote version ({remote_version}) is higher than local version ({local_version}), automatically updating..."
-        )
-        return True
-    else:
-        return False
-
-
-def update_repo():
-    try:
-        repo = git.Repo(search_parent_directories=True)
-
-        origin = repo.remotes.origin
-
-        if repo.is_dirty(untracked_files=True):
-            bt.logging.error(
-                "Update failed: Uncommited changes detected. Please commit changes"
-            )
-            return False
-        try:
-            bt.logging.info("Try pulling remote repository")
-            origin.pull()
-            bt.logging.info("pulling success")
-            return True
-        except git.exc.GitCommandError as e:
-            bt.logging.info(
-                f"update : Merge conflict detected: {e} Recommend you manually commit changes and update"
-            )
-            return handle_merge_conflict(repo)
-
-    except Exception as e:
-        bt.logging.error(
-            f"update failed: {e} Recommend you manually commit changes and update"
-        )
-
-    return False
-
-
-def handle_merge_conflict(repo):
-    try:
-        repo.git.reset("--merge")
-        origin = repo.remotes.origin
-        current_branch = repo.active_branch
-        origin.pull(current_branch.name)
-
-        for item in repo.index.diff(None):
-            file_path = item.a_path
-            bt.logging.info(f"Resolving conflict in file: {file_path}")
-            repo.git.checkout("--theirs", file_path)
-        repo.index.commit("Resolved merge conflicts automatically")
-        bt.logging.info("Merge conflicts resolved, repository updated to remote state.")
-        bt.logging.info("✅ Successfully updated")
-        return True
-    except git.GitCommandError as e:
-        bt.logging.error(
-            f"update failed: {e} Recommend you manually commit changes and update"
-        )
-        return False
-
-
-def version2number(version_string):
-    version_digits = version_string.split(".")
-    return 100 * version_digits[0] + 10 * version_digits[1] + version_digits[2]
+TARGET_BRANCH = "main"
 
 
 def restart_app():
-    bt.logging.info("App restarted due to update")
-
+    """
+    Restart the application to apply the updated changes
+    """
+    bt.logging.success("App restarting due to auto-update")
     python = sys.executable
     os.execl(python, python, *sys.argv)
 
 
-def try_update_packages():
-    bt.logging.info("Try updating packages...")
+class AutoUpdate:
+    """
+    Automatic update utility
+    """
 
-    try:
-        repo = git.Repo(search_parent_directories=True)
-        repo_path = repo.working_tree_dir
+    def __init__(self):
+        try:
+            self.repo = git.Repo(search_parent_directories=True)
+            self.update_requirements = False
+        except Exception as e:
+            bt.logging.exception("Failed to initialize the repository", e)
 
-        requirements_path = os.path.join(repo_path, "requirements.txt")
+    def convert_version_str_to_int(self, version):
+        """
+        Converts the provided version string in the format 0.0.0 into an integer
+        """
+        return int(version.replace(".", ""))
 
-        python_executable = sys.executable
-        subprocess.check_call(
-            [python_executable], "-m", "pip", "install", "-r", requirements_path
+    def get_remote_status(self):
+        """
+        Fetch the remote version string from the neurons/__init__.py file in the current repository
+        """
+        try:
+            # Perform a git fetch to ensure we have the latest remote information
+            self.repo.remotes.origin.fetch()
+
+            # Check if the requirements.txt file has changed
+            local_requirements_path = os.path.join(
+                os.path.dirname(__file__), "..", "requirements.txt"
+            )
+            with open(local_requirements_path, "r", encoding="utf-8") as file:
+                local_requirements_hash = hashlib.sha256(
+                    file.read().encode("utf-8")
+                ).hexdigest()
+            requirements_blob = (
+                self.repo.remote().refs[TARGET_BRANCH].commit.tree / "requirements.txt"
+            )
+            remote_requirements_content = requirements_blob.data_stream.read().decode(
+                "utf-8"
+            )
+            remote_requirements_hash = hashlib.sha256(
+                remote_requirements_content.encode("utf-8")
+            ).hexdigest()
+            self.update_requirements = (
+                local_requirements_hash != remote_requirements_hash
+            )
+
+            # Get version number from remote
+            blob = (
+                self.repo.remote().refs[TARGET_BRANCH].commit.tree
+                / "neurons"
+                / "__init__.py"
+            )
+            lines = blob.data_stream.read().decode("utf-8").split("\n")
+
+            for line in lines:
+                if line.startswith("__version__"):
+                    version_info = line.split("=")[1].strip(" \"'").replace('"', "")
+                    return version_info
+        except Exception as e:
+            bt.logging.exception(
+                "Failed to get remote file content for version check", e
+            )
+            return None
+
+    def check_version_updated(self):
+        """
+        Compares local and remote versions and returns True if the remote version is higher
+        """
+        remote_version = self.get_remote_status()
+        if remote_version is None:
+            bt.logging.error("Failed to get remote version, skipping version check")
+            return False
+
+        local_version = __version__
+
+        bt.logging.info(
+            f"Version check - remote_version: {remote_version}, local_version: {local_version}"
         )
-        bt.logging.info("Finished updating packages.")
 
-    except Exception as e:
-        bt.logging.info(f"Updating packages failed {e}")
+        if self.convert_version_str_to_int(
+            remote_version
+        ) > self.convert_version_str_to_int(local_version):
+            bt.logging.info(
+                f"Remote version ({remote_version}) is higher than local version ({local_version}), automatically updating..."
+            )
+            return True
+        return False
 
+    def attempt_update(self):
+        """
+        Attempt to update the repository by pulling the latest changes from the remote repository
+        """
+        try:
 
-def try_update():
-    try:
-        if check_version_updated() == True:
-            bt.logging.info("Updating local files...")
-            if update_repo() == True:
-                try_update_packages()
-                restart_app()
+            origin = self.repo.remotes.origin
 
-    except Exception as e:
-        bt.logging.info(f"Try updating failed {e}")
+            if self.repo.is_dirty(untracked_files=False):
+                bt.logging.warn(
+                    "Current changeset is dirty. Please commit changes, discard changes or update manually."
+                )
+                return False
+            try:
+                bt.logging.trace("Attempting to pull latest changes...")
+                origin.pull()
+                bt.logging.success("Successfully pulled the latest changes")
+                return True
+            except git.exc.GitCommandError as e:
+                bt.logging.exception(
+                    "Automatic update failed due to conflicts. Attempting to handle merge conflicts...",
+                    e,
+                )
+                return self.handle_merge_conflicts()
+
+        except Exception as e:
+            bt.logging.exception(
+                "Automatic update failed. Manually pull the latest changes and update.",
+                e,
+            )
+
+        return False
+
+    def handle_merge_conflicts(self):
+        """
+        Attempt to automatically resolve any merge conflicts that may have arisen
+        """
+        try:
+            self.repo.git.reset("--merge")
+            origin = self.repo.remotes.origin
+            current_branch = self.repo.active_branch
+            origin.pull(current_branch.name)
+
+            for item in self.repo.index.diff(None):
+                file_path = item.a_path
+                bt.logging.info(f"Resolving conflict in file: {file_path}")
+                self.repo.git.checkout("--theirs", file_path)
+            self.repo.index.commit("Resolved merge conflicts automatically")
+            bt.logging.info(
+                "Merge conflicts resolved, repository updated to remote state."
+            )
+            bt.logging.info("✅ Successfully updated")
+            return True
+        except git.GitCommandError as e:
+            bt.logging.exception(
+                "Failed to resolve merge conflicts, automatic update cannot proceed. Please manually pull and update.",
+                e,
+            )
+            return False
+
+    def attempt_package_update(self):
+        """
+        Attempt to update the packages by installing the requirements from the requirements.txt file
+        """
+        bt.logging.info("Attempting to update packages...")
+
+        try:
+            repo = git.Repo(search_parent_directories=True)
+            repo_path = repo.working_tree_dir
+
+            requirements_path = os.path.join(repo_path, "requirements.txt")
+
+            python_executable = sys.executable
+            subprocess.check_call(
+                [python_executable, "-m", "pip", "install", "-r", requirements_path]
+            )
+            bt.logging.success("Successfully updated packages.")
+        except Exception as e:
+            bt.logging.exception("Failed to update requirements", e)
+
+    def try_update(self):
+        """
+        Automatic update entrypoint method
+        """
+        if not self.check_version_updated():
+            return
+
+        if not self.attempt_update():
+            return
+
+        if self.update_requirements:
+            self.attempt_package_update()
+
+        restart_app()

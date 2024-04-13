@@ -9,7 +9,7 @@ from _validator.reward import reward
 from execution_layer.VerifiedModelSession import VerifiedModelSession
 from rich.console import Console
 from rich.table import Table
-from utils import try_update
+from utils import AutoUpdate
 
 
 class ValidatorSession:
@@ -17,6 +17,7 @@ class ValidatorSession:
         self.config = config
         self.configure()
         self.check_register()
+        self.auto_update = AutoUpdate()
 
     def __enter__(self):
         return self
@@ -334,7 +335,7 @@ class ValidatorSession:
         while True:
             try:
                 if self.config.auto_update == True:
-                    try_update()
+                    self.auto_update.try_update()
                 self.sync_metagraph()
                 self.run_step()
 

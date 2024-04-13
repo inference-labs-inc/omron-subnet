@@ -170,3 +170,4 @@ Makefile
 
 # Huge PKs
 pk.key
+kzg.srs

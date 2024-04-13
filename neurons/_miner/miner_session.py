@@ -4,7 +4,7 @@ import traceback
 import bittensor as bt
 import protocol
 from execution_layer.VerifiedModelSession import VerifiedModelSession
-from utils import try_update
+from utils import AutoUpdate
 
 
 class MinerSession:
@@ -12,6 +12,7 @@ class MinerSession:
         self.config = config
         self.configure()
         self.check_register()
+        self.auto_update = AutoUpdate()
 
     def __enter__(self):
         return self
@@ -68,7 +69,7 @@ class MinerSession:
 
         while True:
             if step % 10 == 0 and self.config.auto_update == True:
-                try_update()
+                self.auto_update.try_update()
             try:
                 if subtensor.block - last_updated_block >= 100:
                     bt.logging.trace("Setting miner weight")
