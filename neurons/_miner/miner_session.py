@@ -41,11 +41,11 @@ class MinerSession:
         # Serve passes the axon information to the network + netuid we are hosting on.
         # This will auto-update if the axon port of external ip has changed.
         bt.logging.info(
-            f"Serving axon {self.queryZkProof} on network: {self.config.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
+            f"Serving axon on network: {subtensor.chain_endpoint} with netuid: {self.config.netuid}"
         )
         axon.serve(netuid=self.config.netuid, subtensor=subtensor)
         bt.logging.info(
-            f"Served axon {self.queryZkProof} on network: {self.config.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
+            f"Served axon on network: {subtensor.chain_endpoint} with netuid: {self.config.netuid}"
         )
 
         # Start the miner's axon, making it active on the network.

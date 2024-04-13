@@ -124,16 +124,16 @@ class ValidatorSession:
         if max_score == 0:
             max_score = 1
 
-        min_score = 0
-
         all_uids = set(range(len(self.scores)))
-        response_uids = set(uid for uid, _, _ in responses)
+        response_uids = set(uid for uid, _, _, _, _ in responses)
         missing_uids = all_uids - response_uids
 
-        responses.extend((uid, False, 1) for uid in missing_uids)
+        responses.extend((uid, False, 1, 0, 0) for uid in missing_uids)
 
-        for uid, response, factor in responses:
-            new_scores[uid] = reward(max_score, self.scores[uid], response, factor)
+        for uid, response, factor, response_time, proof_size in responses:
+            new_scores[uid] = reward(
+                max_score, self.scores[uid], response, factor, response_time, proof_size
+            )
 
         if torch.sum(self.scores).item() != 0:
             self.scores = self.scores / torch.sum(self.scores)
@@ -244,9 +244,7 @@ class ValidatorSession:
         self.sync_scores_uids(uids)
 
         filtered_uids = self.get_querable_uids()
-
         filtered_axons = [metagraph.axons[i] for i in filtered_uids]
-
         random_values = [random.uniform(-1, 1) for _ in range(5)]
 
         query_input = {"model_id": [0], "public_inputs": random_values}
@@ -259,10 +257,15 @@ class ValidatorSession:
                 filtered_axons,
                 protocol.QueryZkProof(query_input=query_input),
                 # All responses have the deserialize function called on them before returning.
-                deserialize=True,
+                deserialize=False,
                 # Timeout set to 60 since this is a decently large proof
                 timeout=60,
             )
+            response_times = [0] * len(filtered_uids)
+            for index, response in enumerate(responses):
+                if response is not None:
+                    response_times[index] = response.dendrite.process_time
+            deserialized_responses = [response.deserialize() for response in responses]
             ip_array = [axon.ip for axon in filtered_axons]
             coldkey_array = [axon.coldkey for axon in filtered_axons]
             print("ip_array", ip_array)
@@ -286,11 +289,24 @@ class ValidatorSession:
             ]
             bt.logging.trace(f"Responses: {responses}")
 
-            verif_results = list(map(self.verify_proof_string, responses))
+            verif_results = list(map(self.verify_proof_string, deserialized_responses))
+            proof_sizes = [
+                len(response) if response is not None else 0
+                for response in deserialized_responses
+            ]
 
             self.log_verify_result(list(zip(filtered_uids, verif_results)))
-
-            self.update_scores(list(zip(filtered_uids, verif_results, weight_factors)))
+            self.update_scores(
+                list(
+                    zip(
+                        filtered_uids,
+                        verif_results,
+                        weight_factors,
+                        response_times,
+                        proof_sizes,
+                    )
+                )
+            )
 
             self.step += 1
 
@@ -349,7 +365,6 @@ class ValidatorSession:
         self.subtensor = bt.subtensor(config=self.config)
         self.dendrite = bt.dendrite(wallet=self.wallet)
         self.metagraph = self.subtensor.metagraph(self.config.netuid)
-        self.subnet = bt.metagraph(netuid=self.config.netuid, lite=False)
 
         self.sync_metagraph()
 

@@ -41,6 +41,22 @@ class QueryZkProof(bt.Synapse):
         return self.query_output
 
 
+class QueryForProvenInference(bt.Synapse):
+    """
+    A Synapse for querying proven inferences.
+    DEV: This synapse is a placeholder.
+    """
+
+    query_input: Optional[Dict] = None
+    query_output: Optional[Dict] = None
+
+    def deserialize(self) -> Dict:
+        """
+        Deserialize the query_output into a dictionary.
+        """
+        return self.query_output
+
+
 class CheckMiner(bt.Synapse):
     """
     CheckMiner class inherits from bt.Synapse.
