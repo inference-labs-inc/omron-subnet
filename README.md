@@ -59,17 +59,25 @@ Miners contribute to this subnet by providing compute to generate output from, a
 
 | Component | Requirement |
 | --------- | ---------- |
+| CPU | 8 core 3.2GHz |
 | RAM | 32GB |
-| Network | 1GB |
+| Network Up | 400Mbps |
+| Network Down | 400Mbps |
 | Storage | 100GB |
 
 #### Recommended
 
+> [!INFO]
+> Exceeding these requirements in terms of storage, network and CPU speed will most likely result in higher rewards due to performance incentivization.
+
 | Component | Recommendation |
 | --------- | ---------- |
+| CPU | 8 core 3.6GHz |
 | RAM | 64GB |
-| Network | 1GB |
-| Storage | 300GB |
+| Network Up | 1Gbps |
+| Network Down | 1Gbps |
+| Storage | 400GB |
+| Storage Medium | SSD |
 
 ## Validator
 
@@ -81,14 +89,19 @@ Validators are responsible for verifying model outputs as provided by miners, an
 
 | Component | Requirement |
 | --------- | ---------- |
+| CPU | 8 core 3.2GHz |
 | RAM | 16GB |
-| Network | 1GB |
+| Network Up | 400Mbps |
+| Network Down | 400Mbps |
 | Storage | 100GB |
 
 #### Recommended
 
 | Component | Recommendation |
 | --------- | ---------- |
+| CPU | 8 core 3.4GHz |
 | RAM | 32GB |
-| Network | 1GB |
+| Network Up | 1Gbps |
+| Network Down | 1Gbps |
 | Storage | 300GB |
+| Storage Medium | SSD |
