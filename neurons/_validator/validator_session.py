@@ -284,7 +284,7 @@ class ValidatorSession:
                     ip_distributions, coldkey_distributions
                 )
             ]
-            bt.logging.debug(f"Responses: {responses}")
+            bt.logging.trace(f"Responses: {responses}")
 
             verif_results = list(map(self.verify_proof_string, responses))
 
