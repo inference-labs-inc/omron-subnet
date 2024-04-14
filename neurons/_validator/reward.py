@@ -16,32 +16,40 @@ RESPONSE_TIME_THRESHOLD = 40
 PROOF_SIZE_THRESHOLD = 30000
 
 
-def reward(max_score, score, value, factor, response_time, proof_size):
-    """
-    This function calculates the reward for a miner based on the provided score, value, and factor.
-    Positional Arguments:
-        max_score (int): The maximum score for the miner.
-        score (int): The current score for the miner.
-        value (bool): Whether the response that the miner submitted was valid.
-        factor (float): The factor to apply to the reward, in case the miner is using multiple hotkeys or serving from the same IP multiple times.
-        response_time (float): The time taken to respond to the query.
-        proof_size (int): The size of the proof.
-    Returns:
-        int: The new score for the miner.
-    """
-    rate = RATE_OF_DECAY
-    distance = score - MINIMUM_SCORE
-    if value:
-        bt.logging.trace(f"Recovering score {score}")
-        # performance_metric = (
-        #     1
-        #     - RESPONSE_TIME_WEIGHT * min(1, response_time / RESPONSE_TIME_THRESHOLD)
-        #     - PROOF_SIZE_WEIGHT * min(1, proof_size / PROOF_SIZE_THRESHOLD)
-        # )
+import torch
+import torch.nn as nn
 
-        rate = RATE_OF_RECOVERY  # * performance_metric
-        distance = max_score - score
-        return score + rate * distance * factor  # - (1 - performance_metric) * 0.01
 
-    bt.logging.trace(f"Decaying score {score}")
-    return score - rate * distance * factor
+class Reward(nn.Module):
+    def __init__(self):
+        super(Reward, self).__init__()
+        self.rate_of_decay = RATE_OF_DECAY
+        self.rate_of_recovery = RATE_OF_RECOVERY
+        self.minimum_score = MINIMUM_SCORE
+
+    def forward(self, max_score, score, verification_result, factor):
+        """
+        This method calculates the reward for a miner based on the provided score, verification_result, and factor using a neural network module.
+        Positional Arguments:
+            max_score (Tensor): The maximum score for the miner.
+            score (Tensor): The current score for the miner.
+            verification_result (Tensor): Whether the response that the miner submitted was valid. (1 or 0)
+            factor (Tensor): The factor to apply to the reward, in case the miner is using multiple hotkeys or serving from the same IP multiple times.
+        Returns:
+            Tensor: The new score for the miner.
+        """
+        # Use 'verification_result' to switch between recovery and decay rates
+        rate = (
+            self.rate_of_decay * (1 - verification_result)
+            + self.rate_of_recovery * verification_result
+        )
+
+        # Calculate distance based on 'verification_result'
+        distance = (max_score - score) * verification_result + (
+            score - self.minimum_score
+        ) * (1 - verification_result)
+
+        # Apply factor
+        new_score = score + rate * distance * factor
+
+        return new_score
