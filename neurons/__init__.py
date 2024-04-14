@@ -1,1 +1,5 @@
-__version__ = "0.0.1"
+"""
+This version number is used to trigger automatic updates.
+"""
+
+__version__ = "0.0.2"
