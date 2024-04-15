@@ -33,15 +33,18 @@ def reward(max_score, score, value, factor, response_time, proof_size):
     distance = score - MINIMUM_SCORE
     if value:
         bt.logging.trace(f"Recovering score {score}")
-        # performance_metric = (
-        #     1
-        #     - RESPONSE_TIME_WEIGHT * min(1, response_time / RESPONSE_TIME_THRESHOLD)
-        #     - PROOF_SIZE_WEIGHT * min(1, proof_size / PROOF_SIZE_THRESHOLD)
-        # )
+        performance_metric = (
+            1
+            - RESPONSE_TIME_WEIGHT * min(1, response_time / RESPONSE_TIME_THRESHOLD)
+            - PROOF_SIZE_WEIGHT * min(1, proof_size / PROOF_SIZE_THRESHOLD)
+        )
 
-        rate = RATE_OF_RECOVERY  # * performance_metric
+        rate = RATE_OF_RECOVERY * performance_metric
         distance = max_score - score
-        return score + rate * distance * factor  # - (1 - performance_metric) * 0.01
+        return min(
+            1,
+            max(0, score + rate * distance * factor - (1 - performance_metric) * 0.01),
+        )
 
     bt.logging.trace(f"Decaying score {score}")
     return score - rate * distance * factor
