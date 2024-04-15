@@ -5,7 +5,6 @@ import uuid
 
 import bittensor as bt
 import ezkl
-import onnxruntime
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -15,9 +14,7 @@ class VerifiedModelSession:
     def __init__(self, public_inputs=[]):
         self.model_id = 0
         self.session_id = str(uuid.uuid4())
-        self.model_path = os.path.join(
-            dir_path, f"../deployment_layer/model_{self.model_id}/network.onnx"
-        )
+
         self.pk_path = os.path.join(
             dir_path, f"../deployment_layer/model_{self.model_id}/pk.key"
         )
@@ -47,31 +44,13 @@ class VerifiedModelSession:
             dir_path, f"./temp/model_{self.model_id}_{self.session_id}.proof"
         )
 
-        self.ort_session = onnxruntime.InferenceSession(
-            self.model_path, providers=["CPUExecutionProvider"]
-        )
-
         self.public_inputs = public_inputs
 
         self.py_run_args = ezkl.PyRunArgs()
         self.py_run_args.input_visibility = "public"
         self.py_run_args.output_visibility = "public"
         self.py_run_args.param_visibility = "fixed"
-
-    # Run an ORT prediction
-    def run_model(self):
-        self.input_name = self.ort_session.get_inputs()[0].name
-        self.input_shape = self.ort_session.get_inputs()[0].shape
         self.batch_size = 1
-        input_data = self.public_inputs
-
-        if input_data is None:
-            bt.logging.error("Input data is None")
-            return
-        outputs = self.ort_session.run(
-            None, {self.input_name: [[[d] for d in input_data]]}
-        )
-        self.outputs = outputs
 
     # Generate the input.json file, which is used in witness generation
     def gen_input_file(self):
@@ -106,8 +85,6 @@ class VerifiedModelSession:
     def gen_proof(self):
 
         try:
-            bt.logging.debug("Running ONNX")
-            self.run_model()
             bt.logging.debug("Generating input file")
             self.gen_input_file()
             bt.logging.debug("Generating witness")
