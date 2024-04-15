@@ -12,7 +12,7 @@ MINIMUM_SCORE = 0
 RESPONSE_TIME_WEIGHT = 0.2
 PROOF_SIZE_WEIGHT = 0.1
 
-RESPONSE_TIME_THRESHOLD = 40
+RESPONSE_TIME_THRESHOLD = 240
 PROOF_SIZE_THRESHOLD = 30000
 
 
@@ -43,7 +43,7 @@ def reward(max_score, score, value, factor, response_time, proof_size):
         distance = max_score - score
         return min(
             1,
-            max(0, score + rate * distance * factor - (1 - performance_metric) * 0.01),
+            max(0, score + rate * distance * factor - (1 - performance_metric) * 0.005),
         )
 
     bt.logging.trace(f"Decaying score {score}")
