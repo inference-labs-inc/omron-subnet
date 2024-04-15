@@ -6,7 +6,7 @@ requests
 setuptools
 apify_client
 boto3
-ezkl==10.2.7
+ezkl==10.2.9
 onnx
 onnxruntime
 bittensor==6.9.3
