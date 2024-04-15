@@ -74,7 +74,7 @@ if __name__ == "__main__":
         py_run_args.output_visibility = "public"
         py_run_args.param_visibility = "fixed"
     ezkl.gen_settings(py_run_args=py_run_args)
-    ezkl.calibrate_settings("input.json")
+    ezkl.calibrate_settings("input.json", target="resources")
     ezkl.compile_circuit()
     ezkl.get_srs()
 
