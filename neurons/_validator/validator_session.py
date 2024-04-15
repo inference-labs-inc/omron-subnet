@@ -260,7 +260,7 @@ class ValidatorSession:
                 # All responses have the deserialize function called on them before returning.
                 deserialize=False,
                 # Timeout set to 60 since this is a decently large proof
-                timeout=60,
+                timeout=300,
             )
             response_times = [0] * len(filtered_uids)
             for index, response in enumerate(responses):
