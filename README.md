@@ -21,15 +21,15 @@ Omron incentivizes miners and validators on Subnet 2 to contribute to the genera
 The reward mechanism for Subnet 2 scores the initial AI predictions based on the cryptographic integrity and time to generate zk-proofs along with the outputs, rather than solely on end results. This approach reduces the computational burden on validators as zk-proofs confirm the source model and integrity of AI predictions efficently.  
 
 ### Miners
-- Receieve prompts or validation strings from the subnet.
-- Generating predictions using custom models.
-- Return the generated content to the subnet for validation and distribution.
--
+- Receive input data from validators on the subnet.
+- Generate predictions using custom, verifiable AI models that have been converted into zero knowledge circuits
+- Return the generated content to the requesting validator for validation and distribution.
+
 
 ### Validators
--
--
--
+- Produce input data and distribute requests for verified inference throughout miners participating on the subnet
+- Confirm that miners are acting faithfully, by verifying the authenticity of the miner's returned zero knowledge proof
+- Score results from miners based on performance metrics such as proof size and response time
 
 ## Quickstart
 
