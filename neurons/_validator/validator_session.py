@@ -85,42 +85,27 @@ class ValidatorSession:
         """
         _, _, _, dendrite = self.unpack_bt_objects()
 
-        async def single_axon_response(target_axon, synapse):
-            return await dendrite.call(
-                target_axon=target_axon,
-                synapse=synapse.copy(),
-                timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-                deserialize=False,
-            )
-
         bt.logging.trace("Querying axons")
         try:
-            loop = asyncio.get_event_loop()
-            result = loop.run_until_complete(
-                asyncio.gather(
-                    *(
-                        single_axon_response(target_axon, synapse)
-                        for target_axon, synapse in zip(axons, synapses)
+            # Create a coroutine for the gather operation
+            coroutine = asyncio.gather(
+                *(
+                    dendrite.forward(
+                        axons=[target_axon],
+                        synapse=synapse,
+                        timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+                        deserialize=False,
                     )
+                    for target_axon, synapse in zip(axons, synapses)
                 )
             )
+
+            # Run the coroutine to completion and return the result
+            result = asyncio.run(coroutine)
             return result
         except Exception as e:
-            bt.logging.exception(
-                "Error while querying axons. Attempting run via new event loop. \n", e
-            )
-            new_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(new_loop)
-            result = new_loop.run_until_complete(
-                asyncio.gather(
-                    *(
-                        single_axon_response(target_axon, synapse)
-                        for target_axon, synapse in zip(axons, synapses)
-                    )
-                )
-            )
-            new_loop.close()
-            return result
+            bt.logging.exception("Error while querying axons. \n", e)
+            return None
 
     def get_querable_uids(self):
         """Returns the uids of the miners that are queryable
