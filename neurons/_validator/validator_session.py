@@ -83,12 +83,12 @@ class ValidatorSession:
         axons: list of axons
         synapses: list of synapses
         """
-        wallet, metagraph, subtensor, dendrite = self.unpack_bt_objects()
+        _, _, _, dendrite = self.unpack_bt_objects()
 
         async def single_axon_response(target_axon, synapse):
             return await dendrite.call(
                 target_axon=target_axon,
-                synapse=synapse,
+                synapse=synapse.copy(),
                 timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
                 deserialize=False,
             )
