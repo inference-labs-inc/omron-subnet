@@ -16,14 +16,13 @@ RESPONSE_TIME_THRESHOLD = 240
 PROOF_SIZE_THRESHOLD = 30000
 
 
-def reward(max_score, score, value, factor, response_time, proof_size):
+def reward(max_score, score, value, response_time, proof_size):
     """
-    This function calculates the reward for a miner based on the provided score, value, and factor.
+    This function calculates the reward for a miner based on the provided score, value, response time and proof size.
     Positional Arguments:
         max_score (int): The maximum score for the miner.
         score (int): The current score for the miner.
         value (bool): Whether the response that the miner submitted was valid.
-        factor (float): The factor to apply to the reward, in case the miner is using multiple hotkeys or serving from the same IP multiple times.
         response_time (float): The time taken to respond to the query.
         proof_size (int): The size of the proof.
     Returns:
@@ -43,8 +42,8 @@ def reward(max_score, score, value, factor, response_time, proof_size):
         distance = max_score - score
         return min(
             1,
-            max(0, score + rate * distance * factor - (1 - performance_metric) * 0.005),
+            max(0, score + rate * distance - (1 - performance_metric) * 0.005),
         )
 
     bt.logging.trace(f"Decaying score {score}")
-    return score - rate * distance * factor
+    return score - rate * distance
