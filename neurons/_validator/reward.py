@@ -5,7 +5,7 @@ This module contains the reward function for the validator.
 import bittensor as bt
 
 RATE_OF_RECOVERY = 0.2
-RATE_OF_DECAY = 0.8
+RATE_OF_DECAY = 0.4
 
 MINIMUM_SCORE = 0
 
