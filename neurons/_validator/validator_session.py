@@ -102,6 +102,7 @@ class ValidatorSession:
 
             # Run the coroutine to completion and return the result
             result = asyncio.run(coroutine)
+            result = [item for sublist in result for item in sublist]
             return result
         except Exception as e:
             bt.logging.exception("Error while querying axons. \n", e)
