@@ -4,50 +4,51 @@ import uuid
 
 import bittensor as bt
 import ezkl
-import onnxruntime
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 
 class VerifiedModelSession:
 
-    def __init__(self, public_inputs=[]):
+    def __init__(self, public_inputs=[], reward_model=False):
         self.model_id = 0
         self.session_id = str(uuid.uuid4())
+        model_path = f"model_{self.model_id}"
+        if reward_model:
+            model_path = "reward"
         self.model_path = os.path.join(
-            dir_path, f"../deployment_layer/model_{self.model_id}/network.onnx"
+            dir_path, f"../deployment_layer/{model_path}/network.onnx"
         )
         self.pk_path = os.path.join(
-            dir_path, f"../deployment_layer/model_{self.model_id}/pk.key"
+            dir_path, f"../deployment_layer/{model_path}/pk.key"
         )
         self.vk_path = os.path.join(
-            dir_path, f"../deployment_layer/model_{self.model_id}/vk.key"
+            dir_path, f"../deployment_layer/{model_path}/vk.key"
         )
         self.srs_path = os.path.join(
-            dir_path, f"../deployment_layer/model_{self.model_id}/kzg.srs"
+            dir_path, f"../deployment_layer/{model_path}/kzg.srs"
         )
         self.circuit_path = os.path.join(
-            dir_path, f"../deployment_layer/model_{self.model_id}/model.compiled"
+            dir_path, f"../deployment_layer/{model_path}/model.compiled"
         )
         self.settings_path = os.path.join(
-            dir_path, f"../deployment_layer/model_{self.model_id}/settings.json"
+            dir_path, f"../deployment_layer/{model_path}/settings.json"
         )
         self.sample_input_path = os.path.join(
-            dir_path, f"../deployment_layer/model_{self.model_id}/input.json"
+            dir_path, f"../deployment_layer/{model_path}/input.json"
         )
 
         self.witness_path = os.path.join(
-            dir_path, f"./temp/witness_{self.model_id}_{self.session_id}.json"
+            dir_path,
+            f"./temp/witness_{self.model_id if not reward_model else 'reward'}_{self.session_id}.json",
         )
         self.input_path = os.path.join(
-            dir_path, f"./temp/input_{self.model_id}_{self.session_id}.json"
+            dir_path,
+            f"./temp/input_{self.model_id if not reward_model else 'reward'}_{self.session_id}.json",
         )
         self.proof_path = os.path.join(
-            dir_path, f"./temp/model_{self.model_id}_{self.session_id}.proof"
-        )
-
-        self.ort_session = onnxruntime.InferenceSession(
-            self.model_path, providers=["CPUExecutionProvider"]
+            dir_path,
+            f"./temp/model_{self.model_id if not reward_model else 'reward'}_{self.session_id}.proof",
         )
 
         self.public_inputs = public_inputs
@@ -56,21 +57,6 @@ class VerifiedModelSession:
         self.py_run_args.input_visibility = "public"
         self.py_run_args.output_visibility = "public"
         self.py_run_args.param_visibility = "fixed"
-
-    # Run an ORT prediction
-    def run_model(self):
-        self.input_name = self.ort_session.get_inputs()[0].name
-        self.input_shape = self.ort_session.get_inputs()[0].shape
-        self.batch_size = 1
-        input_data = self.public_inputs
-
-        if input_data is None:
-            bt.logging.error("Input data is None")
-            return
-        outputs = self.ort_session.run(
-            None, {self.input_name: [[[d] for d in input_data]]}
-        )
-        self.outputs = outputs
 
     # Generate the input.json file, which is used in witness generation
     def gen_input_file(self):
@@ -105,8 +91,6 @@ class VerifiedModelSession:
     def gen_proof(self):
 
         try:
-            bt.logging.debug("Running ONNX")
-            self.run_model()
             bt.logging.debug("Generating input file")
             self.gen_input_file()
             bt.logging.debug("Generating witness")

@@ -1,3 +1,4 @@
+import json
 import random
 import time
 import traceback
@@ -5,7 +6,7 @@ import traceback
 import bittensor as bt
 import protocol
 import torch
-from _validator.reward import reward
+from _validator.reward import Reward
 from execution_layer.VerifiedModelSession import VerifiedModelSession
 from rich.console import Console
 from rich.table import Table
@@ -132,9 +133,12 @@ class ValidatorSession:
         responses.extend((uid, False, 1, 0, 0) for uid in missing_uids)
 
         for uid, response, factor, response_time, proof_size in responses:
-            new_scores[uid] = reward(
-                max_score, self.scores[uid], response, factor, response_time, proof_size
+            session = VerifiedModelSession(
+                public_inputs=[[max_score], [self.scores[uid]], [response], [factor]]
             )
+            proof = session.gen_proof()
+            proof_json = json.loads(proof)
+            return proof_json["pretty_public_inputs"]["rescaled_outputs"]
 
         if torch.sum(self.scores).item() != 0:
             self.scores = self.scores / torch.sum(self.scores)
