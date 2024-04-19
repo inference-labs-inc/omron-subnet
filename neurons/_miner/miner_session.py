@@ -141,10 +141,10 @@ class MinerSession:
 
             bt.logging.error("An error occurred while generating proven output", e)
 
-        bt.logging.info("Proof completed \n")
+        bt.logging.info("✅ Proof completed \n")
         time_out = time.time()
         delta_t = time_out - time_in
-        bt.logging.info(f"Request to Response time {delta_t}s")
+        bt.logging.success(f"Request to Response time {delta_t}s")
         if delta_t > 300:
             bt.logging.error(
                 "Turnaround time is greater than validator timeout. This indicates your hardware is not processing validator's requests in time."
