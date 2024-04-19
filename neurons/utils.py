@@ -119,7 +119,7 @@ class AutoUpdate:
             origin = self.repo.remotes.origin
 
             if self.repo.is_dirty(untracked_files=False):
-                bt.logging.warn(
+                bt.logging.error(
                     "Current changeset is dirty. Please commit changes, discard changes or update manually."
                 )
                 return False
