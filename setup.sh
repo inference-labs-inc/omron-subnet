@@ -90,8 +90,8 @@ if ! python3 -m venv --help > /dev/null 2>&1; then
   echo "venv module not found. Installing venv..."
   sudo apt-get install -y python3-venv
 fi
-python3 -m venv .sn2
-source .sn2/bin/activate
+python3 -m venv $INSTALL_PATH/.sn2
+source $INSTALL_PATH/.sn2/bin/activate
 
 # Install Python dependencies from requirements.txt
 echo "Installing Python dependencies..."
