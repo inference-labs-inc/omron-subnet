@@ -84,7 +84,7 @@ class VerifiedModelSession:
         bt.logging.trace(
             f"New instances after appending with last instance from output: {new_instances}"
         )
-        proof_json["instances"] = instances
+        proof_json["instances"] = new_instances
         bt.logging.trace(f"Proof json: {proof_json}")
 
         with open(self.proof_path, "w", encoding="utf-8") as f:
