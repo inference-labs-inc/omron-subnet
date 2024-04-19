@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import uuid
 
 import bittensor as bt
@@ -96,6 +97,7 @@ class VerifiedModelSession:
             bt.logging.debug("Generating witness")
             self.gen_witness()
             bt.logging.debug("Generating proof")
+            start_time = time.time()
             ezkl.prove(
                 self.witness_path,
                 self.circuit_path,
@@ -104,6 +106,8 @@ class VerifiedModelSession:
                 "single",
                 self.srs_path,
             )
+            end_time = time.time()
+            bt.logging.info(f"Proof generation took {end_time - start_time} seconds")
 
             with open(self.proof_path, "r", encoding="utf-8") as f:
                 proof_content = f.read()

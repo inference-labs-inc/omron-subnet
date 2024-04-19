@@ -1,3 +1,4 @@
+import asyncio
 import json
 import random
 import time
@@ -11,6 +12,8 @@ from execution_layer.VerifiedModelSession import VerifiedModelSession
 from rich.console import Console
 from rich.table import Table
 from utils import AutoUpdate
+
+VALIDATOR_REQUEST_TIMEOUT_SECONDS = 300
 
 
 class ValidatorSession:
@@ -75,6 +78,37 @@ class ValidatorSession:
         )
         self.last_reset_weights_block = self.current_block
 
+    def query_axons(self, axons, synapses):
+        """
+        Modified version of `dendrite.query` which accepts synapses unique to each axon.
+        axons: list of axons
+        synapses: list of synapses
+        """
+        _, _, _, dendrite = self.unpack_bt_objects()
+
+        bt.logging.trace("Querying axons")
+        try:
+            # Create a coroutine for the gather operation
+            coroutine = asyncio.gather(
+                *(
+                    dendrite.forward(
+                        axons=[target_axon],
+                        synapse=synapse,
+                        timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+                        deserialize=False,
+                    )
+                    for target_axon, synapse in zip(axons, synapses)
+                )
+            )
+
+            # Run the coroutine to completion and return the result
+            result = asyncio.run(coroutine)
+            result = [item for sublist in result for item in sublist]
+            return result
+        except Exception as e:
+            bt.logging.exception("Error while querying axons. \n", e)
+            return None
+
     def get_querable_uids(self):
         """Returns the uids of the miners that are queryable
 
@@ -127,14 +161,21 @@ class ValidatorSession:
             max_score = 1
 
         all_uids = set(range(len(self.scores)))
-        response_uids = set(uid for uid, _, _, _, _ in responses)
+        response_uids = set(uid for uid, _, _, _ in responses)
         missing_uids = all_uids - response_uids
 
-        responses.extend((uid, False, 1, 0, 0) for uid in missing_uids)
+        responses.extend((uid, False, 0, 0) for uid in missing_uids)
 
         for uid, response, factor, response_time, proof_size in responses:
             session = VerifiedModelSession(
-                public_inputs=[[max_score], [self.scores[uid]], [response], [factor]]
+                public_inputs=[
+                    [max_score],
+                    [self.scores[uid]],
+                    [response],
+                    [factor],
+                    [response_time],
+                    [proof_size],
+                ]
             )
             proof = session.gen_proof()
             proof_json = json.loads(proof)
@@ -250,51 +291,37 @@ class ValidatorSession:
 
         filtered_uids = self.get_querable_uids()
         filtered_axons = [metagraph.axons[i] for i in filtered_uids]
-        random_values = [random.uniform(-1, 1) for _ in range(5)]
-
-        query_input = {"model_id": [0], "public_inputs": random_values}
+        synapses = [
+            protocol.QueryZkProof(
+                query_input={
+                    "model_id": [0],
+                    "public_inputs": [random.uniform(-1, 1) for _ in range(5)],
+                }
+            )
+            for _ in filtered_axons
+        ]
         bt.logging.info(
-            f"\033[92m >> Sending model_proof query ({query_input}). \033[0m"
+            f"\033[92m >> Sending {len(synapses)} queries for proofs to {len(filtered_axons)} axons in the subnet \033[0m"
         )
+        bt.logging.trace("Synapses being sent", synapses)
 
         try:
-            responses = dendrite.query(
-                filtered_axons,
-                protocol.QueryZkProof(query_input=query_input),
-                # All responses have the deserialize function called on them before returning.
-                deserialize=False,
-                # Timeout set to 60 since this is a decently large proof
-                timeout=60,
-            )
+            responses = self.query_axons(filtered_axons, synapses)
+
             response_times = [0] * len(filtered_uids)
             for index, response in enumerate(responses):
                 if response is not None:
                     response_times[index] = response.dendrite.process_time
             deserialized_responses = [response.deserialize() for response in responses]
-            ip_array = [axon.ip for axon in filtered_axons]
-            coldkey_array = [axon.coldkey for axon in filtered_axons]
-            print("ip_array", ip_array)
-
-            ip_distributions = [1 / ip_array.count(ip) for ip in ip_array]
-            coldkey_distributions = [
-                1
-                / (
-                    coldkey_array.count(coldkey) - 4
-                    if coldkey_array.count(coldkey) > 4
-                    else 1
-                )
-                for coldkey in coldkey_array
-            ]
-
-            weight_factors = [
-                ip_dist * coldkey_dist
-                for ip_dist, coldkey_dist in zip(
-                    ip_distributions, coldkey_distributions
-                )
-            ]
             bt.logging.trace(f"Responses: {responses}")
 
+            bt.logging.trace(f"Deserialized responses: {deserialized_responses}")
+            verification_start = time.time()
             verif_results = list(map(self.verify_proof_string, deserialized_responses))
+            verification_end = time.time()
+            bt.logging.trace(
+                f"Proof verification took {verification_end - verification_start} seconds"
+            )
             proof_sizes = [
                 len(response) if response is not None else 0
                 for response in deserialized_responses
@@ -306,7 +333,6 @@ class ValidatorSession:
                     zip(
                         filtered_uids,
                         verif_results,
-                        weight_factors,
                         response_times,
                         proof_sizes,
                     )

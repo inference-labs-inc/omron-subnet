@@ -13,12 +13,12 @@ class MinerSession:
         self.configure()
         self.check_register()
         self.auto_update = AutoUpdate()
+        self.axon = None
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        None
         return False
 
     def unpack_bt_objects(self):
@@ -60,31 +60,16 @@ class MinerSession:
         """Keep the miner alive. This loop maintains the miner's operations until intentionally stopped."""
 
         bt.logging.info("Starting miner...")
-        wallet, metagraph, subtensor = self.unpack_bt_objects()
+        _, metagraph, subtensor = self.unpack_bt_objects()
 
         self.start_axon()
 
         step = 0
-        last_updated_block = subtensor.block - 100
 
         while True:
             if step % 10 == 0 and self.config.auto_update == True:
                 self.auto_update.try_update()
             try:
-                if subtensor.block - last_updated_block >= 100:
-                    bt.logging.trace("Setting miner weight")
-                    # find the uid that matches config.wallet.hotkey [meta.axons[N].hotkey == config.wallet.hotkey]
-                    # set the weight of that uid to 1.0
-                    uid = None
-                    try:
-                        for _uid, axon in enumerate(metagraph.axons):
-                            if axon.hotkey == wallet.hotkey.ss58_address:
-                                uid = _uid
-                                break
-                    except Exception as e:
-                        bt.logging.warning(f"Could not set miner weight: {e}")
-                        raise e
-                # Below: Periodically update our knowledge of the network graph.
                 if step % 5 == 0:
                     metagraph = subtensor.metagraph(self.config.netuid)
                     log = (
@@ -136,7 +121,7 @@ class MinerSession:
         """
         This function run proof generation of the model (with its output as well)
         """
-
+        time_in = time.time()
         bt.logging.debug("Received request from validator")
         bt.logging.info(f"Input data: {synapse.query_input} \n")
         if synapse.query_input is not None:
@@ -157,4 +142,11 @@ class MinerSession:
             bt.logging.error("An error occurred while generating proven output", e)
 
         bt.logging.info("Proof completed \n")
+        time_out = time.time()
+        delta_t = time_out - time_in
+        bt.logging.info(f"Request to Response time {delta_t}s")
+        if delta_t > 300:
+            bt.logging.error(
+                "Turnaround time is greater than validator timeout. This indicates your hardware is not processing validator's requests in time."
+            )
         return synapse

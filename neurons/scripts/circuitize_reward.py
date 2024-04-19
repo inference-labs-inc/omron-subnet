@@ -45,7 +45,8 @@ dummy_inputs = {
     "max_score": torch.tensor([1.0], dtype=torch.float32),
     "score": torch.tensor([0.5], dtype=torch.float32),
     "verification_result": torch.tensor([1.0], dtype=torch.float32),
-    "factor": torch.tensor([1.0], dtype=torch.float32),
+    "response_time": torch.tensor([100], dtype=torch.float32),
+    "proof_size": torch.tensor([30000], dtype=torch.float32),
 }
 bt.logging.trace(f"Defined dummy inputs for the model export: {dummy_inputs}.")
 
