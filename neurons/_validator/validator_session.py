@@ -339,8 +339,8 @@ class ValidatorSession:
 
             self.step += 1
 
-            # Sleep for a duration equivalent to the block time (i.e., time between successive blocks).
-            time.sleep(bt.__blocktime__)
+            # Sleep for 60s
+            time.sleep(60)
         except RuntimeError as e:
             bt.logging.error(e)
             traceback.print_exc()
