@@ -29,9 +29,11 @@ class MinerSession:
 
     def start_axon(self):
         wallet, metagraph, subtensor = self.unpack_bt_objects()
-        bt.logging.info(f"Starting axon on port: {self.config.axon.port}")
+        bt.logging.info(
+            f"Starting axon on port: {self.config.axon.port}, using external IP: {self.config.external_ip}"
+        )
 
-        axon = bt.axon(wallet=wallet, port=self.config.axon.port)
+        axon = bt.axon(wallet=wallet, config=self.config)
         bt.logging.info(f"Axon created at {axon}")
 
         # Attach determines which functions are called when a request is received.

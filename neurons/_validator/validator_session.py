@@ -317,7 +317,7 @@ class ValidatorSession:
                 map(self.verify_proof_string, deserialized_responses, all_inputs)
             )
             verification_end = time.time()
-            bt.logging.trace(
+            bt.logging.info(
                 f"Proof verification took {verification_end - verification_start} seconds"
             )
             proof_sizes = [
