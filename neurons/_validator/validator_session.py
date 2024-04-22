@@ -1,5 +1,7 @@
 import asyncio
+import json
 import random
+import sys
 import time
 import traceback
 
@@ -320,10 +322,15 @@ class ValidatorSession:
             bt.logging.info(
                 f"Proof verification took {verification_end - verification_start} seconds"
             )
-            proof_sizes = [
-                len(response) if response is not None else 0
-                for response in deserialized_responses
-            ]
+            proof_sizes = []
+            for deserialized_response in deserialized_responses:
+                size = 0
+                try:
+                    size = len(json.loads(deserialized_response)["proof"])
+                except Exception:
+                    # If the proof is None, assign it a very large value
+                    size = sys.maxsize
+                proof_sizes.append(size)
 
             self.log_verify_result(list(zip(filtered_uids, verif_results)))
             self.update_scores(
