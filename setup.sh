@@ -85,14 +85,6 @@ INSTALL_PATH=${INSTALL_PATH:-./omron}
 # Clone SN repo into user's specified directory
 git clone https://github.com/inference-labs-inc/omron-subnet.git $INSTALL_PATH
 
-# setup a venv
-if ! python3 -m venv --help > /dev/null 2>&1; then
-  echo "venv module not found. Installing venv..."
-  sudo apt-get install -y python3-venv
-fi
-python3 -m venv $INSTALL_PATH/.sn2
-source $INSTALL_PATH/.sn2/bin/activate
-
 # Install Python dependencies from requirements.txt
 echo "Installing Python dependencies..."
 python3 -m pip install -r $INSTALL_PATH/requirements.txt
