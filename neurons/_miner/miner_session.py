@@ -29,10 +29,12 @@ class MinerSession:
 
     def start_axon(self):
         wallet, metagraph, subtensor = self.unpack_bt_objects()
-        bt.logging.info(f"Starting axon on port: {self.config.axon.port}")
+        bt.logging.info(
+            f"Starting axon. Custom arguments include the following.\nNote that any null values will fallback to defaults, which are usually sufficient. {self.config.axon}"
+        )
 
-        axon = bt.axon(wallet=wallet, port=self.config.axon.port)
-        bt.logging.info(f"Axon created at {axon}")
+        axon = bt.axon(wallet=wallet, config=self.config)
+        bt.logging.info(f"Axon created: {axon.info()}")
 
         # Attach determines which functions are called when a request is received.
         bt.logging.info("Attaching forward function to axon...")
@@ -50,9 +52,9 @@ class MinerSession:
         )
 
         # Start the miner's axon, making it active on the network.
-        bt.logging.info(f"Starting axon server on port: {self.config.axon.port}")
+        bt.logging.info(f"Starting axon server: {axon.info()}")
         axon.start()
-        bt.logging.info(f"Started axon server on port: {self.config.axon.port}")
+        bt.logging.info(f"Started axon server: {axon.info()}")
 
         self.axon = axon
 

@@ -74,12 +74,21 @@ class VerifiedModelSession:
             self.srs_path,
         )
 
-    def gen_proof_file(self, proof_string):
+    def gen_proof_file(self, proof_string, instances):
         dir_name = os.path.dirname(self.proof_path)
         os.makedirs(dir_name, exist_ok=True)
+        proof_json = json.loads(proof_string)
+        new_instances = instances[0]
+        bt.logging.trace(f"New instances: {new_instances}")
+        new_instances.append(proof_json["instances"][0][-1])
+        bt.logging.trace(
+            f"New instances after appending with last instance from output: {new_instances}"
+        )
+        proof_json["instances"] = [new_instances]
+        bt.logging.trace(f"Proof json: {proof_json}")
 
         with open(self.proof_path, "w", encoding="utf-8") as f:
-            f.write(proof_string)
+            f.write(json.dumps(proof_json))
             f.close()
 
     def gen_proof(self):
@@ -121,10 +130,16 @@ class VerifiedModelSession:
 
         return res
 
-    def verify_proof_string(self, proof_string):
+    def verify_proof_and_inputs(self, proof_string, inputs):
         if proof_string == None:
             return False
-        self.gen_proof_file(proof_string)
+        self.public_inputs = inputs
+        self.gen_input_file()
+        self.gen_witness()
+        with open(self.witness_path, "r", encoding="utf-8") as f:
+            witness_content = f.read()
+        witness_json = json.loads(witness_content)
+        self.gen_proof_file(proof_string, witness_json["inputs"])
         return self.verify_proof()
 
     def __enter__(self):

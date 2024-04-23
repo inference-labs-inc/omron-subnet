@@ -1,5 +1,7 @@
 import asyncio
+import json
 import random
+import sys
 import time
 import traceback
 
@@ -256,18 +258,21 @@ class ValidatorSession:
         console = Console()
         console.print(table)
 
-    def verify_proof_string(self, proof_string: str):
+    def verify_proof_string(self, proof_string: str, inputs):
 
         if proof_string == None:
             return False
         try:
             inference_session = VerifiedModelSession()
-            res = inference_session.verify_proof_string(proof_string)
+            input_values = inputs["public_inputs"]
+            res = inference_session.verify_proof_and_inputs(proof_string, input_values)
             inference_session.end()
             return res
         except Exception as e:
-            bt.logging.error("❌ Unable to verify proof due to an error", e)
-            bt.logging.info(f"Offending proof string: {proof_string}")
+            bt.logging.error("❌ Unable to verify proof due to an error\n", e)
+            bt.logging.trace(
+                f"Offending proof string: {proof_string}\n Inputs: {inputs}"
+            )
 
         return False
 
@@ -277,6 +282,8 @@ class ValidatorSession:
         # Get the uids of all miners in the network.
         uids = metagraph.uids.tolist()
         self.sync_scores_uids(uids)
+
+        all_inputs = []
 
         filtered_uids = self.get_querable_uids()
         filtered_axons = [metagraph.axons[i] for i in filtered_uids]
@@ -289,6 +296,8 @@ class ValidatorSession:
             )
             for _ in filtered_axons
         ]
+        for synapse in synapses:
+            all_inputs.append(synapse.query_input)
         bt.logging.info(
             f"\033[92m >> Sending {len(synapses)} queries for proofs to {len(filtered_axons)} axons in the subnet \033[0m"
         )
@@ -306,15 +315,22 @@ class ValidatorSession:
 
             bt.logging.trace(f"Deserialized responses: {deserialized_responses}")
             verification_start = time.time()
-            verif_results = list(map(self.verify_proof_string, deserialized_responses))
+            verif_results = list(
+                map(self.verify_proof_string, deserialized_responses, all_inputs)
+            )
             verification_end = time.time()
-            bt.logging.trace(
+            bt.logging.info(
                 f"Proof verification took {verification_end - verification_start} seconds"
             )
-            proof_sizes = [
-                len(response) if response is not None else 0
-                for response in deserialized_responses
-            ]
+            proof_sizes = []
+            for deserialized_response in deserialized_responses:
+                size = 0
+                try:
+                    size = len(json.loads(deserialized_response)["proof"])
+                except Exception:
+                    # If the proof is None, assign it a very large value
+                    size = sys.maxsize
+                proof_sizes.append(size)
 
             self.log_verify_result(list(zip(filtered_uids, verif_results)))
             self.update_scores(
@@ -330,8 +346,8 @@ class ValidatorSession:
 
             self.step += 1
 
-            # Sleep for a duration equivalent to the block time (i.e., time between successive blocks).
-            time.sleep(bt.__blocktime__)
+            # Sleep for 60s
+            time.sleep(60)
         except RuntimeError as e:
             bt.logging.error(e)
             traceback.print_exc()
