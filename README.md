@@ -52,7 +52,7 @@ btcli subnet register --subtensor.network finney --netuid 2 --wallet.name {your_
 
 ```console
 cd neurons
-pm2 start miner.py --name miner --interpreter python3 -- \
+pm2 start miner.py --name miner --interpreter ./omron/.venv/bin/python -- \
 --netuid 2 \
 --wallet.name {your_miner_key_name} \
 --wallet.hotkey {your_miner_hotkey_name}
@@ -62,7 +62,7 @@ pm2 start miner.py --name miner --interpreter python3 -- \
 
 ```console
 cd neurons
-pm2 start validator.py --name validator --interpreter python3 -- \
+pm2 start validator.py --name validator --interpreter ./omron/.venv/bin/python -- \
 --netuid 2 \
 --wallet.name {validater_key_name} \
 --wallet.hotkey {validator_hot_key_name}
