@@ -85,6 +85,7 @@ INSTALL_PATH=${INSTALL_PATH:-./omron}
 # Clone SN repo into user's specified directory
 git clone https://github.com/inference-labs-inc/omron-subnet.git $INSTALL_PATH
 
+
 # Setup a Virtual Python environment for dependencies
 if ! python3 -m venv --help > /dev/null 2>&1; then
   echo "venv module not found. Installing venv..."
@@ -93,6 +94,7 @@ fi
 echo "Setting up Python virtual environment..."
 python3 -m venv $INSTALL_PATH/.venv
 source $INSTALL_PATH/.venv/bin/activate
+
 
 # Install Python dependencies from requirements.txt
 echo "Installing Python dependencies..."
