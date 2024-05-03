@@ -7,9 +7,7 @@ OS="`uname`"
 # Flag to let the user know if they need to restart their terminal
 SHOULD_RESTART=false
 
-ifndef GIT_ORG
-GIT_ORG=inference-labs-inc
-endif
+if [ -z GIT_ORG ]; then GIT_ORG=inference-labs-inc; else echo "Fetching from GitHub Org: $GIT_ORG"; fi
 
 
 # OS specific python install
