@@ -28,6 +28,23 @@ def get_config_from_args():
         default=True,
         help="Whether this miner should automatically update upon new release.",
     )
+    
+    # Axon Port
+    parser.add_argument(
+        "--axon.port", 
+        type=int,
+        help="Port to run the axon on.",
+        default=8001
+    )
+    
+    # External IP 
+    parser.add_argument(
+        "--axon.external_ip", 
+        type=str,
+        help="IP for the metagraph",
+        default=bt.utils.networking.get_external_ip()
+    )
+    
     # Adds subtensor specific arguments i.e. --subtensor.chain_endpoint ... --subtensor.network ...
     bt.subtensor.add_args(parser)
     # Adds logging specific arguments i.e. --logging.debug ..., --logging.trace .. or --logging.logging_dir ...
