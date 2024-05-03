@@ -33,8 +33,20 @@ class MinerSession:
             f"Starting axon. Custom arguments include the following.\nNote that any null values will fallback to defaults, which are usually sufficient. {self.config.axon}"
         )
 
-        axon = bt.axon(wallet=wallet, config=self.config)
-        bt.logging.info(f"Axon created: {axon.info()}")
+        #axon = bt.axon(wallet=wallet, config=self.config)
+        #bt.logging.info(f"Axon created: {axon.info()}")
+        if self.config.axon.external_ip is not None:
+            bt.logging.debug(
+                f"Starting axon on port {self.config.axon.port} and external ip {self.config.axon.external_ip}"
+            )
+            axon = bt.axon(
+                wallet=wallet,
+                port=self.config.axon.port,
+                external_ip=self.config.axon.external_ip,
+            )
+        else:
+            bt.logging.debug(f"Starting axon on port {self.config.axon.port}")
+            axon = bt.axon(wallet=wallet, config=self.config)
 
         # Attach determines which functions are called when a request is received.
         bt.logging.info("Attaching forward function to axon...")
