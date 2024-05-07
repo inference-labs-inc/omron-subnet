@@ -386,7 +386,7 @@ class ValidatorSession:
     def check_register(self):
         if self.wallet.hotkey.ss58_address not in self.metagraph.hotkeys:
             bt.logging.error(
-                f"\nYour validator: {self.wallet} if not registered to chain connection: {self.subtensor} \nRun btcli register and try again."
+                f"\nYour validator: {self.wallet} is not registered to chain connection: {self.subtensor} \nRun btcli register and try again."
             )
             exit()
         else:
