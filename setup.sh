@@ -7,6 +7,9 @@ OS="`uname`"
 # Flag to let the user know if they need to restart their terminal
 SHOULD_RESTART=false
 
+if [ -z GIT_ORG ]; then GIT_ORG=inference-labs-inc; else echo "Fetching from GitHub Org: $GIT_ORG"; fi
+
+
 # OS specific python install
 install_python() {
     case $OS in
@@ -83,7 +86,7 @@ read -p "Where would you like to install Omron? (./omron): " INSTALL_PATH </dev/
 INSTALL_PATH=${INSTALL_PATH:-./omron}
 
 # Clone SN repo into user's specified directory
-git clone https://github.com/inference-labs-inc/omron-subnet.git $INSTALL_PATH
+git clone https://github.com/$GIT_ORG/omron-subnet.git $INSTALL_PATH
 
 # Install Python dependencies from requirements.txt
 echo "Installing Python dependencies..."
