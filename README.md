@@ -6,7 +6,7 @@
 
 ### Proof of Inference
 
-[Discord](https://discord.gg/bittensor) • [X](https://twitter.com/omron_ai) • [Inference Labs](https://twitter.com/inference_labs) • [Explorer](https://taostats.io/) • [Research](https://bittensor.com/whitepaper)
+[Discord](https://discord.gg/bittensor) • [X](https://twitter.com/omron_ai) • [Inference Labs](https://twitter.com/inference_labs) • [Explorer](https://taostats.io/) • [Dashboard](https://wandb.ai/inference-labs/omron)
 
 </div>
 
@@ -16,17 +16,18 @@ Omron represents a significant stride in enhancing the Bittensor network, aiming
 
 ### Incentive Mechanism and Reward Structure
 
-Omron incentivizes miners and validators on Subnet 2 to contribute to the generation and validation of high-quality, secure, and efficient verified AI predictions using a specialized reward mechanism that aligns with the unique aspects of zero-knowledge machine learning (zk-ML) and decentralized AI.  Currently Zero-knowledge proofs are generally more CPU computationally intensive and opens the opportunity for non-GPU miners to participate however the end goal is to further incentivize the development of proving systems optimized for GPU based operations.  The incentives are based around Miners creating succinct and efficent models which can be circuitized with a zero-knowledge proving system.  
+Omron incentivizes miners and validators on Subnet 2 to contribute to the generation and validation of high-quality, secure, and efficient verified AI predictions using a specialized reward mechanism that aligns with the unique aspects of zero-knowledge machine learning (zk-ML) and decentralized AI.  Currently Zero-knowledge proofs are generally more CPU computationally intensive and opens the opportunity for non-GPU miners to participate however the end goal is to further incentivize the development of proving systems optimized for GPU based operations.  The incentives are based around Miners creating succinct and efficent models which can be circuitized with a zero-knowledge proving system.
 
-The reward mechanism for Subnet 2 scores the initial AI predictions based on the cryptographic integrity and time to generate zk-proofs along with the outputs, rather than solely on end results. This approach reduces the computational burden on validators as zk-proofs confirm the source model and integrity of AI predictions efficently.  
+The reward mechanism for Subnet 2 scores the initial AI predictions based on the cryptographic integrity and time to generate zk-proofs along with the outputs, rather than solely on end results. This approach reduces the computational burden on validators as zk-proofs confirm the source model and integrity of AI predictions efficently.
 
 ### Miners
+
 - Receive input data from validators on the subnet.
 - Generate predictions using custom, verifiable AI models that have been converted into zero knowledge circuits
 - Return the generated content to the requesting validator for validation and distribution.
 
-
 ### Validators
+
 - Produce input data and distribute requests for verified inference throughout miners participating on the subnet
 - Confirm that miners are acting faithfully, by verifying the authenticity of the miner's returned zero knowledge proof
 - Score results from miners based on performance metrics such as proof size and response time
@@ -86,7 +87,7 @@ Miners contribute to this subnet by providing compute to generate output from, a
 
 #### Recommended
 
-> [!INFO]
+> [!NOTE]
 > Exceeding these requirements in terms of storage, network and CPU speed will most likely result in higher rewards due to performance incentivization.
 
 | Component | Recommendation |

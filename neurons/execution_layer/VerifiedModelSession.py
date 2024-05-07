@@ -5,6 +5,7 @@ import uuid
 
 import bittensor as bt
 import ezkl
+from wandb_logger import safe_log
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -109,12 +110,12 @@ class VerifiedModelSession:
                 self.srs_path,
             )
             end_time = time.time()
-            bt.logging.info(f"Proof generation took {end_time - start_time} seconds")
-
+            proof_time = end_time - start_time
+            bt.logging.info(f"Proof generation took {proof_time} seconds")
             with open(self.proof_path, "r", encoding="utf-8") as f:
                 proof_content = f.read()
 
-            return proof_content
+            return proof_content, proof_time
 
         except Exception as e:
             bt.logging.error(f"An error occured: {e}")

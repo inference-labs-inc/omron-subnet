@@ -8,6 +8,7 @@ import traceback
 import bittensor as bt
 import protocol
 import torch
+import wandb_logger
 from _validator.reward import reward
 from execution_layer.VerifiedModelSession import VerifiedModelSession
 from rich.console import Console
@@ -224,10 +225,11 @@ class ValidatorSession:
         table = Table(title="scores")
         table.add_column("uid", justify="right", style="cyan", no_wrap=True)
         table.add_column("score", justify="right", style="magenta", no_wrap=True)
-
+        log_data = {"scores": {}}
         for uid, score in enumerate(self.scores):
+            log_data["scores"][uid] = score
             table.add_row(str(uid), str(round(score.item(), 4)))
-
+        wandb_logger.safe_log(log_data)
         console = Console()
         console.print(table)
 
@@ -241,9 +243,11 @@ class ValidatorSession:
         table = Table(title="proof verification result")
         table.add_column("uid", justify="right", style="cyan", no_wrap=True)
         table.add_column("Verified?", justify="right", style="magenta", no_wrap=True)
+        verification_results = {"verification_results": {}}
         for uid, result in results:
+            verification_results["verification_results"][uid] = int(result)
             table.add_row(str(uid), str(result))
-
+        wandb_logger.safe_log(verification_results)
         console = Console()
         console.print(table)
 
@@ -251,9 +255,11 @@ class ValidatorSession:
         table = Table(title="weights")
         table.add_column("uid", justify="right", style="cyan", no_wrap=True)
         table.add_column("weight", justify="right", style="magenta", no_wrap=True)
-
+        weights = {"weights": {}}
         for uid, score in enumerate(self.weights):
+            weights["weights"][uid] = score
             table.add_row(str(uid), str(round(score.item(), 4)))
+        wandb_logger.safe_log(weights)
 
         console = Console()
         console.print(table)
@@ -401,8 +407,13 @@ class ValidatorSession:
         self.subtensor = bt.subtensor(config=self.config)
         self.dendrite = bt.dendrite(wallet=self.wallet)
         self.metagraph = self.subtensor.metagraph(self.config.netuid)
-
         self.sync_metagraph()
+        wandb_logger.safe_init(
+            "Validator",
+            self.wallet,
+            self.metagraph,
+            self.config,
+        )
 
     def sync_metagraph(self):
         self.metagraph.sync(subtensor=self.subtensor)

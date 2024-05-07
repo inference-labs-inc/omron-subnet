@@ -8,6 +8,7 @@ import traceback
 import bittensor as bt
 import protocol
 import torch
+import wandb_logger
 from _validator.validator_session import ValidatorSession
 
 
@@ -27,6 +28,22 @@ def get_config_from_args():
         default=50,
         help="Number of blocks to wait before setting weights",
     )
+    parser.add_argument(
+        "--wandb-key", type=str, default="", help="A https://wandb.ai API key"
+    )
+
+    parser.add_argument(
+        "--disable-wandb",
+        default=False,
+        help="Whether to disable WandB logging.",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--dev",
+        default=False,
+        help="Whether to run the miner in development mode for internal testing.",
+        action="store_true",
+    )
 
     # Adds subtensor specific arguments i.e. --subtensor.chain_endpoint ... --subtensor.network ...
     bt.subtensor.add_args(parser)
@@ -34,6 +51,7 @@ def get_config_from_args():
     bt.logging.add_args(parser)
     # Adds wallet specific arguments i.e. --wallet.name ..., --wallet.hotkey ./. or --wallet.path ...
     bt.wallet.add_args(parser)
+
     # Parse the config (will take command-line arguments if provided)
     # To print help message, run python3 neurons/validator.py --help
     config = bt.config(parser)
@@ -55,6 +73,10 @@ def get_config_from_args():
     # Set up logging with the provided configuration and directory.
     bt.logging(config=config, logging_dir=config.full_path)
 
+    if config.wandb_key:
+        wandb_logger.safe_login(api_key=config.wandb_key)
+        bt.logging.success("Logged into WandB")
+
     # Return the parsed config.
     return config
 
@@ -63,6 +85,7 @@ def get_config_from_args():
 if __name__ == "__main__":
     # Parse the configuration.
     config = get_config_from_args()
+
     # Run the main function.
     with ValidatorSession(config) as validator_session:
         validator_session.run()

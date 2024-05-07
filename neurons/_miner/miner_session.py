@@ -3,6 +3,7 @@ import traceback
 
 import bittensor as bt
 import protocol
+import wandb_logger
 from execution_layer.VerifiedModelSession import VerifiedModelSession
 from utils import AutoUpdate
 
@@ -14,6 +15,7 @@ class MinerSession:
         self.check_register()
         self.auto_update = AutoUpdate()
         self.axon = None
+        self.log_batch = []
 
     def __enter__(self):
         return self
@@ -71,6 +73,16 @@ class MinerSession:
         while True:
             if step % 10 == 0 and self.config.auto_update == True:
                 self.auto_update.try_update()
+            if step % 20 == 0:
+                if len(self.log_batch) > 0:
+                    bt.logging.debug(
+                        f"Logging batch to WandB of size {len(self.log_batch)}"
+                    )
+                    for log in self.log_batch:
+                        wandb_logger.safe_log(log)
+                    self.log_batch = []
+                else:
+                    bt.logging.debug("No logs to log to WandB")
             try:
                 if step % 5 == 0:
                     metagraph = subtensor.metagraph(self.config.netuid)
@@ -115,6 +127,7 @@ class MinerSession:
         self.subtensor = bt.subtensor(config=self.config)
         self.metagraph = self.subtensor.metagraph(self.config.netuid)
         self.sync_metagraph()
+        wandb_logger.safe_init("Miner", self.wallet, self.metagraph, self.config)
 
     def sync_metagraph(self):
         self.metagraph.sync(subtensor=self.subtensor)
@@ -136,7 +149,7 @@ class MinerSession:
         try:
             model_session = VerifiedModelSession(public_inputs)
             bt.logging.debug("Model session created successfully")
-            synapse.query_output = model_session.gen_proof()
+            synapse.query_output, proof_time = model_session.gen_proof()
             model_session.end()
         except Exception as e:
             synapse.query_output = "An error occured"
@@ -146,9 +159,19 @@ class MinerSession:
         bt.logging.info("✅ Proof completed \n")
         time_out = time.time()
         delta_t = time_out - time_in
-        bt.logging.success(f"Request to Response time {delta_t}s")
+        bt.logging.info(
+            f"Total response time {delta_t}s. Proof time: {proof_time}s. Overhead time: {delta_t - proof_time}s."
+        )
+        self.log_batch.append(
+            {
+                "proof_time": proof_time,
+                "overhead_time": delta_t - proof_time,
+                "total_response_time": delta_t,
+            }
+        )
+
         if delta_t > 300:
             bt.logging.error(
-                "Turnaround time is greater than validator timeout. This indicates your hardware is not processing validator's requests in time."
+                "Response time is greater than validator timeout. This indicates your hardware is not processing validator's requests in time."
             )
         return synapse
