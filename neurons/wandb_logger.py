@@ -9,7 +9,7 @@ import wandb
 
 ENTITY_NAME = "inferencelabs"
 PROJECT_NAME = "omron"
-_enabled = True
+WANDB_ENABLED = False
 
 
 def safe_login(api_key):
@@ -28,10 +28,10 @@ def safe_init(name, wallet, metagraph, config):
     """
     Attempts to initialize WandB, and logs if unsuccessful
     """
+    global WANDB_ENABLED
     if config.disable_wandb:
         bt.logging.warning("WandB logging disabled.")
-        global _enabled
-        _enabled = False
+        WANDB_ENABLED = False
         return
     try:
         bt.logging.debug("Attempting to initialize WandB")
@@ -93,6 +93,7 @@ def safe_init(name, wallet, metagraph, config):
             config=config_dict,
             settings=wandb.Settings(console=console),
         )
+        WANDB_ENABLED = True
         bt.logging.success("Successfully configured WandB.")
     except Exception as e:
         bt.logging.warning("Failed to configure WandB. Your run will not be logged.")
@@ -105,8 +106,9 @@ def safe_log(data):
     - Ignores request to log if WandB isn't configured
     - Logs to WandB if it is configured
     """
-    global _enabled
-    if not _enabled:
+
+    if not WANDB_ENABLED:
+        bt.logging.debug("Skipping log due to WandB logging disabled.")
         return
 
     try:

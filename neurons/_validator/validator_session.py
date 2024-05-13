@@ -29,7 +29,6 @@ class ValidatorSession:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        None
         return False
 
     def unpack_bt_objects(self):
@@ -80,33 +79,54 @@ class ValidatorSession:
         )
         self.last_reset_weights_block = self.current_block
 
-    def query_axons(self, axons, synapses):
+    def query_axons(self, requests):
         """
         Modified version of `dendrite.query` which accepts synapses unique to each axon.
-        axons: list of axons
-        synapses: list of synapses
+        requests: list of requests
         """
         _, _, _, dendrite = self.unpack_bt_objects()
 
         bt.logging.trace("Querying axons")
+        randomized_requests = random.sample(requests, len(requests))
+        bt.logging.debug(f"Randomized requests: {randomized_requests}")
         try:
             # Create a coroutine for the gather operation
             coroutine = asyncio.gather(
                 *(
                     dendrite.forward(
-                        axons=[target_axon],
-                        synapse=synapse,
+                        axons=[request["axon"]],
+                        synapse=request["synapse"],
                         timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
                         deserialize=False,
                     )
-                    for target_axon, synapse in zip(axons, synapses)
+                    for request in randomized_requests
                 )
             )
 
             # Run the coroutine to completion and return the result
-            result = asyncio.run(coroutine)
-            result = [item for sublist in result for item in sublist]
-            return result
+            results = asyncio.run(coroutine)
+            bt.logging.trace(f"Results: {results}")
+            for i, sublist in enumerate(results):
+                result = sublist[0]
+                try:
+                    randomized_requests[i].update(
+                        {
+                            "result": result,
+                            "response_time": result.dendrite.process_time,
+                            "deserialized": result.deserialize(),
+                        }
+                    )
+                except Exception as e:
+                    bt.logging.trace(f"Error updating request: {e}")
+                    randomized_requests[i].update(
+                        {
+                            "result": result,
+                            "response_time": sys.maxsize,
+                            "deserialized": None,
+                        }
+                    )
+            randomized_requests.sort(key=lambda x: x["uid"])
+            return randomized_requests
         except Exception as e:
             bt.logging.exception("Error while querying axons. \n", e)
             return None
@@ -120,7 +140,7 @@ class ValidatorSession:
         wallet, metagraph, subtensor, dendrite = self.unpack_bt_objects()
         uids = metagraph.uids.tolist()
 
-        # If there are less uids than scores, remove some weights.
+        # Ignore validators, they're not queryable as miners.
         queryable_uids = metagraph.total_stake < 1.024e3
 
         # Remove the weights of miners that are not queryable.
@@ -156,7 +176,7 @@ class ValidatorSession:
         if len(responses) == 0 or responses is None:
             return
 
-        wallet, metagraph, subtensor, dendrite = self.unpack_bt_objects()
+        _, _, subtensor, _ = self.unpack_bt_objects()
         new_scores = self.scores[:]
         max_score = torch.max(self.scores)
         if max_score == 0:
@@ -270,8 +290,7 @@ class ValidatorSession:
             return False
         try:
             inference_session = VerifiedModelSession()
-            input_values = inputs["public_inputs"]
-            res = inference_session.verify_proof_and_inputs(proof_string, input_values)
+            res = inference_session.verify_proof_and_inputs(proof_string, inputs)
             inference_session.end()
             return res
         except Exception as e:
@@ -282,68 +301,99 @@ class ValidatorSession:
 
         return False
 
+    def log_responses(self, responses):
+        """
+        Log response information to the console and to wandb
+        """
+        console = Console()
+        table = Table(title="responses")
+        columns = ["uid", "response_time", "proof_size", "verification_result"]
+        styles = ["cyan", "magenta", "magenta", "magenta"]
+        justifications = ["right"] * 4
+
+        for col, style, justify in zip(columns, styles, justifications):
+            table.add_column(col, justify=justify, style=style, no_wrap=True)
+
+        wandb_log = {"responses": {}}
+        for response in responses:
+            row = [str(response[col]) for col in columns]
+            table.add_row(*row)
+            wandb_log["responses"][response["uid"]] = {
+                col: response[col] if response[col] is not None else 0
+                for col in columns[1:]
+            }
+            wandb_log["responses"][response["uid"]]["verification_result"] = int(
+                response["verification_result"]
+            )
+        wandb_logger.safe_log(wandb_log)
+        console.print(table)
+
     def run_step(self):
-        wallet, metagraph, subtensor, dendrite = self.unpack_bt_objects()
+        _, metagraph, _, _ = self.unpack_bt_objects()
 
         # Get the uids of all miners in the network.
         uids = metagraph.uids.tolist()
         self.sync_scores_uids(uids)
 
-        all_inputs = []
+        requests = []
 
         filtered_uids = self.get_querable_uids()
-        filtered_axons = [metagraph.axons[i] for i in filtered_uids]
-        synapses = [
-            protocol.QueryZkProof(
+        for uid in filtered_uids:
+            axon = metagraph.axons[uid]
+            inputs = [random.uniform(-1, 1) for _ in range(5)]
+            synapse = protocol.QueryZkProof(
                 query_input={
                     "model_id": [0],
-                    "public_inputs": [random.uniform(-1, 1) for _ in range(5)],
+                    "public_inputs": inputs,
                 }
             )
-            for _ in filtered_axons
-        ]
-        for synapse in synapses:
-            all_inputs.append(synapse.query_input)
+            requests.append(
+                {
+                    "uid": uid,
+                    "axon": axon,
+                    "synapse": synapse,
+                    "inputs": inputs,
+                }
+            )
         bt.logging.info(
-            f"\033[92m >> Sending {len(synapses)} queries for proofs to {len(filtered_axons)} axons in the subnet \033[0m"
+            f"\033[92m >> Sending {len(requests)} queries for proofs to miners in the subnet \033[0m"
         )
-        bt.logging.trace("Synapses being sent", synapses)
+        bt.logging.trace("Requests being sent", requests)
 
         try:
-            responses = self.query_axons(filtered_axons, synapses)
-
-            response_times = [0] * len(filtered_uids)
-            for index, response in enumerate(responses):
-                if response is not None:
-                    response_times[index] = response.dendrite.process_time
-            deserialized_responses = [response.deserialize() for response in responses]
+            responses = self.query_axons(requests)
             bt.logging.trace(f"Responses: {responses}")
 
-            bt.logging.trace(f"Deserialized responses: {deserialized_responses}")
-            verification_start = time.time()
-            verif_results = list(
-                map(self.verify_proof_string, deserialized_responses, all_inputs)
-            )
-            verification_end = time.time()
-            bt.logging.info(
-                f"Proof verification took {verification_end - verification_start} seconds"
-            )
+            verification_results = []
+            response_times = []
             proof_sizes = []
-            for deserialized_response in deserialized_responses:
-                size = 0
+            for response in responses:
+                bt.logging.trace(f"Response: {response}")
                 try:
-                    size = len(json.loads(deserialized_response)["proof"])
-                except Exception:
-                    # If the proof is None, assign it a very large value
-                    size = sys.maxsize
-                proof_sizes.append(size)
 
-            self.log_verify_result(list(zip(filtered_uids, verif_results)))
+                    response["verification_result"] = self.verify_proof_string(
+                        response["deserialized"], response["inputs"]
+                    )
+                    response["proof_size"] = len(
+                        json.loads(response["deserialized"])["proof"]
+                    )
+                except Exception as e:
+                    bt.logging.trace(
+                        f"Error verifying proof or checking proof size for uid: {response['uid']}, full response: {response}, error: {e}"
+                    )
+                    response["proof_size"] = sys.maxsize
+                    response["verification_result"] = False
+                verification_results.append(response["verification_result"])
+                response_times.append(response["response_time"])
+                proof_sizes.append(response["proof_size"])
+
+            self.log_responses(responses)
+
             self.update_scores(
                 list(
                     zip(
                         filtered_uids,
-                        verif_results,
+                        verification_results,
                         response_times,
                         proof_sizes,
                     )
