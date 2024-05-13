@@ -368,7 +368,6 @@ class ValidatorSession:
             response_times = []
             proof_sizes = []
             for response in responses:
-                bt.logging.trace(f"Response: {response}")
                 try:
 
                     response["verification_result"] = self.verify_proof_string(
