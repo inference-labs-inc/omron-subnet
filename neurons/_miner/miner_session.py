@@ -133,8 +133,6 @@ class MinerSession:
         self.metagraph.sync(subtensor=self.subtensor)
 
     async def blacklist(self, synapse: protocol.QueryZkProof) -> Tuple[bool,str]:
-        # sorry monkeys, no more random validations
-
         try:
             if synapse.dendrite.hotkey not in self.metagraph.hotkeys:
                 bt.logging.info("Unrecognized hotkey")
@@ -150,7 +148,7 @@ class MinerSession:
             return False, "OK"
 
         except Exception as e:
-            bt.logging.error("we threw an error yo: {}".format(str(e)))
+            bt.logging.error("Error in blacklist {}".format(str(e)))
 
     def queryZkProof(self, synapse: protocol.QueryZkProof) -> protocol.QueryZkProof:
         """
