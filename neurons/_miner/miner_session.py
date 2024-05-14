@@ -40,7 +40,7 @@ class MinerSession:
 
         # Attach determines which functions are called when a request is received.
         bt.logging.info("Attaching forward function to axon...")
-        axon.attach(forward_fn=self.queryZkProof)
+        axon.attach(forward_fn=self.queryZkProof, blacklist_fn=self.blacklist)
         bt.logging.info("Attached forward function to axon")
 
         # Serve passes the axon information to the network + netuid we are hosting on.
@@ -131,6 +131,26 @@ class MinerSession:
 
     def sync_metagraph(self):
         self.metagraph.sync(subtensor=self.subtensor)
+
+    async def blacklist(self, synapse: protocol.QueryZkProof) -> Tuple[bool,str]:
+        # sorry monkeys, no more random validations
+
+        try:
+            if synapse.dendrite.hotkey not in self.metagraph.hotkeys:
+                bt.logging.info("Unrecognized hotkey")
+                return True, "Unrecognized Hotkey"
+            
+            validator_uid = self.metagraph.hotkeys.index(synapse.dendrite.hotkey)
+            stake = self.metagraph.stake[validator_uid].item()
+
+            bt.logging.info("validator : {} | stake: {}".format(validator_uid, stake))
+            if stake < 10000:
+                return True, "Below minimum stake to set weights"
+
+            return False, "OK"
+
+        except Exception as e:
+            bt.logging.error("we threw an error yo: {}".format(str(e)))
 
     def queryZkProof(self, synapse: protocol.QueryZkProof) -> protocol.QueryZkProof:
         """
