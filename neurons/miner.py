@@ -23,6 +23,12 @@ def get_config_from_args():
         help="Whether this miner should automatically update upon new release.",
     )
     parser.add_argument(
+        "--disable-blacklist",
+        default=False,
+        action="store_true",
+        help="Disables request filtering and allows all incoming requests.",
+    )
+    parser.add_argument(
         "--wandb-key", type=str, default="", help="A https://wandb.ai API key"
     )
     parser.add_argument(

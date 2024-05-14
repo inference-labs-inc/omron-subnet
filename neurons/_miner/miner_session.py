@@ -1,5 +1,6 @@
 import time
 import traceback
+from typing import Tuple
 
 import bittensor as bt
 import protocol
@@ -16,6 +17,10 @@ class MinerSession:
         self.auto_update = AutoUpdate()
         self.axon = None
         self.log_batch = []
+        if self.config.disable_blacklist:
+            bt.logging.warning(
+                "Blacklist disabled, allowing all requests. Consider enabling to filter requests."
+            )
 
     def __enter__(self):
         return self
@@ -40,7 +45,7 @@ class MinerSession:
 
         # Attach determines which functions are called when a request is received.
         bt.logging.info("Attaching forward function to axon...")
-        axon.attach(forward_fn=self.queryZkProof)
+        axon.attach(forward_fn=self.queryZkProof, blacklist_fn=self.blacklist)
         bt.logging.info("Attached forward function to axon")
 
         # Serve passes the axon information to the network + netuid we are hosting on.
@@ -131,6 +136,44 @@ class MinerSession:
 
     def sync_metagraph(self):
         self.metagraph.sync(subtensor=self.subtensor)
+
+    def blacklist(self, synapse: protocol.QueryZkProof) -> Tuple[bool, str]:
+        """
+        Filters requests if any of the following conditions are met:
+        - Requesting hotkey is not registered
+        - Requesting UID's stake is below 1k
+        - Requesting UID does not have a validator permit
+
+        Does not filter if the --disable-blacklist flag has been set.
+
+        synapse: The request synapse object
+        returns: (is_blacklisted, reason)
+        """
+        try:
+            if self.config.disable_blacklist:
+                bt.logging.trace("Blacklist disabled, allowing request.")
+                return False, "Allowed"
+
+            if synapse.dendrite.hotkey not in self.metagraph.hotkeys:
+                return True, "Hotkey is not registered"
+
+            requesting_uid = self.metagraph.hotkeys.index(synapse.dendrite.hotkey)
+            stake = self.metagraph.S[requesting_uid].item()
+
+            bt.logging.info(f"Requesting UID: {requesting_uid} | Stake at UID: {stake}")
+            if stake < 1024:
+                return True, "Stake below minimum"
+
+            validator_permit = self.metagraph.validator_permit[requesting_uid].item()
+            if not validator_permit:
+                return True, "Requesting UID has no validator permit"
+
+            bt.logging.trace(f"Allowing request from UID: {requesting_uid}")
+            return False, "Allowed"
+
+        except Exception as e:
+            bt.logging.error(f"Error during blacklist {e}")
+            return True, "An error occurred while filtering the request"
 
     def queryZkProof(self, synapse: protocol.QueryZkProof) -> protocol.QueryZkProof:
         """
