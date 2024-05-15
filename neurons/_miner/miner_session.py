@@ -37,7 +37,9 @@ class MinerSession:
     def start_axon(self):
         wallet, metagraph, subtensor = self.unpack_bt_objects()
         bt.logging.info(
-            f"Starting axon. Custom arguments include the following.\nNote that any null values will fallback to defaults, which are usually sufficient. {self.config.axon}"
+            "Starting axon. Custom arguments include the following.\n"
+            "Note that any null values will fallback to defaults, "
+            f"which are usually sufficient. {self.config.axon}"
         )
 
         axon = bt.axon(wallet=wallet, config=self.config)
@@ -198,6 +200,7 @@ class MinerSession:
             synapse.query_output = "An error occured"
 
             bt.logging.error("An error occurred while generating proven output", e)
+            proof_time = time.time() - time_in
 
         bt.logging.info("✅ Proof completed \n")
         time_out = time.time()
