@@ -199,7 +199,7 @@ class MinerSession:
 
             bt.logging.error("An error occurred while generating proven output", e)
 
-        bt.logging.info("Proof completed \n")
+        bt.logging.info("✅ Proof completed \n")
         time_out = time.time()
         delta_t = time_out - time_in
 
