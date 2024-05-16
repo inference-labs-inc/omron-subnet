@@ -1,9 +1,9 @@
+import asyncio
 import json
+import multiprocessing
 import os
 import time
 import uuid
-import multiprocessing
-import asyncio
 
 import bittensor as bt
 import ezkl
@@ -118,6 +118,8 @@ class VerifiedModelSession:
             f"New instances after appending with last instance from output: {new_instances}"
         )
         proof_json["instances"] = [new_instances]
+        # Enforce EVM transcript type to be used for all proofs, ensuring all are valid for proving on EVM chains
+        proof_json["transcript_type"] = "EVM"
         bt.logging.trace(f"Proof json: {proof_json}")
 
         with open(self.proof_path, "w", encoding="utf-8") as f:
