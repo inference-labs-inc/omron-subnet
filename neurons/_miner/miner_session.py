@@ -1,8 +1,10 @@
 import time
 import traceback
+from typing import Tuple
 
 import bittensor as bt
 import protocol
+import wandb_logger
 from execution_layer.VerifiedModelSession import VerifiedModelSession
 from utils import AutoUpdate
 
@@ -14,6 +16,11 @@ class MinerSession:
         self.check_register()
         self.auto_update = AutoUpdate()
         self.axon = None
+        self.log_batch = []
+        if self.config.disable_blacklist:
+            bt.logging.warning(
+                "Blacklist disabled, allowing all requests. Consider enabling to filter requests."
+            )
 
     def __enter__(self):
         return self
@@ -38,7 +45,7 @@ class MinerSession:
 
         # Attach determines which functions are called when a request is received.
         bt.logging.info("Attaching forward function to axon...")
-        axon.attach(forward_fn=self.queryZkProof)
+        axon.attach(forward_fn=self.queryZkProof, blacklist_fn=self.blacklist)
         bt.logging.info("Attached forward function to axon")
 
         # Serve passes the axon information to the network + netuid we are hosting on.
@@ -71,6 +78,16 @@ class MinerSession:
         while True:
             if step % 10 == 0 and self.config.auto_update == True:
                 self.auto_update.try_update()
+            if step % 20 == 0:
+                if len(self.log_batch) > 0:
+                    bt.logging.debug(
+                        f"Logging batch to WandB of size {len(self.log_batch)}"
+                    )
+                    for log in self.log_batch:
+                        wandb_logger.safe_log(log)
+                    self.log_batch = []
+                else:
+                    bt.logging.debug("No logs to log to WandB")
             try:
                 if step % 5 == 0:
                     metagraph = subtensor.metagraph(self.config.netuid)
@@ -100,7 +117,7 @@ class MinerSession:
     def check_register(self):
         if self.wallet.hotkey.ss58_address not in self.metagraph.hotkeys:
             bt.logging.error(
-                f"\nYour miner: {self.wallet} if not registered to the network: {self.subtensor} \nRun btcli register and try again."
+                f"\nYour miner: {self.wallet} is not registered to the network: {self.subtensor} \nRun btcli register and try again."
             )
             exit()
         else:
@@ -115,9 +132,48 @@ class MinerSession:
         self.subtensor = bt.subtensor(config=self.config)
         self.metagraph = self.subtensor.metagraph(self.config.netuid)
         self.sync_metagraph()
+        wandb_logger.safe_init("Miner", self.wallet, self.metagraph, self.config)
 
     def sync_metagraph(self):
         self.metagraph.sync(subtensor=self.subtensor)
+
+    def blacklist(self, synapse: protocol.QueryZkProof) -> Tuple[bool, str]:
+        """
+        Filters requests if any of the following conditions are met:
+        - Requesting hotkey is not registered
+        - Requesting UID's stake is below 1k
+        - Requesting UID does not have a validator permit
+
+        Does not filter if the --disable-blacklist flag has been set.
+
+        synapse: The request synapse object
+        returns: (is_blacklisted, reason)
+        """
+        try:
+            if self.config.disable_blacklist:
+                bt.logging.trace("Blacklist disabled, allowing request.")
+                return False, "Allowed"
+
+            if synapse.dendrite.hotkey not in self.metagraph.hotkeys:
+                return True, "Hotkey is not registered"
+
+            requesting_uid = self.metagraph.hotkeys.index(synapse.dendrite.hotkey)
+            stake = self.metagraph.S[requesting_uid].item()
+
+            bt.logging.info(f"Requesting UID: {requesting_uid} | Stake at UID: {stake}")
+            if stake < 1024:
+                return True, "Stake below minimum"
+
+            validator_permit = self.metagraph.validator_permit[requesting_uid].item()
+            if not validator_permit:
+                return True, "Requesting UID has no validator permit"
+
+            bt.logging.trace(f"Allowing request from UID: {requesting_uid}")
+            return False, "Allowed"
+
+        except Exception as e:
+            bt.logging.error(f"Error during blacklist {e}")
+            return True, "An error occurred while filtering the request"
 
     def queryZkProof(self, synapse: protocol.QueryZkProof) -> protocol.QueryZkProof:
         """
@@ -136,7 +192,7 @@ class MinerSession:
         try:
             model_session = VerifiedModelSession(public_inputs)
             bt.logging.debug("Model session created successfully")
-            synapse.query_output = model_session.gen_proof()
+            synapse.query_output, proof_time = model_session.gen_proof()
             model_session.end()
         except Exception as e:
             synapse.query_output = "An error occured"
@@ -146,9 +202,20 @@ class MinerSession:
         bt.logging.info("Proof completed \n")
         time_out = time.time()
         delta_t = time_out - time_in
-        bt.logging.info(f"Request to Response time {delta_t}s")
+
+        bt.logging.info(
+            f"Total response time {delta_t}s. Proof time: {proof_time}s. Overhead time: {delta_t - proof_time}s."
+        )
+        self.log_batch.append(
+            {
+                "proof_time": proof_time,
+                "overhead_time": delta_t - proof_time,
+                "total_response_time": delta_t,
+            }
+        )
+
         if delta_t > 300:
             bt.logging.error(
-                "Turnaround time is greater than validator timeout. This indicates your hardware is not processing validator's requests in time."
+                "Response time is greater than validator timeout. This indicates your hardware is not processing validator's requests in time."
             )
         return synapse

@@ -1,16 +1,10 @@
 import argparse
-import json
 import os
-import random
 import time
-import traceback
 
 import bittensor as bt
-import protocol
-import torch
+import wandb_logger
 from _miner.miner_session import MinerSession
-
-# This function is responsible for setting up and parsing command-line arguments.
 
 
 def get_config_from_args():
@@ -28,6 +22,28 @@ def get_config_from_args():
         default=True,
         help="Whether this miner should automatically update upon new release.",
     )
+    parser.add_argument(
+        "--disable-blacklist",
+        default=False,
+        action="store_true",
+        help="Disables request filtering and allows all incoming requests.",
+    )
+    parser.add_argument(
+        "--wandb-key", type=str, default="", help="A https://wandb.ai API key"
+    )
+    parser.add_argument(
+        "--disable-wandb",
+        default=False,
+        help="Whether to disable WandB logging.",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--dev",
+        default=False,
+        help="Whether to run the miner in development mode for internal testing.",
+        action="store_true",
+    )
+
     # Adds subtensor specific arguments i.e. --subtensor.chain_endpoint ... --subtensor.network ...
     bt.subtensor.add_args(parser)
     # Adds logging specific arguments i.e. --logging.debug ..., --logging.trace .. or --logging.logging_dir ...
@@ -38,6 +54,7 @@ def get_config_from_args():
     bt.axon.add_args(parser)
     # Activating the parser to read any command-line inputs.
     # To print help message, run python3 neurons/miner.py --help
+
     config = bt.config(parser)
 
     # Set up logging directory
@@ -55,6 +72,9 @@ def get_config_from_args():
     if not os.path.exists(config.full_path):
         os.makedirs(config.full_path, exist_ok=True)
 
+    if config.wandb_key:
+        wandb_logger.safe_login(api_key=config.wandb_key)
+        bt.logging.success("Logged into WandB")
     return config
 
 
@@ -63,6 +83,7 @@ if __name__ == "__main__":
     # Parse the configuration.
     bt.logging.info("Getting miner configuration...")
     config = get_config_from_args()
+
     # Run the main function.
     try:
         bt.logging.info("Creating miner session...")

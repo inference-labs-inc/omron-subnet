@@ -6,6 +6,7 @@ import sys
 import bittensor as bt
 import git
 import requests
+import wandb_logger
 
 from __init__ import __version__
 
@@ -97,13 +98,17 @@ class AutoUpdate:
 
         local_version = __version__
 
+        local_version_int = self.convert_version_str_to_int(local_version)
+        remote_version_int = self.convert_version_str_to_int(remote_version)
+        wandb_logger.safe_log(
+            {"local_version": local_version_int, "remote_version": remote_version_int}
+        )
+
         bt.logging.info(
             f"Version check - remote_version: {remote_version}, local_version: {local_version}"
         )
 
-        if self.convert_version_str_to_int(
-            remote_version
-        ) > self.convert_version_str_to_int(local_version):
+        if remote_version_int > local_version_int:
             bt.logging.info(
                 f"Remote version ({remote_version}) is higher than local version ({local_version}), automatically updating..."
             )

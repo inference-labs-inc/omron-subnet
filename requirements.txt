@@ -11,3 +11,5 @@ onnx
 onnxruntime
 bittensor==6.9.3
 GitPython
+wandb
+psutil
