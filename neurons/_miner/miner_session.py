@@ -202,7 +202,6 @@ class MinerSession:
         bt.logging.info("✅ Proof completed \n")
         time_out = time.time()
         delta_t = time_out - time_in
-
         bt.logging.info(
             f"Total response time {delta_t}s. Proof time: {proof_time}s. Overhead time: {delta_t - proof_time}s."
         )
