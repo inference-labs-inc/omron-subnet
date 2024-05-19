@@ -90,7 +90,7 @@ class MinerSession:
                     self.log_batch = []
                 else:
                     bt.logging.debug("No logs to log to WandB")
-                # check if registered
+            if step % 600 == 0:
                 self.check_register()
             try:
                 if step % 5 == 0:
