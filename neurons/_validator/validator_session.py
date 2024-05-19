@@ -15,8 +15,11 @@ from rich.console import Console
 from rich.table import Table
 from utils import AutoUpdate
 
-VALIDATOR_REQUEST_TIMEOUT_SECONDS = 300
+VALIDATOR_REQUEST_TIMEOUT_SECONDS = 30
 
+VALIDATOR_SHOULD_QUERY_EACH_BATCH_X_TIMES_PER_EPOCH = 2
+PSEUDO_SHUFFLE_EVERY_X_BLOCK = 360
+EPOCH_LENGTH = 360
 
 class ValidatorSession:
     def __init__(self, config):
@@ -87,8 +90,7 @@ class ValidatorSession:
         _, _, _, dendrite = self.unpack_bt_objects()
 
         bt.logging.trace("Querying axons")
-        randomized_requests = random.sample(requests, len(requests))
-        bt.logging.debug(f"Randomized requests: {randomized_requests}")
+        bt.logging.debug(f"Requests: {requests}")
         try:
             # Create a coroutine for the gather operation
             coroutine = asyncio.gather(
@@ -99,7 +101,7 @@ class ValidatorSession:
                         timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
                         deserialize=False,
                     )
-                    for request in randomized_requests
+                    for request in requests
                 )
             )
 
@@ -109,7 +111,7 @@ class ValidatorSession:
             for i, sublist in enumerate(results):
                 result = sublist[0]
                 try:
-                    randomized_requests[i].update(
+                    requests[i].update(
                         {
                             "result": result,
                             "response_time": result.dendrite.process_time,
@@ -118,18 +120,47 @@ class ValidatorSession:
                     )
                 except Exception as e:
                     bt.logging.trace(f"Error updating request: {e}")
-                    randomized_requests[i].update(
+                    requests[i].update(
                         {
                             "result": result,
                             "response_time": sys.maxsize,
                             "deserialized": None,
                         }
                     )
-            randomized_requests.sort(key=lambda x: x["uid"])
-            return randomized_requests
+            requests.sort(key=lambda x: x["uid"])
+            return requests
         except Exception as e:
             bt.logging.exception("Error while querying axons. \n", e)
             return None
+    
+    def get_valid_validator_hotkeys(self):
+        valid_hotkeys = []
+        hotkeys = self.metagraph.hotkeys.tolist()
+        for index, hotkey in enumerate(hotkeys):
+            if self.metagraph.total_stake[index] >= 1.024e3:
+                valid_hotkeys.append(hotkey)
+        return valid_hotkeys
+
+    def get_validator_index(self):
+        valid_hotkeys = self.get_valid_validator_hotkeys()
+        try:
+            return valid_hotkeys.index(self.config.wallet.hotkey)
+        except ValueError:
+            return -1
+    
+    def split_uids_in_batches(self, group_index, num_groups, queryable_uids):
+        num_miners = len(queryable_uids)
+        miners_per_group = num_miners // num_groups
+        remaining_miners = num_miners % num_groups
+
+        start_index = group_index * miners_per_group
+        end_index = start_index + miners_per_group
+
+        # Add remaining miners to the last group
+        if group_index == num_groups - 1:
+            end_index += remaining_miners
+
+        return queryable_uids[start_index:end_index]
 
     def get_querable_uids(self):
         """Returns the uids of the miners that are queryable
@@ -328,6 +359,45 @@ class ValidatorSession:
         wandb_logger.safe_log(wandb_log)
         console.print(table)
 
+    def deterministically_shuffle_and_batch_queryable_uids(self, metagraph, filtered_uids):
+        """
+        Pseudorandomly shuffles the list of queryable uids, and splits it in batches to reduce concurrent requests from multiple validators
+
+        """
+        validator_uids = metagraph.total_stake >= 1.024e3
+        validator_index = self.get_validator_index()
+        num_validators = len(validator_uids)
+
+        # batch_duration_in_blocks = (EPOCH_LENGTH / VALIDATOR_SHOULD_QUERY_EACH_BATCH_X_TIMES_PER_EPOCH) // num_validators
+        # batch_duration_in_blocks = (360 / 2) // 17 = 10
+        # thus, if there are 17 validators, they will switch groups every 10 blocks, so every ~2 minutes
+
+        # e.g. current_block = 2993336
+        # 2993336 // batch_duration_in_blocks = 2993336 // 10 = 299333
+        # (299333 + validator_index) % num_validators = (299333 + 4) % 17 = 1
+        # as validator 4, I should then query the sub group 1
+
+        batch_duration_in_blocks = (EPOCH_LENGTH / VALIDATOR_SHOULD_QUERY_EACH_BATCH_X_TIMES_PER_EPOCH) // num_validators
+        batch_number_since_genesis = self.current_block // batch_duration_in_blocks
+        batch_index_to_query = (batch_number_since_genesis + validator_index) % num_validators
+
+        # We need to pseudorandomly shuffle the filtered_uids so that miner X isn't always in the same batch as miner Y
+        # Which would be unfair and create batches of varying speed/quality
+
+        # To avoid affecting the whole random package, we create an instance of it, which we seed
+        seed = self.current_block // PSEUDO_SHUFFLE_EVERY_X_BLOCK
+        rng = random.Random.seed(seed)
+        shuffled_filtered_uids = filtered_uids[:]
+        rng.shuffle(shuffled_filtered_uids)
+
+        # Since the shuffling was seeded, all the validators will shuffle the list the exact same way
+        # without having to communicate with each other ensuring that they don't all query the same
+        # miner all at once, which can happen randomly and cause deregistrations
+
+        batched_uids = self.split_uids_in_batches(batch_index_to_query, num_validators, shuffled_filtered_uids)
+        
+        return batched_uids
+    
     def run_step(self):
         _, metagraph, _, _ = self.unpack_bt_objects()
 
@@ -338,7 +408,10 @@ class ValidatorSession:
         requests = []
 
         filtered_uids = self.get_querable_uids()
-        for uid in filtered_uids:
+
+        batched_uids = self.deterministically_shuffle_and_batch_queryable_uids(metagraph, filtered_uids)
+
+        for uid in batched_uids:
             axon = metagraph.axons[uid]
             inputs = [random.uniform(-1, 1) for _ in range(5)]
             synapse = protocol.QueryZkProof(
