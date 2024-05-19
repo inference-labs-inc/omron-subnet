@@ -44,6 +44,13 @@ def get_config_from_args():
         help="Whether to run the miner in development mode for internal testing.",
         action="store_true",
     )
+    
+    parser.add_argument(
+        "--validator_batch_size",
+        type=int,
+        default=64,
+        help="Number of requests to miners performed at once."
+    )
 
     # Adds subtensor specific arguments i.e. --subtensor.chain_endpoint ... --subtensor.network ...
     bt.subtensor.add_args(parser)
