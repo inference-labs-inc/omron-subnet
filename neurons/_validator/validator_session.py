@@ -4,6 +4,7 @@ import random
 import sys
 import time
 import traceback
+from itertools import islice
 
 import bittensor as bt
 import protocol
@@ -89,27 +90,34 @@ class ValidatorSession:
         bt.logging.trace("Querying axons")
         randomized_requests = random.sample(requests, len(requests))
         bt.logging.debug(f"Randomized requests: {randomized_requests}")
-        try:
-            # Create a coroutine for the gather operation
-            coroutine = asyncio.gather(
-                *(
-                    dendrite.forward(
-                        axons=[request["axon"]],
-                        synapse=request["synapse"],
-                        timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-                        deserialize=False,
-                    )
-                    for request in randomized_requests
-                )
-            )
+        
+        def chunked_requests(iterable, size):
+            """Yield successive size chunks from iterable."""
+            iterator = iter(iterable)
+            for first in iterator:
+                yield list(islice(iterator, first, size-1, size))
 
-            # Run the coroutine to completion and return the result
-            results = asyncio.run(coroutine)
-            bt.logging.trace(f"Results: {results}")
-            for i, sublist in enumerate(results):
-                result = sublist[0]
+        try:
+            all_results = []
+            for request_chunk in chunked_requests(randomized_requests, self.config.validator_batch_size):
+                coroutine = asyncio.gather(
+                    *(
+                        dendrite.forward(
+                            axons=[request["axon"]],
+                            synapse=request["synapse"],
+                            timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+                            deserialize=False,
+                        )
+                        for request in request_chunk
+                    )
+                )
+                results = asyncio.run(coroutine)
+                all_results.extend(results)
+                bt.logging.trace(f"Results for chunk: {results}")
+
+            for index, result in enumerate(all_results):
                 try:
-                    randomized_requests[i].update(
+                    randomized_requests[index].update(
                         {
                             "result": result,
                             "response_time": result.dendrite.process_time,
@@ -118,7 +126,7 @@ class ValidatorSession:
                     )
                 except Exception as e:
                     bt.logging.trace(f"Error updating request: {e}")
-                    randomized_requests[i].update(
+                    randomized_requests[index].update(
                         {
                             "result": result,
                             "response_time": sys.maxsize,
@@ -129,7 +137,7 @@ class ValidatorSession:
             return randomized_requests
         except Exception as e:
             bt.logging.exception("Error while querying axons. \n", e)
-            return None
+        return None
 
     def get_querable_uids(self):
         """Returns the uids of the miners that are queryable
