@@ -13,7 +13,7 @@ class MinerSession:
     def __init__(self, config):
         self.config = config
         self.configure()
-        self.check_register(true)
+        self.check_register(exit=True)
         self.auto_update = AutoUpdate()
         self.axon = None
         self.log_batch = []
@@ -93,7 +93,7 @@ class MinerSession:
             if step % 600 == 0:
                 self.check_register()
             try:
-                if step % 5 == 0:
+                if step % 5 == 0 and self.subnet_uid:
                     metagraph = subtensor.metagraph(self.config.netuid)
                     log = (
                         f"Step:{step} | "
@@ -125,6 +125,7 @@ class MinerSession:
             )
             if exit:
                 exit()
+            self.subnet_uid = None
         else:
             # Each miner gets a unique identity (UID) in the network for differentiation.
             subnet_uid = self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
