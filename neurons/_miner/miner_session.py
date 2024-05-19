@@ -13,7 +13,7 @@ class MinerSession:
     def __init__(self, config):
         self.config = config
         self.configure()
-        self.check_register()
+        self.check_register(true)
         self.auto_update = AutoUpdate()
         self.axon = None
         self.log_batch = []
@@ -118,12 +118,13 @@ class MinerSession:
                 bt.logging.error(traceback.format_exc())
                 continue
 
-    def check_register(self):
+    def check_register(self, exit=False):
         if self.wallet.hotkey.ss58_address not in self.metagraph.hotkeys:
             bt.logging.error(
                 f"\nYour miner: {self.wallet} is not registered to the network: {self.subtensor} \nRun btcli register and try again."
             )
-            exit()
+            if exit:
+                exit()
         else:
             # Each miner gets a unique identity (UID) in the network for differentiation.
             subnet_uid = self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
