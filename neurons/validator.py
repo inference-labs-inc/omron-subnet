@@ -48,7 +48,7 @@ def get_config_from_args():
     parser.add_argument(
         "--validator_batch_size",
         type=int,
-        default=64,
+        default=32,
         help="Number of requests to miners performed at once."
     )
 

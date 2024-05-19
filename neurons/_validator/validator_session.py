@@ -113,7 +113,6 @@ class ValidatorSession:
                 )
                 results = asyncio.run(coroutine)
                 all_results.extend(results)
-                bt.logging.trace(f"Results for chunk: {results}")
 
             for index, result in enumerate(all_results):
                 try:
@@ -137,7 +136,7 @@ class ValidatorSession:
             return randomized_requests
         except Exception as e:
             bt.logging.exception("Error while querying axons. \n", e)
-        return None
+            return None
 
     def get_querable_uids(self):
         """Returns the uids of the miners that are queryable
