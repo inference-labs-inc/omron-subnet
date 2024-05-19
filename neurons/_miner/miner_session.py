@@ -90,6 +90,8 @@ class MinerSession:
                     self.log_batch = []
                 else:
                     bt.logging.debug("No logs to log to WandB")
+                # check if registered
+                self.check_register()
             try:
                 if step % 5 == 0:
                     metagraph = subtensor.metagraph(self.config.netuid)
