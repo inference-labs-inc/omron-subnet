@@ -1,6 +1,5 @@
 import argparse
 import os
-import time
 
 import bittensor as bt
 import wandb_logger
@@ -18,9 +17,10 @@ def get_config_from_args():
         "--netuid", type=int, default=1, help="The UID for the Omron subnet."
     )
     parser.add_argument(
-        "--auto-update",
-        default=True,
-        help="Whether this miner should automatically update upon new release.",
+        "--no-auto-update",
+        default=False,
+        help="Whether this miner should NOT automatically update upon new release.",
+        action="store_true",
     )
     parser.add_argument(
         "--disable-blacklist",

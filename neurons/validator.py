@@ -1,13 +1,7 @@
 import argparse
-import json
 import os
-import random
-import time
-import traceback
 
 import bittensor as bt
-import protocol
-import torch
 import wandb_logger
 from _validator.validator_session import ValidatorSession
 
@@ -21,7 +15,8 @@ def get_config_from_args():
 
     # Adds override arguments for network and netuid.
     parser.add_argument("--netuid", type=int, default=1, help="The chain subnet uid.")
-    parser.add_argument("--auto-update", default=True, help="Auto update.")
+
+    parser.add_argument("--no-auto-update", default=False, action="store_true", help="Disable auto update.")
     parser.add_argument(
         "--blocks_per_epoch",
         type=int,

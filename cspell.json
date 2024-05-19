@@ -1,0 +1,32 @@
+{
+  "version": "0.2",
+  "ignorePaths": [],
+  "dictionaryDefinitions": [],
+  "dictionaries": [],
+  "words": [
+    "bittensor",
+    "blocktime",
+    "btcli",
+    "circuitized",
+    "coldkey",
+    "dtype",
+    "ezkl",
+    "Gbps",
+    "incentivizes",
+    "Mbps",
+    "metagraph",
+    "netuid",
+    "Omron",
+    "onnxruntime",
+    "Opentensor",
+    "pydantic",
+    "setdefaulttimeout",
+    "subtensor",
+    "uids",
+    "venv",
+    "wandb",
+    "zkproof"
+  ],
+  "ignoreWords": [],
+  "import": []
+}

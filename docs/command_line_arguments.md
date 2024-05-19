@@ -9,7 +9,7 @@ Arguments that are present within the Omron miner and validator software.
 | Argument | Required | Default | Accepted Values | Description |
 | --- | :-: | --- | --- | --- |
 | `--netuid` | Yes | `2` | Integer | The subnet UID |
-| `--auto-update` | No | `True` | `True`, `False` | Whether to automatically check for and perform software updates. |
+| `--no-auto-update` | No | `False` | `True`, `False` | Whether automatic update should be disabled. |
 | `--disable-blacklist` | No | `False` | `True`, `False` | Disables request filtering and allows all incoming requests. |
 | `--blocks-per-epoch` | No | `50` | Integer | The number of blocks validators wait to set weights on-chain |
 | `--wandb-key` | No | `None` | String | A WandB API key for logging purposes |
