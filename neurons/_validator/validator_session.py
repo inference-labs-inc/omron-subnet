@@ -97,9 +97,11 @@ class ValidatorSession:
             for first in iterator:
                 yield list(islice(iterator, first, size-1, size))
 
+        batch_size = self.config.validator_batch_size
+
         try:
             all_results = []
-            for request_chunk in chunked_requests(randomized_requests, self.config.validator_batch_size):
+            for request_chunk in chunked_requests(randomized_requests, batch_size):
                 coroutine = asyncio.gather(
                     *(
                         dendrite.forward(
@@ -114,24 +116,26 @@ class ValidatorSession:
                 results = asyncio.run(coroutine)
                 all_results.extend(results)
 
-            for index, result in enumerate(all_results):
-                try:
-                    randomized_requests[index].update(
-                        {
-                            "result": result,
-                            "response_time": result.dendrite.process_time,
-                            "deserialized": result.deserialize(),
-                        }
-                    )
-                except Exception as e:
-                    bt.logging.trace(f"Error updating request: {e}")
-                    randomized_requests[index].update(
-                        {
-                            "result": result,
-                            "response_time": sys.maxsize,
-                            "deserialized": None,
-                        }
-                    )
+            for i, results in enumerate(all_results):
+                for j, result in enumerate(results):
+                    index = i * batch_size + j  # Calculate the global index based on the chunk index and local index
+                    try:
+                        randomized_requests[index].update(
+                            {
+                                "result": result,
+                                "response_time": result.dendrite.process_time,
+                                "deserialized": result.deserialize(),
+                            }
+                        )
+                    except Exception as e:
+                        bt.logging.trace(f"Error updating request: {e}")
+                        randomized_requests[index].update(
+                            {
+                                "result": result,
+                                "response_time": sys.maxsize,
+                                "deserialized": None,
+                            }
+                        )
             randomized_requests.sort(key=lambda x: x["uid"])
             return randomized_requests
         except Exception as e:
