@@ -117,7 +117,7 @@ class ValidatorSession:
                 all_results.extend(results)
 
             for i, results in enumerate(all_results):
-                for j, result in enumerate(results):
+                for j, result in enumerate(results): # original code was results[0], but if its an iterable, it should be iterated for code clarity
                     index = i * batch_size + j  # Calculate the global index based on the chunk index and local index
                     try:
                         randomized_requests[index].update(
