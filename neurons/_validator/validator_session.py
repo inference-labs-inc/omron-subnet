@@ -386,7 +386,7 @@ class ValidatorSession:
 
         # To avoid affecting the whole random package, we create an instance of it, which we seed
         seed = self.current_block // PSEUDO_SHUFFLE_EVERY_X_BLOCK
-        rng = random.Random.seed(seed)
+        rng = random.Random(seed)
         shuffled_filtered_uids = filtered_uids[:]
         rng.shuffle(shuffled_filtered_uids)
 
