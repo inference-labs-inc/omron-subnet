@@ -1,13 +1,64 @@
+import asyncio
 import json
+import multiprocessing
 import os
 import time
 import uuid
 
 import bittensor as bt
 import ezkl
-from wandb_logger import safe_log
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
+
+
+def gen_witness(input_path, circuit_path, witness_path, vk_path, srs_path):
+    bt.logging.debug("Generating witness")
+    res = ezkl.gen_witness(
+        input_path,
+        circuit_path,
+        witness_path,
+        vk_path,
+        srs_path,
+    )
+    bt.logging.debug(f"Gen witness result: {res}")
+
+
+async def gen_proof(
+    input_path, vk_path, witness_path, circuit_path, pk_path, proof_path, srs_path
+):
+    gen_witness(input_path, circuit_path, witness_path, vk_path, srs_path)
+
+    bt.logging.debug("Generating proof!!!!!!")
+    ezkl.prove(
+        witness_path,
+        circuit_path,
+        pk_path,
+        proof_path,
+        "single",
+        srs_path,
+    )
+
+
+def proof_worker(
+    input_path, vk_path, witness_path, circuit_path, pk_path, proof_path, srs_path
+):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        result = loop.run_until_complete(
+            gen_proof(
+                input_path,
+                vk_path,
+                witness_path,
+                circuit_path,
+                pk_path,
+                proof_path,
+                srs_path,
+            )
+        )
+        return result
+    finally:
+        loop.close()
 
 
 class VerifiedModelSession:
@@ -15,34 +66,25 @@ class VerifiedModelSession:
     def __init__(self, public_inputs=[]):
         self.model_id = 0
         self.session_id = str(uuid.uuid4())
+        model_path = os.path.join(
+            os.path.dirname(dir_path), f"deployment_layer/model_{self.model_id}"
+        )
 
-        self.pk_path = os.path.join(
-            dir_path, f"../deployment_layer/model_{self.model_id}/pk.key"
-        )
-        self.vk_path = os.path.join(
-            dir_path, f"../deployment_layer/model_{self.model_id}/vk.key"
-        )
-        self.srs_path = os.path.join(
-            dir_path, f"../deployment_layer/model_{self.model_id}/kzg.srs"
-        )
-        self.circuit_path = os.path.join(
-            dir_path, f"../deployment_layer/model_{self.model_id}/model.compiled"
-        )
-        self.settings_path = os.path.join(
-            dir_path, f"../deployment_layer/model_{self.model_id}/settings.json"
-        )
-        self.sample_input_path = os.path.join(
-            dir_path, f"../deployment_layer/model_{self.model_id}/input.json"
-        )
+        self.pk_path = os.path.join(model_path, "pk.key")
+        self.vk_path = os.path.join(model_path, "vk.key")
+        self.srs_path = os.path.join(model_path, "kzg.srs")
+        self.circuit_path = os.path.join(model_path, "model.compiled")
+        self.settings_path = os.path.join(model_path, "settings.json")
+        self.sample_input_path = os.path.join(model_path, "input.json")
 
         self.witness_path = os.path.join(
-            dir_path, f"./temp/witness_{self.model_id}_{self.session_id}.json"
+            dir_path, f"temp/witness_{self.model_id}_{self.session_id}.json"
         )
         self.input_path = os.path.join(
-            dir_path, f"./temp/input_{self.model_id}_{self.session_id}.json"
+            dir_path, f"temp/input_{self.model_id}_{self.session_id}.json"
         )
         self.proof_path = os.path.join(
-            dir_path, f"./temp/model_{self.model_id}_{self.session_id}.proof"
+            dir_path, f"temp/model_{self.model_id}_{self.session_id}.proof"
         )
 
         self.public_inputs = public_inputs
@@ -65,16 +107,6 @@ class VerifiedModelSession:
         with open(self.input_path, "w", encoding="utf-8") as f:
             json.dump(data, f)
 
-    def gen_witness(self):
-
-        ezkl.gen_witness(
-            self.input_path,
-            self.circuit_path,
-            self.witness_path,
-            self.vk_path,
-            self.srs_path,
-        )
-
     def gen_proof_file(self, proof_string, instances):
         dir_name = os.path.dirname(self.proof_path)
         os.makedirs(dir_name, exist_ok=True)
@@ -86,6 +118,8 @@ class VerifiedModelSession:
             f"New instances after appending with last instance from output: {new_instances}"
         )
         proof_json["instances"] = [new_instances]
+        # Enforce EVM transcript type to be used for all proofs, ensuring all are valid for proving on EVM chains
+        proof_json["transcript_type"] = "EVM"
         bt.logging.trace(f"Proof json: {proof_json}")
 
         with open(self.proof_path, "w", encoding="utf-8") as f:
@@ -97,18 +131,22 @@ class VerifiedModelSession:
         try:
             bt.logging.debug("Generating input file")
             self.gen_input_file()
-            bt.logging.debug("Generating witness")
-            self.gen_witness()
-            bt.logging.debug("Generating proof")
+            bt.logging.debug("Starting generating proof process...")
             start_time = time.time()
-            ezkl.prove(
-                self.witness_path,
-                self.circuit_path,
-                self.pk_path,
-                self.proof_path,
-                "single",
-                self.srs_path,
-            )
+            with multiprocessing.Pool(1) as p:
+                p.apply(
+                    func=proof_worker,
+                    kwds={
+                        "input_path": self.input_path,
+                        "vk_path": self.vk_path,
+                        "witness_path": self.witness_path,
+                        "circuit_path": self.circuit_path,
+                        "pk_path": self.pk_path,
+                        "proof_path": self.proof_path,
+                        "srs_path": self.srs_path,
+                    },
+                )
+
             end_time = time.time()
             proof_time = end_time - start_time
             bt.logging.info(f"Proof generation took {proof_time} seconds")
@@ -119,7 +157,7 @@ class VerifiedModelSession:
 
         except Exception as e:
             bt.logging.error(f"An error occured: {e}")
-            return f"An error occured on miner proof: {e}"
+            return f"An error occured on miner proof: {e}", 0
 
     def verify_proof(self):
         res = ezkl.verify(
@@ -136,7 +174,13 @@ class VerifiedModelSession:
             return False
         self.public_inputs = inputs
         self.gen_input_file()
-        self.gen_witness()
+        gen_witness(
+            self.input_path,
+            self.circuit_path,
+            self.witness_path,
+            self.vk_path,
+            self.srs_path,
+        )
         with open(self.witness_path, "r", encoding="utf-8") as f:
             witness_content = f.read()
         witness_json = json.loads(witness_content)
