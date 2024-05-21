@@ -5,6 +5,7 @@ from typing import Tuple
 import bittensor as bt
 import protocol
 import wandb_logger
+import websocket
 from execution_layer.VerifiedModelSession import VerifiedModelSession
 from utils import AutoUpdate
 
@@ -21,6 +22,7 @@ class MinerSession:
             bt.logging.warning(
                 "Blacklist disabled, allowing all requests. Consider enabling to filter requests."
             )
+        websocket.setdefaulttimeout(30)
 
     def __enter__(self):
         return self
@@ -28,21 +30,14 @@ class MinerSession:
     def __exit__(self, exc_type, exc_val, exc_tb):
         return False
 
-    def unpack_bt_objects(self):
-        wallet = self.wallet
-        metagraph = self.metagraph
-        subtensor = self.subtensor
-        return wallet, metagraph, subtensor
-
     def start_axon(self):
-        wallet, metagraph, subtensor = self.unpack_bt_objects()
         bt.logging.info(
             "Starting axon. Custom arguments include the following.\n"
             "Note that any null values will fallback to defaults, "
             f"which are usually sufficient. {self.config.axon}"
         )
 
-        axon = bt.axon(wallet=wallet, config=self.config)
+        axon = bt.axon(wallet=self.wallet, config=self.config)
         bt.logging.info(f"Axon created: {axon.info()}")
 
         # Attach determines which functions are called when a request is received.
@@ -53,11 +48,11 @@ class MinerSession:
         # Serve passes the axon information to the network + netuid we are hosting on.
         # This will auto-update if the axon port of external ip has changed.
         bt.logging.info(
-            f"Serving axon on network: {subtensor.chain_endpoint} with netuid: {self.config.netuid}"
+            f"Serving axon on network: {self.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
         )
-        axon.serve(netuid=self.config.netuid, subtensor=subtensor)
+        axon.serve(netuid=self.config.netuid, subtensor=self.subtensor)
         bt.logging.info(
-            f"Served axon on network: {subtensor.chain_endpoint} with netuid: {self.config.netuid}"
+            f"Served axon on network: {self.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
         )
 
         # Start the miner's axon, making it active on the network.
@@ -68,42 +63,44 @@ class MinerSession:
         self.axon = axon
 
     def run(self):
-        """Keep the miner alive. This loop maintains the miner's operations until intentionally stopped."""
-
+        """
+        Keep the miner alive.
+        This loop maintains the miner's operations until intentionally stopped.
+        """
         bt.logging.info("Starting miner...")
-        _, metagraph, subtensor = self.unpack_bt_objects()
-
         self.start_axon()
 
         step = 0
 
         while True:
-            if step % 10 == 0 and self.config.auto_update == True:
-                self.auto_update.try_update()
-            if step % 20 == 0:
-                if len(self.log_batch) > 0:
-                    bt.logging.debug(
-                        f"Logging batch to WandB of size {len(self.log_batch)}"
-                    )
-                    for log in self.log_batch:
-                        wandb_logger.safe_log(log)
-                    self.log_batch = []
-                else:
-                    bt.logging.debug("No logs to log to WandB")
             try:
+                if step % 10 == 0 and self.config.auto_update:
+                    self.auto_update.try_update()
+
+                if step % 20 == 0:
+                    if len(self.log_batch) > 0:
+                        bt.logging.debug(
+                            f"Logging batch to WandB of size {len(self.log_batch)}"
+                        )
+                        for log in self.log_batch:
+                            wandb_logger.safe_log(log)
+                        self.log_batch = []
+                    else:
+                        bt.logging.debug("No logs to log to WandB")
+
                 if step % 5 == 0:
-                    metagraph = subtensor.metagraph(self.config.netuid)
-                    log = (
+                    # update metagraph with the latest data
+                    self.metagraph = self.subtensor.metagraph(self.config.netuid)
+                    bt.logging.info(
                         f"Step:{step} | "
-                        f"Block:{metagraph.block.item()} | "
-                        f"Stake:{metagraph.S[self.subnet_uid]} | "
-                        f"Rank:{metagraph.R[self.subnet_uid]} | "
-                        f"Trust:{metagraph.T[self.subnet_uid]} | "
-                        f"Consensus:{metagraph.C[self.subnet_uid] } | "
-                        f"Incentive:{metagraph.I[self.subnet_uid]} | "
-                        f"Emission:{metagraph.E[self.subnet_uid]}"
+                        f"Block:{self.metagraph.block.item()} | "
+                        f"Stake:{self.metagraph.S[self.subnet_uid]} | "
+                        f"Rank:{self.metagraph.R[self.subnet_uid]} | "
+                        f"Trust:{self.metagraph.T[self.subnet_uid]} | "
+                        f"Consensus:{self.metagraph.C[self.subnet_uid]} | "
+                        f"Incentive:{self.metagraph.I[self.subnet_uid]} | "
+                        f"Emission:{self.metagraph.E[self.subnet_uid]}"
                     )
-                    bt.logging.info(log)
                 step += 1
                 time.sleep(1)
 
@@ -112,14 +109,15 @@ class MinerSession:
                 bt.logging.success("Miner killed via keyboard interrupt.")
                 break
             # In case of unforeseen errors, the miner will log the error and continue operations.
-            except Exception as e:
+            except Exception:
                 bt.logging.error(traceback.format_exc())
                 continue
 
     def check_register(self):
         if self.wallet.hotkey.ss58_address not in self.metagraph.hotkeys:
             bt.logging.error(
-                f"\nYour miner: {self.wallet} is not registered to the network: {self.subtensor} \nRun btcli register and try again."
+                f"\nYour miner: {self.wallet} is not registered to the network: {self.subtensor} \n"
+                "Run btcli register and try again."
             )
             exit()
         else:
@@ -133,11 +131,7 @@ class MinerSession:
         self.wallet = bt.wallet(config=self.config)
         self.subtensor = bt.subtensor(config=self.config)
         self.metagraph = self.subtensor.metagraph(self.config.netuid)
-        self.sync_metagraph()
         wandb_logger.safe_init("Miner", self.wallet, self.metagraph, self.config)
-
-    def sync_metagraph(self):
-        self.metagraph.sync(subtensor=self.subtensor)
 
     def blacklist(self, synapse: protocol.QueryZkProof) -> Tuple[bool, str]:
         """
@@ -184,11 +178,16 @@ class MinerSession:
         time_in = time.time()
         bt.logging.debug("Received request from validator")
         bt.logging.info(f"Input data: {synapse.query_input} \n")
-        if synapse.query_input is not None:
-            model_id = synapse.query_input["model_id"]
-            public_inputs = synapse.query_input["public_inputs"]
-        else:
+
+        if not synapse.query_input or not synapse.query_input.get(
+            "public_inputs", None
+        ):
             bt.logging.error("Received empty query input")
+            synapse.query_output = "Empty query input"
+            return synapse
+
+        # model_id = synapse.query_input["model_id"]
+        public_inputs = synapse.query_input["public_inputs"]
 
         # Run inputs through the model and generate a proof.
         try:
@@ -197,8 +196,7 @@ class MinerSession:
             synapse.query_output, proof_time = model_session.gen_proof()
             model_session.end()
         except Exception as e:
-            synapse.query_output = "An error occured"
-
+            synapse.query_output = "An error occurred"
             bt.logging.error("An error occurred while generating proven output", e)
             proof_time = time.time() - time_in
 
@@ -206,7 +204,8 @@ class MinerSession:
         time_out = time.time()
         delta_t = time_out - time_in
         bt.logging.info(
-            f"Total response time {delta_t}s. Proof time: {proof_time}s. Overhead time: {delta_t - proof_time}s."
+            f"Total response time {delta_t}s. Proof time: {proof_time}s. "
+            f"Overhead time: {delta_t - proof_time}s."
         )
         self.log_batch.append(
             {
@@ -218,6 +217,7 @@ class MinerSession:
 
         if delta_t > 300:
             bt.logging.error(
-                "Response time is greater than validator timeout. This indicates your hardware is not processing validator's requests in time."
+                "Response time is greater than validator timeout. "
+                "This indicates your hardware is not processing validator's requests in time."
             )
         return synapse
