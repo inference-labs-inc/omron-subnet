@@ -1,0 +1,27 @@
+{
+  "version": "0.2",
+  "ignorePaths": [],
+  "dictionaryDefinitions": [],
+  "dictionaries": [],
+  "words": [
+    "bittensor",
+    "blocktime",
+    "btcli",
+    "coldkey",
+    "dtype",
+    "ezkl",
+    "metagraph",
+    "netuid",
+    "Omron",
+    "onnxruntime",
+    "pydantic",
+    "querable",
+    "setdefaulttimeout",
+    "subtensor",
+    "uids",
+    "wandb",
+    "zkproof"
+  ],
+  "ignoreWords": [],
+  "import": []
+}

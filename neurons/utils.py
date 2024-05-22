@@ -2,10 +2,10 @@ import hashlib
 import os
 import subprocess
 import sys
+from typing import Optional
 
 import bittensor as bt
 import git
-import requests
 import wandb_logger
 
 from __init__ import __version__
@@ -31,7 +31,7 @@ class AutoUpdate:
         try:
             self.repo = git.Repo(search_parent_directories=True)
             self.update_requirements = False
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             bt.logging.exception("Failed to initialize the repository", e)
 
     def convert_version_str_to_int(self, version):
@@ -40,13 +40,13 @@ class AutoUpdate:
         """
         return int(version.replace(".", ""))
 
-    def get_remote_status(self):
+    def get_remote_status(self) -> Optional[str]:
         """
         Fetch the remote version string from the neurons/__init__.py file in the current repository
         """
         try:
             # Perform a git fetch to ensure we have the latest remote information
-            self.repo.remotes.origin.fetch()
+            self.repo.remotes.origin.fetch(kill_after_timeout=5)
 
             # Check if the requirements.txt file has changed
             local_requirements_path = os.path.join(
@@ -92,7 +92,7 @@ class AutoUpdate:
         Compares local and remote versions and returns True if the remote version is higher
         """
         remote_version = self.get_remote_status()
-        if remote_version is None:
+        if not remote_version:
             bt.logging.error("Failed to get remote version, skipping version check")
             return False
 
@@ -110,7 +110,8 @@ class AutoUpdate:
 
         if remote_version_int > local_version_int:
             bt.logging.info(
-                f"Remote version ({remote_version}) is higher than local version ({local_version}), automatically updating..."
+                f"Remote version ({remote_version}) is higher "
+                f"than local version ({local_version}), automatically updating..."
             )
             return True
         return False
@@ -130,7 +131,7 @@ class AutoUpdate:
                 return False
             try:
                 bt.logging.trace("Attempting to pull latest changes...")
-                origin.pull()
+                origin.pull(kill_after_timeout=10)
                 bt.logging.success("Successfully pulled the latest changes")
                 return True
             except git.exc.GitCommandError as e:
@@ -189,7 +190,8 @@ class AutoUpdate:
 
             python_executable = sys.executable
             subprocess.check_call(
-                [python_executable, "-m", "pip", "install", "-r", requirements_path]
+                [python_executable, "-m", "pip", "install", "-r", requirements_path],
+                timeout=60,
             )
             bt.logging.success("Successfully updated packages.")
         except Exception as e:
@@ -199,6 +201,10 @@ class AutoUpdate:
         """
         Automatic update entrypoint method
         """
+        if self.repo.active_branch.name != "main":
+            bt.logging.warning("Not on the main branch, skipping auto-update")
+            return
+
         if not self.check_version_updated():
             return
 
