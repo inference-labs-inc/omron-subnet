@@ -31,7 +31,7 @@ class AutoUpdate:
         try:
             self.repo = git.Repo(search_parent_directories=True)
             self.update_requirements = False
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             bt.logging.exception("Failed to initialize the repository", e)
 
     def convert_version_str_to_int(self, version):
@@ -201,6 +201,10 @@ class AutoUpdate:
         """
         Automatic update entrypoint method
         """
+        if self.repo.active_branch.name != "main":
+            bt.logging.warning("Not on the main branch, skipping auto-update")
+            return
+
         if not self.check_version_updated():
             return
 
