@@ -377,7 +377,7 @@ class ValidatorSession:
         # (299333 + validator_index) % num_validators = (299333 + 4) % 17 = 1
         # as validator 4, I should then query the sub group 1
 
-        batch_duration_in_blocks = (EPOCH_LENGTH / VALIDATOR_SHOULD_QUERY_EACH_BATCH_X_TIMES_PER_EPOCH) // num_validators
+        batch_duration_in_blocks = int(EPOCH_LENGTH / VALIDATOR_SHOULD_QUERY_EACH_BATCH_X_TIMES_PER_EPOCH) // num_validators
         batch_number_since_genesis = self.current_block // batch_duration_in_blocks
         batch_index_to_query = (batch_number_since_genesis + validator_index) % num_validators
 
