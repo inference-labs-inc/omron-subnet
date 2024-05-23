@@ -135,7 +135,7 @@ class ValidatorSession:
     
     def get_valid_validator_hotkeys(self):
         valid_hotkeys = []
-        hotkeys = self.metagraph.hotkeys.tolist()
+        hotkeys = self.metagraph.hotkeys
         for index, hotkey in enumerate(hotkeys):
             if self.metagraph.total_stake[index] >= 1.024e3:
                 valid_hotkeys.append(hotkey)
