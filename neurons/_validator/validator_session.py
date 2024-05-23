@@ -388,7 +388,7 @@ class ValidatorSession:
         seed = self.current_block // PSEUDO_SHUFFLE_EVERY_X_BLOCK
         rng = random.Random(seed)
         shuffled_filtered_uids = filtered_uids[:]
-        rng.shuffle(shuffled_filtered_uids)
+        rng.shuffle(list(shuffled_filtered_uids))
 
         # Since the shuffling was seeded, all the validators will shuffle the list the exact same way
         # without having to communicate with each other ensuring that they don't all query the same
