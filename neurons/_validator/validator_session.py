@@ -144,7 +144,7 @@ class ValidatorSession:
     def get_validator_index(self):
         valid_hotkeys = self.get_valid_validator_hotkeys()
         try:
-            return valid_hotkeys.index(self.config.wallet.hotkey)
+            return valid_hotkeys.index(self.wallet.hotkey.ss58_address)
         except ValueError:
             return -1
     
