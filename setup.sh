@@ -57,6 +57,12 @@ if [ -z "$(command -v python3)" ]; then
   install_python
 fi
 
+# Check if python3-venv is installed, if not then install it
+if ! dpkg -s python3-venv > /dev/null 2>&1; then
+  echo "python3-venv not found. Installing python3-venv..."
+  install_python
+fi
+
 # Check if Node is installed, if not then install it
 if [ -z "$(command -v node)" ]; then
   echo "Node not found. Installing Node..."
@@ -69,12 +75,6 @@ INSTALL_PATH=${INSTALL_PATH:-./omron}
 
 # Clone SN repo into user's specified directory
 git clone https://github.com/inference-labs-inc/omron-subnet.git $INSTALL_PATH
-
-# Setup a Virtual Python environment for dependencies
-if ! python3 -m venv --help > /dev/null 2>&1; then
-  echo "venv module not found. Installing venv..."
-  sudo apt-get install -y python3-venv
-fi
 
 echo "Setting up Python virtual environment..."
 python3 -m venv $INSTALL_PATH/.venv
