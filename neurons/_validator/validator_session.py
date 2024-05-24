@@ -366,7 +366,7 @@ class ValidatorSession:
         """
         validator_uids = metagraph.total_stake >= 1.024e3
         validator_index = self.get_validator_index()
-        num_validators = len(validator_uids)
+        num_validators = (validator_uids == True).sum().item()
 
         # batch_duration_in_blocks = (EPOCH_LENGTH / VALIDATOR_SHOULD_QUERY_EACH_BATCH_X_TIMES_PER_EPOCH) // num_validators
         # batch_duration_in_blocks = (360 / 2) // 17 = 10
