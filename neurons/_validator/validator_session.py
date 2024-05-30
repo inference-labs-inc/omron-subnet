@@ -4,6 +4,7 @@ import random
 import sys
 import time
 import traceback
+from typing import Dict, Generator, Iterable, List, Tuple
 
 import bittensor as bt
 import protocol
@@ -13,7 +14,7 @@ from _validator.reward import reward
 from execution_layer.VerifiedModelSession import VerifiedModelSession
 from rich.console import Console
 from rich.table import Table
-from utils import AutoUpdate
+from utils import AutoUpdate, clean_temp_files
 
 VALIDATOR_REQUEST_TIMEOUT_SECONDS = 30
 
@@ -34,13 +35,6 @@ class ValidatorSession:
     def __exit__(self, exc_type, exc_val, exc_tb):
         return False
 
-    def unpack_bt_objects(self):
-        wallet = self.wallet
-        metagraph = self.metagraph
-        subtensor = self.subtensor
-        dendrite = self.dendrite
-        return wallet, metagraph, subtensor, dendrite
-
     def init_scores(self):
         bt.logging.info("Creating validation weights")
 
@@ -49,13 +43,12 @@ class ValidatorSession:
         except Exception:
             scores = torch.zeros_like(self.metagraph.S, dtype=torch.float32)
 
-            scores = scores * torch.Tensor(
+            self.scores = scores * torch.Tensor(
                 [
                     self.metagraph.neurons[uid].axon_info.ip != "0.0.0.0"
                     for uid in self.metagraph.uids
                 ]
             )
-            self.scores = scores
 
         bt.logging.info("Successfully setup scores")
 
@@ -63,8 +56,10 @@ class ValidatorSession:
         return self.scores
 
     def sync_scores_uids(self, uids):
-        # If the metagraph has changed, update the weights.
-        # If there are more uids than scores, add more weights.
+        """
+        If the metagraph has changed, update the weights.
+        If there are more uids than scores, add more weights.
+        """
         if len(uids) > len(self.scores):
             bt.logging.trace("Adding more weights")
             size_difference = len(uids) - len(self.scores)
@@ -72,30 +67,19 @@ class ValidatorSession:
             self.scores = torch.cat((self.scores, new_scores))
             del new_scores
 
-    def init_running_args(self):
-
-        self.step = 0
-        self.current_block = self.subtensor.block
-
-        self.last_updated_block = self.current_block - (
-            self.current_block % self.config.blocks_per_epoch
-        )
-        self.last_reset_weights_block = self.current_block
-
-    def query_axons(self, requests):
+    def query_axons(self, requests: List[Dict]) -> List[Dict]:
         """
         Modified version of `dendrite.query` which accepts synapses unique to each axon.
         requests: list of requests
         """
-        _, _, _, dendrite = self.unpack_bt_objects()
-
         bt.logging.trace("Querying axons")
-        bt.logging.debug(f"Requests: {requests}")
+        random.shuffle(requests)
+        bt.logging.debug(f"Randomized requests: {requests}")
         try:
             # Create a coroutine for the gather operation
             coroutine = asyncio.gather(
                 *(
-                    dendrite.forward(
+                    self.dendrite.forward(
                         axons=[request["axon"]],
                         synapse=request["synapse"],
                         timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
@@ -131,7 +115,7 @@ class ValidatorSession:
             return requests
         except Exception as e:
             bt.logging.exception("Error while querying axons. \n", e)
-            return None
+            return []
     
     def get_valid_validator_hotkeys(self):
         valid_hotkeys = []
@@ -162,66 +146,39 @@ class ValidatorSession:
 
         return queryable_uids[start_index:end_index]
 
-    def get_querable_uids(self):
-        """Returns the uids of the miners that are queryable
-
-        Returns:
-            _type_: _description_
+    def get_queryable_uids(self, uids: List[int]) -> Generator[int, None, None]:
         """
-        wallet, metagraph, subtensor, dendrite = self.unpack_bt_objects()
-        uids = metagraph.uids.tolist()
+        Returns the uids of the miners that are queryable
+        """
+        # Ignore validators, they're not queryable as miners (torch.nn.Parameter)
+        queryable_flags: Iterable[bool] = self.metagraph.total_stake < 1.024e3
 
-        # Ignore validators, they're not queryable as miners.
-        queryable_uids = metagraph.total_stake < 1.024e3
+        for uid, is_queryable in zip(uids, queryable_flags):
+            if self.metagraph.neurons[uid].axon_info.ip != "0.0.0.0" and is_queryable:
+                yield uid
 
-        # Remove the weights of miners that are not queryable.
-        queryable_uids = queryable_uids * torch.Tensor(
-            [metagraph.neurons[uid].axon_info.ip != "0.0.0.0" for uid in uids]
-        )
-
-        active_miners = torch.sum(queryable_uids)
-
-        # if there are no active miners, set active_miners to 1
-        if active_miners == 0:
-            active_miners = 1
-
-        # zip uids and queryable_uids, filter only the uids that are queryable, unzip, and get the uids
-        zipped_uids = list(zip(uids, queryable_uids))
-
-        filtered_uids = list(zip(*filter(lambda x: x[1], zipped_uids)))
-        bt.logging.debug(f"filtered_uids: {filtered_uids}")
-
-        if len(filtered_uids) != 0:
-            filtered_uids = filtered_uids[0]
-
-        return filtered_uids
-
-    def update_scores(self, responses):
-        """Updates scores based on the response from the miners
-
+    def update_scores(self, responses: List[Tuple[int, bool, float, int]]) -> None:
+        """
+        Updates scores based on the response from the miners
         Args:
-            responses (_type_): [(uid, response)] array from the miners
-
-
+            responses (list): `[(uid, verification_result, response_time, proof_size)]`
         """
-        if len(responses) == 0 or responses is None:
+        if not responses:
             return
 
-        _, _, subtensor, _ = self.unpack_bt_objects()
-        new_scores = self.scores[:]
         max_score = torch.max(self.scores)
         if max_score == 0:
             max_score = 1
 
+        # add response info for non-queryable uids with zeros (those are validators' uids)
         all_uids = set(range(len(self.scores)))
-        response_uids = set(uid for uid, _, _, _ in responses)
+        response_uids = set(r[0] for r in responses)
         missing_uids = all_uids - response_uids
-
         responses.extend((uid, False, 0, 0) for uid in missing_uids)
 
-        for uid, response, response_time, proof_size in responses:
-            new_scores[uid] = reward(
-                max_score, self.scores[uid], response, response_time, proof_size
+        for uid, verified, response_time, proof_size in responses:
+            self.scores[uid] = reward(
+                max_score, self.scores[uid], verified, response_time, proof_size
             )
 
         if torch.sum(self.scores).item() != 0:
@@ -229,12 +186,14 @@ class ValidatorSession:
 
         self.log_scores()
         self.try_store_scores()
-        self.current_block = subtensor.block
+        self.current_block = self.subtensor.block
         if self.current_block - self.last_updated_block > self.config.blocks_per_epoch:
-            self.update_weights()
+            self.update_weights(torch.tensor(list(all_uids)))
 
-    def update_weights(self):
-        wallet, metagraph, subtensor, dendrite = self.unpack_bt_objects()
+    def update_weights(self, uids: torch.Tensor) -> None:
+        if uids.shape[0] == 0 or len(self.scores) == 0:
+            bt.logging.warning("No uids or scores to update weights. Skipping.")
+            return
 
         if torch.sum(self.scores).item() != 0:
             weights = self.scores / torch.sum(self.scores)
@@ -247,30 +206,29 @@ class ValidatorSession:
             processed_uids,
             processed_weights,
         ) = bt.utils.weight_utils.process_weights_for_netuid(
-            uids=metagraph.uids,
+            uids=uids,
             weights=weights,
             netuid=self.config.netuid,
-            subtensor=subtensor,
+            subtensor=self.subtensor,
         )
         bt.logging.info(f"Processed weights: {processed_weights}")
         bt.logging.info(f"Processed uids: {processed_uids}")
 
-        result = subtensor.set_weights(
+        is_weights_set, set_weights_msg = self.subtensor.set_weights(
             netuid=self.config.netuid,  # Subnet to set weights on.
-            wallet=wallet,  # Wallet to sign set weights using hotkey.
+            wallet=self.wallet,  # Wallet to sign set weights using hotkey.
             uids=processed_uids,  # Uids of the miners to set weights for.
             weights=processed_weights,  # Weights to set for the miners.
         )
 
+        if not is_weights_set:
+            bt.logging.error(f"Failed to set weights - {set_weights_msg}.")
+            return
+
+        bt.logging.success(f"✅ Successfully set weights - {set_weights_msg}")
         self.weights = weights
+        self.last_updated_block = self.metagraph.block.item()
         self.log_weights()
-
-        self.last_updated_block = metagraph.block.item()
-
-        if result:
-            bt.logging.success("✅ Successfully set weights.")
-        else:
-            bt.logging.error("Failed to set weights.")
 
     def log_scores(self):
         table = Table(title="scores")
@@ -315,9 +273,8 @@ class ValidatorSession:
         console = Console()
         console.print(table)
 
-    def verify_proof_string(self, proof_string: str, inputs):
-
-        if proof_string == None:
+    def verify_proof_string(self, proof_string: str, inputs: List[float]) -> bool:
+        if not proof_string:
             return False
         try:
             inference_session = VerifiedModelSession()
@@ -399,15 +356,13 @@ class ValidatorSession:
         return batched_uids
     
     def run_step(self):
-        _, metagraph, _, _ = self.unpack_bt_objects()
-
         # Get the uids of all miners in the network.
-        uids = metagraph.uids.tolist()
+        uids = self.metagraph.uids.tolist()
         self.sync_scores_uids(uids)
 
         requests = []
 
-        filtered_uids = self.get_querable_uids()
+        filtered_uids = self.get_querable_uids(uids)
 
         batched_uids = self.deterministically_shuffle_and_batch_queryable_uids(metagraph, filtered_uids)
 
@@ -437,12 +392,10 @@ class ValidatorSession:
             responses = self.query_axons(requests)
             bt.logging.trace(f"Responses: {responses}")
 
-            verification_results = []
-            response_times = []
-            proof_sizes = []
+            # collect results - list of tuples (uid, is_verified, response_time, proof_size)
+            verification_results: List[Tuple[int, bool, float, int]] = []
             for response in responses:
                 try:
-
                     response["verification_result"] = self.verify_proof_string(
                         response["deserialized"], response["inputs"]
                     )
@@ -451,28 +404,23 @@ class ValidatorSession:
                     )
                 except Exception as e:
                     bt.logging.trace(
-                        f"Error verifying proof or checking proof size for uid: {response['uid']}, full response: {response}, error: {e}"
+                        f"Error verifying proof or checking proof size for uid: "
+                        f"{response['uid']}, full response: {response}, error: {e}"
                     )
                     response["proof_size"] = sys.maxsize
                     response["verification_result"] = False
-                verification_results.append(response["verification_result"])
-                response_times.append(response["response_time"])
-                proof_sizes.append(response["proof_size"])
 
-            self.log_responses(responses)
-
-            self.update_scores(
-                list(
-                    zip(
-                        filtered_uids,
-                        verification_results,
-                        response_times,
-                        proof_sizes,
+                verification_results.append(
+                    (
+                        response["uid"],
+                        response["verification_result"],
+                        response["response_time"],
+                        response["proof_size"],
                     )
                 )
-            )
 
-            self.step += 1
+            self.log_responses(responses)
+            self.update_scores(verification_results)
 
             # Sleep for 60s
             time.sleep(60)
@@ -485,25 +433,31 @@ class ValidatorSession:
         # If the user interrupts the program, gracefully exit.
         except KeyboardInterrupt:
             bt.logging.success("Keyboard interrupt detected. Exiting validator.")
+            clean_temp_files()
             exit()
 
     def run(self):
+        """
+        Start the validator session and run the main loop
+        """
         bt.logging.debug("Validator started its running loop")
-
-        wallet, metagraph, subtensor, dendrite = self.unpack_bt_objects()
-
         self.init_scores()
-        self.init_running_args()
+        self.current_block = self.subtensor.block
+        # Set the last updated block to the last epoch boundary
+        self.last_updated_block = self.current_block - (
+            self.current_block % self.config.blocks_per_epoch
+        )
 
         while True:
             try:
-                if self.config.auto_update == True:
+                if not self.config.no_auto_update:
                     self.auto_update.try_update()
-                self.sync_metagraph()
+                self.metagraph.sync(subtensor=self.subtensor)
                 self.run_step()
 
             except KeyboardInterrupt:
                 bt.logging.info("KeyboardInterrupt caught. Exiting validator.")
+                clean_temp_files()
                 exit()
 
             except Exception as e:
@@ -514,7 +468,8 @@ class ValidatorSession:
     def check_register(self):
         if self.wallet.hotkey.ss58_address not in self.metagraph.hotkeys:
             bt.logging.error(
-                f"\nYour validator: {self.wallet} is not registered to chain connection: {self.subtensor} \nRun btcli register and try again."
+                f"\nYour validator: {self.wallet} is not registered to chain connection: "
+                f"{self.subtensor} \nRun btcli register and try again."
             )
             exit()
         else:
@@ -524,18 +479,17 @@ class ValidatorSession:
             self.subnet_uid = subnet_uid
 
     def configure(self):
-        # === Configure Bittensor objects ====
+        """
+        Configure Bittensor objects
+        """
         self.wallet = bt.wallet(config=self.config)
         self.subtensor = bt.subtensor(config=self.config)
         self.dendrite = bt.dendrite(wallet=self.wallet)
         self.metagraph = self.subtensor.metagraph(self.config.netuid)
-        self.sync_metagraph()
+
         wandb_logger.safe_init(
             "Validator",
             self.wallet,
             self.metagraph,
             self.config,
         )
-
-    def sync_metagraph(self):
-        self.metagraph.sync(subtensor=self.subtensor)

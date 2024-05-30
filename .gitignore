@@ -133,6 +133,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+omron-venv/
 
 # Spyder project settings
 .spyderproject
@@ -171,3 +172,6 @@ Makefile
 # Huge PKs
 pk.key
 kzg.srs
+
+# pm2 config file
+ecosystem.config.js

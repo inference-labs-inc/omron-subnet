@@ -10,15 +10,15 @@ To mine and validate for the Omron subnet, you'll need to install several prereq
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/inference-labs-inc/omron-subnet/main/setup.sh)"
 ```
 
-| Tool | Description |
-| --- | --- |
-| [`NodeJS`] | A JavaScript runtime that is widely used for building web applications. |
-| [`pm2`] | A process manager for Node.js applications that is used to run and manage applications in the background. |
-| [`Python`] | A programming language that is widely used for scientific computing and data analysis. |
-| [`pip`] | A package manager for Python that is used to install and manage Python packages. |
-| [`btcli`] | A command-line interface for interacting with the Bittensor network. |
-| [`kzg.srs`] | A structured reference string to be placed in `neurons/deployment_layer/model_0/` |
-| [`pk.key`] | A proving key to be placed in `neurons/deployment_layer/model_0/` |
+| Tool        | Description                                                                                               |
+| ----------- | --------------------------------------------------------------------------------------------------------- |
+| [`NodeJS`]  | A JavaScript runtime that is widely used for building web applications.                                   |
+| [`pm2`]     | A process manager for Node.js applications that is used to run and manage applications in the background. |
+| [`Python`]  | A programming language that is widely used for scientific computing and data analysis.                    |
+| [`pip`]     | A package manager for Python that is used to install and manage Python packages.                          |
+| [`btcli`]   | A command-line interface for interacting with the Bittensor network.                                      |
+| [`kzg.srs`] | A structured reference string to be placed in `neurons/deployment_layer/model_0/`                         |
+| [`pk.key`]  | A proving key to be placed in `neurons/deployment_layer/model_0/`                                         |
 
 ## 2. Create a new wallet
 
@@ -44,14 +44,22 @@ Run the following command to register on the subnet. You are required to registe
 
 Replace `default` values below with your wallet and hotkey names if they are not `default`.
 
-| Variable | Description |
-| --- | --- |
-| `NETWORK` | The network you are registering on. This can be either `finney` for mainnet or `test` for testnet. |
-| `NETUID` | The network ID of the subnet you are registering on. For testnet, our netuid is `118` and on mainnet, our netuid is `2`. |
+| Variable  | Description                                                                                                              |
+| --------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `NETWORK` | The network you are registering on. This can be either `finney` for mainnet or `test` for testnet.                       |
+| `NETUID`  | The network ID of the subnet you are registering on. For testnet, our netuid is `118` and on mainnet, our netuid is `2`. |
 
 ```console
 btcli subnet register --subtensor.network {NETWORK} --netuid {NETUID} --wallet.name default --wallet.hotkey default
 ```
+
+## 4. Run your miner or validator
+
+To run your miner or validator, follow the instructions linked below based on the network you intend to mine or validate on.
+
+[Local "Staging" Network →](./running_on_staging.md)
+[Mainnet "Finney" →](./running_on_mainnet.md)
+[Testnet →](./running_on_testnet.md)
 
 [`NodeJS`]: https://nodejs.org/en/download/
 [`pm2`]: https://pm2.keymetrics.io/docs/usage/quick-start/
