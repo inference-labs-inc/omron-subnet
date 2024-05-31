@@ -142,10 +142,19 @@ class ValidatorSession:
         response_uids = set(r[0] for r in responses)
         missing_uids = all_uids - response_uids
         responses.extend((uid, False, 0, 0) for uid in missing_uids)
+        max_response_time = max(
+            (response[2] if response[2] is not None else 0 for response in responses),
+            default=0,
+        )
 
         for uid, verified, response_time, proof_size in responses:
             self.scores[uid] = reward(
-                max_score, self.scores[uid], verified, response_time, proof_size
+                max_score,
+                self.scores[uid],
+                verified,
+                response_time,
+                proof_size,
+                max_response_time,
             )
 
         if torch.sum(self.scores).item() != 0:
