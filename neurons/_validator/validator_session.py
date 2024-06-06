@@ -17,6 +17,7 @@ from rich.table import Table
 from utils import AutoUpdate, clean_temp_files
 
 VALIDATOR_REQUEST_TIMEOUT_SECONDS = 300
+MAX_CONCURRENT_REQUESTS = 16
 
 
 class ValidatorSession:
@@ -64,30 +65,31 @@ class ValidatorSession:
             self.scores = torch.cat((self.scores, new_scores))
             del new_scores
 
-    def query_axons(self, requests: List[Dict]) -> List[Dict]:
+    async def query_axons(self, requests: List[Dict]) -> List[Dict]:
         """
         Modified version of `dendrite.query` which accepts synapses unique to each axon.
         requests: list of requests
         """
         bt.logging.trace("Querying axons")
         random.shuffle(requests)
-        bt.logging.debug(f"Randomized requests: {requests}")
+        bt.logging.debug(f"Shuffled requests: {requests}")
+        # Create a semaphore that locks the number of concurrent requests to MAX_CONCURRENT_REQUESTS
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+
+        async def send_request(request):
+            async with semaphore:
+                return await self.dendrite.forward(
+                    axons=[request["axon"]],
+                    synapse=request["synapse"],
+                    timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+                    deserialize=False,
+                )
+
+        tasks = [send_request(request) for request in requests]
+
         try:
             # Create a coroutine for the gather operation
-            coroutine = asyncio.gather(
-                *(
-                    self.dendrite.forward(
-                        axons=[request["axon"]],
-                        synapse=request["synapse"],
-                        timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-                        deserialize=False,
-                    )
-                    for request in requests
-                )
-            )
-
-            # Run the coroutine to completion and return the result
-            results = asyncio.run(coroutine)
+            results = await asyncio.gather(*tasks)
             bt.logging.trace(f"Results: {results}")
             for i, sublist in enumerate(results):
                 result = sublist[0]
@@ -313,7 +315,8 @@ class ValidatorSession:
         bt.logging.trace("Requests being sent", requests)
 
         try:
-            responses = self.query_axons(requests)
+            loop = asyncio.get_event_loop()
+            responses = loop.run_until_complete(self.query_axons(requests))
             bt.logging.trace(f"Responses: {responses}")
 
             # collect results - list of tuples (uid, is_verified, response_time, proof_size)
