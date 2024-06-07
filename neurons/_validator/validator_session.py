@@ -16,7 +16,9 @@ from rich.console import Console
 from rich.table import Table
 from utils import AutoUpdate, clean_temp_files
 
+
 VALIDATOR_REQUEST_TIMEOUT_SECONDS = 30
+MAX_CONCURRENT_REQUESTS = 16
 
 VALIDATOR_SHOULD_QUERY_EACH_BATCH_X_TIMES_PER_EPOCH = 2
 PSEUDO_SHUFFLE_EVERY_X_BLOCK = 360
@@ -67,30 +69,31 @@ class ValidatorSession:
             self.scores = torch.cat((self.scores, new_scores))
             del new_scores
 
-    def query_axons(self, requests: List[Dict]) -> List[Dict]:
+    async def query_axons(self, requests: List[Dict]) -> List[Dict]:
         """
         Modified version of `dendrite.query` which accepts synapses unique to each axon.
         requests: list of requests
         """
         bt.logging.trace("Querying axons")
         random.shuffle(requests)
-        bt.logging.debug(f"Randomized requests: {requests}")
+        bt.logging.debug(f"Shuffled requests: {requests}")
+        # Create a semaphore that locks the number of concurrent requests to MAX_CONCURRENT_REQUESTS
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+
+        async def send_request(request):
+            async with semaphore:
+                return await self.dendrite.forward(
+                    axons=[request["axon"]],
+                    synapse=request["synapse"],
+                    timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+                    deserialize=False,
+                )
+
+        tasks = [send_request(request) for request in requests]
+
         try:
             # Create a coroutine for the gather operation
-            coroutine = asyncio.gather(
-                *(
-                    self.dendrite.forward(
-                        axons=[request["axon"]],
-                        synapse=request["synapse"],
-                        timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-                        deserialize=False,
-                    )
-                    for request in requests
-                )
-            )
-
-            # Run the coroutine to completion and return the result
-            results = asyncio.run(coroutine)
+            results = await asyncio.gather(*tasks)
             bt.logging.trace(f"Results: {results}")
             for i, sublist in enumerate(results):
                 result = sublist[0]
@@ -175,10 +178,19 @@ class ValidatorSession:
         response_uids = set(r[0] for r in responses)
         missing_uids = all_uids - response_uids
         responses.extend((uid, False, 0, 0) for uid in missing_uids)
+        max_response_time = max(
+            (response[2] if response[2] is not None else 0 for response in responses),
+            default=0,
+        )
 
         for uid, verified, response_time, proof_size in responses:
             self.scores[uid] = reward(
-                max_score, self.scores[uid], verified, response_time, proof_size
+                max_score,
+                self.scores[uid],
+                verified,
+                response_time,
+                proof_size,
+                max_response_time,
             )
 
         if torch.sum(self.scores).item() != 0:
@@ -278,7 +290,7 @@ class ValidatorSession:
             return False
         try:
             inference_session = VerifiedModelSession()
-            res = inference_session.verify_proof_and_inputs(proof_string, inputs)
+            res = inference_session.verify_proof_and_inputs(proof_string, [inputs])
             inference_session.end()
             return res
         except Exception as e:
@@ -409,7 +421,8 @@ class ValidatorSession:
         bt.logging.trace("Requests being sent", requests)
 
         try:
-            responses = self.query_axons(requests)
+            loop = asyncio.get_event_loop()
+            responses = loop.run_until_complete(self.query_axons(requests))
             bt.logging.trace(f"Responses: {responses}")
 
             # collect results - list of tuples (uid, is_verified, response_time, proof_size)
@@ -472,6 +485,10 @@ class ValidatorSession:
             try:
                 if not self.config.no_auto_update:
                     self.auto_update.try_update()
+                else:
+                    bt.logging.info(
+                        "Automatic updates are disabled, skipping version check"
+                    )
                 self.metagraph.sync(subtensor=self.subtensor)
                 self.run_step()
 
