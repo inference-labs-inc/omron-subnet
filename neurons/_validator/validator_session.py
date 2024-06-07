@@ -388,6 +388,10 @@ class ValidatorSession:
             try:
                 if not self.config.no_auto_update:
                     self.auto_update.try_update()
+                else:
+                    bt.logging.info(
+                        "Automatic updates are disabled, skipping version check"
+                    )
                 self.metagraph.sync(subtensor=self.subtensor)
                 self.run_step()
 

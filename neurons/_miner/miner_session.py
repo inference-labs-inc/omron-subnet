@@ -74,8 +74,13 @@ class MinerSession:
 
         while True:
             try:
-                if step % 10 == 0 and not self.config.no_auto_update:
-                    self.auto_update.try_update()
+                if step % 10 == 0:
+                    if not self.config.no_auto_update:
+                        self.auto_update.try_update()
+                    else:
+                        bt.logging.info(
+                            "Automatic updates are disabled, skipping version check"
+                        )
 
                 if step % 20 == 0:
                     if len(self.log_batch) > 0:
