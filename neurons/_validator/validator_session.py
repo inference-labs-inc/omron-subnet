@@ -316,12 +316,12 @@ class ValidatorSession:
         wandb_logger.safe_log(wandb_log)
         console.print(table)
 
-    def deterministically_shuffle_and_batch_queryable_uids(self, metagraph, filtered_uids):
+    def deterministically_shuffle_and_batch_queryable_uids(self, filtered_uids):
         """
         Pseudorandomly shuffles the list of queryable uids, and splits it in batches to reduce concurrent requests from multiple validators
 
         """
-        validator_uids = metagraph.total_stake >= 1.024e3
+        validator_uids = self.metagraph.total_stake >= 1.024e3
         validator_index = self.get_validator_index()
         num_validators = (validator_uids == True).sum().item()
 
@@ -364,25 +364,45 @@ class ValidatorSession:
 
         filtered_uids = self.get_querable_uids(uids)
 
-        batched_uids = self.deterministically_shuffle_and_batch_queryable_uids(metagraph, filtered_uids)
+        batched_uids = self.deterministically_shuffle_and_batch_queryable_uids(filtered_uids)
 
-        for uid in batched_uids:
-            axon = metagraph.axons[uid]
-            inputs = [random.uniform(-1, 1) for _ in range(5)]
-            synapse = protocol.QueryZkProof(
-                query_input={
-                    "model_id": [0],
-                    "public_inputs": inputs,
-                }
-            )
-            requests.append(
-                {
-                    "uid": uid,
-                    "axon": axon,
-                    "synapse": synapse,
-                    "inputs": inputs,
-                }
-            )
+        num_miners_in_batch = len(batched_uids)
+
+        # mocking the list of requests that would be sent by the API to the validator
+        lower_requests_limit = 2*num_miners_in_batch 
+        upper_requests_limit = 5*num_miners_in_batch 
+        num_concurrent_requests = random.randint(lower_requests_limit, upper_requests_limit)
+
+        proof_inputs = [random.uniform(-1, 1) for _ in range(num_concurrent_requests)]
+
+        # proof_inputs would be what the validator receives, here's how it should be split
+        # between the miners in the current batch
+
+        miner_inputs = [[] for _ in range(num_miners_in_batch)]
+
+        for i, proof_input in enumerate(proof_inputs):
+            # we split it in batches using the drawer principle / by round-robin
+            miner_inputs[i % num_miners_in_batch].append(proof_input)
+        
+        for i, uid in enumerate(batched_uids):
+            axon = self.metagraph.axons[uid]
+            inputs_array = proof_inputs[i]
+            for inputs in inputs_array:
+                synapse = protocol.QueryZkProof(
+                    query_input={
+                        "model_id": [0],
+                        "public_inputs": inputs,
+                    }
+                )
+                requests.append(
+                    {
+                        "uid": uid,
+                        "axon": axon,
+                        "synapse": synapse,
+                        "inputs": inputs,
+                    }
+                )
+
         bt.logging.info(
             f"\033[92m >> Sending {len(requests)} queries for proofs to miners in the subnet \033[0m"
         )
