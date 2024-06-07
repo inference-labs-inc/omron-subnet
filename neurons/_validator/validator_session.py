@@ -386,7 +386,7 @@ class ValidatorSession:
         
         for i, uid in enumerate(batched_uids):
             axon = self.metagraph.axons[uid]
-            inputs_array = proof_inputs[i]
+            inputs_array = miner_inputs[i]
             for inputs in inputs_array:
                 synapse = protocol.QueryZkProof(
                     query_input={
