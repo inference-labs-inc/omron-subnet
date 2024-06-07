@@ -196,21 +196,26 @@ class MinerSession:
             synapse.query_output = "Empty query input"
             return synapse
 
-        # model_id = synapse.query_input["model_id"]
+        model_id = synapse.query_input.get("model_id", [0])
         public_inputs = synapse.query_input["public_inputs"]
+        if model_id == [0]:
+            public_inputs = [public_inputs]
 
         # Run inputs through the model and generate a proof.
         try:
-            model_session = VerifiedModelSession(public_inputs)
+            model_session = VerifiedModelSession(public_inputs, model_id)
             bt.logging.debug("Model session created successfully")
             synapse.query_output, proof_time = model_session.gen_proof()
             model_session.end()
+            try:
+                bt.logging.info("✅ Proof completed \n")
+            except UnicodeEncodeError:
+                bt.logging.info("Proof completed \n")
         except Exception as e:
             synapse.query_output = "An error occurred"
-            bt.logging.error("An error occurred while generating proven output", e)
+            bt.logging.error(f"An error occurred while generating proven output\n{e}")
             proof_time = time.time() - time_in
 
-        bt.logging.info("✅ Proof completed \n")
         time_out = time.time()
         delta_t = time_out - time_in
         bt.logging.info(

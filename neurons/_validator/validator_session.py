@@ -256,7 +256,7 @@ class ValidatorSession:
             return False
         try:
             inference_session = VerifiedModelSession()
-            res = inference_session.verify_proof_and_inputs(proof_string, inputs)
+            res = inference_session.verify_proof_and_inputs(proof_string, [inputs])
             inference_session.end()
             return res
         except Exception as e:
