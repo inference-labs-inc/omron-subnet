@@ -66,7 +66,7 @@ def reward(
         performance_metric = RESPONSE_TIME_WEIGHT * (
             1 - h(response_score)
         ) - PROOF_SIZE_WEIGHT * min(1, proof_size / PROOF_SIZE_THRESHOLD)
-        rate = RATE_OF_RECOVERY * performance_metric
+        rate = RATE_OF_RECOVERY
         max_score = max_score * performance_metric
         distance = max_score - score
         return score + rate * distance
