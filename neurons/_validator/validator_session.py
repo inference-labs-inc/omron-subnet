@@ -16,7 +16,7 @@ from rich.console import Console
 from rich.table import Table
 from utils import AutoUpdate, clean_temp_files
 
-VALIDATOR_REQUEST_TIMEOUT_SECONDS = 300
+VALIDATOR_REQUEST_TIMEOUT_SECONDS = 30
 MAX_CONCURRENT_REQUESTS = 16
 
 
@@ -132,41 +132,81 @@ class ValidatorSession:
         Args:
             responses (list): `[(uid, verification_result, response_time, proof_size)]`
         """
-        if not responses:
-            return
+        try:
+            if not responses:
+                bt.logging.error("No responses received, skipping score update")
+                return
 
-        max_score = torch.max(self.scores)
-        if max_score == 0:
-            max_score = 1
+            max_score = torch.max(self.scores)
+            if max_score == 0:
+                max_score = 1
 
-        # add response info for non-queryable uids with zeros (those are validators' uids)
-        all_uids = set(range(len(self.scores)))
-        response_uids = set(r[0] for r in responses)
-        missing_uids = all_uids - response_uids
-        responses.extend((uid, False, 0, 0) for uid in missing_uids)
-        max_response_time = max(
-            (response[2] if response[2] is not None else 0 for response in responses),
-            default=0,
-        )
+            # add response info for non-queryable uids with zeros (those are validators' uids)
+            all_uids = set(range(len(self.scores)))
+            response_uids = set(r[0] for r in responses)
+            missing_uids = all_uids - response_uids
+            responses.extend((uid, False, 0, 0) for uid in missing_uids)
+            median_max_response_time = torch.median(
+                torch.tensor(
+                    sorted(
+                        [
+                            (
+                                response[2]
+                                if response[2] is not None
+                                else VALIDATOR_REQUEST_TIMEOUT_SECONDS
+                            )
+                            for response in responses
+                        ]
+                    )[-max(int(len(responses) * 0.05), 1) :]
+                )
+            ).item()
+            min_response_time = torch.min(
+                (
+                    torch.tensor(
+                        [
+                            (
+                                response[2]
+                                if response[2] is not None
+                                else VALIDATOR_REQUEST_TIMEOUT_SECONDS
+                            )
+                            for response in responses
+                        ]
+                    )
+                )
+            ).item()
 
-        for uid, verified, response_time, proof_size in responses:
-            self.scores[uid] = reward(
-                max_score,
-                self.scores[uid],
-                verified,
-                response_time,
-                proof_size,
-                max_response_time,
-            )
+            bt.logging.debug(f"Median max response time: {median_max_response_time}")
+            bt.logging.debug(f"Min response time: {min_response_time}")
 
-        if torch.sum(self.scores).item() != 0:
-            self.scores = self.scores / torch.sum(self.scores)
+            for uid, verified, response_time, proof_size in responses:
+                self.scores[uid] = reward(
+                    max_score,
+                    self.scores[uid],
+                    verified,
+                    (
+                        response_time
+                        if response_time
+                        else VALIDATOR_REQUEST_TIMEOUT_SECONDS
+                    ),
+                    proof_size,
+                    median_max_response_time,
+                    min_response_time,
+                )
 
-        self.log_scores()
-        self.try_store_scores()
-        self.current_block = self.subtensor.block
-        if self.current_block - self.last_updated_block > self.config.blocks_per_epoch:
-            self.update_weights(torch.tensor(list(all_uids)))
+            if torch.sum(self.scores).item() != 0:
+                self.scores = self.scores / torch.sum(self.scores)
+
+            self.log_scores()
+            self.try_store_scores()
+            self.current_block = self.subtensor.block
+            if (
+                self.current_block - self.last_updated_block
+                > self.config.blocks_per_epoch
+            ):
+                self.update_weights(torch.tensor(list(all_uids)))
+        except Exception as e:
+            bt.logging.error("Error while updating scores", e)
+            traceback.print_exc()
 
     def update_weights(self, uids: torch.Tensor) -> None:
         if uids.shape[0] == 0 or len(self.scores) == 0:
