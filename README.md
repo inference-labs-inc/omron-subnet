@@ -6,7 +6,7 @@
 
 ### Proof of Inference
 
-[Discord](https://discord.gg/bittensor) • [X](https://twitter.com/omron_ai) • [Inference Labs](https://twitter.com/inference_labs) • [Explorer](https://taostats.io/) • [Dashboard](https://wandb.ai/inferencelabs/omron)
+[Documentation](https://docs.omron.ai/) • [X](https://twitter.com/omron_ai) • [Inference Labs](https://twitter.com/inference_labs) • [Explorer](https://taostats.io/) • [Dashboard](https://wandb.ai/inferencelabs/omron)
 
 </div>
 
