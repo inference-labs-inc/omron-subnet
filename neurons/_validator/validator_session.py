@@ -17,8 +17,14 @@ from rich.table import Table
 from utils import AutoUpdate, clean_temp_files
 
 
+# The maximum time miners can take to respond to requests
 VALIDATOR_REQUEST_TIMEOUT_SECONDS = 30
+# The maximum number of concurrent requests
 MAX_CONCURRENT_REQUESTS = 16
+# Size in percent of the sample to be used for the maximum score median
+MAXIMUM_SCORE_MEDIAN_SAMPLE = 0.05
+# Shift in seconds to apply to the minimum response time for vertical asymptote adjustment
+MINIMUM_SCORE_SHIFT = 0.5
 
 VALIDATOR_SHOULD_QUERY_EACH_BATCH_X_TIMES_PER_EPOCH = 2
 PSEUDO_SHUFFLE_EVERY_X_BLOCK = 360
@@ -166,41 +172,86 @@ class ValidatorSession:
         Args:
             responses (list): `[(uid, verification_result, response_time, proof_size)]`
         """
-        if not responses:
-            return
+        try:
+            if not responses:
+                bt.logging.error("No responses received, skipping score update")
+                return
 
-        max_score = torch.max(self.scores)
-        if max_score == 0:
-            max_score = 1
+            max_score = torch.max(self.scores)
+            if max_score == 0:
+                max_score = 1
 
-        # add response info for non-queryable uids with zeros (those are validators' uids)
-        all_uids = set(range(len(self.scores)))
-        response_uids = set(r[0] for r in responses)
-        missing_uids = all_uids - response_uids
-        responses.extend((uid, False, 0, 0) for uid in missing_uids)
-        max_response_time = max(
-            (response[2] if response[2] is not None else 0 for response in responses),
-            default=0,
-        )
-
-        for uid, verified, response_time, proof_size in responses:
-            self.scores[uid] = reward(
-                max_score,
-                self.scores[uid],
-                verified,
-                response_time,
-                proof_size,
-                max_response_time,
+            # add response info for non-queryable uids with zeros (those are validators' uids)
+            all_uids = set(range(len(self.scores)))
+            response_uids = set(r[0] for r in responses)
+            missing_uids = all_uids - response_uids
+            responses.extend((uid, False, 0, 0) for uid in missing_uids)
+            # Filter responses by verified and sort them
+            sorted_filtered_times = sorted(
+                [r[2] for r in responses if r[1] and r[2] > 0]
+            )
+            # Take the median value of miners with high response times
+            median_max_response_time = torch.clamp(
+                torch.median(
+                    torch.tensor(
+                        sorted_filtered_times[
+                            -max(
+                                int(
+                                    len(sorted_filtered_times)
+                                    * MAXIMUM_SCORE_MEDIAN_SAMPLE
+                                ),
+                                1,
+                            ) :
+                        ]
+                    )
+                ),
+                0,
+                VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+            ).item()
+            # Get the fastest response time and apply a shift
+            # Note that this does not adjust the miner's response time - it establishes a good position for the
+            # right vertical asymptote across all reward runs
+            min_response_time = (
+                torch.clamp(
+                    torch.min(torch.tensor(sorted_filtered_times)),
+                    0,
+                    VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+                ).item()
+                - MINIMUM_SCORE_SHIFT
             )
 
-        if torch.sum(self.scores).item() != 0:
-            self.scores = self.scores / torch.sum(self.scores)
+            bt.logging.debug(f"Median max response time: {median_max_response_time}")
+            bt.logging.debug(f"Min response time: {min_response_time}")
 
-        self.log_scores()
-        self.try_store_scores()
-        self.current_block = self.subtensor.block
-        if self.current_block - self.last_updated_block > self.config.blocks_per_epoch:
-            self.update_weights(torch.tensor(list(all_uids)))
+            for uid, verified, response_time, proof_size in responses:
+                self.scores[uid] = reward(
+                    max_score,
+                    self.scores[uid],
+                    verified,
+                    (
+                        response_time
+                        if response_time
+                        else VALIDATOR_REQUEST_TIMEOUT_SECONDS
+                    ),
+                    proof_size,
+                    median_max_response_time,
+                    min_response_time,
+                )
+
+            if torch.sum(self.scores).item() != 0:
+                self.scores = self.scores / torch.sum(self.scores)
+
+            self.log_scores()
+            self.try_store_scores()
+            self.current_block = self.subtensor.block
+            if (
+                self.current_block - self.last_updated_block
+                > self.config.blocks_per_epoch
+            ):
+                self.update_weights(torch.tensor(list(all_uids)))
+        except Exception as e:
+            bt.logging.error("Error while updating scores", e)
+            traceback.print_exc()
 
     def update_weights(self, uids: torch.Tensor) -> None:
         if uids.shape[0] == 0 or len(self.scores) == 0:
@@ -382,7 +433,7 @@ class ValidatorSession:
 
         # mocking the list of requests that would be sent by the API to the validator
         lower_requests_limit = 2*num_miners_in_batch 
-        upper_requests_limit = 5*num_miners_in_batch 
+        upper_requests_limit = MAX_CONCURRENT_REQUESTS*num_miners_in_batch 
         num_concurrent_requests = random.randint(lower_requests_limit, upper_requests_limit)
 
         proof_inputs = [random.uniform(-1, 1) for _ in range(num_concurrent_requests)]
