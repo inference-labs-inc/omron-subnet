@@ -1,17 +1,37 @@
 import hashlib
 import os
+import shutil
 import subprocess
 import sys
 from typing import Optional
-import shutil
 
 import bittensor as bt
 import git
+import torch
 import wandb_logger
 
 from __init__ import __version__
 
 TARGET_BRANCH = "main"
+
+
+def hotkey_to_split_tensor(hotkey_ss58=None):
+    """
+    Converts a hotkey into a tensor of ascii numbers representing the hotkey SS58
+    """
+    if hotkey_ss58 is None:
+        bt.logging.error("No hotkey provided, cannot split into a tensor")
+        return None
+
+    split = [ord(c) for c in hotkey_ss58]
+    return torch.tensor(
+        split,
+        dtype=torch.float,
+    )
+
+
+def split_tensor_to_hotkey(split_tensor):
+    return "".join([chr(i) for i in split_tensor.tolist()])
 
 
 def restart_app():

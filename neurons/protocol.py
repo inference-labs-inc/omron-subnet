@@ -16,7 +16,7 @@ THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABI
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
-
+from __future__ import annotations
 from typing import Dict, Optional
 
 import bittensor as bt
@@ -57,21 +57,17 @@ class QueryForProvenInference(bt.Synapse):
         return self.query_output
 
 
-class CheckMiner(bt.Synapse):
+class QueryForProofAggregation(bt.Synapse):
     """
-    CheckMiner class inherits from bt.Synapse.
-    It is used to check the miner's status. This is not used yet.
+    Query for aggregation of multiple proofs into a single proof
     """
 
-    # Required request input, send url_hash for check
-    check_url_hash: str
+    proofs: list[str] = []
+    model_id: str or int
+    aggregation_proof: Optional[str] = None
 
-    # TODO: Add error handling for when check_output is None
-    check_output: Optional[Dict] = None
-
-    def deserialize(self) -> Dict:
+    def deserialize(self) -> str:
         """
-        Deserialize the check_output into a dictionary.
+        Return the aggregation proof
         """
-        # TODO: Add error handling for when check_output is None
-        return self.check_output
+        return self.aggregation_proof

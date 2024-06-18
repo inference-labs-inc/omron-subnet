@@ -82,6 +82,7 @@ if __name__ == "__main__":
             "Failed to establish HTTP connection. This could indicate that the axon is not running or your port is not exposed. Please check your configuration.\n",
             e,
         )
+        raise e
 
     wallet = bt.wallet(name=args.wallet, hotkey=args.hotkey)
     axon = bt.axon(wallet=wallet, external_ip=args.external_ip, external_port=args.port)

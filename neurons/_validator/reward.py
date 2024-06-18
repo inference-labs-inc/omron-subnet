@@ -2,107 +2,134 @@
 This module contains the reward function for the validator.
 """
 
-import math
-
-import bittensor as bt
-
-RATE_OF_RECOVERY = 0.1
-RATE_OF_DECAY = 0.4
-
-MINIMUM_SCORE = 0
-
-RESPONSE_TIME_WEIGHT = 1
-PROOF_SIZE_WEIGHT = 0
-
-PROOF_SIZE_THRESHOLD = 30000
-
-# Controls how flat the curve is
-FLATTENING_COEFFICIENT = 9 / 10
+import torch
+from torch import nn
 
 
-def f(x):
+class Reward(nn.Module):
     """
-    Shifted tan curve
-    `x` is a value between 0 and 1
-    Output is a value between approximately -6.3 and 6.3
-    x = 0.5 gives 0
-    x < 0.5 gives negative output
-    x > 0.5 gives positive output
-    Graph of the function - https://www.desmos.com/calculator/dpfikiniz8
+    This module is responsible for calculating the reward for a miner based on the provided score, verification_result,
+    response_time, and proof_size in it's forward pass.
     """
-    return math.tan((x - 0.5) * math.pi * FLATTENING_COEFFICIENT)
 
+    def __init__(self):
+        super().__init__()
+        self.RATE_OF_DECAY = torch.tensor(0.4)
+        self.RATE_OF_RECOVERY = torch.tensor(0.1)
+        self.FLATTENING_COEFFICIENT = torch.tensor(0.9)
+        self.PROOF_SIZE_THRESHOLD = torch.tensor(3648)
+        self.PROOF_SIZE_WEIGHT = torch.tensor(0)
+        self.RESPONSE_TIME_WEIGHT = torch.tensor(1)
+        self.MAXIMUM_RESPONSE_TIME_DECIMAL = torch.tensor(0.99)
 
-def g(x):
-    """
-    `x` is a value between 0 and 1
-    The result is a value between 0 and 12 approximately
-    Output increases with `x`
-    Creates a smooth curve for the reward function
-    The graph of the function - https://www.desmos.com/calculator/vklt2b5arm
-    """
-    return f(x) - f(0)
-
-
-def h(x):
-    """
-    `x` is a value between 0 and 1
-    The output is also a value between 0 and 1 with positive non-linear mapping
-    The graph of the function https://www.desmos.com/calculator/y5ebhrrjjr
-    """
-    return g(x) / g(1)
-
-
-def reward(
-    max_score,
-    score,
-    value,
-    response_time,
-    proof_size,
-    max_response_time,
-    min_response_time,
-):
-    """
-    This function calculates the reward for a miner based on the provided score, value, response time and proof size.
-    Positional Arguments:
-        max_score (int): The maximum score for the miner.
-        score (int): The current score for the miner.
-        value (bool): Whether the response that the miner submitted was valid.
-        response_time (float): The time taken to respond to the query.
-        max_response_time (float): The maximum response time across all miners.
-        min_response_time (float): The minimum response time across all miners.
-    Returns:
-        int: The new score for the miner.
-    """
-    rate = RATE_OF_DECAY
-    distance = score - MINIMUM_SCORE
-    max_response_time = min(max(max_response_time, 0), 30)
-    min_response_time = min(max(min_response_time, 0), max_response_time)
-    if value:
-        # Normalizes response_score based on the response time, ranging from 0 to 0.99
-        # larger response time leads to larger response_score
-        # The larger the response score, the worse the response time
-        response_score = min(
-            max(response_time - min_response_time, 0)
-            / (max_response_time - min_response_time),
-            0.99,
+    def shifted_tan(self, x: torch.FloatTensor) -> torch.FloatTensor:
+        """
+        Shifted tangent curve
+        """
+        return torch.tan(
+            torch.mul(
+                torch.mul(torch.sub(x, torch.tensor(0.5)), torch.pi),
+                self.FLATTENING_COEFFICIENT,
+            )
         )
-        # Converts the response score to a performance metric.
-        # Performance metric has negative correlation with the score (and response time accordingly)
-        # but with a non-linear mapping. The metric is a value between 0 and 1.
-        # Graph - https://www.desmos.com/calculator/6vogdkyrcj (time weight is one, proof size weight is zero)
-        performance_metric = RESPONSE_TIME_WEIGHT * (
-            1 - h(response_score)
-        ) - PROOF_SIZE_WEIGHT * min(1, proof_size / PROOF_SIZE_THRESHOLD)
-        # Fixed rate of change
-        rate = RATE_OF_RECOVERY
-        # Better performance -> larger max_score
-        max_score = max_score * performance_metric
-        # Difference in current score vs max_score
-        distance = max_score - score
-        # Increase score based on rate of change and distance away from a target max_score
-        return score + rate * distance
 
-    bt.logging.trace(f"Decaying score {score}")
+    def tan_shift_difference(self, x: torch.FloatTensor) -> torch.FloatTensor:
+        """
+        Difference
+        """
+        return torch.sub(self.shifted_tan(x), self.shifted_tan(torch.tensor(0.0)))
 
-    return score - rate * distance
+    def normalized_tangent_curve(self, x: torch.FloatTensor) -> torch.FloatTensor:
+        return torch.div(
+            self.tan_shift_difference(x), self.tan_shift_difference(torch.tensor(1.0))
+        )
+
+    def forward(
+        self,
+        maximum_score: torch.FloatTensor,
+        previous_score: torch.FloatTensor,
+        verified: torch.BoolTensor,
+        proof_size: torch.IntTensor,
+        response_time: torch.FloatTensor,
+        maximum_response_time: torch.FloatTensor,
+        minimum_response_time: torch.FloatTensor,
+        validator_hotkey: torch.IntTensor,
+        block_number: torch.IntTensor,
+        miner_uid: torch.IntTensor,
+    ):
+        """
+        This method calculates the reward for a miner based on the provided score, verification_result,
+        response_time, and proof_size using a neural network module.
+        Positional Arguments:
+            max_score (FloatTensor): The maximum score for the miner.
+            score (FloatTensor): The current score for the miner.
+            verified (BoolTensor): Whether the response that the miner submitted was valid.
+            proof_size (FloatTensor): The size of the proof.
+            response_time (FloatTensor): The time taken to respond to the query.
+            maximum_response_time (FloatTensor): The maximum response time received from validator queries
+            minimum_response_time (FloatTensor): The minimum response time received from validator queries
+            validator_hotkey (FloatTensor[]): Ascii representation of the validator's hotkey
+            block_number (FloatTensor): The block number of the block that the response was submitted in.
+        Returns:
+            [new_score, validator_hotkey, block_number]
+        """
+        # Determine rate of scoring change based on whether the response was verified
+        rate_of_change = torch.where(
+            verified, self.RATE_OF_RECOVERY, self.RATE_OF_DECAY
+        )
+
+        # Normalize the response time into a decimal between zero and the maximum response time decimal
+        # Maximum is capped at maximum response time decimal here to limit degree of score reduction
+        # in cases of very poor performance
+        response_time_normalized = torch.clamp(
+            torch.div(
+                torch.sub(response_time, minimum_response_time),
+                torch.sub(maximum_response_time, minimum_response_time),
+            ),
+            0,
+            self.MAXIMUM_RESPONSE_TIME_DECIMAL,
+        )
+
+        # Calculate reward metrics from both response time and proof size
+        response_time_reward_metric = torch.mul(
+            self.RESPONSE_TIME_WEIGHT,
+            torch.sub(
+                torch.tensor(1), self.normalized_tangent_curve(response_time_normalized)
+            ),
+        )
+        proof_size_reward_metric = torch.mul(
+            self.PROOF_SIZE_WEIGHT,
+            torch.clamp(
+                proof_size / self.PROOF_SIZE_THRESHOLD, torch.tensor(0), torch.tensor(1)
+            ),
+        )
+
+        # Combine reward metrics to provide a final score based on provided inputs
+        calculated_score_fraction = torch.clamp(
+            torch.sub(response_time_reward_metric, proof_size_reward_metric),
+            torch.tensor(0),
+            torch.tensor(1),
+        )
+
+        # Adjust the maximum score for the miner based on calculated metrics
+        maximum_score = torch.mul(maximum_score, calculated_score_fraction)
+
+        # Get the distance of the previous score from the new maximum or zero, depending on verification status
+        distance_from_score = torch.where(
+            verified, torch.sub(maximum_score, previous_score), previous_score
+        )
+
+        # Calculate the difference in scoring that will be applied based on the rate and distance from target score
+        change_in_score = torch.mul(rate_of_change, distance_from_score)
+
+        # Provide a new score based on their previous score and change in score. In cases where verified is false,
+        # scores are always decreased.
+        new_score = torch.where(
+            verified,
+            previous_score + change_in_score,
+            previous_score - change_in_score,
+        )
+
+        # Technically, new score is the only output that matters since we verify all inputs.
+        # These metadata fields are included to force torch.jit to leave them in when converting to ONNX
+        return [new_score, validator_hotkey, block_number, miner_uid]

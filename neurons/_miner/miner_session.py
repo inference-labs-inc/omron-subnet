@@ -1,6 +1,6 @@
 import time
 import traceback
-from typing import Tuple
+from typing import Tuple, Union
 
 import bittensor as bt
 import protocol
@@ -41,9 +41,12 @@ class MinerSession:
         bt.logging.info(f"Axon created: {axon.info()}")
 
         # Attach determines which functions are called when a request is received.
-        bt.logging.info("Attaching forward function to axon...")
-        axon.attach(forward_fn=self.queryZkProof, blacklist_fn=self.blacklist)
-        bt.logging.info("Attached forward function to axon")
+        bt.logging.info("Attaching forward functions to axon...")
+        axon.attach(forward_fn=self.queryZkProof, blacklist_fn=self.proof_blacklist)
+        axon.attach(
+            forward_fn=self.aggregateProof, blacklist_fn=self.aggregation_blacklist
+        )
+        bt.logging.info("Attached forward functions to axon")
 
         # Serve passes the axon information to the network + netuid we are hosting on.
         # This will auto-update if the axon port of external ip has changed.
@@ -143,7 +146,23 @@ class MinerSession:
         self.metagraph = self.subtensor.metagraph(self.config.netuid)
         wandb_logger.safe_init("Miner", self.wallet, self.metagraph, self.config)
 
-    def blacklist(self, synapse: protocol.QueryZkProof) -> Tuple[bool, str]:
+    def proof_blacklist(self, synapse: protocol.QueryZkProof) -> Tuple[bool, str]:
+        """
+        Blacklist method for the proof generation endpoint
+        """
+        return self._blacklist(synapse)
+
+    def aggregation_blacklist(
+        self, synapse: protocol.QueryForProofAggregation
+    ) -> Tuple[bool, str]:
+        """
+        Blacklist method for the aggregation endpoint
+        """
+        return self._blacklist(synapse)
+
+    def _blacklist(
+        self, synapse: Union[protocol.QueryZkProof, protocol.QueryForProofAggregation]
+    ) -> Tuple[bool, str]:
         """
         Filters requests if any of the following conditions are met:
         - Requesting hotkey is not registered
@@ -226,6 +245,64 @@ class MinerSession:
             {
                 "proof_time": proof_time,
                 "overhead_time": delta_t - proof_time,
+                "total_response_time": delta_t,
+            }
+        )
+
+        if delta_t > 300:
+            bt.logging.error(
+                "Response time is greater than validator timeout. "
+                "This indicates your hardware is not processing validator's requests in time."
+            )
+        return synapse
+
+    def aggregateProof(
+        self, synapse: protocol.QueryForProofAggregation
+    ) -> protocol.QueryForProofAggregation:
+        """
+        Generates an aggregate proof for the provided proofs.
+        """
+        time_in = time.time()
+        bt.logging.debug(f"Aggregation input: {synapse.proofs} \n")
+        bt.logging.info(
+            f"Received proof aggregation request with {len(synapse.proofs)}"
+        )
+
+        if not synapse.proofs or not synapse.model_id:
+            bt.logging.error(
+                "Received proof aggregation request with no proofs or model_id"
+            )
+            synapse.aggregation_proof = "Missing critical data"
+            return synapse
+        aggregation_time = 0
+
+        # Run proofs through the aggregate circuit
+        try:
+            model_session = VerifiedModelSession(synapse.proofs, synapse.model_id)
+            bt.logging.debug("Model session created successfully")
+            synapse.aggregation_proof, aggregation_time = model_session.aggregate_proof(
+                synapse.proofs
+            )
+            model_session.end()
+            try:
+                bt.logging.info("✅ Aggregation completed \n")
+            except UnicodeEncodeError:
+                bt.logging.info("Aggregation completed \n")
+        except Exception as e:
+            synapse.aggregation_proof = "An error occurred"
+            bt.logging.error(f"An error occurred while aggregating proofs\n{e}")
+
+        time_out = time.time()
+        delta_t = time_out - time_in
+        overhead_time = delta_t - aggregation_time
+        bt.logging.info(
+            f"Total response time {delta_t}s. Aggregation time: {aggregation_time}s. "
+            f"Overhead time: {overhead_time}s."
+        )
+        self.log_batch.append(
+            {
+                "aggregation_time": aggregation_time,
+                "overhead_time": overhead_time,
                 "total_response_time": delta_t,
             }
         )

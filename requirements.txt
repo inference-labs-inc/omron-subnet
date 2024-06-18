@@ -3,6 +3,7 @@ python-dotenv
 SQLAlchemy
 pandas
 requests
+numpy==1.26.4
 setuptools
 apify_client
 boto3

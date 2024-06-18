@@ -92,7 +92,7 @@ class VerifiedModelSession:
             dir_path, "temp", f"input_{self.model_name}_{self.session_id}.json"
         )
         self.proof_path = os.path.join(
-            dir_path, "temp", f"model_{self.model_name}_{self.session_id}.proof"
+            dir_path, "temp", f"proof_{self.model_name}_{self.session_id}.json"
         )
 
         self.public_inputs = public_inputs
@@ -115,15 +115,15 @@ class VerifiedModelSession:
             json.dump(data, f)
         bt.logging.info(f"Input data: {data}")
 
-    def gen_proof_file(self, proof_string, instances):
+    def gen_proof_file(self, proof_string, inputs):
         dir_name = os.path.dirname(self.proof_path)
         os.makedirs(dir_name, exist_ok=True)
         proof_json = json.loads(proof_string)
-        new_instances = list(chain.from_iterable(instances))
+        new_instances = list(chain.from_iterable(inputs))
         bt.logging.trace(f"New instances: {new_instances}")
-        new_instances.append(proof_json["instances"][0][-1])
+        new_instances += proof_json["instances"][0][len(new_instances):]
         bt.logging.trace(
-            f"New instances after appending with last instance from output: {new_instances}"
+            f"New instances after appending with last instances from output: {new_instances}"
         )
         proof_json["instances"] = [new_instances]
         # Enforce EVM transcript type to be used for all proofs, ensuring all are valid for proving on EVM chains
@@ -134,8 +134,42 @@ class VerifiedModelSession:
             f.write(json.dumps(proof_json))
             f.close()
 
-    def gen_proof(self):
+    def aggregate_proofs(self, proofs):
+        """
+        Aggregates proofs for the previous weight adjustment period.
+        """
+        try:
+            proof_paths = []
+            for i, proof in enumerate(proofs):
+                proof_path = os.path.join(
+                    dir_path,
+                    "temp",
+                    f"proof_{self.model_name}_{self.session_id}_{i}.proof",
+                )
+                with open(proof_path, "w", encoding="utf-8") as f:
+                    f.write(proof)
+                proof_paths.append(proof_path)
+            bt.logging.debug(
+                f"Generating aggregated proof given proof paths: {proof_paths}"
+            )
+            path = os.path.join(
+                dir_path,
+                "temp",
+                f"aggregated_proof_{self.model_name}_{self.session_id}.proof",
+            )
+            time_start = time.time()
+            ezkl.aggregate(aggregation_snarks=proof_paths, output_path=path)
+            time_delta = time.time() - time_start
+            bt.logging.info(f"Proof aggregation took {time_delta} seconds")
+            with open(path, "r", encoding="utf-8") as f:
+                aggregated_proof = f.read()
+            return aggregated_proof, time_delta
+        except Exception as e:
+            bt.logging.error(f"An error occurred during proof aggregation: {e}")
+            traceback.print_exc()
+            raise
 
+    def gen_proof(self):
         try:
             bt.logging.debug("Generating input file")
             self.gen_input_file()

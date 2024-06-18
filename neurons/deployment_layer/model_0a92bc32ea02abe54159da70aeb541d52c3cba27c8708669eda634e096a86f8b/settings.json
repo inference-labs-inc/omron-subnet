@@ -1,0 +1,142 @@
+{
+    "run_args": {
+        "tolerance": {
+            "val": 0.0,
+            "scale": 1.0
+        },
+        "input_scale": 16,
+        "param_scale": 16,
+        "scale_rebase_multiplier": 1,
+        "lookup_range": [
+            -150354,
+            97480
+        ],
+        "logrows": 18,
+        "num_inner_cols": 2,
+        "variables": [
+            [
+                "batch_size",
+                1
+            ]
+        ],
+        "input_visibility": "Public",
+        "output_visibility": "Public",
+        "param_visibility": "Fixed",
+        "div_rebasing": false,
+        "rebase_frac_zero_constants": false,
+        "check_mode": "UNSAFE",
+        "commitment": "KZG"
+    },
+    "num_rows": 112,
+    "total_assignments": 224,
+    "total_const_size": 11,
+    "total_dynamic_col_size": 0,
+    "num_dynamic_lookups": 0,
+    "num_shuffles": 0,
+    "total_shuffle_col_size": 0,
+    "model_instance_shapes": [
+        [
+            1
+        ],
+        [
+            1
+        ],
+        [
+            1
+        ],
+        [
+            1
+        ],
+        [
+            1
+        ],
+        [
+            1
+        ],
+        [
+            1
+        ],
+        [
+            64
+        ],
+        [
+            1
+        ],
+        [
+            1
+        ],
+        [
+            1
+        ],
+        [
+            64
+        ],
+        [
+            1
+        ],
+        [
+            1
+        ]
+    ],
+    "model_output_scales": [
+        16,
+        0,
+        0,
+        0
+    ],
+    "model_input_scales": [
+        16,
+        16,
+        0,
+        0,
+        16,
+        16,
+        16,
+        0,
+        0,
+        0
+    ],
+    "module_sizes": {
+        "polycommit": [],
+        "poseidon": [
+            0,
+            [
+                0
+            ]
+        ]
+    },
+    "required_lookups": [
+        "ReLU",
+        {
+            "Min": {
+                "scale": 65536.0,
+                "a": 0.99
+            }
+        },
+        {
+            "Tan": {
+                "scale": 65536.0
+            }
+        },
+        {
+            "Min": {
+                "scale": 65536.0,
+                "a": 1.0
+            }
+        }
+    ],
+    "required_range_checks": [
+        [
+            -32768,
+            32768
+        ],
+        [
+            32768,
+            98304
+        ]
+    ],
+    "check_mode": "UNSAFE",
+    "version": "10.2.7",
+    "num_blinding_factors": null,
+    "timestamp": 1718658006597
+}
