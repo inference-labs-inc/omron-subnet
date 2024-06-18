@@ -160,13 +160,19 @@ class MinerSession:
                 bt.logging.trace("Blacklist disabled, allowing request.")
                 return False, "Allowed"
 
-            if synapse.dendrite.hotkey not in self.metagraph.hotkeys:
+            validator_hotkey = synapse.dendrite.hotkey
+
+            if validator_hotkey not in self.metagraph.hotkeys:
                 return True, "Hotkey is not registered"
 
-            requesting_uid = self.metagraph.hotkeys.index(synapse.dendrite.hotkey)
+            requesting_uid = self.metagraph.hotkeys.index(validator_hotkey)
             stake = self.metagraph.S[requesting_uid].item()
 
-            bt.logging.info(f"Requesting UID: {requesting_uid} | Stake at UID: {stake}")
+            try:
+                bt.logging.info(f"👈 Request by: {validator_hotkey} | UID: {requesting_uid} | Stake: {stake} 🥩")
+            except UnicodeEncodeError:
+                bt.logging.info(f"Request by: {validator_hotkey} | UID: {requesting_uid} | Stake: {stake}")
+
             if stake < 1024:
                 return True, "Stake below minimum"
 
@@ -207,10 +213,7 @@ class MinerSession:
             bt.logging.debug("Model session created successfully")
             synapse.query_output, proof_time = model_session.gen_proof()
             model_session.end()
-            try:
-                bt.logging.info("✅ Proof completed \n")
-            except UnicodeEncodeError:
-                bt.logging.info("Proof completed \n")
+            bt.logging.info("Proof completed \n")
         except Exception as e:
             synapse.query_output = "An error occurred"
             bt.logging.error(f"An error occurred while generating proven output\n{e}")
@@ -218,10 +221,18 @@ class MinerSession:
 
         time_out = time.time()
         delta_t = time_out - time_in
-        bt.logging.info(
-            f"Total response time {delta_t}s. Proof time: {proof_time}s. "
-            f"Overhead time: {delta_t - proof_time}s."
-        )
+
+        try:
+            bt.logging.info(
+                f"✅ Total response time {delta_t}s. Proof time: {proof_time}s. "
+                f"Overhead time: {delta_t - proof_time}s."
+            )
+        except UnicodeEncodeError:
+            bt.logging.info(
+                f"Total response time {delta_t}s. Proof time: {proof_time}s. "
+                f"Overhead time: {delta_t - proof_time}s."
+            )
+        
         self.log_batch.append(
             {
                 "proof_time": proof_time,
