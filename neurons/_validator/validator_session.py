@@ -281,32 +281,31 @@ class ValidatorSession:
                     )
                 )
 
+                torch_arguments = [
+                    max_score,
+                    self.scores[uid],
+                    torch.tensor(verified),
+                    torch.tensor(proof_size),
+                    torch.tensor(response_time),
+                    median_max_response_time,
+                    min_response_time,
+                    hotkey_to_split_tensor(self.wallet.hotkey.public_key.hex()),
+                    self.metagraph.block,
+                    uid,
+                ]
+                bt.logging.debug(
+                    f"Calculating score for miner given the following inputs: "
+                    f"{torch_arguments}"
+                )
+
+                output_tensor = reward_model.forward(*torch_arguments)
+
+                bt.logging.trace(f"Reward output tensor: {output_tensor}")
+                self.scores[uid] = output_tensor[0]
+                bt.logging.debug(f"Updated score for UID {uid}: {self.scores[uid]}")
+
                 if model_id == [PROOF_OF_WEIGHTS_MODEL_ID]:
-                    bt.logging.info(f"Received proof of weights for UID {uid}")
-
-                    torch_arguments = [
-                        max_score,
-                        self.scores[uid],
-                        torch.tensor(verified),
-                        torch.tensor(proof_size),
-                        torch.tensor(response_time),
-                        median_max_response_time,
-                        min_response_time,
-                        hotkey_to_split_tensor(self.wallet.hotkey.public_key.hex()),
-                        self.metagraph.block,
-                        uid,
-                    ]
-
-                    bt.logging.debug(
-                        f"Calculating score for miner given the following inputs: "
-                        f"{torch_arguments}"
-                    )
-
-                    output_tensor = reward_model.forward(*torch_arguments)
-
-                    bt.logging.trace(f"Reward output tensor: {output_tensor}")
-                    self.scores[uid] = output_tensor[0]
-                    bt.logging.debug(f"Updated score for UID {uid}: {self.scores[uid]}")
+                    bt.logging.info(f"Received proof of weights for UID {uid}, proof: {proof_json}")
 
                 if model_id != PROOF_OF_WEIGHTS_MODEL_ID:
                     # If the model is not the SN2 proof of weights model itself, we send the proof with inputs into the
