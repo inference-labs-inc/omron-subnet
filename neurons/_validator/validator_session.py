@@ -223,9 +223,7 @@ class ValidatorSession:
         if not responses:
             bt.logging.error("No responses received, skipping score update")
             return
-        max_score = torch.max(self.scores)
-        if max_score == 0:
-            max_score = 1
+        max_score = 1 / len(self.scores)
 
         # add response info for non-queryable uids with zeros (those are validators' uids)
         all_uids = set(range(len(self.scores)))
