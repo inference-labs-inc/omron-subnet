@@ -25,7 +25,7 @@ def get_config_from_args():
     parser.add_argument(
         "--blocks_per_epoch",
         type=int,
-        default=50,
+        default=100,
         help="Number of blocks to wait before setting weights",
     )
     parser.add_argument(
