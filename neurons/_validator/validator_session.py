@@ -557,11 +557,11 @@ class ValidatorSession:
     def save_proof_of_weights(self, proof_json: dict):
         file_path = os.path.join(self.pow_directory, f"{uuid.uuid4()}.json")
         try:
-            instances = proof_json["instances"]
+            instances = proof_json["instances"][0]
             validator_hotkey = "".join(
                 [
                     chr(ezkl.felt_to_int(char))
-                    for char in instances[: len(instances) - 2][:64]
+                    for char in instances[-66:-2]
                 ]
             )
             block_number = ezkl.felt_to_int(instances[-2])
