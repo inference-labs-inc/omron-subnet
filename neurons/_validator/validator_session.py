@@ -478,7 +478,7 @@ class ValidatorSession:
         justifications = ["right"] * 5
 
         for col, style, justify in zip(columns, styles, justifications):
-            table.add_column(col, justify=justify, style=style, no_wrap=True)
+            table.add_column(col, justify=justify, style=style)
 
         wandb_log = {"responses": {}}
         for response in responses:

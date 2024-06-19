@@ -19,7 +19,7 @@ def sync_model_files():
     """
     Sync external model files
     """
-    MODEL_DIR = os.path.join("deployment_layer")
+    MODEL_DIR = os.path.join(os.path.dirname(__file__), "deployment_layer")
     SYNC_LOG_PREFIX = "  SYNC  | "
 
     for model_hash in os.listdir(MODEL_DIR):
