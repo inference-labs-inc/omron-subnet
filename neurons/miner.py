@@ -4,7 +4,8 @@ import os
 import bittensor as bt
 import wandb_logger
 from _miner.miner_session import MinerSession
-
+from utils import sync_model_files
+import traceback
 
 def get_config_from_args():
     """
@@ -83,6 +84,13 @@ if __name__ == "__main__":
     # Parse the configuration.
     bt.logging.info("Getting miner configuration...")
     config = get_config_from_args()
+
+    # Sync remote model files
+    try:
+        sync_model_files()
+    except Exception as e:
+        bt.logging.error("Failed to sync model files. Please run ./sync_model_files.sh to manually sync them.", e)
+        traceback.print_exc()
 
     # Run the main function.
     try:

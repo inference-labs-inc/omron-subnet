@@ -38,7 +38,10 @@ MAX_CONCURRENT_REQUESTS = 16
 DEFAULT_PROOF_SIZE = 5000
 # Enables aggregation requests for proof of weights
 ENABLE_POW_AGGREGATION = False
-
+# Size in percent of the sample to be used for the maximum score median
+MAXIMUM_SCORE_MEDIAN_SAMPLE = 0.05
+# Shift in seconds to apply to the minimum response time for vertical asymptote adjustment
+MINIMUM_SCORE_SHIFT = 0.5
 
 class ProofOfWeightsStatus(Enum):
     """
@@ -251,35 +254,44 @@ class ValidatorSession:
                     bt.logging.error(f"Invalid uid format: {uid}, skipping")
                     continue
 
-                median_max_response_time = torch.median(
-                    torch.tensor(
-                        sorted(
-                            [
-                                (
-                                    response[2]
-                                    if response[2] is not None
-                                    else VALIDATOR_REQUEST_TIMEOUT_SECONDS
-                                )
-                                for response in responses
-                            ]
-                        )[-max(int(len(responses) * 0.05), 1) :]
-                    )
+                # Filter responses by verified and sort them
+                sorted_filtered_times = sorted(
+                    [r[2] for r in responses if r[1] and r[2] > 0]
                 )
-
-                min_response_time = torch.min(
-                    (
+                # Take the median value of miners with high response times
+                median_max_response_time = torch.clamp(
+                    torch.median(
                         torch.tensor(
-                            [
-                                (
-                                    response[2]
-                                    if response[2] is not None
-                                    else 0
-                                )
-                                for response in responses
+                            sorted_filtered_times[
+                                -max(
+                                    int(
+                                        len(sorted_filtered_times)
+                                        * MAXIMUM_SCORE_MEDIAN_SAMPLE
+                                    ),
+                                    1,
+                                ) :
                             ]
                         )
-                    )
+                    ),
+                    0,
+                    VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+                ).item()
+
+                # Get the fastest response time and apply a shift
+                # Note that this does not adjust the miner's response time - it establishes a good position for the
+                # right vertical asymptote across all reward runs
+                min_response_time = (
+                    torch.clamp(
+                        torch.min(torch.tensor(sorted_filtered_times)),
+                        0,
+                        VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+                    ).item()
+                    - MINIMUM_SCORE_SHIFT
                 )
+
+                bt.logging.debug(f"Median max response time: {median_max_response_time}")
+                bt.logging.debug(f"Min response time: {min_response_time}")
+
 
                 torch_arguments = [
                     max_score,
