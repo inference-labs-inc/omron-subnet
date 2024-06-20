@@ -169,7 +169,7 @@ class MinerSession:
             stake = self.metagraph.S[requesting_uid].item()
 
             try:
-                bt.logging.info(f"👈 Request by: {validator_hotkey} | UID: {requesting_uid} | Stake: {stake} 🥩")
+                bt.logging.info(f"Request by: {validator_hotkey} | UID: {requesting_uid} | Stake: {stake} 🥩")
             except UnicodeEncodeError:
                 bt.logging.info(f"Request by: {validator_hotkey} | UID: {requesting_uid} | Stake: {stake}")
 
