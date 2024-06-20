@@ -222,12 +222,10 @@ class MinerSession:
 
         time_out = time.time()
         delta_t = time_out - time_in
-
         bt.logging.info(
             f"Total response time {delta_t}s. Proof time: {proof_time}s. "
             f"Overhead time: {delta_t - proof_time}s."
         )
-        
         self.log_batch.append(
             {
                 "proof_time": proof_time,
