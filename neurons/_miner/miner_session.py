@@ -160,18 +160,16 @@ class MinerSession:
                 bt.logging.trace("Blacklist disabled, allowing request.")
                 return False, "Allowed"
 
-            validator_hotkey = synapse.dendrite.hotkey
-
-            if validator_hotkey not in self.metagraph.hotkeys:
+            if synapse.dendrite.hotkey not in self.metagraph.hotkeys:
                 return True, "Hotkey is not registered"
 
-            requesting_uid = self.metagraph.hotkeys.index(validator_hotkey)
+            requesting_uid = self.metagraph.hotkeys.index(synapse.dendrite.hotkey)
             stake = self.metagraph.S[requesting_uid].item()
 
             try:
-                bt.logging.info(f"Request by: {validator_hotkey} | UID: {requesting_uid} | Stake: {stake} 🥩")
+                bt.logging.info(f"Request by: {synapse.dendrite.hotkey} | UID: {requesting_uid} | Stake: {stake} 🥩")
             except UnicodeEncodeError:
-                bt.logging.info(f"Request by: {validator_hotkey} | UID: {requesting_uid} | Stake: {stake}")
+                bt.logging.info(f"Request by: {synapse.dendrite.hotkey} | UID: {requesting_uid} | Stake: {stake}")
 
             if stake < 1024:
                 return True, "Stake below minimum"
