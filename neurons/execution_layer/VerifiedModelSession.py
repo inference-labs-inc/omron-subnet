@@ -14,7 +14,7 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 
 
 def gen_witness(input_path, circuit_path, witness_path, vk_path, srs_path):
-    bt.logging.debug("Generating witness")
+    bt.logging.trace("Generating witness")
     res = ezkl.gen_witness(
         input_path,
         circuit_path,
@@ -22,7 +22,7 @@ def gen_witness(input_path, circuit_path, witness_path, vk_path, srs_path):
         vk_path,
         srs_path,
     )
-    bt.logging.debug(f"Gen witness result: {res}")
+    bt.logging.trace(f"Gen witness result: {res}")
 
 
 async def gen_proof(
@@ -30,7 +30,7 @@ async def gen_proof(
 ):
     gen_witness(input_path, circuit_path, witness_path, vk_path, srs_path)
 
-    bt.logging.debug("Generating proof")
+    bt.logging.trace("Generating proof")
     res = ezkl.prove(
         witness_path,
         circuit_path,
@@ -39,7 +39,7 @@ async def gen_proof(
         "single",
         srs_path,
     )
-    bt.logging.debug(f"Proof generated: {proof_path}, result: {res}")
+    bt.logging.trace(f"Proof generated: {proof_path}, result: {res}")
 
 
 def proof_worker(
@@ -104,6 +104,7 @@ class VerifiedModelSession:
 
     # Generate the input.json file, which is used in witness generation
     def gen_input_file(self):
+        bt.logging.trace("Generating input file")
         input_data = self.public_inputs
         input_shapes = [[1]]
         data = {"input_data": input_data, "input_shapes": input_shapes}
@@ -113,7 +114,7 @@ class VerifiedModelSession:
 
         with open(self.input_path, "w", encoding="utf-8") as f:
             json.dump(data, f)
-        bt.logging.info(f"Input data: {data}")
+        bt.logging.trace(f"Generated input.json with data: {data}")
 
     def gen_proof_file(self, proof_string, inputs):
         dir_name = os.path.dirname(self.proof_path)

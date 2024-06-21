@@ -43,6 +43,7 @@ MAXIMUM_SCORE_MEDIAN_SAMPLE = 0.05
 # Shift in seconds to apply to the minimum response time for vertical asymptote adjustment
 MINIMUM_SCORE_SHIFT = 0.5
 
+
 class ProofOfWeightsStatus(Enum):
     """
     Status of proof of weights requests
@@ -113,7 +114,7 @@ class ValidatorSession:
                 ]
             )
 
-        bt.logging.info("Successfully setup scores")
+        bt.logging.success("Successfully setup scores")
 
         self.log_scores()
         return self.scores
@@ -179,7 +180,9 @@ class ValidatorSession:
                         }
                     )
                 except Exception as e:
-                    bt.logging.trace(f"Error updating request: {e}")
+                    bt.logging.warning(
+                        f"Failed to add result, response time and deserialized output to request for UID: {requests[i]['uid']}. Error: {e}"
+                    )
                     traceback.print_exc()
                     requests[i].update(
                         {
@@ -229,15 +232,51 @@ class ValidatorSession:
         all_uids = set(range(len(self.scores)))
         response_uids = set(r[0] for r in responses)
         missing_uids = all_uids - response_uids
+        bt.logging.debug(f"UIDs without responses: {missing_uids}")
 
         responses.extend((uid, False, 0, 0, [0], {}) for uid in missing_uids)
-        max_response_time = max(
-            (response[2] if response[2] is not None else 0 for response in responses),
-            default=0,
-        )
 
-        bt.logging.info("Responses: ", responses)
+        bt.logging.trace("Raw responses: ", responses)
         reward_model = Reward()
+
+        # Filter responses by verified and sort them
+        sorted_filtered_times = sorted([r[2] for r in responses if r[1] and r[2] > 0])
+        # Take the median value of miners with high response times
+        if sorted_filtered_times:
+            median_max_response_time = torch.clamp(
+                torch.median(
+                    torch.tensor(
+                        sorted_filtered_times[
+                            -max(
+                                int(
+                                    len(sorted_filtered_times)
+                                    * MAXIMUM_SCORE_MEDIAN_SAMPLE
+                                ),
+                                1,
+                            ) :
+                        ]
+                    )
+                ),
+                0,
+                VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+            ).item()
+            # Get the fastest response time and apply a shift
+            # Note that this does not adjust the miner's response time - it establishes a good position for the
+            # right vertical asymptote across all reward runs
+            min_response_time = (
+                torch.clamp(
+                    torch.min(torch.tensor(sorted_filtered_times)),
+                    0,
+                    VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+                ).item()
+                - MINIMUM_SCORE_SHIFT
+            )
+        else:
+            min_response_time = 0
+            median_max_response_time = VALIDATOR_REQUEST_TIMEOUT_SECONDS
+
+        bt.logging.info(f"Median of highest response times: {median_max_response_time}")
+        bt.logging.info(f"Minimum response time: {min_response_time}")
 
         for response in responses:
             try:
@@ -252,45 +291,6 @@ class ValidatorSession:
                     bt.logging.error(f"Invalid uid format: {uid}, skipping")
                     continue
 
-                # Filter responses by verified and sort them
-                sorted_filtered_times = sorted(
-                    [r[2] for r in responses if r[1] and r[2] > 0]
-                )
-                # Take the median value of miners with high response times
-                median_max_response_time = torch.clamp(
-                    torch.median(
-                        torch.tensor(
-                            sorted_filtered_times[
-                                -max(
-                                    int(
-                                        len(sorted_filtered_times)
-                                        * MAXIMUM_SCORE_MEDIAN_SAMPLE
-                                    ),
-                                    1,
-                                ) :
-                            ]
-                        )
-                    ),
-                    0,
-                    VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-                ).item()
-
-                # Get the fastest response time and apply a shift
-                # Note that this does not adjust the miner's response time - it establishes a good position for the
-                # right vertical asymptote across all reward runs
-                min_response_time = (
-                    torch.clamp(
-                        torch.min(torch.tensor(sorted_filtered_times)),
-                        0,
-                        VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-                    ).item()
-                    - MINIMUM_SCORE_SHIFT
-                )
-
-                bt.logging.debug(f"Median max response time: {median_max_response_time}")
-                bt.logging.debug(f"Min response time: {min_response_time}")
-
-
                 torch_arguments = [
                     max_score,
                     self.scores[uid],
@@ -303,8 +303,9 @@ class ValidatorSession:
                     self.metagraph.block,
                     uid,
                 ]
+
                 bt.logging.debug(
-                    f"Calculating score for miner given the following inputs: "
+                    f"Calculating score for miner {uid} given the following inputs: "
                     f"{torch_arguments}"
                 )
 
@@ -314,13 +315,10 @@ class ValidatorSession:
                 self.scores[uid] = output_tensor[0]
                 bt.logging.debug(f"Updated score for UID {uid}: {self.scores[uid]}")
 
-                if model_id == [PROOF_OF_WEIGHTS_MODEL_ID]:
-                    bt.logging.info(f"Received proof of weights for UID {uid}, proof: {proof_json}")
-
-                if model_id != PROOF_OF_WEIGHTS_MODEL_ID:
+                if model_id[0] != PROOF_OF_WEIGHTS_MODEL_ID:
                     # If the model is not the SN2 proof of weights model itself, we send the proof with inputs into the
                     # proof of weights queue
-                    bt.logging.debug(
+                    bt.logging.trace(
                         f"Appending proof of weights for UID {uid} to queue"
                     )
                     proof_of_weights = ProofOfWeightsItem(
@@ -330,7 +328,7 @@ class ValidatorSession:
                             [verified],
                             [proof_size],
                             [float(torch.tensor(response_time))],
-                            [float(max_response_time)],
+                            [float(median_max_response_time)],
                             [float(min_response_time)],
                             hotkey_to_split_tensor(
                                 self.wallet.hotkey.public_key.hex()
@@ -451,13 +449,7 @@ class ValidatorSession:
             inference_session.end()
             return res
         except Exception as e:
-            bt.logging.error("❌ Unable to verify proof due to an error\n", e)
-            traceback.print_exc()
-            bt.logging.trace(
-                f"Offending proof string: {proof_string}\n Inputs: {inputs}"
-            )
-
-        return False
+            raise e
 
     def log_responses(self, responses):
         """
@@ -487,7 +479,7 @@ class ValidatorSession:
                 for index in range(1, len(columns))
             }
             wandb_log["responses"][response[0]]["verification_result"] = int(
-                response[3]
+                response[1]
             )
         wandb_logger.safe_log(wandb_log)
         console.print(table)
@@ -502,6 +494,11 @@ class ValidatorSession:
         if self.aggregation_active:
             self.aggregation_active = False
         use_proof_of_weights = len(self.proof_of_weights_queue) >= len(uids)
+
+        if use_proof_of_weights:
+            bt.logging.info("Preparing synapses for request to proof of weights")
+        else:
+            bt.logging.info("Preparing synapses for request to the default model")
 
         for uid in uids:
             model_id: Union[str, list[Union[str, int]]] = [0]
@@ -568,10 +565,7 @@ class ValidatorSession:
         try:
             instances = proof_json["instances"][0]
             validator_hotkey = "".join(
-                [
-                    chr(ezkl.felt_to_int(char))
-                    for char in instances[-66:-2]
-                ]
+                [chr(ezkl.felt_to_int(char)) for char in instances[-66:-2]]
             )
             block_number = ezkl.felt_to_int(instances[-2])
             miner_uid = ezkl.felt_to_int(instances[-1])
@@ -579,6 +573,17 @@ class ValidatorSession:
                 self.pow_directory,
                 f"{block_number}_{validator_hotkey}_{miner_uid}.json",
             )
+
+            table = Table(title="Proof of Weights")
+
+            table.add_column("Instances", justify="left", style="cyan")
+            table.add_column("Proof", justify="left", style="magenta")
+
+            table.add_row(str(instances), str(proof_json["proof"]))
+
+            console = Console()
+            console.print(table)
+
             self.pow_aggregation_queue[miner_uid].append(file_path)
         except Exception as e:
             bt.logging.error(
@@ -598,49 +603,85 @@ class ValidatorSession:
         """
         try:
             proof_raw = []
-            verification_result = self.verify_proof_string(
-                response["deserialized"],
-                response["inputs"],
-                model_id=response["model_id"],
-            )
-            try:
-                proof_json = json.loads(response["deserialized"])
-                proof_raw = proof_json["proof"]
-            except Exception as e:
-                bt.logging.debug(
-                    f"Unable to parse proof json for response: {response}, error: {e}"
-                )
-                proof_json = {}
-
+            proof_json = None
             proof_size = DEFAULT_PROOF_SIZE
+            verification_result = False
+            deserialized_response = response["deserialized"]
+
+            if deserialized_response in ["An error occurred", None, ""]:
+                bt.logging.warning(
+                    f"\033[31mMiner at UID: {response['uid']} failed to provide a valid proof. Response from miner: {deserialized_response}\033[0m"
+                )
+            else:
+                try:
+                    proof_json = json.loads(deserialized_response)
+                    proof_raw = proof_json["proof"]
+                except Exception as e:
+                    bt.logging.warning(
+                        f"\033[31mMiner at UID: {response['uid']} failed to provide a JSON serializable proof. Deserialized Response: {deserialized_response} Error: {e} {traceback.format_exc()}\033[0m"
+                    )
+
+            if proof_json:
+                bt.logging.debug(
+                    f"Attempting to verify proof for UID: {response['uid']}"
+                )
+                try:
+                    verification_result = self.verify_proof_string(
+                        json.dumps(proof_json),
+                        response["inputs"],
+                        model_id=response["model_id"],
+                    )
+                    if not verification_result:
+                        bt.logging.warning(
+                            f"\033[31mMiner at UID: {response['uid']} provided a proof, but verification failed.\033[0m"
+                        )
+                except Exception as e:
+                    bt.logging.warning(
+                        f"\033[31mUnable to verify proof for UID: {response['uid']}. Error: {e}\033[0m"
+                    )
+                    traceback.print_exc()
+                if not verification_result:
+                    bt.logging.trace(
+                        f"Failing proof content for UID: {response['uid']}: {proof_json}"
+                    )
+
             try:
                 proof_size = len(proof_raw)
             except Exception as e:
-                bt.logging.debug(
-                    f"Unable to determine proof size for response: {response}, error: {e}"
+                bt.logging.warning(
+                    f"Unable to determine proof size for UID: {response['uid']}. Error: {e}"
                 )
-            response["proof_size"] = proof_size
+                traceback.print_exc()
 
             if (
                 response["model_id"][0] == PROOF_OF_WEIGHTS_MODEL_ID
                 and verification_result
             ):
+                bt.logging.debug(
+                    f"Proof of Weights is valid from UID: {response['uid']}. Saving to disk."
+                )
                 self.save_proof_of_weights(proof_json)
+
+            if verification_result:
+                bt.logging.success(
+                    f"\033[32mMiner at UID: {response['uid']} provided a valid proof in {response['response_time']} seconds.\033[0m"
+                )
 
             return (
                 response["uid"],
                 verification_result,
                 response["response_time"],
-                response["proof_size"],
+                proof_size,
                 response["model_id"],
                 proof_json,
             )
-
         except json.JSONDecodeError:
             bt.logging.error(f"JSON decoding failed for response: {response}")
+            traceback.print_exc()
             return response["uid"], False, VALIDATOR_REQUEST_TIMEOUT_SECONDS, 0, [0], {}
         except Exception as e:
             bt.logging.error(f"Error processing response: {response}, error: {e}")
+            traceback.print_exc()
             return response["uid"], False, VALIDATOR_REQUEST_TIMEOUT_SECONDS, 0, [0], {}
 
     def log_and_commit_proof(

@@ -15,6 +15,7 @@ from __init__ import __version__
 
 TARGET_BRANCH = "main"
 
+
 def sync_model_files():
     """
     Sync external model files
@@ -23,38 +24,47 @@ def sync_model_files():
     SYNC_LOG_PREFIX = "  SYNC  | "
 
     for model_hash in os.listdir(MODEL_DIR):
-        if not model_hash.startswith('model_'):
+        if not model_hash.startswith("model_") or model_hash == "model_0":
             continue
 
-        metadata_file = os.path.join(MODEL_DIR, model_hash, 'metadata.json')
+        metadata_file = os.path.join(MODEL_DIR, model_hash, "metadata.json")
         if not os.path.isfile(metadata_file):
-            bt.logging.error(SYNC_LOG_PREFIX + f"Error: Metadata file not found at {metadata_file}")
+            bt.logging.error(
+                SYNC_LOG_PREFIX
+                + f"Metadata file not found at {metadata_file} for {model_hash}. Skipping sync for this model."
+            )
             continue
 
         try:
-            with open(metadata_file, 'r') as f:
+            with open(metadata_file, "r") as f:
                 metadata = json.load(f)
         except json.JSONDecodeError:
-            bt.logging.error(SYNC_LOG_PREFIX + f"Error: Failed to parse JSON from {metadata_file}")
+            bt.logging.error(
+                SYNC_LOG_PREFIX + f"Failed to parse JSON from {metadata_file}"
+            )
             continue
 
-        external_files = metadata.get('external_files', {})
+        external_files = metadata.get("external_files", {})
         for key, url in external_files.items():
             file_path = os.path.join(MODEL_DIR, model_hash, key)
             if os.path.isfile(file_path):
-                bt.logging.info(SYNC_LOG_PREFIX + f"File {key} for {model_hash} already downloaded, skipping...")
+                bt.logging.info(
+                    SYNC_LOG_PREFIX
+                    + f"File {key} for {model_hash} already downloaded, skipping..."
+                )
                 continue
 
             bt.logging.info(SYNC_LOG_PREFIX + f"Downloading {url} to {file_path}...")
             try:
                 response = requests.get(url)
                 response.raise_for_status()
-                with open(file_path, 'wb') as f:
+                with open(file_path, "wb") as f:
                     f.write(response.content)
             except requests.RequestException as e:
-                bt.logging.error(SYNC_LOG_PREFIX + f"Error: Failed to download {url} to {file_path}: {e}")
+                bt.logging.error(
+                    SYNC_LOG_PREFIX + f"Failed to download {url} to {file_path}: {e}"
+                )
                 continue
-
 
 
 def hotkey_to_split_tensor(hotkey_ss58=None):
