@@ -185,7 +185,11 @@ class MinerSession:
             requesting_uid = self.metagraph.hotkeys.index(synapse.dendrite.hotkey)
             stake = self.metagraph.S[requesting_uid].item()
 
-            bt.logging.info(f"Requesting UID: {requesting_uid} | Stake at UID: {stake}")
+            try:
+                bt.logging.info(f"Request by: {synapse.dendrite.hotkey} | UID: {requesting_uid} | Stake: {stake} 🥩")
+            except UnicodeEncodeError:
+                bt.logging.info(f"Request by: {synapse.dendrite.hotkey} | UID: {requesting_uid} | Stake: {stake}")
+
             if stake < 1024:
                 return True, "Stake below minimum"
 
