@@ -278,6 +278,9 @@ class ValidatorSession:
         bt.logging.info(f"Median of highest response times: {median_max_response_time}")
         bt.logging.info(f"Minimum response time: {min_response_time}")
 
+        response_times = []
+        verified_count = 0
+
         for response in responses:
             try:
                 if not isinstance(response, tuple) or len(response) != 6:
@@ -341,15 +344,43 @@ class ValidatorSession:
                     self.proof_of_weights_queue.append(proof_of_weights)
 
                 bt.logging.trace(f"Calculated score for UID {uid}: {self.scores[uid]}")
+
+                # Collect response times and count verified responses
+                response_times.append(response_time)
+                if verified:
+                    verified_count += 1
+
             except Exception as e:
                 bt.logging.error(f"Error calculating score for uid: {uid}, error: {e}")
                 traceback.print_exc()
+
         self.log_scores()
         self.try_store_scores()
         self.current_block = self.subtensor.block
         if self.current_block - self.last_updated_block > self.config.blocks_per_epoch:
             self.update_weights(torch.tensor(list(all_uids)))
         self.aggregation_active = True
+
+        # Calculate and log system-wide metrics for this iteration
+        if response_times:
+            max_response_time = max(response_times)
+            min_response_time = min(response_times)
+            mean_response_time = sum(response_times) / len(response_times)
+            median_response_time = sorted(response_times)[len(response_times) // 2]
+
+            # Log to wandb
+            wandb_logger.safe_log(
+                {
+                    model_id[0]: {
+                        "max_response_time": max_response_time,
+                        "min_response_time": min_response_time,
+                        "mean_response_time": mean_response_time,
+                        "median_response_time": median_response_time,
+                        "total_responses": len(response_times),
+                        "verified_responses": verified_count,
+                    }
+                }
+            )
 
     def update_weights(self, uids: torch.Tensor) -> None:
         if uids.shape[0] == 0 or len(self.scores) == 0:
@@ -453,35 +484,43 @@ class ValidatorSession:
 
     def log_responses(self, responses):
         """
-        Log response information to the console and to wandb
+        Log response information to the console and to wandb.
         """
         console = Console()
-        table = Table(title="responses")
+        table = Table(title="Responses")
         columns = [
-            "uid",
-            "verification_result",
-            "response_time",
-            "proof_size",
-            "model_id",
+            "UID",
+            "Verification Result",
+            "Response Time",
+            "Proof Size",
+            "Model ID",
         ]
-        styles = ["cyan", "magenta", "magenta", "magenta", "magenta"]
-        justifications = ["right"] * 5
 
-        for col, style, justify in zip(columns, styles, justifications):
-            table.add_column(col, justify=justify, style=style)
+        for col in columns:
+            table.add_column(col, justify="right", style="magenta")
 
         wandb_log = {"responses": {}}
         for response in responses:
-            row = [str(response[index]) for index in range(len(columns))]
-            table.add_row(*row)
-            wandb_log["responses"][response[0]] = {
-                columns[index]: response[index] if response[index] is not None else 0
-                for index in range(1, len(columns))
+            uid, verification_result, response_time, proof_size, model_id, _ = response
+
+            # Add row to the console table
+            table.add_row(*map(str, response[:-1]))
+
+            # Prepare data for wandb logging
+            if uid not in wandb_log["responses"]:
+                wandb_log["responses"][uid] = {}
+            model_id = model_id[0] if isinstance(model_id, list) else model_id
+
+            wandb_log["responses"][uid][model_id] = {
+                "verification_result": int(verification_result),
+                "response_time": response_time or 0,
+                "proof_size": proof_size or 0,
             }
-            wandb_log["responses"][response[0]]["verification_result"] = int(
-                response[1]
-            )
+
+        # Log to wandb
         wandb_logger.safe_log(wandb_log)
+
+        # Print the table to console
         console.print(table)
 
     def prepare_requests(self, uids: list[int]) -> list[dict]:

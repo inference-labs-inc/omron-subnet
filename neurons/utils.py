@@ -24,7 +24,7 @@ def sync_model_files():
     SYNC_LOG_PREFIX = "  SYNC  | "
 
     for model_hash in os.listdir(MODEL_DIR):
-        if not model_hash.startswith("model_") or model_hash == "model_0":
+        if not model_hash.startswith("model_"):
             continue
 
         metadata_file = os.path.join(MODEL_DIR, model_hash, "metadata.json")

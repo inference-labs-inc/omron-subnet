@@ -1,17 +1,10 @@
 #!/bin/bash
 
-# Check if the terminal can parse JSON with jq. If not then install jq
-if ! command -v jq &> /dev/null
-then
-    echo "jq is not installed. Installing now..."
-    curl -sS https://webi.sh/jq | bash
-fi
-
 # Search for models in the deployment layer
 MODEL_DIR="neurons/deployment_layer"
-for MODEL_HASH in $(ls $MODEL_DIR | grep 'model_'); do
+for MODEL_FOLDER in $(find "$MODEL_DIR" -maxdepth 1 -type d -name 'model_*'); do
     # See if the model has metadata attached
-    METADATA_FILE="${MODEL_DIR}/${MODEL_HASH}/metadata.json"
+    METADATA_FILE="${MODEL_FOLDER}/metadata.json"
 
     if [ ! -f "$METADATA_FILE" ]; then
         echo "Error: Metadata file not found at $METADATA_FILE"
@@ -27,16 +20,16 @@ for MODEL_HASH in $(ls $MODEL_DIR | grep 'model_'); do
 
     while IFS=' ' read -r key url; do
         # If the external file already exists then do nothing
-        if [ -f "${MODEL_DIR}/${MODEL_HASH}/${key}" ]; then
-            echo "File ${key} already downloaded, skipping..."
+        if [ -f "${MODEL_FOLDER}/${key}" ]; then
+            echo "File ${key} already downloaded at ${MODEL_FOLDER}/${key}, skipping..."
             continue
         fi
         # If the file doesn't exist we'll pull from the URL specified
-        echo "Downloading ${url} to ${MODEL_DIR}/${MODEL_HASH}/${key}..."
-        curl -o "${MODEL_DIR}/${MODEL_HASH}/${key}" "${url}"
+        echo "Downloading ${url} to ${MODEL_FOLDER}/${key}..."
+        curl -o "${MODEL_FOLDER}/${key}" "${url}"
         # If the file doesn't download then we'll skip this file and echo the error
         if [ $? -ne 0 ]; then
-            echo "Error: Failed to download ${url} to ${MODEL_DIR}/${MODEL_HASH}/${key}"
+            echo "Error: Failed to download ${url} to ${MODEL_FOLDER}/${key}"
             continue
         fi
     done <<< "$external_files"

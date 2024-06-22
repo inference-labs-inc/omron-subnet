@@ -243,9 +243,11 @@ class MinerSession:
         )
         self.log_batch.append(
             {
-                "proof_time": proof_time,
-                "overhead_time": delta_t - proof_time,
-                "total_response_time": delta_t,
+                str(model_id[0]): {
+                    "proof_time": proof_time,
+                    "overhead_time": delta_t - proof_time,
+                    "total_response_time": delta_t,
+                }
             }
         )
 

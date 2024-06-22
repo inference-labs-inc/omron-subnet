@@ -1,0 +1,10 @@
+{
+    "name": "Model 0 (LSTM)",
+    "description": "Omron's default LSTM model.",
+    "author": "Inference Labs",
+    "version": "0.0.1",
+    "external_files": {
+        "pk.key": "https://storage.omron.ai/pk_xs.key",
+        "kzg.srs": "https://storage.omron.ai/kzg_xs.srs"
+    }
+}

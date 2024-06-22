@@ -68,10 +68,28 @@ if ! dpkg -s python3-venv >/dev/null 2>&1; then
 	sudo apt install -y python3-venv
 fi
 
-# Check if Node is installed, if not then install it
-if ! command -v node >/dev/null 2>&1; then
-	echo "Node not found. Installing Node..."
+# Check if Node and npm are installed, if not then install them
+if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+	echo "Node or npm not found. Installing Node and npm..."
 	install_node
+fi
+
+# Check if jq is installed, if not then install it
+if ! command -v jq >/dev/null 2>&1; then
+	echo "jq not found. Installing jq..."
+	case ${OS} in
+	'Linux')
+		sudo apt update
+		sudo apt install -y jq
+		;;
+	'Darwin')
+		brew install jq
+		;;
+	*)
+		echo "Unsupported OS for jq installation"
+		exit 1
+		;;
+	esac
 fi
 
 # Check if PM2 is installed, if not then install it
@@ -79,7 +97,6 @@ if ! command -v pm2 >/dev/null 2>&1; then
 	echo "pm2 not found. Installing pm2..."
 	sudo npm install -g pm2
 fi
-
 # Ask user where they want to install the SN
 read -rp "Where would you like to install Omron? (./omron): " INSTALL_PATH </dev/tty
 INSTALL_PATH=${INSTALL_PATH:-./omron}
@@ -125,12 +142,12 @@ else
 	echo -e "\033[32mInstallation complete. \033[0m"
 fi
 
-# Download the SN's PK
-echo "Downloading PK..."
-sudo wget https://storage.omron.ai/pk_xs.key -O "${INSTALL_PATH}"/neurons/deployment_layer/model_0/pk.key
+# Set working directory to install dir
+cd "${INSTALL_PATH}" || exit
 
-echo "Downloading SRS..."
-sudo wget https://storage.omron.ai/kzg_xs.srs -O "${INSTALL_PATH}"/neurons/deployment_layer/model_0/kzg.srs
+# Sync remote files for all models
+echo "Syncing model files..."
+bash "./sync_model_files.sh"
 
 # Display next steps
 echo -e "\033[32mOmron has been installed to ${INSTALL_PATH}. Please run \`cd ${INSTALL_PATH}\` to navigate to the directory.\033[0m"
