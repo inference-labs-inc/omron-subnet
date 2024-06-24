@@ -28,7 +28,6 @@ PRODUCE_AGGREGATE_CIRCUIT = False
 # Append to system path in order to import validator
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-
 # trunk-ignore(flake8/E402)
 # trunk-ignore(pylint/C0413)
 from _validator.reward import Reward
@@ -43,7 +42,7 @@ if args.trace:
     bt.logging.set_trace(True)
 
 # Create the new circuit's directory
-os.chdir(os.path.join(os.path.dirname(__file__), "..", "deployment_layer")
+os.chdir(os.path.join(os.path.dirname(__file__), "..", "deployment_layer"))
 new_model_folder = "new_model"
 os.makedirs(new_model_folder, exist_ok=True)
 os.chdir(new_model_folder)
@@ -54,6 +53,64 @@ reward_model.eval()
 bt.logging.trace(
     f"Instantiated Reward model: {reward_model} and set it to evaluation mode."
 )
+
+SETTINGS_CONFIGURATION = {
+    "run_args": {
+        "tolerance": {"val": 0.0, "scale": 1.0},
+        "input_scale": 16,
+        "param_scale": 16,
+        "scale_rebase_multiplier": 1,
+        "lookup_range": [-150354, 97480],
+        "logrows": 18,
+        "num_inner_cols": 2,
+        "variables": [["batch_size", 1]],
+        "input_visibility": "Public",
+        "output_visibility": "Public",
+        "param_visibility": "Fixed",
+        "div_rebasing": False,
+        "rebase_frac_zero_constants": False,
+        "check_mode": "UNSAFE",
+        "commitment": "KZG",
+    },
+    "num_rows": 112,
+    "total_assignments": 224,
+    "total_const_size": 11,
+    "total_dynamic_col_size": 0,
+    "num_dynamic_lookups": 0,
+    "num_shuffles": 0,
+    "total_shuffle_col_size": 0,
+    "model_instance_shapes": [
+        [1],
+        [1],
+        [1],
+        [1],
+        [1],
+        [1],
+        [1],
+        [64],
+        [1],
+        [1],
+        [1],
+        [64],
+        [1],
+        [1],
+    ],
+    "model_output_scales": [16, 0, 0, 0],
+    "model_input_scales": [16, 16, 0, 0, 16, 16, 16, 0, 0, 0],
+    "module_sizes": {"polycommit": [], "poseidon": [0, [0]]},
+    "required_lookups": [
+        "ReLU",
+        {"Min": {"scale": 65536.0, "a": 0.99}},
+        {"Tan": {"scale": 65536.0}},
+        {"Min": {"scale": 65536.0, "a": 1.0}},
+    ],
+    "required_range_checks": [[-32768, 32768], [32768, 98304]],
+    "check_mode": "UNSAFE",
+    "version": "10.2.7",
+    "num_blinding_factors": None,
+    "timestamp": 1718658006597,
+}
+
 
 # Define sample inputs for the model export
 sample_inputs = {
@@ -157,9 +214,24 @@ if __name__ == "__main__":
     bt.logging.trace("Initiating inference with ONNX Runtime on network.onnx.")
     ort_session = ort.InferenceSession("network.onnx")
     np_inputs = {
-        k: np.array(v, dtype=np.float32 if k not in ["block_number", "miner_uid", "proof_size"] else np.int32)
-        if k != "verified"
-        else np.array(v, dtype=np.bool_)
+        k: (
+            np.array(
+                v,
+                dtype=(
+                    np.float32
+                    if k
+                    not in [
+                        "block_number",
+                        "miner_uid",
+                        "proof_size",
+                        "validator_hotkey",
+                    ]
+                    else np.int32
+                ),
+            )
+            if k != "verified"
+            else np.array(v, dtype=np.bool_)
+        )
         for k, v in sample_inputs.items()
     }
     output = ort_session.run(
@@ -187,8 +259,11 @@ if __name__ == "__main__":
         py_run_args.input_visibility = "public"
         py_run_args.output_visibility = "public"
         py_run_args.param_visibility = "fixed"
-        ezkl.gen_settings(py_run_args=py_run_args)
-        ezkl.calibrate_settings("input.json", target="accuracy", scales=[16], lookup_safety_margin=1)
+        # ezkl.gen_settings(py_run_args=py_run_args)
+        # ezkl.calibrate_settings("input.json", target="accuracy", scales=[16])
+        # Use predefined settings rather than generated settings
+        with open("settings.json", "w") as f:
+            json.dump(SETTINGS_CONFIGURATION, f)
         ezkl.get_srs()
         ezkl.compile_circuit()
         ezkl.setup(
@@ -207,7 +282,7 @@ if __name__ == "__main__":
             model="model.compiled",
             pk_path="pk.key",
             proof_path="proof.json",
-            proof_type="for-aggr" if PRODUCE_AGGREGATE_CIRCUIT else "EVM",
+            proof_type="for-aggr" if PRODUCE_AGGREGATE_CIRCUIT else "single",
         )
         ezkl.verify(
             proof_path="proof.json",
@@ -219,7 +294,7 @@ if __name__ == "__main__":
             model="model.compiled",
             pk_path="pk.key",
             proof_path="proof_2.json",
-            proof_type="for-aggr" if PRODUCE_AGGREGATE_CIRCUIT else "EVM",
+            proof_type="for-aggr" if PRODUCE_AGGREGATE_CIRCUIT else "single",
         )
         if PRODUCE_AGGREGATE_CIRCUIT:
             ezkl.setup_aggregate(
@@ -240,9 +315,11 @@ if __name__ == "__main__":
         # Hash the VK and set it as the folder's name
         with open("vk.key", "rb") as f:
             vk_key = f.read()
-        vk_key_sha256 = hashlib.sha256(vk_key).hexdigest()
-        os.rename(new_model_folder, f"model_vk_key_sha256)
-
+        model_vk_key_sha256 = hashlib.sha256(vk_key).hexdigest()
+        new_folder_name = f"model_{model_vk_key_sha256}"
+        parent_dir = os.path.dirname(os.getcwd())
+        new_path = os.path.join(parent_dir, new_folder_name)
+        os.rename(os.getcwd(), new_path)
         bt.logging.success("Successfully circuitized the reward function.")
 
 
