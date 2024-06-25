@@ -330,7 +330,7 @@ class ValidatorSession:
                             [float(self.scores[uid])],
                             [verified],
                             [proof_size],
-                            [float(torch.tensor(response_time))],
+                            [float(torch.clamp(torch.tensor(response_time), 0, median_max_response_time))],
                             [float(median_max_response_time)],
                             [float(min_response_time)],
                             hotkey_to_split_tensor(
