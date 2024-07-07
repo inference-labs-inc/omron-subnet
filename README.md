@@ -56,7 +56,8 @@ Comprehensive steps to start and connect to a development blockchain instance ca
 
 ```console
 pm2 start miner.py --name miner --interpreter ../omron-venv/bin/python --kill-timeout 3000 -- \
---netuid 2 \
+--netuid 1 \
+--subtensor.network local \
 --wallet.name {your_miner_key_name} \
 --wallet.hotkey {your_miner_hotkey_name}
 ```
@@ -65,7 +66,8 @@ pm2 start miner.py --name miner --interpreter ../omron-venv/bin/python --kill-ti
 
 ```console
 pm2 start miner.py --name miner --interpreter python3 --kill-timeout 3000 -- \
-  --netuid 2 \
+  --netuid 1 \
+  --subtensor.network local \
   --wallet.name {your_miner_key_name} \
   --wallet.hotkey {your_miner_hotkey_name}
 ```
@@ -83,7 +85,8 @@ pm2 start miner.py --name miner --interpreter python3 --kill-timeout 3000 -- \
 
 ```console
 pm2 start validator.py --name validator --interpreter ../omron-venv/bin/python --kill-timeout 3000 -- \
---netuid 2 \
+--netuid 1 \
+--subtensor.network local \
 --wallet.name {validator_key_name} \
 --wallet.hotkey {validator_hot_key_name}
 ```
@@ -92,7 +95,8 @@ pm2 start validator.py --name validator --interpreter ../omron-venv/bin/python -
 
 ```console
 pm2 start validator.py --name validator --interpreter python3 --kill-timeout 3000 -- \
-  --netuid 2 \
+  --netuid 1 \
+  --subtensor.network local \
   --wallet.name {validator_key_name} \
   --wallet.hotkey {validator_hot_key_name}
 ```
