@@ -30,6 +30,91 @@ This project was completed as a submission in the Brussels ** dAGI House ** hack
 
 *To be added*
 
+## Instructions for running locally
+
+> [!CAUTION]
+> This requires running on confidential computing hardware with Intel SGX support.
+
+### Start a local bittensor blockchain
+
+Comprehensive steps to start and connect to a development blockchain instance can be found at the below link.
+
+[Starting the chain →](./docs/running_on_staging.md)
+
+
+
+### Run the miner
+
+> [!IMPORTANT]
+> Ensure you are within the `/neurons` directory before using the commands below to start your miner
+>
+> ```console
+> cd neurons
+> ```
+
+#### Within a virtual environment
+
+```console
+pm2 start miner.py --name miner --interpreter ../omron-venv/bin/python --kill-timeout 3000 -- \
+--netuid 2 \
+--wallet.name {your_miner_key_name} \
+--wallet.hotkey {your_miner_hotkey_name}
+```
+
+#### Outside of a virtual environment
+
+```console
+pm2 start miner.py --name miner --interpreter python3 --kill-timeout 3000 -- \
+  --netuid 2 \
+  --wallet.name {your_miner_key_name} \
+  --wallet.hotkey {your_miner_hotkey_name}
+```
+
+### Run the validator
+
+> [!IMPORTANT]
+> Ensure you are within the `/neurons` directory before using the commands below to start your validator
+>
+> ```console
+> cd neurons
+> ```
+
+#### Within a virtual environment
+
+```console
+pm2 start validator.py --name validator --interpreter ../omron-venv/bin/python --kill-timeout 3000 -- \
+--netuid 2 \
+--wallet.name {validator_key_name} \
+--wallet.hotkey {validator_hot_key_name}
+```
+
+#### Outside of a virtual environment
+
+```console
+pm2 start validator.py --name validator --interpreter python3 --kill-timeout 3000 -- \
+  --netuid 2 \
+  --wallet.name {validator_key_name} \
+  --wallet.hotkey {validator_hot_key_name}
+```
+
+### Observe the logs between the two processes
+
+Use the below docker commands to view inferences traveling back and forth between the miner and validator
+
+```console
+docker logs miner
+```
+
+```console
+docker logs validator
+```
+
+Use the below pm2 logging to view the validator's interpretation of the miner's responses including adjustments to scoring.
+
+```console
+pm2 logs validator
+```
+
 ## Features
 
 Validators within the subnet query miners and the following exchange occurs.
