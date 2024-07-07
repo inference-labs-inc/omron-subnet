@@ -108,7 +108,7 @@ if __name__ == "__main__":
             "deployment_layer",
             "tee",
             "miner",
-            "worker.yaml",
+            "docker-compose.yaml",
         )
         with open(worker_yaml_path, "r") as file:
             compose_config = yaml.safe_load(file)

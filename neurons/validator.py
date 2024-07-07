@@ -6,6 +6,8 @@ import wandb_logger
 from _validator.validator_session import ValidatorSession
 from utils import sync_model_files
 import traceback
+import yaml
+import os
 
 
 # This function is responsible for setting up and parsing command-line arguments.
@@ -91,15 +93,13 @@ if __name__ == "__main__":
     # Configure TEE controller
     try:
         bt.logging.info("Starting FastChat controller in TEE...")
-        import yaml
-        import os
 
         controller_yaml_path = os.path.join(
             os.path.dirname(__file__),
             "deployment_layer",
             "tee",
             "validator",
-            "controller.yaml",
+            "docker-compose.yaml",
         )
         with open(controller_yaml_path, "r") as file:
             compose_config = yaml.safe_load(file)
