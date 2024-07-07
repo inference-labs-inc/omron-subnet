@@ -7,6 +7,7 @@ from _validator.validator_session import ValidatorSession
 from utils import sync_model_files
 import traceback
 
+
 # This function is responsible for setting up and parsing command-line arguments.
 def get_config_from_args():
     """
@@ -87,11 +88,41 @@ if __name__ == "__main__":
     # Parse the configuration.
     config = get_config_from_args()
 
+    # Configure TEE controller
+    try:
+        bt.logging.info("Starting FastChat controller in TEE...")
+        import yaml
+        import os
+
+        controller_yaml_path = os.path.join(
+            os.path.dirname(__file__),
+            "deployment_layer",
+            "tee",
+            "validator",
+            "controller.yaml",
+        )
+        with open(controller_yaml_path, "r") as file:
+            compose_config = yaml.safe_load(file)
+
+        docker_command = ["docker", "compose", "-f", controller_yaml_path, "up", "-d"]
+
+        subprocess.run(docker_command, check=True)
+        bt.logging.success("FastChat controller started successfully in TEE.")
+    except subprocess.CalledProcessError as e:
+        bt.logging.error(f"Failed to start FastChat controller in TEE: {e}")
+    except Exception as e:
+        bt.logging.error(
+            f"An unexpected error occurred while starting FastChat controller: {e}"
+        )
+
     # Sync remote model files
     try:
         sync_model_files()
     except Exception as e:
-        bt.logging.error("Failed to sync model files. Please run ./sync_model_files.sh to manually sync them.", e)
+        bt.logging.error(
+            "Failed to sync model files. Please run ./sync_model_files.sh to manually sync them.",
+            e,
+        )
         traceback.print_exc()
 
     # Run the main function.

@@ -100,41 +100,29 @@ if __name__ == "__main__":
     # Startup TEE worker
     try:
         bt.logging.info("Starting FastChat worker in TEE...")
-        docker_command = [
-            "docker",
-            "run",
-            "-d",
-            "--name",
-            "miner-tee",
-            "--device",
-            "/dev/sgx",
-            "-e",
-            "CONTROLLER_HOST=0.0.0.0",
-            "-e",
-            "CONTROLLER_PORT=21005",
-            "-e",
-            f"WORKER_HOST={subprocess.check_output(['hostname', '-i']).decode().strip()}",
-            "-e",
-            "WORKER_PORT=21841",
-            "-e",
-            "MODEL_PATH=/llama",
-            "-e",
-            "OMP_NUM_THREADS=16",
-            "-e",
-            "ENABLE_PERF_OUTPUT=true",
-            "-v",
-            "/mnt/sde/tpch-data/:/llama",
-            "-v",
-            "/var/run/aesmd/aesm.socket:/var/run/aesmd/aesm.socket",
-            "--cpus",
-            "16",
-            "--memory",
-            "32G",
-            "intelanalytics/bigdl-ppml-trusted-bigdl-llm-gramine-ref:2.4.0-SNAPSHOT",
-            "-m",
-            "worker",
-        ]
+        import yaml
+        import os
 
+        worker_yaml_path = os.path.join(
+            os.path.dirname(__file__),
+            "deployment_layer",
+            "tee",
+            "miner",
+            "worker.yaml",
+        )
+        with open(worker_yaml_path, "r") as file:
+            compose_config = yaml.safe_load(file)
+
+        # Update the WORKER_HOST environment variable
+        compose_config["services"]["executor"]["environment"].append(
+            f"WORKER_HOST={subprocess.check_output(['hostname', '-i']).decode().strip()}"
+        )
+
+        # Write the updated configuration back to the file
+        with open(worker_yaml_path, "w") as file:
+            yaml.dump(compose_config, file)
+
+        docker_command = ["docker", "compose", "-f", worker_yaml_path, "up", "-d"]
         subprocess.run(docker_command, check=True)
         bt.logging.success("FastChat worker started successfully in TEE.")
     except subprocess.CalledProcessError as e:
