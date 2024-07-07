@@ -15,9 +15,13 @@
 
 ## Introduction
 
-Trusted Execution Environments (TEEs) provide a secure way of executing Trusted Apps (TAs)
+We have extended the functionality of Omron, Bittensor SN2, to include the use of Trusted Execution Environments (TEEs) as a means of verification and Proof-of-Inference. Miners compete against each other to be the best in performance, and only the top miners receive rewards from the Bittensor network.
 
-Omron (https://omron.ai) is a Proof-of-Inference compute cluster deployed to Bittensor. [Omron SN 2](https://x.taostats.io/subnet/2) is the worlds largest zkml proving cluster.
+Trusted Execution Environments (TEEs) provide a secure way of executing Trusted Apps (TAs). This enables 3rd parties to query models all while the inputs/prompts remain fully private to all parties.
+
+[Omron](https://omron.ai) is a Proof-of-Inference compute cluster deployed on Bittensor. [Omron SN 2](https://x.taostats.io/subnet/2) is the worlds largest zkml proving cluster.
+
+Omron currently supports verified inference through the use of zero knowledge proofs. Models are converted to zk circuits which produce cryptographic proof of execution.
 
 This project was completed as a submission in the Brussels ** dAGI House ** hackathon July 5-7 2024. [DoraHacks Link](https://dorahacks.io/hackathon/dagihouse/buidl)
 
