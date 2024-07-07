@@ -23,6 +23,7 @@ from execution_layer.VerifiedModelSession import VerifiedModelSession
 from rich.console import Console
 from rich.table import Table
 from utils import AutoUpdate, clean_temp_files, hotkey_to_split_tensor
+from execution_layer.TEEModelSession import TEEModelSession
 
 # Hash of the reward model's VK
 PROOF_OF_WEIGHTS_MODEL_ID: str = (
@@ -42,6 +43,8 @@ ENABLE_POW_AGGREGATION = False
 MAXIMUM_SCORE_MEDIAN_SAMPLE = 0.05
 # Shift in seconds to apply to the minimum response time for vertical asymptote adjustment
 MINIMUM_SCORE_SHIFT = 0.5
+# Whether TEE inferences should be enabled
+USE_TEE = True
 
 
 class ProofOfWeightsStatus(Enum):
@@ -330,7 +333,15 @@ class ValidatorSession:
                             [float(self.scores[uid])],
                             [verified],
                             [proof_size],
-                            [float(torch.clamp(torch.tensor(response_time), 0, median_max_response_time))],
+                            [
+                                float(
+                                    torch.clamp(
+                                        torch.tensor(response_time),
+                                        0,
+                                        median_max_response_time,
+                                    )
+                                )
+                            ],
                             [float(median_max_response_time)],
                             [float(min_response_time)],
                             hotkey_to_split_tensor(
@@ -768,6 +779,34 @@ class ValidatorSession:
         """
         Run a single step of the validator.
         """
+
+        random_inputs = [
+            "Once upon a time",
+            "In a galaxy far, far away",
+            "It was a dark and stormy night",
+            "The quick brown fox jumps over the lazy dog",
+            "To be or not to be, that is the question",
+        ]
+        if USE_TEE:
+            # For demonstration purposes we'll ignore zk inference and use TEE only
+            uid = 1
+            reward_model = Reward()
+            reward_model.eval()
+            session = TEEModelSession()
+            result = session.run_verified_inference(random.choice(random_inputs))
+            self.scores[uid] = reward_model.forward(
+                1,
+                self.scores[uid],
+                torch.tensor(result.success),
+                torch.tensor(DEFAULT_PROOF_SIZE),
+                torch.tensor(result.execution_time),
+                torch.tensor(VALIDATOR_REQUEST_TIMEOUT_SECONDS),
+                torch.tensor(0),
+                hotkey_to_split_tensor(self.wallet.hotkey.public_key.hex()),
+                self.metagraph.block,
+                uid,
+            )
+            return
 
         uids = self.metagraph.uids.tolist()
         self.sync_scores_uids(uids)

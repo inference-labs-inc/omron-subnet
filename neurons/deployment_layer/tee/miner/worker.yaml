@@ -1,0 +1,35 @@
+version: '3'
+
+services:
+  executor:
+    image: intelanalytics/bigdl-ppml-trusted-bigdl-llm-gramine-ref:2.4.0-SNAPSHOT
+    environment:
+      - CONTROLLER_HOST=validator
+      - CONTROLLER_PORT=21005
+      - WORKER_HOST=${WORKER_HOST:-0.0.0.0}
+      - WORKER_PORT=21841
+      - MODEL_PATH=/llama
+      - OMP_NUM_THREADS=16
+      - ENABLE_PERF_OUTPUT=true
+    volumes:
+      - /mnt/sde/tpch-data:/llama
+      - /var/run/aesmd/aesm.socket:/var/run/aesmd/aesm.socket
+    command: ["-m", "worker"]
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 32G
+          cpus: '16'
+        # reservations:
+        #   devices:
+        #     - driver: intel.com/sgx
+        #       count: 1
+        #       capabilities: [sgx.intel.com/enclave, sgx.intel.com/provision]
+    labels:
+      fastchat: worker
+    restart: always
+
+networks:
+  default:
+    driver: bridge

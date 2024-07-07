@@ -11,6 +11,7 @@ import torch
 import wandb_logger
 import requests
 import json
+from huggingface_hub import snapshot_download
 from __init__ import __version__
 
 TARGET_BRANCH = "main"
@@ -24,6 +25,15 @@ def sync_model_files():
     SYNC_LOG_PREFIX = "  SYNC  | "
 
     for model_hash in os.listdir(MODEL_DIR):
+
+        if model_hash.startswith("tee"):
+            # LLama 7B for TEE inferences
+            snapshot_download(
+                "luodian/llama-7b-hf",
+                local_dir=os.path.join(MODEL_DIR, model_hash, "model"),
+            )
+            continue
+
         if not model_hash.startswith("model_"):
             continue
 

@@ -6,6 +6,8 @@ import wandb_logger
 from _miner.miner_session import MinerSession
 from utils import sync_model_files
 import traceback
+import subprocess
+
 
 def get_config_from_args():
     """
@@ -89,8 +91,58 @@ if __name__ == "__main__":
     try:
         sync_model_files()
     except Exception as e:
-        bt.logging.error("Failed to sync model files. Please run ./sync_model_files.sh to manually sync them.", e)
+        bt.logging.error(
+            "Failed to sync model files. Please run ./sync_model_files.sh to manually sync them.",
+            e,
+        )
         traceback.print_exc()
+
+    # Startup TEE worker
+    try:
+        bt.logging.info("Starting FastChat worker in TEE...")
+        docker_command = [
+            "docker",
+            "run",
+            "-d",
+            "--name",
+            "fastchat-worker",
+            "--device",
+            "/dev/sgx",
+            "-e",
+            "CONTROLLER_HOST=bigdl-a1234bd-fschat-controller-service",
+            "-e",
+            "CONTROLLER_PORT=21005",
+            "-e",
+            f"WORKER_HOST={subprocess.check_output(['hostname', '-i']).decode().strip()}",
+            "-e",
+            "WORKER_PORT=21841",
+            "-e",
+            "MODEL_PATH=/llama",
+            "-e",
+            "OMP_NUM_THREADS=16",
+            "-e",
+            "ENABLE_PERF_OUTPUT=true",
+            "-v",
+            "/mnt/sde/tpch-data/:/llama",
+            "-v",
+            "/var/run/aesmd/aesm.socket:/var/run/aesmd/aesm.socket",
+            "--cpus",
+            "16",
+            "--memory",
+            "32G",
+            "intelanalytics/bigdl-ppml-trusted-bigdl-llm-gramine-ref:2.4.0-SNAPSHOT",
+            "-m",
+            "worker",
+        ]
+
+        subprocess.run(docker_command, check=True)
+        bt.logging.success("FastChat worker started successfully in TEE.")
+    except subprocess.CalledProcessError as e:
+        bt.logging.error(f"Failed to start FastChat worker in TEE: {e}")
+    except Exception as e:
+        bt.logging.error(
+            f"An unexpected error occurred while starting FastChat worker: {e}"
+        )
 
     # Run the main function.
     try:

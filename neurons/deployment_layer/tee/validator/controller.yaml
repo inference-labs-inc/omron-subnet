@@ -1,0 +1,34 @@
+version: "3"
+
+services:
+  fastchat-controller:
+    image: intelanalytics/bigdl-ppml-trusted-bigdl-llm-gramine-ref:2.4.0-SNAPSHOT
+    environment:
+      - CONTROLLER_HOST=0.0.0.0
+      - CONTROLLER_PORT=21005
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - ENABLE_PERF_OUTPUT=true
+    ports:
+      - "21005:21005"
+      - "8000:8000"
+    volumes:
+      - /var/run/aesmd/aesm.socket:/var/run/aesmd/aesm.socket
+    command: ["-m", "controller"]
+    deploy:
+      resources:
+        limits:
+          memory: 16G
+          cpus: "4"
+        # reservations:
+        #   devices:
+        #     - driver: intel.com/sgx
+        #       count: 1
+        #       capabilities: [sgx.intel.com/enclave, sgx.intel.com/provision]
+    labels:
+      fastchat-appid: llama
+      fastchat-app-type: controller
+
+networks:
+  default:
+    driver: bridge

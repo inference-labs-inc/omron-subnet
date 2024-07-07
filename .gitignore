@@ -175,3 +175,4 @@ pk_aggr.key
 kzg.srs
 # pm2 config file
 ecosystem.config.js
+neurons/deployment_layer/tee/model/

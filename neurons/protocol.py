@@ -17,10 +17,15 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE S
 DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
+from enum import Enum
 from typing import Dict, Optional
+from attr import field
 
 import bittensor as bt
 
+class ProvingSystem(Enum):
+    TEE="TrustedExecution"
+    ZK="ZeroKnowledge"
 
 class QueryZkProof(bt.Synapse):
     """
@@ -34,27 +39,16 @@ class QueryZkProof(bt.Synapse):
     # Optional request output, filled by receiving axon.
     query_output: Optional[str] = None
 
-    def deserialize(self: bt.Synapse) -> str:
-        """
-        unpack query_output
-        """
-        return self.query_output
-
 
 class QueryForProvenInference(bt.Synapse):
     """
     A Synapse for querying proven inferences.
     DEV: This synapse is a placeholder.
     """
-
-    query_input: Optional[Dict] = None
-    query_output: Optional[Dict] = None
-
-    def deserialize(self) -> Dict:
-        """
-        Deserialize the query_output into a dictionary.
-        """
-        return self.query_output
+    model_id: str = field(init=False)
+    proof_system: ProvingSystem = field(init=False, default=ProvingSystem.ZK)
+    query_input: Optional[Dict] = field(init=False)
+    query_output: Optional[Dict] = field(init=False)
 
 
 class QueryForProofAggregation(bt.Synapse):
