@@ -22,6 +22,7 @@ Trusted Execution Environments (TEEs) provide a secure way of executing Trusted 
 [Omron](https://omron.ai) is a Proof-of-Inference compute cluster deployed on Bittensor. [Omron SN 2](https://x.taostats.io/subnet/2) is the worlds largest zkml proving cluster.
 
 Omron currently supports verified inference through the use of zero knowledge proofs. Models are converted to zk circuits which produce cryptographic proof of execution.
+Adding TEE functionality greatly reduces overhead incurred in verifying computation and improves response time, at the tradeoff of additional trust assumptions. Another goal of ours was to provide hardware enclave abstraction, allowing miners who have diverse hardware to easily participate in the network.
 
 This project was completed as a submission in the Brussels ** dAGI House ** hackathon July 5-7 2024. [DoraHacks Link](https://dorahacks.io/hackathon/dagihouse/buidl)
 
