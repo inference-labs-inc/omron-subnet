@@ -41,7 +41,7 @@ ENABLE_POW_AGGREGATION = False
 # Size in percent of the sample to be used for the maximum score median
 MAXIMUM_SCORE_MEDIAN_SAMPLE = 0.05
 # Shift in seconds to apply to the minimum response time for vertical asymptote adjustment
-MINIMUM_SCORE_SHIFT = 0.5
+MINIMUM_SCORE_SHIFT = 0.0
 # Weights version hyperparameter
 WEIGHTS_VERSION = 25
 
