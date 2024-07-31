@@ -42,6 +42,8 @@ ENABLE_POW_AGGREGATION = False
 MAXIMUM_SCORE_MEDIAN_SAMPLE = 0.05
 # Shift in seconds to apply to the minimum response time for vertical asymptote adjustment
 MINIMUM_SCORE_SHIFT = 0.5
+# Weights version hyperparameter
+WEIGHTS_VERSION = 25
 
 
 class ProofOfWeightsStatus(Enum):
@@ -423,6 +425,7 @@ class ValidatorSession:
             wallet=self.wallet,  # Wallet to sign set weights using hotkey.
             uids=processed_uids,  # Uids of the miners to set weights for.
             weights=processed_weights,  # Weights to set for the miners.
+            version_key=WEIGHTS_VERSION
         )
 
         if not is_weights_set:
