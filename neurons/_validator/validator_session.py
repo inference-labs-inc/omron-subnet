@@ -43,7 +43,7 @@ MAXIMUM_SCORE_MEDIAN_SAMPLE = 0.05
 # Shift in seconds to apply to the minimum response time for vertical asymptote adjustment
 MINIMUM_SCORE_SHIFT = 0.0
 # Weights version hyperparameter
-WEIGHTS_VERSION = 26
+WEIGHTS_VERSION = 1027
 
 
 class ProofOfWeightsStatus(Enum):
