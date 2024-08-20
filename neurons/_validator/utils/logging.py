@@ -183,7 +183,11 @@ def log_pow(proof_and_public_signals: dict):
         bt.logging.error(f"Error logging proof of weights: {e}")
 
 
-def log_system_metrics(response_times, verified_count):
+def log_system_metrics(response_times, verified_count, model_id):
+    circuit = circuit_store.get_circuit(model_id)
+    circuit_name = model_id
+    if circuit:
+        circuit_name = circuit.metadata.name
     if response_times:
         max_response_time = max(response_times)
         min_response_time = min(response_times)
@@ -191,7 +195,7 @@ def log_system_metrics(response_times, verified_count):
         median_response_time = sorted(response_times)[len(response_times) // 2]
         wandb_logger.safe_log(
             {
-                "system_metrics": {
+                f"{circuit_name}": {
                     "max_response_time": max_response_time,
                     "min_response_time": min_response_time,
                     "mean_response_time": mean_response_time,

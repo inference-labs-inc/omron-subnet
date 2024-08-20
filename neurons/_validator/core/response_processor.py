@@ -35,7 +35,8 @@ class ResponseProcessor:
             if r.response_time is not None and r.verification_result
         ]
         verified_count = sum(1 for r in processed_responses if r.verification_result)
-        log_system_metrics(response_times, verified_count)
+        model_id = processed_responses[0].model_id
+        log_system_metrics(response_times, verified_count, model_id)
 
         if not processed_responses[0].model_id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
             return processed_responses
