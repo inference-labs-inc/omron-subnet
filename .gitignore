@@ -175,3 +175,5 @@ pk_aggr.key
 kzg.srs
 # pm2 config file
 ecosystem.config.js
+neurons/_validator/proof_of_weights/
+**.zkey

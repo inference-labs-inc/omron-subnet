@@ -2,20 +2,20 @@ import argparse
 import os
 
 import bittensor as bt
-import wandb_logger
-from _validator.validator_session import ValidatorSession
-from utils import sync_model_files
-import traceback
+from constants import ONCHAIN_PROOF_OF_WEIGHTS_ENABLED, PROOF_OF_WEIGHTS_INTERVAL
 
-# This function is responsible for setting up and parsing command-line arguments.
+from utils import wandb_logger
+from _validator.validator_session import ValidatorSession
+from utils import run_shared_preflight_checks
+
+
 def get_config_from_args():
     """
-    This function sets up and parses command-line arguments.
+    Parses CLI arguments into bt configuration
     """
     parser = argparse.ArgumentParser()
 
-    # Adds override arguments for network and netuid.
-    parser.add_argument("--netuid", type=int, default=1, help="The chain subnet uid.")
+    parser.add_argument("--netuid", type=int, default=1, help="The uid of the subnet.")
 
     parser.add_argument(
         "--no-auto-update",
@@ -46,54 +46,55 @@ def get_config_from_args():
         action="store_true",
     )
 
-    # Adds subtensor specific arguments i.e. --subtensor.chain_endpoint ... --subtensor.network ...
-    bt.subtensor.add_args(parser)
-    # Adds logging specific arguments i.e. --logging.debug ..., --logging.trace .. or --logging.logging_dir ...
-    bt.logging.add_args(parser)
-    # Adds wallet specific arguments i.e. --wallet.name ..., --wallet.hotkey ./. or --wallet.path ...
-    bt.wallet.add_args(parser)
+    parser.add_argument(
+        "--enable-pow",
+        default=ONCHAIN_PROOF_OF_WEIGHTS_ENABLED,
+        action="store_true",
+        help="Whether proof of weights is enabled",
+    )
 
-    # Parse the config (will take command-line arguments if provided)
-    # To print help message, run python3 neurons/validator.py --help
+    parser.add_argument(
+        "--pow-target-interval",
+        type=int,
+        default=PROOF_OF_WEIGHTS_INTERVAL,
+        help="The target interval for committing proof of weights to the chain",
+    )
+
+    bt.subtensor.add_args(parser)
+    bt.logging.add_args(parser)
+    bt.wallet.add_args(parser)
     config = bt.config(parser)
 
-    # Logging is crucial for monitoring and debugging purposes.
     config.full_path = os.path.expanduser(
         "{}/{}/{}/netuid{}/{}".format(
-            config.logging.logging_dir,
-            config.wallet.name,
-            config.wallet.hotkey,
+            config.logging.logging_dir,  # type: ignore
+            config.wallet.name,  # type: ignore
+            config.wallet.hotkey,  # type: ignore
             config.netuid,
             "validator",
         )
     )
-    # Ensure the logging directory exists.
+
     if not os.path.exists(config.full_path):
         os.makedirs(config.full_path, exist_ok=True)
 
-    # Set up logging with the provided configuration and directory.
     bt.logging(config=config, logging_dir=config.full_path)
 
     if config.wandb_key:
         wandb_logger.safe_login(api_key=config.wandb_key)
         bt.logging.success("Logged into WandB")
 
-    # Return the parsed config.
     return config
 
 
-# The main function parses the configuration and runs the validator.
 if __name__ == "__main__":
-    # Parse the configuration.
-    config = get_config_from_args()
+    configuration = get_config_from_args()
+    run_shared_preflight_checks()
 
-    # Sync remote model files
     try:
-        sync_model_files()
-    except Exception as e:
-        bt.logging.error("Failed to sync model files. Please run ./sync_model_files.sh to manually sync them.", e)
-        traceback.print_exc()
-
-    # Run the main function.
-    with ValidatorSession(config) as validator_session:
+        bt.logging.info("Creating validator session...")
+        validator_session = ValidatorSession(configuration)
+        bt.logging.info("Running main loop...")
         validator_session.run()
+    except Exception as e:
+        bt.logging.error("Critical error while attempting to run validator: ", e)

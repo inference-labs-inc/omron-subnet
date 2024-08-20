@@ -1,25 +1,9 @@
-"""
-The MIT License (MIT)
-Copyright © 2023 Chris Wilson
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
-documentation files (the “Software”), to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
-and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of
-the Software.
-
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-"""
 from __future__ import annotations
 from typing import Dict, Optional
 
 import bittensor as bt
+
+from execution_layer.circuit import ProofSystem
 
 
 class QueryZkProof(bt.Synapse):
@@ -34,7 +18,7 @@ class QueryZkProof(bt.Synapse):
     # Optional request output, filled by receiving axon.
     query_output: Optional[str] = None
 
-    def deserialize(self: bt.Synapse) -> str:
+    def deserialize(self: QueryZkProof) -> str | None:
         """
         unpack query_output
         """
@@ -47,14 +31,37 @@ class QueryForProvenInference(bt.Synapse):
     DEV: This synapse is a placeholder.
     """
 
-    query_input: Optional[Dict] = None
-    query_output: Optional[Dict] = None
+    query_input: Optional[dict] = None
+    query_output: Optional[dict] = None
 
-    def deserialize(self) -> Dict:
+    def deserialize(self) -> dict | None:
         """
         Deserialize the query_output into a dictionary.
         """
         return self.query_output
+
+
+class ProofOfWeightsSynapse(bt.Synapse):
+    """
+    A synapse for conveying proof of weights messages
+    """
+
+    subnet_uid: int = 2
+    verification_key_hash: str
+    proof_system: ProofSystem = ProofSystem.CIRCOM
+    inputs: dict
+    proof: str
+    public_signals: str
+
+    def deserialize(self) -> dict | None:
+        """
+        Return the proof
+        """
+        return {
+            "inputs": self.inputs,
+            "proof": self.proof,
+            "public_signals": self.public_signals,
+        }
 
 
 class QueryForProofAggregation(bt.Synapse):
@@ -66,7 +73,7 @@ class QueryForProofAggregation(bt.Synapse):
     model_id: str or int
     aggregation_proof: Optional[str] = None
 
-    def deserialize(self) -> str:
+    def deserialize(self) -> str | None:
         """
         Return the aggregation proof
         """

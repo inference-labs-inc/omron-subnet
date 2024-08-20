@@ -1,34 +1,40 @@
+# from __future__ import annotations
 import time
 import traceback
+import json
 from typing import Tuple, Union
 
 import bittensor as bt
-import protocol
-import wandb_logger
+from constants import (
+    SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
+    STEAK,
+    VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+    VALIDATOR_STAKE_THRESHOLD,
+)
+
+from protocol import QueryForProofAggregation, QueryZkProof, ProofOfWeightsSynapse
+from utils import wandb_logger
 import websocket
-from execution_layer.VerifiedModelSession import VerifiedModelSession
+from execution_layer.verified_model_session import VerifiedModelSession
+from deployment_layer.circuit_store import circuit_store
 from utils import AutoUpdate, clean_temp_files
 
 
 class MinerSession:
+
+    axon: Union[bt.axon, None] = None
+
     def __init__(self, config):
         self.config = config
         self.configure()
         self.check_register(should_exit=True)
         self.auto_update = AutoUpdate()
-        self.axon = None
         self.log_batch = []
         if self.config.disable_blacklist:
             bt.logging.warning(
                 "Blacklist disabled, allowing all requests. Consider enabling to filter requests."
             )
         websocket.setdefaulttimeout(30)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        return False
 
     def start_axon(self):
         bt.logging.info(
@@ -45,6 +51,10 @@ class MinerSession:
         axon.attach(forward_fn=self.queryZkProof, blacklist_fn=self.proof_blacklist)
         axon.attach(
             forward_fn=self.aggregateProof, blacklist_fn=self.aggregation_blacklist
+        )
+        axon.attach(
+            forward_fn=self.handle_pow_request,
+            blacklist_fn=self.pow_blacklist,
         )
         bt.logging.info("Attached forward functions to axon")
 
@@ -76,6 +86,7 @@ class MinerSession:
         step = 0
 
         while True:
+            step += 1
             try:
                 if step % 10 == 0:
                     if not self.config.no_auto_update:
@@ -99,19 +110,24 @@ class MinerSession:
                 if step % 600 == 0:
                     self.check_register()
 
-                if step % 5 == 0 and self.subnet_uid:
-                    self.metagraph = self.subtensor.metagraph(self.config.netuid)
-                    bt.logging.info(
-                        f"Step:{step} | "
-                        f"Block:{self.metagraph.block.item()} | "
-                        f"Stake:{self.metagraph.S[self.subnet_uid]} | "
-                        f"Rank:{self.metagraph.R[self.subnet_uid]} | "
-                        f"Trust:{self.metagraph.T[self.subnet_uid]} | "
-                        f"Consensus:{self.metagraph.C[self.subnet_uid]} | "
-                        f"Incentive:{self.metagraph.I[self.subnet_uid]} | "
-                        f"Emission:{self.metagraph.E[self.subnet_uid]}"
-                    )
-                step += 1
+                if step % 24 == 0 and self.subnet_uid is not None:
+                    try:
+                        self.metagraph = self.subtensor.metagraph(self.config.netuid)
+                        bt.logging.info(
+                            f"Step:{step} | "
+                            f"Block:{self.metagraph.block.item()} | "
+                            f"Stake:{self.metagraph.S[self.subnet_uid]} | "
+                            f"Rank:{self.metagraph.R[self.subnet_uid]} | "
+                            f"Trust:{self.metagraph.T[self.subnet_uid]} | "
+                            f"Consensus:{self.metagraph.C[self.subnet_uid]} | "
+                            f"Incentive:{self.metagraph.I[self.subnet_uid]} | "
+                            f"Emission:{self.metagraph.E[self.subnet_uid]}"
+                        )
+                    except Exception:
+                        bt.logging.warning(
+                            f"Failed to sync metagraph: {traceback.format_exc()}"
+                        )
+
                 time.sleep(1)
 
             # If someone intentionally stops the miner, it'll safely terminate operations.
@@ -146,22 +162,29 @@ class MinerSession:
         self.metagraph = self.subtensor.metagraph(self.config.netuid)
         wandb_logger.safe_init("Miner", self.wallet, self.metagraph, self.config)
 
-    def proof_blacklist(self, synapse: protocol.QueryZkProof) -> Tuple[bool, str]:
+    def proof_blacklist(self, synapse: QueryZkProof) -> Tuple[bool, str]:
         """
         Blacklist method for the proof generation endpoint
         """
         return self._blacklist(synapse)
 
     def aggregation_blacklist(
-        self, synapse: protocol.QueryForProofAggregation
+        self, synapse: QueryForProofAggregation
     ) -> Tuple[bool, str]:
         """
         Blacklist method for the aggregation endpoint
         """
         return self._blacklist(synapse)
 
+    def pow_blacklist(self, synapse: ProofOfWeightsSynapse) -> Tuple[bool, str]:
+        """
+        Blacklist method for the proof generation endpoint
+        """
+        return self._blacklist(synapse)
+
     def _blacklist(
-        self, synapse: Union[protocol.QueryZkProof, protocol.QueryForProofAggregation]
+        self,
+        synapse: Union[QueryZkProof, QueryForProofAggregation, ProofOfWeightsSynapse],
     ) -> Tuple[bool, str]:
         """
         Filters requests if any of the following conditions are met:
@@ -179,18 +202,23 @@ class MinerSession:
                 bt.logging.trace("Blacklist disabled, allowing request.")
                 return False, "Allowed"
 
-            if synapse.dendrite.hotkey not in self.metagraph.hotkeys:
+            if synapse.dendrite.hotkey not in self.metagraph.hotkeys:  # type: ignore
                 return True, "Hotkey is not registered"
 
-            requesting_uid = self.metagraph.hotkeys.index(synapse.dendrite.hotkey)
+            requesting_uid = self.metagraph.hotkeys.index(synapse.dendrite.hotkey)  # type: ignore
             stake = self.metagraph.S[requesting_uid].item()
 
             try:
-                bt.logging.info(f"Request by: {synapse.dendrite.hotkey} | UID: {requesting_uid} | Stake: {stake} 🥩")
+                bt.logging.info(
+                    f"Request by: {synapse.dendrite.hotkey} | UID: {requesting_uid} "  # type: ignore
+                    f"| Stake: {stake} {STEAK}"
+                )
             except UnicodeEncodeError:
-                bt.logging.info(f"Request by: {synapse.dendrite.hotkey} | UID: {requesting_uid} | Stake: {stake}")
+                bt.logging.info(
+                    f"Request by: {synapse.dendrite.hotkey} | UID: {requesting_uid} | Stake: {stake}"  # type: ignore
+                )
 
-            if stake < 1024:
+            if stake < VALIDATOR_STAKE_THRESHOLD:
                 return True, "Stake below minimum"
 
             validator_permit = self.metagraph.validator_permit[requesting_uid].item()
@@ -204,13 +232,13 @@ class MinerSession:
             bt.logging.error(f"Error during blacklist {e}")
             return True, "An error occurred while filtering the request"
 
-    def queryZkProof(self, synapse: protocol.QueryZkProof) -> protocol.QueryZkProof:
+    def queryZkProof(self, synapse: QueryZkProof) -> QueryZkProof:
         """
         This function run proof generation of the model (with its output as well)
         """
         time_in = time.time()
         bt.logging.debug("Received request from validator")
-        bt.logging.info(f"Input data: {synapse.query_input} \n")
+        bt.logging.debug(f"Input data: {synapse.query_input} \n")
 
         if not synapse.query_input or not synapse.query_input.get(
             "public_inputs", None
@@ -219,21 +247,40 @@ class MinerSession:
             synapse.query_output = "Empty query input"
             return synapse
 
-        model_id = synapse.query_input.get("model_id", [0])
+        model_id = synapse.query_input.get("model_id", SINGLE_PROOF_OF_WEIGHTS_MODEL_ID)
         public_inputs = synapse.query_input["public_inputs"]
-        if model_id == [0]:
-            public_inputs = [public_inputs]
 
         # Run inputs through the model and generate a proof.
         try:
-            model_session = VerifiedModelSession(public_inputs, model_id)
+            circuit = circuit_store.get_circuit(str(model_id))
+            if not circuit:
+                raise ValueError(
+                    f"Circuit {model_id} not found. This indicates a missing deployment layer folder or invalid request"
+                )
+            model_name = circuit.metadata.name
+            model_session = VerifiedModelSession(public_inputs, circuit)
             bt.logging.debug("Model session created successfully")
-            synapse.query_output, proof_time = model_session.gen_proof()
+            proof, public, proof_time = model_session.gen_proof()
+            synapse.query_output = json.dumps(
+                {
+                    "proof": proof,
+                    "public_signals": public,
+                }
+            )
+            bt.logging.trace(f"Proof: {synapse.query_output}, Time: {proof_time}")
             model_session.end()
             try:
-                bt.logging.info("✅ Proof completed \n")
+                bt.logging.info(
+                    f"✅ Proof completed for {model_name} "
+                    f"version {circuit.metadata.version} "
+                    f"using the {circuit.metadata.proof_system} proof system \n"
+                )
             except UnicodeEncodeError:
-                bt.logging.info("Proof completed \n")
+                bt.logging.info(
+                    f"Proof completed for {model_name} "
+                    f"version {circuit.metadata.version} "
+                    f"using the {circuit.metadata.proof_system} proof system \n"
+                )
         except Exception as e:
             synapse.query_output = "An error occurred"
             bt.logging.error(f"An error occurred while generating proven output\n{e}")
@@ -247,7 +294,7 @@ class MinerSession:
         )
         self.log_batch.append(
             {
-                str(model_id[0]): {
+                str(model_id): {
                     "proof_time": proof_time,
                     "overhead_time": delta_t - proof_time,
                     "total_response_time": delta_t,
@@ -255,7 +302,71 @@ class MinerSession:
             }
         )
 
-        if delta_t > 300:
+        if delta_t > VALIDATOR_REQUEST_TIMEOUT_SECONDS:
+            bt.logging.error(
+                "Response time is greater than validator timeout. "
+                "This indicates your hardware is not processing validator's requests in time."
+            )
+        return synapse
+
+    def handle_pow_request(
+        self, synapse: ProofOfWeightsSynapse
+    ) -> ProofOfWeightsSynapse:
+        """
+        Handles a proof of weights request
+        """
+        time_in = time.time()
+        bt.logging.debug("Received proof of weights request from validator")
+        bt.logging.debug(f"Input data: {synapse.inputs} \n")
+
+        if not synapse.inputs:
+            bt.logging.error("Received empty input for proof of weights")
+            return synapse
+        bt.logging.trace(f"Input lengths: {len(synapse.inputs['previous_score'])}")
+
+        try:
+            circuit = circuit_store.get_circuit(str(synapse.verification_key_hash))
+
+            if not circuit:
+                raise ValueError(
+                    f"Circuit {synapse.verification_key_hash} not found. "
+                    "This indicates a missing deployment layer folder or invalid request"
+                )
+            model_session = VerifiedModelSession(synapse.inputs, circuit)
+
+            bt.logging.debug("Model session created successfully")
+            proof, public, proof_time = model_session.gen_proof()
+            model_session.end()
+
+            synapse.proof = proof
+            synapse.public_signals = public
+            bt.logging.info(
+                f"✅ Proof of weights completed for {synapse.verification_key_hash} "
+                f"using the {synapse.proof_system} proof system \n"
+            )
+        except Exception as e:
+            bt.logging.error(
+                f"An error occurred while generating proof of weights\n{e}"
+            )
+            proof_time = time.time() - time_in
+
+        time_out = time.time()
+        delta_t = time_out - time_in
+        bt.logging.info(
+            f"Total response time {delta_t}s. Proof time: {proof_time}s. "
+            f"Overhead time: {delta_t - proof_time}s."
+        )
+        self.log_batch.append(
+            {
+                str(synapse.verification_key_hash): {
+                    "proof_time": proof_time,
+                    "overhead_time": delta_t - proof_time,
+                    "total_response_time": delta_t,
+                }
+            }
+        )
+
+        if delta_t > VALIDATOR_REQUEST_TIMEOUT_SECONDS:
             bt.logging.error(
                 "Response time is greater than validator timeout. "
                 "This indicates your hardware is not processing validator's requests in time."
@@ -263,8 +374,8 @@ class MinerSession:
         return synapse
 
     def aggregateProof(
-        self, synapse: protocol.QueryForProofAggregation
-    ) -> protocol.QueryForProofAggregation:
+        self, synapse: QueryForProofAggregation
+    ) -> QueryForProofAggregation:
         """
         Generates an aggregate proof for the provided proofs.
         """
@@ -282,12 +393,20 @@ class MinerSession:
             return synapse
         aggregation_time = 0
 
+        model_id = synapse.model_id
+
         # Run proofs through the aggregate circuit
         try:
-            model_session = VerifiedModelSession(synapse.proofs, synapse.model_id)
+            circuit = circuit_store.get_circuit(str(model_id))
+            if not circuit:
+                raise ValueError(
+                    f"Circuit {model_id} not found."
+                    "This indicates a missing deployment layer folder or invalid request."
+                )
+            model_session = VerifiedModelSession(None, circuit)
             bt.logging.debug("Model session created successfully")
-            synapse.aggregation_proof, aggregation_time = model_session.aggregate_proof(
-                synapse.proofs
+            synapse.aggregation_proof, aggregation_time = (
+                model_session.aggregate_proofs(synapse.proofs)
             )
             model_session.end()
             try:

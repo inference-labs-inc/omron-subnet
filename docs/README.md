@@ -42,6 +42,12 @@ Instructions for configuring a PM2 ecosystem file which allows for streamlined s
 
 [View PM2 Configuration →]
 
+## [Versioning]
+
+Information about Omron's versioning system and how to stay up-to-date with the latest releases.
+
+[View versioning →]
+
 [Setup instructions]: ./shared_setup_steps.md
 [Running on Mainnet]: ./running_on_mainnet.md
 [Running on Testnet]: ./running_on_testnet.md
@@ -54,4 +60,6 @@ Instructions for configuring a PM2 ecosystem file which allows for streamlined s
 [View mainnet instructions →]: ./running_on_mainnet.md
 [View testnet instructions →]: ./running_on_testnet.md
 [View local instructions →]: ./running_on_staging.md
+[Versioning]: ./versioning.md
+[View versioning →]: ./versioning.md
 [← Back to home]: ../

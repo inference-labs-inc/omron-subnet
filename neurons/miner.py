@@ -1,19 +1,19 @@
 import argparse
 import os
+import traceback
 
 import bittensor as bt
-import wandb_logger
+import utils.wandb_logger as wandb_logger
 from _miner.miner_session import MinerSession
-from utils import sync_model_files
-import traceback
+from utils import run_shared_preflight_checks
+
 
 def get_config_from_args():
     """
-    This function initializes the necessary command-line arguments.
-    Using command-line arguments allows users to customize various miner settings.
+    Creates the configuration from CLI args.
     """
     parser = argparse.ArgumentParser()
-    # Adds override arguments for network and netuid.
+
     parser.add_argument(
         "--netuid", type=int, default=1, help="The UID for the Omron subnet."
     )
@@ -45,31 +45,25 @@ def get_config_from_args():
         action="store_true",
     )
 
-    # Adds subtensor specific arguments i.e. --subtensor.chain_endpoint ... --subtensor.network ...
     bt.subtensor.add_args(parser)
-    # Adds logging specific arguments i.e. --logging.debug ..., --logging.trace .. or --logging.logging_dir ...
     bt.logging.add_args(parser)
-    # Adds wallet specific arguments i.e. --wallet.name ..., --wallet.hotkey ./. or --wallet.path ...
     bt.wallet.add_args(parser)
-    # Adds axon specific arguments i.e. --axon.port ...
     bt.axon.add_args(parser)
-    # Activating the parser to read any command-line inputs.
-    # To print help message, run python3 neurons/miner.py --help
 
     config = bt.config(parser)
 
-    # Set up logging directory
-    # Logging captures events for diagnosis or understanding miner's behavior.
     config.full_path = os.path.expanduser(
         "{}/{}/{}/netuid{}/{}".format(
-            config.logging.logging_dir,
-            config.wallet.name,
-            config.wallet.hotkey,
+            config.logging.logging_dir,  # type: ignore
+            config.wallet.name,  # type: ignore
+            config.wallet.hotkey,  # type: ignore
             config.netuid,
             "miner",
         )
     )
-    # Ensure the directory for logging exists, else create one.
+
+    bt.logging(config=config, logging_dir=config.full_path)
+
     if not os.path.exists(config.full_path):
         os.makedirs(config.full_path, exist_ok=True)
 
@@ -79,24 +73,18 @@ def get_config_from_args():
     return config
 
 
-# The main function parses the configuration and runs the validator.
 if __name__ == "__main__":
-    # Parse the configuration.
     bt.logging.info("Getting miner configuration...")
     config = get_config_from_args()
 
-    # Sync remote model files
-    try:
-        sync_model_files()
-    except Exception as e:
-        bt.logging.error("Failed to sync model files. Please run ./sync_model_files.sh to manually sync them.", e)
-        traceback.print_exc()
+    run_shared_preflight_checks()
 
-    # Run the main function.
     try:
         bt.logging.info("Creating miner session...")
         miner_session = MinerSession(config)
         bt.logging.info("Running main loop...")
         miner_session.run()
-    except Exception as e:
-        bt.logging.error("error", e)
+    except Exception:
+        bt.logging.error(
+            f"CRITICAL: Failed to run miner session\n{traceback.format_exc()}"
+        )
