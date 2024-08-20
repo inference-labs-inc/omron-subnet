@@ -5,7 +5,7 @@ from _validator.models.completed_proof_of_weights import CompletedProofOfWeights
 
 from _validator.models.miner_response import MinerResponse
 from _validator.scoring.score_manager import ScoreManager
-from _validator.utils.logging import log_responses
+from _validator.utils.logging import log_responses, log_system_metrics
 from deployment_layer.circuit_store import circuit_store
 
 
@@ -29,6 +29,13 @@ class ResponseProcessor:
     def process_responses(self, responses: list[dict]) -> list[MinerResponse]:
         processed_responses = [self.process_single_response(r) for r in responses]
         log_responses(processed_responses)
+        response_times = [
+            r.response_time
+            for r in processed_responses
+            if r.response_time is not None and r.verification_result
+        ]
+        verified_count = sum(1 for r in processed_responses if r.verification_result)
+        log_system_metrics(response_times, verified_count)
 
         if not processed_responses[0].model_id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
             return processed_responses
