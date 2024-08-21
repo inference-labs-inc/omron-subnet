@@ -141,11 +141,12 @@ class VerifiedModelSession:
         self.remove_temp_files()
 
     def remove_temp_files(self):
-        for path in [
+        for path in (
             self.session_storage.input_path,
             self.session_storage.witness_path,
             self.session_storage.proof_path,
-        ]:
+            self.session_storage.public_path,
+        ):
             if os.path.exists(path):
                 os.remove(path)
 
