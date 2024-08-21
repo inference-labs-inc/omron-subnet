@@ -37,7 +37,7 @@ class AutoUpdate:
 
             # Check if the requirements.txt file has changed
             local_requirements_path = os.path.join(
-                os.path.dirname(__file__), "..", "requirements.txt"
+                os.path.dirname(__file__), "..", "..", "requirements.txt"
             )
             with open(local_requirements_path, "r", encoding="utf-8") as file:
                 local_requirements_hash = hashlib.sha256(
