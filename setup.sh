@@ -183,8 +183,14 @@ if ! command -v pm2 >/dev/null 2>&1; then
 	sudo npm install -g pm2
 fi
 
-# If NO_INSTALL is true, exit here
-if [ "$NO_INSTALL" = true ]; then
+# If NO_INSTALL is true, install pip deps and exit
+if [[ ${NO_INSTALL} == true ]]; then
+	if [[ -f "./omron-venv/bin/activate" ]]; then
+		echo "Activating existing venv..."
+		source "./omron-venv/bin/activate"
+	fi
+	echo "Installing Python dependencies..."
+	python3 -m pip install -r requirements.txt
 	echo "Dependencies checked and installed. Exiting without installing Omron."
 	exit 0
 fi
@@ -223,7 +229,7 @@ python3 -m pip install -r "${INSTALL_PATH}"/requirements.txt
 # Check if btcli is installed, if not then install it
 if ! command -v btcli >/dev/null 2>&1; then
 	echo "btcli not found. Installing btcli...!!!"
-	python3 -m pip install bittensor
+	python3 -m pip install bittensor==6.9.4
 	SHOULD_RESTART=true
 fi
 
