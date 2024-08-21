@@ -115,6 +115,7 @@ class ResponseProcessor:
             res: bool = inference_session.verify_proof(
                 response.public_json, response.proof_json
             )
+            inference_session.end()
             return res
         except Exception as e:
             raise e

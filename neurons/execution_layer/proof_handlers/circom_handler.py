@@ -33,7 +33,8 @@ class CircomHandler(ProofSystemHandler):
         try:
             bt.logging.debug(
                 f"Starting proof generation with paths: {session.session_storage.input_path}, "
-                f"{session.model.paths.compiled_model}, {session.model.paths.pk}, {session.session_storage.proof_path}"
+                f"{session.model.paths.compiled_model}, {session.model.paths.pk}, "
+                f"{session.session_storage.proof_path}, {session.session_storage.public_path}"
             )
 
             proof = self.proof_worker(
@@ -41,6 +42,7 @@ class CircomHandler(ProofSystemHandler):
                 circuit_path=session.model.paths.compiled_model,
                 pk_path=session.model.paths.pk,
                 proof_path=session.session_storage.proof_path,
+                public_path=session.session_storage.public_path,
             )
 
             return proof
@@ -141,8 +143,9 @@ class CircomHandler(ProofSystemHandler):
                         current_index += 1
                 else:
                     current_index += input_sizes[input_name]
-            public_file_path = f"{session.session_storage.proof_path}.public.json"
-            with open(public_file_path, "w", encoding="utf-8") as public_file:
+            with open(
+                session.session_storage.public_path, "w", encoding="utf-8"
+            ) as public_file:
                 json.dump(updated_public_data, public_file)
 
             bt.logging.trace("Diff between original and updated public_data:")
@@ -155,7 +158,7 @@ class CircomHandler(ProofSystemHandler):
                     LOCAL_SNARKJS_PATH,
                     "g16v",
                     session.model.paths.vk,
-                    public_file_path,
+                    session.session_storage.public_path,
                     session.session_storage.proof_path,
                 ],
                 check=True,
@@ -176,7 +179,9 @@ class CircomHandler(ProofSystemHandler):
             return False
 
     @staticmethod
-    def proof_worker(input_path, circuit_path, pk_path, proof_path) -> tuple[str, str]:
+    def proof_worker(
+        input_path, circuit_path, pk_path, proof_path, public_path
+    ) -> tuple[str, str]:
         try:
             # trunk-ignore(bandit/B603)
             result = subprocess.run(
@@ -187,7 +192,7 @@ class CircomHandler(ProofSystemHandler):
                     circuit_path,
                     pk_path,
                     proof_path,
-                    f"{proof_path}.public.json",
+                    public_path,
                 ],
                 check=True,
                 capture_output=True,
@@ -200,9 +205,7 @@ class CircomHandler(ProofSystemHandler):
             proof = None
             with open(proof_path, "r", encoding="utf-8") as proof_file:
                 proof = proof_file.read()
-            with open(
-                f"{proof_path}.public.json", "r", encoding="utf-8"
-            ) as public_file:
+            with open(public_path, "r", encoding="utf-8") as public_file:
                 public_data = public_file.read()
             return proof, public_data
         except subprocess.CalledProcessError as e:

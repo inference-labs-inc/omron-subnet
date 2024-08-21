@@ -195,6 +195,8 @@ class ScoreManager:
 
         self._process_witness_results(witness_list, pow_circuit.settings["scaling"])
 
+        session.end()
+
     def _prepare_pow_inputs(
         self, items: list[ProofOfWeightsItem], scaling: int
     ) -> dict:
