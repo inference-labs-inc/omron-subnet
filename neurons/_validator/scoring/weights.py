@@ -6,6 +6,8 @@ from constants import WEIGHT_RATE_LIMIT, WEIGHTS_VERSION
 from _validator.utils.logging import log_weights
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
 
+from utils.system import timeout_with_multiprocess
+
 
 @dataclass
 class WeightsManager:
@@ -35,6 +37,17 @@ class WeightsManager:
         bt.logging.trace(f"Last update weights block: {self.last_update_weights_block}")
         return current_block - self.last_update_weights_block >= WEIGHT_RATE_LIMIT
 
+    @timeout_with_multiprocess(seconds=60)
+    def set_weights(self, netuid, wallet, uids, weights, version_key):
+        return self.subtensor.set_weights(
+            netuid=netuid,
+            wallet=wallet,
+            uids=uids,
+            weights=weights,
+            wait_for_inclusion=True,
+            version_key=version_key,
+        )
+
     def update_weights(self, scores: torch.Tensor) -> bool:
         """
         Updates the weights based on the given scores and sets them on the chain.
@@ -59,19 +72,21 @@ class WeightsManager:
         weights[scores.nonzero()] = scores[scores.nonzero()]
 
         try:
-            success = self.subtensor.set_weights(
+            success = self.set_weights(
                 netuid=self.metagraph.netuid,
                 wallet=self.wallet,
                 uids=self.metagraph.uids.tolist(),
                 weights=weights.tolist(),
-                wait_for_inclusion=False,
                 version_key=WEIGHTS_VERSION,
             )
-            if success:
-                log_weights(weights)
-                self.last_update_weights_block = int(self.metagraph.block.item())
-                return True
-            bt.logging.error("Failed to set weights on chain")
+            if success is not None:
+                if success:
+                    log_weights(weights)
+                    self.last_update_weights_block = int(self.metagraph.block.item())
+                    return True
+                bt.logging.error("Failed to set weights on chain")
+            else:
+                bt.logging.error("Setting weights timed out")
             return False
         except Exception as e:
             bt.logging.error(f"Failed to set weights on chain with exception: {e}")
