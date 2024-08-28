@@ -32,6 +32,12 @@ if not os.path.exists(POW_RECEIPT_DIRECTORY):
     os.makedirs(POW_RECEIPT_DIRECTORY)
 
 
+def to_tensor(value, dtype):
+    if isinstance(value, torch.Tensor):
+        return value.clone().detach().to(dtype)
+    return torch.tensor(value, dtype=dtype)
+
+
 dummy_miner_response = MinerResponse.empty()
 
 
@@ -49,22 +55,18 @@ class ProofOfWeightsItem:
     uid: torch.Tensor
 
     def __post_init__(self):
-        self.max_score = torch.tensor(self.max_score, dtype=torch.float32)
-        self.previous_score = torch.tensor(self.previous_score, dtype=torch.float32)
-        self.verification_result = torch.tensor(
-            self.verification_result, dtype=torch.bool
+        self.max_score = to_tensor(self.max_score, torch.float32)
+        self.previous_score = to_tensor(self.previous_score, torch.float32)
+        self.verification_result = to_tensor(self.verification_result, torch.bool)
+        self.proof_size = to_tensor(self.proof_size, torch.int64)
+        self.response_time = to_tensor(self.response_time, torch.float32)
+        self.median_max_response_time = to_tensor(
+            self.median_max_response_time, torch.float32
         )
-        self.proof_size = torch.tensor(self.proof_size, dtype=torch.int64)
-        self.response_time = torch.tensor(self.response_time, dtype=torch.float32)
-        self.median_max_response_time = torch.tensor(
-            self.median_max_response_time, dtype=torch.float32
-        )
-        self.min_response_time = torch.tensor(
-            self.min_response_time, dtype=torch.float32
-        )
-        self.block_number = torch.tensor(self.block_number, dtype=torch.int64)
-        self.validator_uid = torch.tensor(self.validator_uid, dtype=torch.int64)
-        self.uid = torch.tensor(self.uid, dtype=torch.int64)
+        self.min_response_time = to_tensor(self.min_response_time, torch.float32)
+        self.block_number = to_tensor(self.block_number, torch.int64)
+        self.validator_uid = to_tensor(self.validator_uid, torch.int64)
+        self.uid = to_tensor(self.uid, torch.int64)
 
     @staticmethod
     def from_miner_response(
