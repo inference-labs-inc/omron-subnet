@@ -79,14 +79,11 @@ class WeightsManager:
                 weights=weights.tolist(),
                 version_key=WEIGHTS_VERSION,
             )
-            if success is not None:
-                if success:
-                    log_weights(weights)
-                    self.last_update_weights_block = int(self.metagraph.block.item())
-                    return True
-                bt.logging.error("Failed to set weights on chain")
-            else:
-                bt.logging.error("Setting weights timed out")
+            if success:
+                log_weights(weights)
+                self.last_update_weights_block = int(self.metagraph.block.item())
+                return True
+            bt.logging.error("Failed to set weights")
             return False
         except Exception as e:
             bt.logging.error(f"Failed to set weights on chain with exception: {e}")
