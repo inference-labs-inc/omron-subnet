@@ -182,6 +182,7 @@ class ValidatorLoop:
                     )
                 )
                 < self.config.subtensor.get_current_block()
+                and len(self.response_processor.completed_proof_of_weights_queue)
             ):
                 log_and_commit_proof(
                     self.config.wallet.hotkey,
