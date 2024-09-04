@@ -249,7 +249,6 @@ def ensure_rust_nightly_installed():
     If not installed, install it.
     """
     RUST_LOG_PREFIX = "  RUST  | "
-    TOOLCHAIN = "nightly-2024-08-01"
 
     try:
         result = subprocess.run(
@@ -258,7 +257,7 @@ def ensure_rust_nightly_installed():
             capture_output=True,
             text=True,
         )
-        if TOOLCHAIN in result.stdout:
+        if "nightly" in result.stdout:
             result = subprocess.run(
                 [
                     f"{os.path.expanduser('~')}/.cargo/bin/rustup",
@@ -266,7 +265,7 @@ def ensure_rust_nightly_installed():
                     "list",
                     "--installed",
                     "--toolchain",
-                    TOOLCHAIN,
+                    "nightly",
                 ],
                 check=True,
                 capture_output=True,
@@ -275,24 +274,22 @@ def ensure_rust_nightly_installed():
     except subprocess.CalledProcessError:
         pass
 
-    logging.info(f"{RUST_LOG_PREFIX}Installing Rust {TOOLCHAIN}...")
+    logging.info(f"{RUST_LOG_PREFIX}Installing Rust nightly...")
     try:
         subprocess.run(
             [
                 f"{os.path.expanduser('~')}/.cargo/bin/rustup",
                 "toolchain",
                 "install",
-                TOOLCHAIN,
+                "nightly",
             ],
             check=True,
         )
-        logging.info(
-            f"{RUST_LOG_PREFIX}Rust {TOOLCHAIN} has been successfully installed."
-        )
+        logging.info(f"{RUST_LOG_PREFIX}Rust nightly has been successfully installed.")
     except subprocess.CalledProcessError as e:
         logging.error(f"{RUST_LOG_PREFIX}Failed to install Rust toolchain: {e}")
         raise RuntimeError(
-            f"Rust {TOOLCHAIN} installation failed. Please install it manually."
+            "Rust nightly installation failed. Please install it manually."
         ) from e
 
 
