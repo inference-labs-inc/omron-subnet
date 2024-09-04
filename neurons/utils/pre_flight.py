@@ -211,22 +211,13 @@ def ensure_rust_cargo_installed():
     except (subprocess.CalledProcessError, FileNotFoundError):
         logging.info(f"{RUST_LOG_PREFIX}Rust and/or Cargo not found. Installing...")
         try:
+
+            rustup_script = requests.get("https://sh.rustup.rs").text
             subprocess.run(
-                [
-                    "curl",
-                    "--proto",
-                    "=https",
-                    "--tlsv1.2",
-                    "-sSf",
-                    "https://sh.rustup.rs",
-                    "|",
-                    "sh",
-                    "-s",
-                    "--",
-                    "-y",
-                ],
+                ["sh", "-s", "--", "-y"],
+                input=rustup_script.encode(),
                 check=True,
-                shell=True,
+                shell=False,
             )
             logging.info(
                 f"{RUST_LOG_PREFIX}Rust and Cargo have been successfully installed."
