@@ -239,11 +239,21 @@ def ensure_rust_nightly_installed():
 
     try:
         result = subprocess.run(
-            ["rustup", "toolchain", "list"], check=True, capture_output=True, text=True
+            [f"{os.path.expanduser('~')}/.cargo/bin/rustup", "toolchain", "list"],
+            check=True,
+            capture_output=True,
+            text=True,
         )
         if TOOLCHAIN in result.stdout:
             result = subprocess.run(
-                ["rustup", "target", "list", "--installed", "--toolchain", TOOLCHAIN],
+                [
+                    f"{os.path.expanduser('~')}/.cargo/bin/rustup",
+                    "target",
+                    "list",
+                    "--installed",
+                    "--toolchain",
+                    TOOLCHAIN,
+                ],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -254,7 +264,12 @@ def ensure_rust_nightly_installed():
     logging.info(f"{RUST_LOG_PREFIX}Installing Rust {TOOLCHAIN}...")
     try:
         subprocess.run(
-            ["rustup", "toolchain", "install", TOOLCHAIN],
+            [
+                f"{os.path.expanduser('~')}/.cargo/bin/rustup",
+                "toolchain",
+                "install",
+                TOOLCHAIN,
+            ],
             check=True,
         )
         logging.info(
