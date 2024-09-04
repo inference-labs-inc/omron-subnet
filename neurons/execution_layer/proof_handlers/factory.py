@@ -1,10 +1,12 @@
 from execution_layer.proof_handlers.circom_handler import CircomHandler
 from execution_layer.circuit import ProofSystem
+from execution_layer.proof_handlers.jolt_handler import JoltHandler
 
 
 class ProofSystemFactory:
     _handlers = {
         ProofSystem.CIRCOM: CircomHandler,
+        ProofSystem.JOLT: JoltHandler,
     }
 
     @classmethod

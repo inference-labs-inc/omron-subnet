@@ -8,6 +8,8 @@ import requests
 # trunk-ignore(pylint/E0611)
 from bittensor import logging
 
+from constants import IGNORED_MODEL_HASHES
+
 
 LOCAL_SNARKJS_INSTALL_DIR = os.path.join(os.path.expanduser("~"), ".snarkjs")
 LOCAL_SNARKJS_PATH = os.path.join(
@@ -23,6 +25,9 @@ def run_shared_preflight_checks():
     - Model files are synced up
     - Node.js >= 20 is installed
     - SnarkJS is installed
+    - Rust and Cargo are installed
+    - Rust nightly toolchain is installed
+    - Jolt is installed
 
     Raises:
         Exception: If any of the pre-flight checks fail.
@@ -31,6 +36,9 @@ def run_shared_preflight_checks():
         ("Syncing model files", sync_model_files),
         ("Ensuring Node.js version", ensure_nodejs_version),
         ("Checking SnarkJS installation", ensure_snarkjs_installed),
+        ("Checking Rust and Cargo installation", ensure_rust_cargo_installed),
+        ("Checking Rust nightly toolchain", ensure_rust_nightly_installed),
+        ("Checking Jolt installation", ensure_jolt_installed),
     ]
 
     logging.info(" PreFlight | Running pre-flight checks")
@@ -107,6 +115,14 @@ def sync_model_files():
         if not model_hash.startswith("model_"):
             continue
 
+        for ignored_hash in IGNORED_MODEL_HASHES:
+            if model_hash.endswith(ignored_hash):
+                logging.info(
+                    SYNC_LOG_PREFIX
+                    + f"Ignoring model {model_hash} as it is in the ignored list."
+                )
+                continue
+
         metadata_file = os.path.join(MODEL_DIR, model_hash, "metadata.json")
         if not os.path.isfile(metadata_file):
             logging.error(
@@ -179,6 +195,142 @@ def ensure_nodejs_version():
     raise RuntimeError(
         "Node.js >= 20 is required but not installed. Please install it manually and restart the process."
     )
+
+
+def ensure_rust_cargo_installed():
+    """
+    Ensure that Rust and Cargo are installed.
+    If not installed, install them.
+    """
+    RUST_LOG_PREFIX = "  RUST  | "
+
+    try:
+        subprocess.run(["rustc", "--version"], check=True, capture_output=True)
+        subprocess.run(["cargo", "--version"], check=True, capture_output=True)
+        logging.info(f"{RUST_LOG_PREFIX}Rust and Cargo are already installed.")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        logging.info(f"{RUST_LOG_PREFIX}Rust and/or Cargo not found. Installing...")
+        try:
+            subprocess.run(
+                [
+                    "curl",
+                    "--proto",
+                    "=https",
+                    "--tlsv1.2",
+                    "-sSf",
+                    "https://sh.rustup.rs",
+                    "|",
+                    "sh",
+                    "-s",
+                    "--",
+                    "-y",
+                ],
+                check=True,
+                shell=True,
+            )
+            logging.info(
+                f"{RUST_LOG_PREFIX}Rust and Cargo have been successfully installed."
+            )
+        except subprocess.CalledProcessError as e:
+            logging.error(f"{RUST_LOG_PREFIX}Failed to install Rust and Cargo: {e}")
+            raise RuntimeError(
+                "Rust and Cargo installation failed. Please install them manually."
+            ) from e
+
+
+def ensure_rust_nightly_installed():
+    """
+    Ensure that the Rust nightly toolchain is installed with the specified target.
+    If not installed, install it.
+    """
+    RUST_LOG_PREFIX = "  RUST  | "
+    TOOLCHAIN = "nightly-2024-08-01"
+
+    try:
+        result = subprocess.run(
+            ["rustup", "toolchain", "list"], check=True, capture_output=True, text=True
+        )
+        if TOOLCHAIN in result.stdout:
+            result = subprocess.run(
+                ["rustup", "target", "list", "--installed", "--toolchain", TOOLCHAIN],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+    except subprocess.CalledProcessError:
+        pass
+
+    logging.info(f"{RUST_LOG_PREFIX}Installing Rust {TOOLCHAIN}...")
+    try:
+        subprocess.run(
+            ["rustup", "toolchain", "install", TOOLCHAIN],
+            check=True,
+        )
+        logging.info(
+            f"{RUST_LOG_PREFIX}Rust {TOOLCHAIN} has been successfully installed."
+        )
+    except subprocess.CalledProcessError as e:
+        logging.error(f"{RUST_LOG_PREFIX}Failed to install Rust toolchain: {e}")
+        raise RuntimeError(
+            f"Rust {TOOLCHAIN} installation failed. Please install it manually."
+        ) from e
+
+
+def ensure_jolt_installed():
+    """
+    Ensure that Jolt is installed.
+    If not installed, install it and the toolchain.
+    """
+    JOLT_LOG_PREFIX = "  JOLT  | "
+
+    try:
+        subprocess.run(
+            [
+                os.path.join(os.path.expanduser("~"), ".cargo", "bin", "jolt"),
+                "--version",
+            ],
+            check=True,
+            capture_output=True,
+        )
+        logging.info(f"{JOLT_LOG_PREFIX}Jolt is already installed.")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        logging.info(f"{JOLT_LOG_PREFIX}Jolt not found. Installing...")
+        try:
+            subprocess.run(
+                [
+                    "cargo",
+                    "+nightly",
+                    "install",
+                    "--git",
+                    "https://github.com/a16z/jolt",
+                    "--force",
+                    "--bins",
+                    "jolt",
+                ],
+                check=True,
+            )
+            logging.info(f"{JOLT_LOG_PREFIX}Jolt has been successfully installed.")
+        except subprocess.CalledProcessError as e:
+            logging.error(f"{JOLT_LOG_PREFIX}Failed to install Jolt: {e}")
+            raise RuntimeError(
+                "Jolt installation failed. Please install it manually."
+            ) from e
+
+    logging.info(f"{JOLT_LOG_PREFIX}Running jolt install-toolchain...")
+    try:
+        subprocess.run(
+            [
+                os.path.join(os.path.expanduser("~"), ".cargo", "bin", "jolt"),
+                "install-toolchain",
+            ],
+            check=True,
+        )
+        logging.info(f"{JOLT_LOG_PREFIX}jolt install-toolchain completed successfully.")
+    except subprocess.CalledProcessError as e:
+        logging.error(f"{JOLT_LOG_PREFIX}Failed to run jolt install-toolchain: {e}")
+        raise RuntimeError(
+            "jolt install-toolchain failed. Please run it manually."
+        ) from e
 
 
 def is_safe_path(base_path, path):

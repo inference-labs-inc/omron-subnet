@@ -6,6 +6,15 @@ BATCHED_PROOF_OF_WEIGHTS_MODEL_ID = (
 SINGLE_PROOF_OF_WEIGHTS_MODEL_ID = (
     "9998a12b8194d3e57d332b484ede57c3d871d42a176456c4e10da2995791d181"
 )
+# The model ID for a single proof of weights model, using the Jolt proof system
+SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT = (
+    "71be1e1b2f3ab68c082bcf00cc920a87715a95f09f04e46deb9626c87aa7ca82"
+)
+IGNORED_MODEL_HASHES = [
+    "0",
+    "0a92bc32ea02abe54159da70aeb541d52c3cba27c8708669eda634e096a86f8b",
+]
+
 # The maximum timespan allowed for miners to respond to a query
 VALIDATOR_REQUEST_TIMEOUT_SECONDS = 60
 # The timeout for aggregation requests

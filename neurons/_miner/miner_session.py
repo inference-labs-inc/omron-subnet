@@ -261,6 +261,9 @@ class MinerSession:
             model_session = VerifiedModelSession(public_inputs, circuit)
             bt.logging.debug("Model session created successfully")
             proof, public, proof_time = model_session.gen_proof()
+            if isinstance(proof, bytes):
+                proof = proof.hex()
+
             synapse.query_output = json.dumps(
                 {
                     "proof": proof,

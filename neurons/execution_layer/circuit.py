@@ -16,6 +16,7 @@ class ProofSystem(str, Enum):
     # ZK Proof Systems
     ZKML = "ZKML"
     CIRCOM = "CIRCOM"
+    JOLT = "JOLT"
 
     def __str__(self):
         return self.value
@@ -79,6 +80,8 @@ class CircuitPaths:
             self.pk = os.path.join(self.base_path, "circuit.zkey")
             self.vk = os.path.join(self.base_path, "verification_key.json")
             self.compiled_model = os.path.join(self.base_path, "circuit.wasm")
+        elif proof_system == ProofSystem.JOLT:
+            self.compiled_model = os.path.join(self.base_path, "circuit")
         else:
             raise ValueError(f"Proof system {proof_system} not supported")
 

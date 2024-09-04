@@ -27,6 +27,9 @@ class ResponseProcessor:
         self.completed_proof_of_weights_queue: list[CompletedProofOfWeightsItem] = []
 
     def process_responses(self, responses: list[dict]) -> list[MinerResponse]:
+        if len(responses) == 0:
+            logging.error("No responses received")
+            return []
         processed_responses = [self.process_single_response(r) for r in responses]
         log_responses(processed_responses)
         response_times = [
@@ -44,7 +47,7 @@ class ResponseProcessor:
         verified_batched_responses = [
             r
             for r in processed_responses
-            if r.verification_result and r.proof_json is not None
+            if r.verification_result and r.proof_content is not None
         ]
         if verified_batched_responses:
             # trunk-ignore(bandit/B311)
@@ -53,11 +56,11 @@ class ResponseProcessor:
                 f"Selected Proof of Weights from UID: {selected_response.uid} to use "
                 "as batched proof of weights for this interval."
             )
-            save_proof_of_weights(selected_response.public_json, selected_response.proof_json)  # type: ignore
+            save_proof_of_weights(selected_response.public_json, selected_response.proof_content)  # type: ignore
             self.completed_proof_of_weights_queue.append(
                 CompletedProofOfWeightsItem(
                     selected_response.public_json,
-                    selected_response.proof_json,
+                    selected_response.proof_content,
                     BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
                 )
             )
@@ -73,12 +76,12 @@ class ResponseProcessor:
 
     def process_single_response(self, response: dict) -> MinerResponse:
         miner_response = MinerResponse.from_raw_response(response)
-        if miner_response.proof_json is None:
+        if miner_response.proof_content is None:
             logging.debug(
                 f"Miner at UID: {miner_response.uid} failed to provide a valid proof. "
                 f"Response from miner: {miner_response.raw}"
             )
-        elif miner_response.proof_json:
+        elif miner_response.proof_content:
             logging.debug(f"Attempting to verify proof for UID: {miner_response.uid}")
             try:
                 verification_result = self.verify_proof_string(
@@ -105,7 +108,7 @@ class ResponseProcessor:
     def verify_proof_string(
         self, response: MinerResponse, validator_inputs: list[float] | dict
     ) -> bool:
-        if not response.proof_json or not response.public_json:
+        if not response.proof_content or not response.public_json:
             logging.error(f"Proof or public json not found for UID: {response.uid}")
             return False
         try:
@@ -113,7 +116,7 @@ class ResponseProcessor:
                 validator_inputs, circuit_store.get_circuit(str(response.model_id))
             )
             res: bool = inference_session.verify_proof(
-                response.public_json, response.proof_json
+                response.public_json, response.proof_content
             )
             inference_session.end()
             return res

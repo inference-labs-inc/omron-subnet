@@ -130,6 +130,10 @@ class ValidatorLoop:
 
         requests = self.prepare_requests(filtered_uids)
 
+        if len(requests) == 0:
+            bt.logging.error("No requests prepared")
+            return
+
         bt.logging.info(
             f"\033[92m >> Sending {len(requests)} queries for proofs to miners in the subnet \033[0m"
         )

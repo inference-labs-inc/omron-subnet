@@ -17,8 +17,9 @@ async def query_axons(dendrite, requests):
 
     async def send_request(request):
         async with semaphore:
+            axon = request["axon"]
             return await dendrite.forward(
-                axons=[request["axon"]],
+                axons=[axon],
                 synapse=request["synapse"],
                 timeout=(
                     VALIDATOR_REQUEST_TIMEOUT_SECONDS

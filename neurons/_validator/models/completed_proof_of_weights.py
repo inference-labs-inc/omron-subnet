@@ -11,7 +11,7 @@ class CompletedProofOfWeightsItem:
     """
 
     signals: list[str] | None = field(default=None)
-    proof: dict | None = field(default=None)
+    proof: dict | str | None = field(default=None)
     model_id: str | None = field(default=None)
 
     def __post_init__(self):
