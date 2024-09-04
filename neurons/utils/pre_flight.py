@@ -205,8 +205,22 @@ def ensure_rust_cargo_installed():
     RUST_LOG_PREFIX = "  RUST  | "
 
     try:
-        subprocess.run(["rustc", "--version"], check=True, capture_output=True)
-        subprocess.run(["cargo", "--version"], check=True, capture_output=True)
+        subprocess.run(
+            [
+                os.path.join(os.path.expanduser("~"), ".cargo", "bin", "rustc"),
+                "--version",
+            ],
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            [
+                os.path.join(os.path.expanduser("~"), ".cargo", "bin", "cargo"),
+                "--version",
+            ],
+            check=True,
+            capture_output=True,
+        )
         logging.info(f"{RUST_LOG_PREFIX}Rust and Cargo are already installed.")
     except (subprocess.CalledProcessError, FileNotFoundError):
         logging.info(f"{RUST_LOG_PREFIX}Rust and/or Cargo not found. Installing...")
@@ -304,7 +318,7 @@ def ensure_jolt_installed():
         try:
             subprocess.run(
                 [
-                    "cargo",
+                    os.path.join(os.path.expanduser("~"), ".cargo", "bin", "cargo"),
                     "+nightly",
                     "install",
                     "--git",
