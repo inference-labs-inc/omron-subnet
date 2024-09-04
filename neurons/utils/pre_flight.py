@@ -233,6 +233,32 @@ def ensure_rust_cargo_installed():
                 check=True,
                 shell=False,
             )
+            cargo_path = os.path.join(os.path.expanduser("~"), ".cargo", "bin", "cargo")
+            if not os.path.exists(cargo_path):
+                logging.info(
+                    f"{RUST_LOG_PREFIX}Cargo not found. Adding cargo component..."
+                )
+                try:
+                    subprocess.run(
+                        [
+                            os.path.join(
+                                os.path.expanduser("~"), ".cargo", "bin", "rustup"
+                            ),
+                            "component",
+                            "add",
+                            "cargo",
+                        ],
+                        check=True,
+                        capture_output=True,
+                    )
+                    logging.info(
+                        f"{RUST_LOG_PREFIX}Cargo component added successfully."
+                    )
+                except subprocess.CalledProcessError as e:
+                    logging.error(
+                        f"{RUST_LOG_PREFIX}Failed to add cargo component: {e}"
+                    )
+                    raise RuntimeError("Failed to add cargo component.") from e
             logging.info(
                 f"{RUST_LOG_PREFIX}Rust and Cargo have been successfully installed."
             )
@@ -249,6 +275,7 @@ def ensure_rust_nightly_installed():
     If not installed, install it.
     """
     RUST_LOG_PREFIX = "  RUST  | "
+    TOOLCHAIN = "nightly-2024-08-01"
 
     try:
         result = subprocess.run(
@@ -257,7 +284,7 @@ def ensure_rust_nightly_installed():
             capture_output=True,
             text=True,
         )
-        if "nightly" in result.stdout:
+        if TOOLCHAIN in result.stdout:
             result = subprocess.run(
                 [
                     f"{os.path.expanduser('~')}/.cargo/bin/rustup",
@@ -265,7 +292,7 @@ def ensure_rust_nightly_installed():
                     "list",
                     "--installed",
                     "--toolchain",
-                    "nightly",
+                    TOOLCHAIN,
                 ],
                 check=True,
                 capture_output=True,
@@ -274,22 +301,24 @@ def ensure_rust_nightly_installed():
     except subprocess.CalledProcessError:
         pass
 
-    logging.info(f"{RUST_LOG_PREFIX}Installing Rust nightly...")
+    logging.info(f"{RUST_LOG_PREFIX}Installing Rust {TOOLCHAIN}...")
     try:
         subprocess.run(
             [
                 f"{os.path.expanduser('~')}/.cargo/bin/rustup",
                 "toolchain",
                 "install",
-                "nightly",
+                TOOLCHAIN,
             ],
             check=True,
         )
-        logging.info(f"{RUST_LOG_PREFIX}Rust nightly has been successfully installed.")
+        logging.info(
+            f"{RUST_LOG_PREFIX}Rust {TOOLCHAIN} has been successfully installed."
+        )
     except subprocess.CalledProcessError as e:
         logging.error(f"{RUST_LOG_PREFIX}Failed to install Rust toolchain: {e}")
         raise RuntimeError(
-            "Rust nightly installation failed. Please install it manually."
+            f"Rust {TOOLCHAIN} installation failed. Please install it manually."
         ) from e
 
 
