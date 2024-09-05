@@ -200,7 +200,7 @@ def ensure_nodejs_version():
 def ensure_rust_cargo_installed():
     """
     Ensure that Rust and Cargo are installed.
-    If not installed, install them.
+    If not installed, install them and instruct the user to restart the shell and PM2 process.
     """
     RUST_LOG_PREFIX = "  RUST  | "
 
@@ -225,7 +225,6 @@ def ensure_rust_cargo_installed():
     except (subprocess.CalledProcessError, FileNotFoundError):
         logging.info(f"{RUST_LOG_PREFIX}Rust and/or Cargo not found. Installing...")
         try:
-
             rustup_script = requests.get("https://sh.rustup.rs").text
             subprocess.run(
                 ["sh", "-s", "--", "-y"],
@@ -262,6 +261,13 @@ def ensure_rust_cargo_installed():
             logging.info(
                 f"{RUST_LOG_PREFIX}Rust and Cargo have been successfully installed."
             )
+
+            logging.info(f"{RUST_LOG_PREFIX}Installation complete.")
+            logging.info(
+                f"{RUST_LOG_PREFIX}\033[93mPausing. To complete install, restart your machine using sudo reboot.\033[0m"
+            )
+            time.sleep(float("inf"))
+
         except subprocess.CalledProcessError as e:
             logging.error(f"{RUST_LOG_PREFIX}Failed to install Rust and Cargo: {e}")
             raise RuntimeError(
