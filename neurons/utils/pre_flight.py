@@ -265,6 +265,10 @@ def ensure_rust_cargo_installed():
 
             logging.info(f"{RUST_LOG_PREFIX}Installation complete.")
             logging.info(
+                f"{RUST_LOG_PREFIX}\033[93mIMPORTANT: Ensure you have pkg-config, libssl-dev and openssl installed"
+                "with sudo apt install pkg-config libssl-dev openssl.\033[0m"
+            )
+            logging.info(
                 f"{RUST_LOG_PREFIX}\033[93mPausing. To complete install, restart your machine using sudo reboot.\033[0m"
             )
             time.sleep(1e9)
