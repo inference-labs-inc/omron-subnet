@@ -21,12 +21,13 @@ def create_and_print_table(
         rows (list[list[str]]): A list of rows, where each row is a list of string values.
 
     """
-    table = Table(title=title)
+    table = Table(title=title, expand=True)
     for col_name, justify, style in columns:
         table.add_column(col_name, justify=justify, style=style, no_wrap=True)
     for row in rows:
         table.add_row(*row)
-    Console().print(table)
+    console = Console()
+    console.print(table)
 
 
 def log_tensor_data(title: str, data: torch.Tensor, log_key: str):

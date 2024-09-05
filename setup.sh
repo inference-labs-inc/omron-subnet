@@ -9,6 +9,9 @@ SHOULD_RESTART=false
 # Flag to check if we should only install dependencies
 NO_INSTALL=false
 
+sudo apt update
+sudo apt install -y pkg-config libssl-dev openssl
+
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
 	case $1 in
@@ -26,7 +29,6 @@ install_python() {
 	case ${OS} in
 	'Linux')
 		# FIXME(Ivan): Linux is not always Ubuntu, checking DISTRIB_ID is recommended here
-		sudo apt update
 		sudo apt install -y software-properties-common
 		sudo add-apt-repository -y ppa:deadsnakes/ppa
 		sudo apt update

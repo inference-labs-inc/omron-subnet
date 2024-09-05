@@ -121,7 +121,7 @@ class VerifiedModelSession:
         """
         return session.proof_handler.gen_proof(session)
 
-    def verify_proof(self, public_data: list[str], proof: dict) -> bool:
+    def verify_proof(self, public_data: list[str], proof: dict | str) -> bool:
         """
         Verify a proven inference.
         """

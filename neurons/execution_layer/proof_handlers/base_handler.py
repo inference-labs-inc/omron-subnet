@@ -35,7 +35,7 @@ class ProofSystemHandler(ABC):
 
     @abstractmethod
     def verify_proof(
-        self, session: VerifiedModelSession, public_data: list[str], proof: dict
+        self, session: VerifiedModelSession, public_data: list[str], proof: dict | str
     ) -> bool:
         """
         Verify a proof for the given session.
@@ -43,7 +43,7 @@ class ProofSystemHandler(ABC):
         Args:
             session (VerifiedModelSession): The current handler session.
             public_data (list[float]): The public data to verify the proof against.
-            proof (dict): The proof to verify.
+            proof (dict | str): The proof to verify.
         """
 
     @abstractmethod

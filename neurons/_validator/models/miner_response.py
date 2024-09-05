@@ -22,7 +22,7 @@ class MinerResponse:
         response_time (float): Time taken by the miner to respond.
         proof_size (int): Size of the proof provided by the miner.
         model_id (str): Identifier of the model used.
-        proof_json (Any): JSON representation of the proof.
+        proof_content (Any): Content of the proof - either a string or a dict.
         raw (str): Deserialized form of the response.
         error (str): Error message, if any occurred during processing.
     """
@@ -32,7 +32,7 @@ class MinerResponse:
     response_time: float
     proof_size: int
     model_id: str
-    proof_json: dict | None = None
+    proof_content: dict | str | None = None
     public_json: list[str] | None = None
     raw: dict | None = None
     error: str | None = None
@@ -53,7 +53,7 @@ class MinerResponse:
                 response = json.loads(response)
             deserialized_response = response.get("deserialized")
 
-            proof_json = None
+            proof_content = None
             public_json = None
             if isinstance(deserialized_response, str):
                 try:
@@ -66,8 +66,13 @@ class MinerResponse:
                 proof = deserialized_response.get("proof", "{}")
                 public_signals = deserialized_response.get("public_signals", "[]")
 
-                if proof:
-                    proof_json = json.loads(proof) if isinstance(proof, str) else proof
+                if isinstance(proof, str):
+                    if all(c in "0123456789ABCDEFabcdef" for c in proof):
+                        proof_content = proof
+                    else:
+                        proof_content = json.loads(proof)
+                else:
+                    proof_content = proof
                 if public_signals:
                     public_json = (
                         json.loads(public_signals)
@@ -75,16 +80,21 @@ class MinerResponse:
                         else public_signals
                     )
 
-            proof_size = (
-                sum(
-                    len(str(value))
-                    for key in ("pi_a", "pi_b", "pi_c")
-                    for element in proof_json.get(key, [])
-                    for value in (element if isinstance(element, list) else [element])
+            if isinstance(proof_content, str):
+                proof_size = len(proof_content)
+            else:
+                proof_size = (
+                    sum(
+                        len(str(value))
+                        for key in ("pi_a", "pi_b", "pi_c")
+                        for element in proof_content.get(key, [])
+                        for value in (
+                            element if isinstance(element, list) else [element]
+                        )
+                    )
+                    if proof_content
+                    else DEFAULT_PROOF_SIZE
                 )
-                if proof_json
-                else DEFAULT_PROOF_SIZE
-            )
 
             return cls(
                 uid=response.get("uid", 0),
@@ -94,7 +104,7 @@ class MinerResponse:
                 ),
                 proof_size=proof_size,
                 model_id=response.get("model_id", SINGLE_PROOF_OF_WEIGHTS_MODEL_ID),
-                proof_json=proof_json,
+                proof_content=proof_content,
                 public_json=public_json,
                 raw=deserialized_response,
             )
@@ -119,7 +129,7 @@ class MinerResponse:
             response_time=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
             proof_size=DEFAULT_PROOF_SIZE,
             model_id=SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
-            proof_json=None,
+            proof_content=None,
             public_json=None,
             raw=None,
             error="Empty response",

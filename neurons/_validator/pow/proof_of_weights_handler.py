@@ -14,6 +14,7 @@ from _validator.scoring.reward import (
 from constants import (
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
     BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
+    SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT,
 )
 from execution_layer.circuit import ProofSystem
 from protocol import ProofOfWeightsSynapse, QueryZkProof
@@ -21,6 +22,8 @@ from deployment_layer.circuit_store import circuit_store
 
 
 class ProofOfWeightsHandler:
+    use_jolt = False
+
     @staticmethod
     def prepare_pow_request(uid, proof_of_weights_queue, subnet_uid):
         logging.debug(
@@ -38,12 +41,20 @@ class ProofOfWeightsHandler:
             proof_of_weights_queue, use_batched_pow, use_single_pow, uid
         )
 
+        proof_system = ProofSystem.CIRCOM
+        if use_single_pow and ProofOfWeightsHandler.use_jolt:
+            proof_system = ProofSystem.JOLT
+
+        ProofOfWeightsHandler.use_jolt = not ProofOfWeightsHandler.use_jolt
+
         serialized_items = ProofOfWeightsItem.to_dict_list(pow_items)
 
-        inputs = ProofOfWeightsHandler._prepare_inputs(serialized_items, scaling)
+        inputs = ProofOfWeightsHandler._prepare_inputs(
+            serialized_items, scaling, proof_system
+        )
 
         synapse, model_id = ProofOfWeightsHandler._create_synapse(
-            use_batched_pow, subnet_uid, inputs
+            use_batched_pow, subnet_uid, inputs, proof_system
         )
 
         logging.debug(f"PoW request prepared with model ID: {model_id}")
@@ -109,7 +120,9 @@ class ProofOfWeightsHandler:
         return pow_items
 
     @staticmethod
-    def _create_synapse(use_batched_pow, subnet_uid, inputs):
+    def _create_synapse(
+        use_batched_pow: bool, subnet_uid: int, inputs: dict, proof_system: ProofSystem
+    ):
         """Create the appropriate synapse based on the PoW type."""
         logging.trace("Creating synapse")
         if use_batched_pow:
@@ -125,6 +138,9 @@ class ProofOfWeightsHandler:
             logging.debug(f"Created batched PoW synapse with model ID: {model_id}")
         else:
             model_id = SINGLE_PROOF_OF_WEIGHTS_MODEL_ID
+            if proof_system == ProofSystem.JOLT:
+                model_id = SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT
+
             synapse = QueryZkProof(
                 query_input={
                     "model_id": model_id,
@@ -135,19 +151,12 @@ class ProofOfWeightsHandler:
         return synapse, model_id
 
     @staticmethod
-    def _prepare_inputs(serialized_items: dict, scaling: int) -> dict:
+    def _prepare_inputs(
+        serialized_items: dict, scaling: int, proof_system: ProofSystem
+    ) -> dict:
         """Prepare the inputs for the Proof of Weights circuit."""
         logging.trace("Preparing inputs for PoW circuit")
         inputs = {
-            "RATE_OF_DECAY": int(RATE_OF_DECAY * scaling),
-            "RATE_OF_RECOVERY": int(RATE_OF_RECOVERY * scaling),
-            "FLATTENING_COEFFICIENT": int(FLATTENING_COEFFICIENT * scaling),
-            "PROOF_SIZE_WEIGHT": int(PROOF_SIZE_WEIGHT * scaling),
-            "PROOF_SIZE_THRESHOLD": int(PROOF_SIZE_THRESHOLD * scaling),
-            "RESPONSE_TIME_WEIGHT": int(RESPONSE_TIME_WEIGHT * scaling),
-            "MAXIMUM_RESPONSE_TIME_DECIMAL": int(
-                MAXIMUM_RESPONSE_TIME_DECIMAL * scaling
-            ),
             "maximum_score": [
                 int(score * scaling) for score in serialized_items["max_score"]
             ],
@@ -172,7 +181,21 @@ class ProofOfWeightsHandler:
             "block_number": serialized_items["block_number"],
             "validator_uid": serialized_items["validator_uid"],
             "miner_uid": serialized_items["uid"],
-            "scaling": scaling,
         }
+        if proof_system == ProofSystem.CIRCOM:
+            inputs["scaling"] = scaling
+            inputs["RATE_OF_DECAY"] = int(RATE_OF_DECAY * scaling)
+            inputs["RATE_OF_RECOVERY"] = int(RATE_OF_RECOVERY * scaling)
+            inputs["FLATTENING_COEFFICIENT"] = int(FLATTENING_COEFFICIENT * scaling)
+            inputs["PROOF_SIZE_WEIGHT"] = int(PROOF_SIZE_WEIGHT * scaling)
+            inputs["PROOF_SIZE_THRESHOLD"] = int(PROOF_SIZE_THRESHOLD * scaling)
+            inputs["RESPONSE_TIME_WEIGHT"] = int(RESPONSE_TIME_WEIGHT * scaling)
+            inputs["MAXIMUM_RESPONSE_TIME_DECIMAL"] = int(
+                MAXIMUM_RESPONSE_TIME_DECIMAL * scaling
+            )
+        if proof_system == ProofSystem.JOLT:
+            inputs["uid_responsible_for_proof"] = inputs["validator_uid"][-1]
+
         logging.debug("Inputs prepared for PoW circuit")
+        logging.trace(f"Inputs: {inputs}")
         return inputs

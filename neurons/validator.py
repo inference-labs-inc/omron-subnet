@@ -1,5 +1,6 @@
 import argparse
 import os
+import traceback
 
 import bittensor as bt
 from constants import ONCHAIN_PROOF_OF_WEIGHTS_ENABLED, PROOF_OF_WEIGHTS_INTERVAL
@@ -98,3 +99,4 @@ if __name__ == "__main__":
         validator_session.run()
     except Exception as e:
         bt.logging.error("Critical error while attempting to run validator: ", e)
+        traceback.print_exc()
