@@ -15,6 +15,7 @@ LOCAL_SNARKJS_INSTALL_DIR = os.path.join(os.path.expanduser("~"), ".snarkjs")
 LOCAL_SNARKJS_PATH = os.path.join(
     LOCAL_SNARKJS_INSTALL_DIR, "node_modules", ".bin", "snarkjs"
 )
+TOOLCHAIN = "nightly-2024-08-01"
 
 
 def run_shared_preflight_checks():
@@ -281,7 +282,6 @@ def ensure_rust_nightly_installed():
     If not installed, install it.
     """
     RUST_LOG_PREFIX = "  RUST  | "
-    TOOLCHAIN = "nightly-2024-08-01"
 
     try:
         result = subprocess.run(
@@ -351,7 +351,7 @@ def ensure_jolt_installed():
             subprocess.run(
                 [
                     os.path.join(os.path.expanduser("~"), ".cargo", "bin", "cargo"),
-                    "+nightly",
+                    f"+{TOOLCHAIN}",
                     "install",
                     "--git",
                     "https://github.com/a16z/jolt",
