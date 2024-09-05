@@ -266,7 +266,7 @@ def ensure_rust_cargo_installed():
             logging.info(
                 f"{RUST_LOG_PREFIX}\033[93mPausing. To complete install, restart your machine using sudo reboot.\033[0m"
             )
-            time.sleep(float("inf"))
+            time.sleep(1e9)
 
         except subprocess.CalledProcessError as e:
             logging.error(f"{RUST_LOG_PREFIX}Failed to install Rust and Cargo: {e}")
