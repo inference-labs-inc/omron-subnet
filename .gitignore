@@ -177,3 +177,4 @@ kzg.srs
 ecosystem.config.js
 neurons/_validator/proof_of_weights/
 **.zkey
+**/target/

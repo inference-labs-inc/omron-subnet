@@ -81,7 +81,9 @@ class CircuitPaths:
             self.vk = os.path.join(self.base_path, "verification_key.json")
             self.compiled_model = os.path.join(self.base_path, "circuit.wasm")
         elif proof_system == ProofSystem.JOLT:
-            self.compiled_model = os.path.join(self.base_path, "circuit")
+            self.compiled_model = os.path.join(
+                self.base_path, "target", "release", "circuit"
+            )
         else:
             raise ValueError(f"Proof system {proof_system} not supported")
 
