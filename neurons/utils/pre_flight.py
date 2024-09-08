@@ -40,6 +40,7 @@ def run_shared_preflight_checks():
         ("Checking Rust and Cargo installation", ensure_rust_cargo_installed),
         ("Checking Rust nightly toolchain", ensure_rust_nightly_installed),
         ("Checking Jolt installation", ensure_jolt_installed),
+        ("Compiling Jolt circuits", compile_jolt_circuits),
     ]
 
     logging.info(" PreFlight | Running pre-flight checks")
@@ -387,6 +388,60 @@ def ensure_jolt_installed():
         raise RuntimeError(
             "jolt install-toolchain failed. Please run it manually."
         ) from e
+
+
+def compile_jolt_circuits():
+    """
+    Compile Jolt circuits for each model that uses the Jolt proof system
+    """
+    JOLT_LOG_PREFIX = "  JOLT  | "
+    MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "deployment_layer")
+
+    for model_hash in os.listdir(MODEL_DIR):
+        if not model_hash.startswith("model_"):
+            continue
+
+        metadata_file = os.path.join(MODEL_DIR, model_hash, "metadata.json")
+        if not os.path.isfile(metadata_file):
+            logging.warning(
+                f"{JOLT_LOG_PREFIX}Metadata file not found for {model_hash}. Skipping."
+            )
+            continue
+
+        try:
+            with open(metadata_file, "r", encoding="utf-8") as f:
+                metadata = json.load(f)
+        except json.JSONDecodeError:
+            logging.error(f"{JOLT_LOG_PREFIX}Failed to parse JSON from {metadata_file}")
+            continue
+
+        if metadata.get("proof_system") != "JOLT":
+            logging.info(f"{JOLT_LOG_PREFIX}Skipping non-Jolt circuit: {model_hash}")
+            continue
+
+        circuit_path = os.path.join(
+            MODEL_DIR, model_hash, "target", "release", "circuit"
+        )
+        if os.path.exists(circuit_path):
+            logging.info(f"{JOLT_LOG_PREFIX}Circuit already compiled for {model_hash}")
+            continue
+
+        logging.info(f"{JOLT_LOG_PREFIX}Compiling circuit for {model_hash}")
+        try:
+            subprocess.run(
+                ["cargo", "build", "--release"],
+                cwd=os.path.join(MODEL_DIR, model_hash),
+                check=True,
+            )
+            logging.info(
+                f"{JOLT_LOG_PREFIX}Successfully compiled circuit for {model_hash}"
+            )
+        except subprocess.CalledProcessError as e:
+            logging.error(
+                f"{JOLT_LOG_PREFIX}Failed to compile circuit for {model_hash}: {e}"
+            )
+
+    logging.info(f"{JOLT_LOG_PREFIX}Jolt circuit compilation process completed.")
 
 
 def is_safe_path(base_path, path):
