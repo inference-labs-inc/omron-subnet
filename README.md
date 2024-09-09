@@ -146,7 +146,7 @@ Validators are responsible for verifying model outputs as provided by miners, an
 | RAM          | 16GB          |
 | Network Up   | 400Mbps       |
 | Network Down | 400Mbps       |
-| Storage      | 100GB         |
+| Storage      | 1TB           |
 
 #### Recommended
 
@@ -154,7 +154,7 @@ Validators are responsible for verifying model outputs as provided by miners, an
 | -------------- | -------------- |
 | CPU            | 8 core 3.4GHz  |
 | RAM            | 32GB           |
-| Network Up     | 1Gbps          |
-| Network Down   | 1Gbps          |
-| Storage        | 300GB          |
+| Network Up     | 1+Gbps         |
+| Network Down   | 1+Gbps         |
+| Storage        | 2+TB           |
 | Storage Medium | SSD            |
