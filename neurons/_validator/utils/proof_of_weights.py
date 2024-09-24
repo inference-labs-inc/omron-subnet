@@ -110,7 +110,7 @@ class ProofOfWeightsItem:
                 [ProofOfWeightsItem.empty()] * (target_item_count - len(items))
             )
         elif len(items) > target_item_count:
-            items = items[:target_item_count]
+            items = items[-target_item_count:]
 
         return items
 
