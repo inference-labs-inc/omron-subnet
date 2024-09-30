@@ -13,6 +13,7 @@ class CompletedProofOfWeightsItem:
     signals: list[str] | None = field(default=None)
     proof: dict | str | None = field(default=None)
     model_id: str | None = field(default=None)
+    netuid: int | None = field(default=None)
 
     def __post_init__(self):
         self.signals = self.signals
@@ -24,4 +25,5 @@ class CompletedProofOfWeightsItem:
             "signals": self.signals,
             "proof": self.proof,
             "verification_key": self.model_id,
+            "netuid": self.netuid,
         }

@@ -6,6 +6,8 @@ import copy
 import sys
 import time
 import traceback
+
+import secrets
 from typing import NoReturn
 
 import bittensor as bt
@@ -95,10 +97,12 @@ class ValidatorLoop:
         for uid in filtered_uids:
             axon = self.config.metagraph.axons[uid]
             pow_request = copy.deepcopy(base_request)
-
             # Update the last UID in the validator_uid list with the miner's UID
+            # + replace last 9 with unique and random values
             if "inputs" in pow_request and "validator_uid" in pow_request["inputs"]:
-                pow_request["inputs"]["validator_uid"][-1] = uid
+                pow_request["inputs"]["validator_uid"][-10:] = [
+                    secrets.randbelow(257) for _ in range(9)
+                ] + [uid]
             else:
                 bt.logging.warning(
                     f"Unable to update validator_uid for miner {uid}. Check the structure of pow_request."
@@ -191,7 +195,7 @@ class ValidatorLoop:
                 log_and_commit_proof(
                     self.config.wallet.hotkey,
                     self.config.subtensor,
-                    [self.response_processor.completed_proof_of_weights_queue[-1]],
+                    self.response_processor.completed_proof_of_weights_queue,
                 )
                 self.last_pow_commit_block = self.config.subtensor.get_current_block()
 

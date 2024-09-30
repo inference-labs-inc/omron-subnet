@@ -62,6 +62,9 @@ class ResponseProcessor:
                     selected_response.public_json,
                     selected_response.proof_content,
                     BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
+                    circuit_store.get_circuit(
+                        str(selected_response.model_id)
+                    ).metadata.netuid,
                 )
             )
         else:

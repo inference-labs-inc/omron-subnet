@@ -100,6 +100,7 @@ class CircuitMetadata:
     version: str
     proof_system: str
     external_files: dict[str, str]
+    netuid: int = -1
 
     @classmethod
     def from_file(cls, metadata_path: str) -> CircuitMetadata:
