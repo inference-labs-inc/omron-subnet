@@ -277,7 +277,12 @@ def log_and_commit_proof(
     )
 
     remark_bodies = []
-    for item in proof_list:
+    for i, item in enumerate(proof_list):
+        if i >= 2:
+            bt.logging.warning(
+                f"Too many proofs ({len(proof_list)}). Only processing the first 5."
+            )
+            break
         remark_bodies.append(item.to_remark())
     bt.logging.trace(f"Remark bodies: {remark_bodies}")
     try:
@@ -289,7 +294,7 @@ def log_and_commit_proof(
                 call_params={"remark": json.dumps(remark_bodies)},
             )
             extrinsic = substrate.create_signed_extrinsic(
-                call=remark_call, keypair=hotkey
+                call=remark_call, keypair=hotkey, era={"period": 20}
             )
             result = substrate.submit_extrinsic(
                 extrinsic, wait_for_inclusion=True, wait_for_finalization=True

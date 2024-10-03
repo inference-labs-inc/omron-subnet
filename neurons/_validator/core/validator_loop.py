@@ -50,6 +50,7 @@ class ValidatorLoop:
         self.response_processor = ResponseProcessor(
             self.config.metagraph, self.score_manager, self.config.user_uid
         )
+        self.log_pow = False
         self.weights_manager = WeightsManager(
             self.config.subtensor,
             self.config.metagraph,
@@ -180,6 +181,18 @@ class ValidatorLoop:
 
         self.score_manager.update_scores(processed_responses)
 
+        if self.log_pow and self.config.config.get(
+            "enable_pow", ONCHAIN_PROOF_OF_WEIGHTS_ENABLED
+        ):
+            log_and_commit_proof(
+                self.config.wallet.hotkey,
+                self.config.subtensor,
+                self.response_processor.completed_proof_of_weights_queue,
+            )
+            self.last_pow_commit_block = self.config.subtensor.get_current_block()
+            self.response_processor.completed_proof_of_weights_queue = []
+            self.log_pow = False
+
         if self.weights_manager.update_weights(self.score_manager.scores):
             if (
                 self.config.config.get("enable_pow", ONCHAIN_PROOF_OF_WEIGHTS_ENABLED)
@@ -191,13 +204,10 @@ class ValidatorLoop:
                 )
                 < self.config.subtensor.get_current_block()
                 and len(self.response_processor.completed_proof_of_weights_queue)
+                and not self.log_pow
             ):
-                log_and_commit_proof(
-                    self.config.wallet.hotkey,
-                    self.config.subtensor,
-                    self.response_processor.completed_proof_of_weights_queue,
-                )
-                self.last_pow_commit_block = self.config.subtensor.get_current_block()
+                # Log PoW during the next iteration
+                self.log_pow = True
 
     def _log_overhead_time(self, start_time):
         """
