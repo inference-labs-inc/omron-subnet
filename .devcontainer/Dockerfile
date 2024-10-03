@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/base:jammy
+FROM --platform=linux/amd64 mcr.microsoft.com/devcontainers/base:jammy
 
 # Install dependencies and some nice to have tools
 RUN apt-get update && \
@@ -81,7 +81,7 @@ RUN cd subtensor && \
     sleep 5 && \
     yes | btcli wallet faucet --wallet.name owner $WPATH $LOCALNET & \
     sleep 30 && \
-    pkill -2 localnet && \
+    pkill -2 localnet ; \
     pkill -2 subtensor
 
 RUN cd subtensor && \
@@ -89,7 +89,7 @@ RUN cd subtensor && \
     sleep 5 && \
     yes | btcli wallet faucet --wallet.name miner $WPATH $LOCALNET & \
     sleep 30 && \
-    pkill -2 localnet && \
+    pkill -2 localnet ; \
     pkill -2 subtensor
 
 RUN cd subtensor && \
@@ -97,7 +97,7 @@ RUN cd subtensor && \
     sleep 5 && \
     yes | btcli wallet faucet --wallet.name validator $WPATH $LOCALNET & \
     sleep 30 && \
-    pkill -2 localnet && \
+    pkill -2 localnet ; \
     pkill -2 subtensor
 
 # Register the subnet
@@ -109,7 +109,7 @@ RUN cd subtensor && \
     btcli subnet register --wallet.name validator --no-prompt --netuid 1   --wallet.hotkey default $WPATH $LOCALNET && \
     btcli root nominate   --wallet.name validator --no-prompt              --wallet.hotkey default $WPATH $LOCALNET && \
     btcli stake add       --wallet.name validator --no-prompt --amount 100 --wallet.hotkey default $WPATH $LOCALNET && \
-    pkill -2 localnet && \
+    pkill -2 localnet ; \
     pkill -2 subtensor
 
 # Add scripts to start and stop the localnet, and aliases for common btcli commands
