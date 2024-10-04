@@ -15,6 +15,8 @@ from constants import (
     DEFAULT_MAX_SCORE,
     DEFAULT_PROOF_SIZE,
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+    MAX_PROOFS_TO_LOG,
+    PROOF_OF_WEIGHTS_LIFESPAN,
 )
 from utils import wandb_logger
 
@@ -278,9 +280,9 @@ def log_and_commit_proof(
 
     remark_bodies = []
     for i, item in enumerate(proof_list):
-        if i >= 2:
+        if i >= MAX_PROOFS_TO_LOG:
             bt.logging.warning(
-                f"Too many proofs ({len(proof_list)}). Only processing the first 5."
+                f"Too many proofs ({len(proof_list)}). Only processing the first {MAX_PROOFS_TO_LOG}."
             )
             break
         remark_bodies.append(item.to_remark())
@@ -294,7 +296,9 @@ def log_and_commit_proof(
                 call_params={"remark": json.dumps(remark_bodies)},
             )
             extrinsic = substrate.create_signed_extrinsic(
-                call=remark_call, keypair=hotkey, era={"period": 20}
+                call=remark_call,
+                keypair=hotkey,
+                era={"period": PROOF_OF_WEIGHTS_LIFESPAN},
             )
             result = substrate.submit_extrinsic(
                 extrinsic, wait_for_inclusion=True, wait_for_finalization=True
