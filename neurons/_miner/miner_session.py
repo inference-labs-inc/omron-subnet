@@ -257,7 +257,7 @@ class MinerSession:
                 raise ValueError(
                     f"Circuit {model_id} not found. This indicates a missing deployment layer folder or invalid request"
                 )
-            model_name = circuit.metadata.name
+            bt.logging.info(f"Running proof generation for {circuit}")
             model_session = VerifiedModelSession(public_inputs, circuit)
             bt.logging.debug("Model session created successfully")
             proof, public, proof_time = model_session.gen_proof()
@@ -273,17 +273,9 @@ class MinerSession:
             bt.logging.trace(f"Proof: {synapse.query_output}, Time: {proof_time}")
             model_session.end()
             try:
-                bt.logging.info(
-                    f"✅ Proof completed for {model_name} "
-                    f"version {circuit.metadata.version} "
-                    f"using the {circuit.metadata.proof_system} proof system \n"
-                )
+                bt.logging.info(f"✅ Proof completed for {circuit}\n")
             except UnicodeEncodeError:
-                bt.logging.info(
-                    f"Proof completed for {model_name} "
-                    f"version {circuit.metadata.version} "
-                    f"using the {circuit.metadata.proof_system} proof system \n"
-                )
+                bt.logging.info(f"Proof completed for {circuit}\n")
         except Exception as e:
             synapse.query_output = "An error occurred"
             bt.logging.error(f"An error occurred while generating proven output\n{e}")
@@ -335,6 +327,7 @@ class MinerSession:
                     f"Circuit {synapse.verification_key_hash} not found. "
                     "This indicates a missing deployment layer folder or invalid request"
                 )
+            bt.logging.info(f"Running proof generation for {circuit}")
             model_session = VerifiedModelSession(synapse.inputs, circuit)
 
             bt.logging.debug("Model session created successfully")
@@ -343,10 +336,7 @@ class MinerSession:
 
             synapse.proof = proof
             synapse.public_signals = public
-            bt.logging.info(
-                f"✅ Proof of weights completed for {synapse.verification_key_hash} "
-                f"using the {synapse.proof_system} proof system \n"
-            )
+            bt.logging.info(f"✅ Proof of weights completed for {circuit}\n")
         except Exception as e:
             bt.logging.error(
                 f"An error occurred while generating proof of weights\n{e}"

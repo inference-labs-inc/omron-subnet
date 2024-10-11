@@ -1,5 +1,7 @@
 import math
 import torch
+import numpy as np
+import numpy.random as rand
 from bittensor import logging
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
 from _validator.scoring.reward import (
@@ -11,6 +13,7 @@ from _validator.scoring.reward import (
     RATE_OF_RECOVERY,
     RESPONSE_TIME_WEIGHT,
 )
+from execution_layer.circuit import Circuit
 from constants import (
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
     BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
@@ -19,10 +22,12 @@ from constants import (
 from execution_layer.circuit import ProofSystem
 from protocol import ProofOfWeightsSynapse, QueryZkProof
 from deployment_layer.circuit_store import circuit_store
+import secrets
 
 
 class ProofOfWeightsHandler:
     use_jolt = False
+    use_sn27 = False
 
     @staticmethod
     def prepare_pow_request(uid, proof_of_weights_queue, subnet_uid):
@@ -33,28 +38,46 @@ class ProofOfWeightsHandler:
             proof_of_weights_queue
         )
 
-        pow_circuit = ProofOfWeightsHandler._get_pow_circuit()
-        scaling = pow_circuit.settings["scaling"]
-        logging.trace(f"PoW circuit scaling: {scaling}")
+        proof_system = ProofSystem.CIRCOM
+        if use_single_pow and ProofOfWeightsHandler.use_jolt:
+            proof_system = ProofSystem.JOLT
+        ProofOfWeightsHandler.use_jolt = not ProofOfWeightsHandler.use_jolt
+
+        if use_batched_pow:
+            model_id = BATCHED_PROOF_OF_WEIGHTS_MODEL_ID
+        elif proof_system == ProofSystem.CIRCOM:
+            model_id = SINGLE_PROOF_OF_WEIGHTS_MODEL_ID
+        else:
+            model_id = (
+                next(
+                    (
+                        circuit.id
+                        for circuit in circuit_store.circuits.values()
+                        if circuit.metadata.netuid == 27
+                    ),
+                    None,
+                )
+                if ProofOfWeightsHandler.use_sn27
+                else SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT
+            )
+            ProofOfWeightsHandler.use_sn27 = not ProofOfWeightsHandler.use_sn27
+            if model_id is None:
+                raise ValueError(f"No circuit found for subnet_uid: {subnet_uid}")
+
+        circuit = circuit_store.get_circuit(model_id)
+        logging.debug(f"PoW circuit: {circuit}")
+        logging.info(f"Preparing for requests with {circuit}")
 
         pow_items = ProofOfWeightsHandler._prepare_pow_items(
             proof_of_weights_queue, use_batched_pow, use_single_pow, uid
         )
 
-        proof_system = ProofSystem.CIRCOM
-        if use_single_pow and ProofOfWeightsHandler.use_jolt:
-            proof_system = ProofSystem.JOLT
-
-        ProofOfWeightsHandler.use_jolt = not ProofOfWeightsHandler.use_jolt
-
         serialized_items = ProofOfWeightsItem.to_dict_list(pow_items)
 
-        inputs = ProofOfWeightsHandler._prepare_inputs(
-            serialized_items, scaling, proof_system
-        )
+        inputs = ProofOfWeightsHandler._prepare_inputs(serialized_items, circuit)
 
-        synapse, model_id = ProofOfWeightsHandler._create_synapse(
-            use_batched_pow, subnet_uid, inputs, proof_system
+        synapse = ProofOfWeightsHandler._create_synapse(
+            use_batched_pow, subnet_uid, inputs, circuit
         )
 
         logging.debug(f"PoW request prepared with model ID: {model_id}")
@@ -98,7 +121,7 @@ class ProofOfWeightsHandler:
     @staticmethod
     def _prepare_pow_items(
         proof_of_weights_queue, use_batched_pow, use_single_pow, uid
-    ):
+    ) -> list[ProofOfWeightsItem]:
         """Prepare and pad the PoW items based on the determined PoW type."""
         logging.trace("Preparing PoW items")
         if use_batched_pow:
@@ -121,41 +144,52 @@ class ProofOfWeightsHandler:
 
     @staticmethod
     def _create_synapse(
-        use_batched_pow: bool, subnet_uid: int, inputs: dict, proof_system: ProofSystem
-    ):
+        use_batched_pow: bool,
+        subnet_uid: int,
+        inputs: dict,
+        circuit: Circuit,
+    ) -> ProofOfWeightsSynapse | QueryZkProof:
         """Create the appropriate synapse based on the PoW type."""
         logging.trace("Creating synapse")
         if use_batched_pow:
-            model_id = BATCHED_PROOF_OF_WEIGHTS_MODEL_ID
             synapse = ProofOfWeightsSynapse(
                 subnet_uid=subnet_uid,
-                verification_key_hash=model_id,
+                verification_key_hash=circuit.id,
                 proof_system=ProofSystem.CIRCOM,
                 inputs=inputs,
                 proof="",
                 public_signals="",
             )
-            logging.debug(f"Created batched PoW synapse with model ID: {model_id}")
-        else:
-            model_id = SINGLE_PROOF_OF_WEIGHTS_MODEL_ID
-            if proof_system == ProofSystem.JOLT:
-                model_id = SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT
+            logging.debug(f"Created batched SN2 PoW synapse with model: {circuit}")
 
+        elif subnet_uid == 27:
+            synapse = ProofOfWeightsSynapse(
+                subnet_uid=subnet_uid,
+                verification_key_hash=circuit.id,
+                proof_system=ProofSystem.JOLT,
+                inputs=inputs,
+                proof="",
+                public_signals="",
+            )
+            logging.debug(f"Created batched PoW synapse for SN27 with model: {circuit}")
+        else:
             synapse = QueryZkProof(
                 query_input={
-                    "model_id": model_id,
+                    "model_id": circuit.id,
                     "public_inputs": inputs,
                 }
             )
-            logging.debug(f"Created single PoW synapse with model ID: {model_id}")
-        return synapse, model_id
+            logging.debug(f"Created single synapse for SN2 with model: {circuit}")
+        return synapse
 
     @staticmethod
     def _prepare_inputs(
-        serialized_items: dict, scaling: int, proof_system: ProofSystem
+        serialized_items: dict,
+        circuit: Circuit,
     ) -> dict:
         """Prepare the inputs for the Proof of Weights circuit."""
-        logging.trace("Preparing inputs for PoW circuit")
+        logging.trace(f"Preparing inputs for {circuit}")
+        scaling = circuit.settings.get("scaling", 100000000)
         inputs = {
             "maximum_score": [
                 int(score * scaling) for score in serialized_items["max_score"]
@@ -182,7 +216,7 @@ class ProofOfWeightsHandler:
             "validator_uid": serialized_items["validator_uid"],
             "miner_uid": serialized_items["uid"],
         }
-        if proof_system == ProofSystem.CIRCOM:
+        if circuit.proof_system == ProofSystem.CIRCOM:
             inputs["scaling"] = scaling
             inputs["RATE_OF_DECAY"] = int(RATE_OF_DECAY * scaling)
             inputs["RATE_OF_RECOVERY"] = int(RATE_OF_RECOVERY * scaling)
@@ -193,9 +227,40 @@ class ProofOfWeightsHandler:
             inputs["MAXIMUM_RESPONSE_TIME_DECIMAL"] = int(
                 MAXIMUM_RESPONSE_TIME_DECIMAL * scaling
             )
-        if proof_system == ProofSystem.JOLT:
+        if circuit.proof_system == ProofSystem.JOLT:
             inputs["uid_responsible_for_proof"] = inputs["validator_uid"][-1]
 
-        logging.debug("Inputs prepared for PoW circuit")
+        if circuit.metadata.netuid == 27:
+            inputs = {
+                "success_weight": rand.uniform(0.8, 1.2),
+                "difficulty_weight": rand.uniform(0.8, 1.2),
+                "time_elapsed_weight": rand.uniform(0.2, 0.4),
+                "failed_penalty_weight": rand.uniform(0.3, 0.5),
+                "allocation_weight": rand.uniform(0.15, 0.25),
+                "pow_min_difficulty": rand.randint(6, 8),
+                "pow_max_difficulty": rand.randint(11, 13),
+                "pow_timeout": rand.uniform(25, 35),
+                "max_score_challenge": rand.uniform(200.0, 300.0),
+                "max_score_allocation": rand.uniform(15.0, 25.0),
+                "max_score": rand.uniform(220.0, 320.0),
+                "failed_penalty_exp": rand.uniform(1.3, 1.7),
+                "validator_uid": serialized_items["validator_uid"],
+                "challenge_attempts": rand.randint(10, 10000, 256).tolist(),
+                "last_20_challenge_failed": rand.randint(0, 11, 256).tolist(),
+                "challenge_elapsed_time_avg": rand.uniform(0.001, 31, 256).tolist(),
+                "challenge_difficulty_avg": rand.uniform(7, 12, 256).tolist(),
+                "has_docker": rand.choice([True, False], 256).tolist(),
+                "allocated_hotkey": rand.choice([True, False], 256).tolist(),
+                "penalized_hotkey_count": rand.randint(0, 10, 256).tolist(),
+                "half_validators": int(rand.randint(1, 10)),
+                "nonce": secrets.randbits(128),
+            }
+            inputs["challenge_successes"] = rand.randint(
+                np.array(inputs["challenge_attempts"]) // 2,
+                inputs["challenge_attempts"],
+            ).tolist()
+            inputs["uid_responsible_for_proof"] = inputs["validator_uid"][-1]
+
+        logging.debug(f"Inputs prepared for {circuit}")
         logging.trace(f"Inputs: {inputs}")
         return inputs

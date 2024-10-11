@@ -143,3 +143,8 @@ class Circuit:
             logging.warning(
                 f"Failed to load settings for model {self.id}. Using default settings."
             )
+
+    def __str__(self):
+        return (
+            f"{self.metadata.name} v{self.metadata.version} using {self.proof_system}"
+        )

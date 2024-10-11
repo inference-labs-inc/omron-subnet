@@ -90,8 +90,9 @@ class ValidatorLoop:
             list: List of prepared requests.
         """
 
+        subnet_uid = self.config.subnet_uid
         base_request = ProofOfWeightsHandler.prepare_pow_request(
-            0, self.score_manager.proof_of_weights_queue, self.config.subnet_uid
+            0, self.score_manager.proof_of_weights_queue, subnet_uid
         )
 
         requests = []
@@ -109,6 +110,8 @@ class ValidatorLoop:
                     f"Unable to update validator_uid for miner {uid}. Check the structure of pow_request."
                 )
 
+            if "inputs" in pow_request and "nonce" in pow_request["inputs"]:
+                pow_request["inputs"]["nonce"] = secrets.randbits(63)
             bt.logging.trace(
                 f"Prepared request for miner {uid} with axon {axon}: {pow_request}"
             )
