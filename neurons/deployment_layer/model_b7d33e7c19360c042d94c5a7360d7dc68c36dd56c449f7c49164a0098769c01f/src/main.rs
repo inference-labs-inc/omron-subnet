@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use guest::{build_score, ScoreInput, ScoreOutput, BATCH_SIZE};
+use guest::{build_score_sn27, ScoreInput, ScoreOutput, BATCH_SIZE};
 use jolt_core::jolt::vm::rv32i_vm::{RV32IHyraxProof, Serializable};
 use log::{debug, error, info, trace};
 use postcard;
@@ -72,7 +72,7 @@ fn main() -> ExitCode {
 
     let cli = Cli::parse();
 
-    let (prove_score, verify_score) = build_score();
+    let (prove_score, verify_score) = build_score_sn27();
 
     match &cli.command {
         Commands::Prove(args) => match prove_command(args, prove_score) {
