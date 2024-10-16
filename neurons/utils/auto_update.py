@@ -193,7 +193,7 @@ class AutoUpdate:
         Automatic update entrypoint method
         """
         if self.repo.head.is_detached or self.repo.active_branch.name != "main":
-            logging.warning("Not on the main branch, skipping auto-update")
+            logging.debug("Not on the main branch, skipping auto-update")
             return
 
         if not self.check_version_updated():
