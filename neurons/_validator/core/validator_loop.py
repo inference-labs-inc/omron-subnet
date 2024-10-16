@@ -167,7 +167,7 @@ class ValidatorLoop:
         if not self.config.config.no_auto_update:
             self.auto_update.try_update()
         else:
-            bt.logging.info("Automatic updates are disabled, skipping version check")
+            bt.logging.debug("Automatic updates are disabled, skipping version check")
 
     def _process_requests(self, requests):
         """
