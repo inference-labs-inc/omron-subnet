@@ -713,7 +713,7 @@ dependencies = [
 [[package]]
 name = "common"
 version = "0.2.0"
-source = "git+https://github.com/a16z/jolt#33c737e60af2bcb514d7b83ca8a3bd0143d49d21"
+source = "git+https://github.com/a16z/jolt?rev=5eb488381d383034ea1dd558011da0055c5b0c55#5eb488381d383034ea1dd558011da0055c5b0c55"
 dependencies = [
  "ark-serialize 0.4.2",
  "serde",
@@ -1742,7 +1742,7 @@ checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
 [[package]]
 name = "jolt-core"
 version = "0.1.0"
-source = "git+https://github.com/a16z/jolt#33c737e60af2bcb514d7b83ca8a3bd0143d49d21"
+source = "git+https://github.com/a16z/jolt?rev=5eb488381d383034ea1dd558011da0055c5b0c55#5eb488381d383034ea1dd558011da0055c5b0c55"
 dependencies = [
  "alloy-primitives",
  "alloy-rs",
@@ -1797,7 +1797,7 @@ dependencies = [
 [[package]]
 name = "jolt-sdk"
 version = "0.1.0"
-source = "git+https://github.com/a16z/jolt#33c737e60af2bcb514d7b83ca8a3bd0143d49d21"
+source = "git+https://github.com/a16z/jolt?rev=5eb488381d383034ea1dd558011da0055c5b0c55#5eb488381d383034ea1dd558011da0055c5b0c55"
 dependencies = [
  "ark-bn254",
  "ark-ec",
@@ -1815,7 +1815,7 @@ dependencies = [
 [[package]]
 name = "jolt-sdk-macros"
 version = "0.1.0"
-source = "git+https://github.com/a16z/jolt#33c737e60af2bcb514d7b83ca8a3bd0143d49d21"
+source = "git+https://github.com/a16z/jolt?rev=5eb488381d383034ea1dd558011da0055c5b0c55#5eb488381d383034ea1dd558011da0055c5b0c55"
 dependencies = [
  "common",
  "lazy_static",
@@ -3350,7 +3350,7 @@ checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 [[package]]
 name = "tracer"
 version = "0.2.0"
-source = "git+https://github.com/a16z/jolt#33c737e60af2bcb514d7b83ca8a3bd0143d49d21"
+source = "git+https://github.com/a16z/jolt?rev=5eb488381d383034ea1dd558011da0055c5b0c55#5eb488381d383034ea1dd558011da0055c5b0c55"
 dependencies = [
  "common",
  "fnv",
