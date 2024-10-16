@@ -8,17 +8,22 @@ template CalculateScore() {
     signal input actual_price;
     signal input predicted_price;
     signal input date_difference;
+    signal input price_weight;
+    signal input date_weight;
     signal output final_score;
+
+    signal const max_points;
+    max_points <== 14;
 
     component lessThan14 = LessThan(32);
     lessThan14.in[0] <== date_difference;
-    lessThan14.in[1] <== 14;
+    lessThan14.in[1] <== max_points;
 
     signal date_score_numerator;
-    date_score_numerator <== (14 - date_difference) * lessThan14.out + 0 * (1 - lessThan14.out);
+    date_score_numerator <== (max_points - date_difference) * lessThan14.out + 0 * (1 - lessThan14.out);
 
     signal date_score;
-    date_score <== (date_score_numerator * 100) / 14;
+    date_score <== (date_score_numerator * 100) / max_points;
 
     signal price_difference;
     price_difference <== abs(actual_price - predicted_price);
@@ -34,7 +39,7 @@ template CalculateScore() {
     price_score <== (100 - price_ratio) * lessThan100.out + 0 * (1 - lessThan100.out);
 
 
-    final_score <== (price_score * 86 + date_score * 14) / 100;
+    final_score <== (price_score * price_weight + date_score * date_weight) / 100;
 }
 
 component main = CalculateScore();
