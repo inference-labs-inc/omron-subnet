@@ -16,7 +16,7 @@ IGNORED_MODEL_HASHES = [
 ]
 
 # The maximum timespan allowed for miners to respond to a query
-VALIDATOR_REQUEST_TIMEOUT_SECONDS = 60
+VALIDATOR_REQUEST_TIMEOUT_SECONDS = 120
 # The timeout for aggregation requests
 VALIDATOR_AGG_REQUEST_TIMEOUT_SECONDS = 600
 # Maximum number of concurrent requests that the validator will handle
