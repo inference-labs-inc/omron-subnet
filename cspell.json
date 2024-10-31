@@ -13,6 +13,7 @@
     "dtype",
     "fastapi",
     "Gbps",
+    "hexsha",
     "incentivizes",
     "Keypair",
     "localnet",
