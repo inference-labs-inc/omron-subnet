@@ -20,6 +20,8 @@ pm2 start miner.py --name miner --interpreter python3 -- \
 --wallet.hotkey {your_miner_hotkey_name}
 ```
 
+[View all acceptable CLI arguments →]
+
 ## Validating
 
 Run the following command to start a validator on mainnet
@@ -32,4 +34,7 @@ pm2 start validator.py --name validator --interpreter python3 -- \
 --wallet.hotkey {your_validator_hotkey_name}
 ```
 
+[View all acceptable CLI arguments →]
+
+[View all acceptable CLI arguments →]: ./command_line_arguments.md
 [`shared_setup_steps.md`]: ./shared_setup_steps.md

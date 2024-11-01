@@ -116,7 +116,7 @@ class ResponseProcessor:
             return False
         try:
             inference_session = VerifiedModelSession(
-                validator_inputs, circuit_store.get_circuit(str(response.model_id))
+                validator_inputs, circuit_store.get_circuit(response.model_id)
             )
             res: bool = inference_session.verify_proof(
                 response.public_json, response.proof_content

@@ -61,6 +61,45 @@ def get_config_from_args():
         help="The target interval for committing proof of weights to the chain",
     )
 
+    parser.add_argument(
+        "--ignore-external-requests",
+        type=lambda x: x.lower() == "true",
+        default=True,
+        help="Whether to ignore external requests.",
+    )
+
+    parser.add_argument(
+        "--external-api-host",
+        type=str,
+        default="0.0.0.0",
+        help="The host for the external API.",
+    )
+
+    parser.add_argument(
+        "--external-api-port",
+        type=int,
+        default=8000,
+        help="The port for the external API.",
+    )
+
+    parser.add_argument(
+        "--external-api-workers",
+        type=int,
+        default=1,
+        help="The number of workers for the external API.",
+    )
+
+    parser.add_argument(
+        "--do-not-verify-external-signatures",
+        default=False,
+        action="store_true",
+        help=(
+            "External PoW requests are signed by validator's (sender's) wallet. "
+            "By default we verify is the wallet legitimate. "
+            "You can disable this check with the flag."
+        ),
+    )
+
     bt.subtensor.add_args(parser)
     bt.logging.add_args(parser)
     bt.wallet.add_args(parser)

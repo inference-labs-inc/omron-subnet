@@ -4,19 +4,38 @@ These are options configurable via command line arguments, when running miner or
 
 ## Custom Arguments
 
-Arguments that are present within the Omron miner and validator software.
+Arguments that are present within the Omron miner and validator software. The below arguments apply to both miner and validator software.
 
-| Argument                | Required | Default | Accepted Values | Description                                                                |
-| ----------------------- | :------: | ------- | --------------- | -------------------------------------------------------------------------- |
-| `--netuid`              |   Yes    | `2`     | Integer         | The subnet UID                                                             |
-| `--no-auto-update`      |    No    | `False` | `True`, `False` | Whether automatic update should be disabled.                               |
-| `--disable-blacklist`   |    No    | `False` | `True`, `False` | Disables request filtering and allows all incoming requests.               |
-| `--blocks-per-epoch`    |    No    | `50`    | Integer         | The number of blocks validators wait to set weights on-chain               |
-| `--wandb-key`           |    No    | `None`  | String          | A WandB API key for logging purposes                                       |
-| `--disable-wandb`       |    No    | `False` | `True`, `False` | Whether to disable WandB logging.                                          |
-| `--dev`                 |    No    | `False` | `True`, `False` | Whether to run the software in development mode. **For internal use only** |
-| `--enable-pow`          |    No    | `False` | `True`, `False` | Whether on-chain proof of weights is enabled                               |
-| `--pow-target-interval` |    No    | `1000`  | Integer         | The target block interval for committing proof of weights to the chain     |
+| Argument           | Required | Default | Accepted Values | Description                                                                |
+| ------------------ | :------: | ------- | --------------- | -------------------------------------------------------------------------- |
+| `--netuid`         |   Yes    | `2`     | Integer         | The subnet UID                                                             |
+| `--no-auto-update` |    No    | `False` | `True`, `False` | Whether automatic update should be disabled.                               |
+| `--wandb-key`      |    No    | `None`  | String          | A WandB API key for logging purposes                                       |
+| `--disable-wandb`  |    No    | `False` | `True`, `False` | Whether to disable WandB logging.                                          |
+| `--dev`            |    No    | `False` | `True`, `False` | Whether to run the software in development mode. **For internal use only** |
+
+### Miner specific arguments
+
+The below arguments are specific to miner software and have no effect on validator software.
+
+| Argument              | Required | Default | Accepted Values | Description                                                  |
+| --------------------- | :------: | ------- | --------------- | ------------------------------------------------------------ |
+| `--disable-blacklist` |    No    | `False` | `True`, `False` | Disables request filtering and allows all incoming requests. |
+
+### Validator specific arguments
+
+The below arguments are specific to validator software and have no effect on miner software.
+
+| Argument                              | Required | Default   | Accepted Values | Description                                                                                                                                                                                 |
+| ------------------------------------- | :------: | --------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--blocks-per-epoch`                  |    No    | `50`      | Integer         | The number of blocks validators wait to set weights on-chain                                                                                                                                |
+| `--enable-pow`                        |    No    | `False`   | `True`, `False` | Whether on-chain proof of weights is enabled                                                                                                                                                |
+| `--pow-target-interval`               |    No    | `1000`    | Integer         | The target block interval for committing proof of weights to the chain                                                                                                                      |
+| `--ignore-external-requests`          |    No    | `True`    | `True`, `False` | Whether the validator should ignore external requests through it's API.                                                                                                                     |
+| `--external-api-port`                 |    No    | `8000`    | Integer         | The port for the validator's external API.                                                                                                                                                  |
+| `--external-api-workers`              |    No    | `1`       | Integer         | The number of workers for the validator's external API.                                                                                                                                     |
+| `--external-api-host`                 |    No    | `0.0.0.0` | String          | The host for the validator's external API.                                                                                                                                                  |
+| `--do-not-verify-external-signatures` |    No    | `False`   | `True`, `False` | External PoW requests are signed by validator's (sender's) wallet. By default, these are checked to ensure legitimacy. This should only be disabled in controlled development environments. |
 
 ## Built-in Arguments
 

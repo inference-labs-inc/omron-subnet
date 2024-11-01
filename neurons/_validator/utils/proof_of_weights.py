@@ -4,6 +4,7 @@ import traceback
 from dataclasses import dataclass
 import bittensor as bt
 import torch
+from typing import Optional
 
 from substrateinterface import ExtrinsicReceipt
 from _validator.models.completed_proof_of_weights import CompletedProofOfWeightsItem
@@ -222,7 +223,9 @@ class ProofOfWeightsItem:
         return items
 
 
-def save_proof_of_weights(public_signals: list, proof: str):
+def save_proof_of_weights(
+    public_signals: list, proof: str, proof_filename: Optional[str] = None
+):
     """
     Save the proof of weights to a JSON file.
 
@@ -238,12 +241,14 @@ def save_proof_of_weights(public_signals: list, proof: str):
         bt.logging.error(f"Error logging proof of weights: {e}")
         traceback.print_exc()
     try:
-        block_numbers_out = public_signals[1025:2049]
+        if proof_filename is None:
+            block_numbers_out = public_signals[1025:2049]
 
-        unique_block_numbers = list(set(block_numbers_out))
-        unique_block_numbers.sort()
-        block_number = "_".join(str(num) for num in unique_block_numbers)
-        file_path = os.path.join(POW_DIRECTORY, f"{block_number}.json")
+            unique_block_numbers = list(set(block_numbers_out))
+            unique_block_numbers.sort()
+            proof_filename = "_".join(str(num) for num in unique_block_numbers)
+
+        file_path = os.path.join(POW_DIRECTORY, f"{proof_filename}.json")
 
         proof_json = {"public_signals": public_signals, "proof": proof}
 

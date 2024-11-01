@@ -317,7 +317,6 @@ class MinerSession:
         if not synapse.inputs:
             bt.logging.error("Received empty input for proof of weights")
             return synapse
-        bt.logging.trace(f"Input lengths: {len(synapse.inputs['previous_score'])}")
 
         try:
             circuit = circuit_store.get_circuit(str(synapse.verification_key_hash))
@@ -334,7 +333,7 @@ class MinerSession:
             proof, public, proof_time = model_session.gen_proof()
             model_session.end()
 
-            synapse.proof = proof
+            synapse.proof = proof.hex() if isinstance(proof, bytes) else proof
             synapse.public_signals = public
             bt.logging.info(f"✅ Proof of weights completed for {circuit}\n")
         except Exception as e:

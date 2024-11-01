@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import bittensor as bt
-from _validator.config.config import ValidatorConfig
+from _validator.config import ValidatorConfig
 from _validator.core.validator_loop import ValidatorLoop
 from utils import clean_temp_files
 import sys
@@ -10,7 +10,7 @@ import sys
 class ValidatorSession:
     def __init__(self, config: bt.config):
         self.config = ValidatorConfig(config)
-        self.validator_loop = ValidatorLoop(config)
+        self.validator_loop = ValidatorLoop(self.config)
 
     def run(self):
         """
