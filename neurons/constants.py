@@ -53,3 +53,5 @@ PROOF_OF_WEIGHTS_INTERVAL = 1000
 MAX_PROOFS_TO_LOG = 2
 # Era period for proof of weights (mortality of the pow log)
 PROOF_OF_WEIGHTS_LIFESPAN = 2
+# Active competition
+ACTIVE_COMPETITION = 1

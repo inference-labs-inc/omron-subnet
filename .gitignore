@@ -178,3 +178,4 @@ ecosystem.config.js
 neurons/_validator/proof_of_weights/
 **.zkey
 **/target/
+./neurons/_miner/CIRCUIT_CID

@@ -1,6 +1,7 @@
 attrs==24.2.0
 bittensor==6.9.4
 ezkl==15.1.0
+fire
 GitPython
 numpy==1.26.4
 packaging==24.1

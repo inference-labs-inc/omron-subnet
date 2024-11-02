@@ -1,5 +1,6 @@
 # from __future__ import annotations
 import time
+import os
 import traceback
 import json
 from typing import Tuple, Union
@@ -18,6 +19,8 @@ import websocket
 from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
 from utils import AutoUpdate, clean_temp_files
+
+CIRCUIT_CID_PATH = os.path.join(os.path.dirname(__file__), "CIRCUIT_CID")
 
 
 class MinerSession:
@@ -106,6 +109,26 @@ class MinerSession:
                         self.log_batch = []
                     else:
                         bt.logging.debug("No logs to log to WandB")
+
+                    if os.path.exists(CIRCUIT_CID_PATH):
+                        bt.logging.trace("Local CID found.")
+                        with open(CIRCUIT_CID_PATH, "r") as f:
+                            local_cid = f.read()
+                            remote_cid = self.subtensor.get_commitment(
+                                self.config.netuid, self.subnet_uid
+                            )
+                            if local_cid == remote_cid:
+                                bt.logging.debug(
+                                    f"Local CID {local_cid} matches on-chain CID"
+                                )
+                            else:
+                                bt.logging.warning(
+                                    f"Local CID {local_cid} does not match on-chain CID {remote_cid}"
+                                )
+                                self.subtensor.commit(local_cid)
+                                bt.logging.success(
+                                    f"Updated on-chain CID to {local_cid}"
+                                )
 
                 if step % 600 == 0:
                     self.check_register()
