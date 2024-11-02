@@ -3,6 +3,7 @@ pragma circom 2.0.0;
 include "./circomlib/comparators.circom";
 include "./circomlib/gates.circom";
 include "./circomlib/bitify.circom";
+include "./circomlib/mux1.circom";
 include "./intdiv.circom";
 
 template CalculateScore() {
@@ -13,61 +14,65 @@ template CalculateScore() {
     signal input date_weight;
     signal output final_score;
 
-    var max_points = 14000000;
+    var max_points = 14;
+    var SCALE = 1000000000;
 
-    component lessThan14 = LessThan(32);
+    component actualPricePositive = GreaterEqThan(252);
+    actualPricePositive.in[0] <== actual_price;
+    actualPricePositive.in[1] <== 0;
+    actualPricePositive.out === 1;
+
+    component predictedPricePositive = GreaterEqThan(252);
+    predictedPricePositive.in[0] <== predicted_price;
+    predictedPricePositive.in[1] <== 0;
+    predictedPricePositive.out === 1;
+
+    component dateDiffPositive = GreaterEqThan(252);
+    dateDiffPositive.in[0] <== date_difference;
+    dateDiffPositive.in[1] <== 0;
+    dateDiffPositive.out === 1;
+
+    component lessThan14 = LessThan(252);
     lessThan14.in[0] <== date_difference;
     lessThan14.in[1] <== max_points;
 
-    signal date_score_numerator;
-    date_score_numerator <== (max_points - date_difference) * lessThan14.out + 0 * (1000000 - lessThan14.out);
+    signal raw_date_points <== (max_points - date_difference) * lessThan14.out;
 
-    signal date_score;
-    date_score <== (date_score_numerator * 100000000) / max_points;
+    component date_div = IntDiv(252);
+    date_div.in[0] <== raw_date_points * SCALE;
+    date_div.in[1] <== max_points;
 
-    signal price_difference;
-    component isNegative = LessThan(32);
-    isNegative.in[0] <== predicted_price;
-    isNegative.in[1] <== actual_price;
+    component isLessThan = LessThan(252);
+    isLessThan.in[0] <== predicted_price;
+    isLessThan.in[1] <== actual_price;
 
-    signal diff1;
-    signal diff2;
-    signal term1;
-    signal term2;
+    signal diff1 <== actual_price - predicted_price;
+    signal diff2 <== predicted_price - actual_price;
 
-    diff1 <== actual_price - predicted_price;
-    diff2 <== predicted_price - actual_price;
+    component abs_diff = Mux1();
+    abs_diff.c[0] <== diff2;
+    abs_diff.c[1] <== diff1;
+    abs_diff.s <== isLessThan.out;
 
-    term1 <== isNegative.out * diff1;
-    term2 <== (1 - isNegative.out) * diff2;
+    component price_div = IntDiv(252);
+    price_div.in[0] <== abs_diff.out * SCALE;
+    price_div.in[1] <== actual_price;
 
-    price_difference <== term1 + term2;
-    signal price_ratio;
-    signal price_ratio_numerator;
-    price_ratio_numerator <== price_difference * 100000000;
-    component div = IntDiv(32);
-    div.in[0] <== price_ratio_numerator;
-    div.in[1] <== actual_price;
-    price_ratio <== div.out;
+    component lessThan100 = LessThan(252);
+    lessThan100.in[0] <== price_div.out;
+    lessThan100.in[1] <== SCALE;
 
-    component lessThan100 = LessThan(32);
-    lessThan100.in[0] <== price_ratio;
-    lessThan100.in[1] <== 100000000;
+    signal price_score <== (SCALE - price_div.out) * lessThan100.out;
 
-    signal price_score;
-    price_score <== (100000000 - price_ratio) * lessThan100.out + 0 * (1000000 - lessThan100.out);
+    component price_weighted = IntDiv(252);
+    price_weighted.in[0] <== price_score * price_weight;
+    price_weighted.in[1] <== 100;
 
+    component date_weighted = IntDiv(252);
+    date_weighted.in[0] <== date_div.out * date_weight;
+    date_weighted.in[1] <== 100;
 
-    signal intermediate_sum;
-    signal price_term;
-    signal date_term;
-    price_term <== price_score * price_weight;
-    date_term <== date_score * date_weight;
-    intermediate_sum <== price_term + date_term;
-    component final_div = IntDiv(32);
-    final_div.in[0] <== intermediate_sum;
-    final_div.in[1] <== 100000000;
-    final_score <== final_div.out;
+    final_score <== price_weighted.out + date_weighted.out;
 }
 
 component main {public [actual_price, predicted_price, date_difference, price_weight, date_weight]} = CalculateScore();
