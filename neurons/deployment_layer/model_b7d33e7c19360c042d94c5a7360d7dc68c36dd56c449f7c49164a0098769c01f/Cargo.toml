@@ -12,8 +12,8 @@ codegen-units = 1
 lto = "fat"
 
 [dependencies]
-jolt-sdk = { git = "https://github.com/a16z/jolt", features = ["host"], commit = "5eb488381d383034ea1dd558011da0055c5b0c55" }
-jolt-core = { git = "https://github.com/a16z/jolt", features = ["host"], commit = "5eb488381d383034ea1dd558011da0055c5b0c55" }
+jolt-sdk = { git = "https://github.com/a16z/jolt", features = ["host"], rev = "5eb488381d383034ea1dd558011da0055c5b0c55" }
+jolt-core = { git = "https://github.com/a16z/jolt", features = ["host"], rev = "5eb488381d383034ea1dd558011da0055c5b0c55" }
 guest = { path = "./guest" }
 print-no-std = "0.1.0"
 clap = "4.5.16"

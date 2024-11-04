@@ -1,5 +1,4 @@
 import math
-import torch
 import numpy as np
 import numpy.random as rand
 from bittensor import logging
@@ -30,61 +29,82 @@ class ProofOfWeightsHandler:
     use_sn27 = False
 
     @staticmethod
-    def prepare_pow_request(uid, proof_of_weights_queue, subnet_uid):
-        logging.debug(
-            f"Preparing PoW request for validator UID: {uid}, subnet UID: {subnet_uid}"
-        )
-        use_batched_pow, use_single_pow = ProofOfWeightsHandler._determine_pow_type(
-            proof_of_weights_queue
-        )
-
-        proof_system = ProofSystem.CIRCOM
-        if use_single_pow and ProofOfWeightsHandler.use_jolt:
-            proof_system = ProofSystem.JOLT
-        ProofOfWeightsHandler.use_jolt = not ProofOfWeightsHandler.use_jolt
-
-        if use_batched_pow:
-            model_id = BATCHED_PROOF_OF_WEIGHTS_MODEL_ID
-        elif proof_system == ProofSystem.CIRCOM:
-            model_id = SINGLE_PROOF_OF_WEIGHTS_MODEL_ID
-        else:
-            model_id = (
-                next(
-                    (
-                        circuit.id
-                        for circuit in circuit_store.circuits.values()
-                        if circuit.metadata.netuid == 27
-                    ),
-                    None,
-                )
-                if ProofOfWeightsHandler.use_sn27
-                else SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT
+    def prepare_pow_request(proof_of_weights_queue, subnet_uid):
+        logging.debug(f"Preparing PoW request for subnet UID: {subnet_uid}")
+        model_id = SINGLE_PROOF_OF_WEIGHTS_MODEL_ID
+        circuit = circuit_store.get_circuit(model_id)
+        if subnet_uid in (2, 118):
+            use_batched_pow, use_single_pow = ProofOfWeightsHandler._determine_pow_type(
+                proof_of_weights_queue
             )
-            ProofOfWeightsHandler.use_sn27 = not ProofOfWeightsHandler.use_sn27
+
+            proof_system = (
+                ProofSystem.JOLT
+                if use_single_pow and ProofOfWeightsHandler.use_jolt
+                else ProofSystem.CIRCOM
+            )
+            ProofOfWeightsHandler.use_jolt = not ProofOfWeightsHandler.use_jolt
+
+            if use_batched_pow:
+                model_id = BATCHED_PROOF_OF_WEIGHTS_MODEL_ID
+            elif proof_system == ProofSystem.CIRCOM:
+                model_id = SINGLE_PROOF_OF_WEIGHTS_MODEL_ID
+            else:
+                model_id = (
+                    next(
+                        (
+                            c.id
+                            for c in circuit_store.circuits.values()
+                            if c.metadata.netuid == 27
+                        ),
+                        None,
+                    )
+                    if ProofOfWeightsHandler.use_sn27
+                    else SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT
+                )
+                ProofOfWeightsHandler.use_sn27 = not ProofOfWeightsHandler.use_sn27
+
             if model_id is None:
                 raise ValueError(f"No circuit found for subnet_uid: {subnet_uid}")
 
-        circuit = circuit_store.get_circuit(model_id)
+            circuit = circuit_store.get_circuit(model_id)
+        else:
+            circuit = next(
+                (
+                    c
+                    for c in circuit_store.circuits.values()
+                    if c.metadata.netuid == subnet_uid
+                ),
+                None,
+            )
+
+        if circuit is None:
+            raise ValueError(f"No circuit found for subnet_uid: {subnet_uid}")
+
         logging.debug(f"PoW circuit: {circuit}")
         logging.info(f"Preparing for requests with {circuit}")
 
-        pow_items = ProofOfWeightsHandler._prepare_pow_items(
-            proof_of_weights_queue, use_batched_pow, use_single_pow, uid
+        serialized_items = (
+            proof_of_weights_queue[0] if len(proof_of_weights_queue) else []
         )
+        inputs = serialized_items
 
-        serialized_items = ProofOfWeightsItem.to_dict_list(pow_items)
+        if subnet_uid in (2, 118):
+            pow_items: list[ProofOfWeightsItem] = (
+                ProofOfWeightsHandler._prepare_pow_items(
+                    proof_of_weights_queue, circuit
+                )
+            )
+            serialized_items = ProofOfWeightsItem.to_dict_list(pow_items)
+            inputs = ProofOfWeightsHandler._prepare_inputs(serialized_items, circuit)
 
-        inputs = ProofOfWeightsHandler._prepare_inputs(serialized_items, circuit)
+        synapse = ProofOfWeightsHandler._create_synapse(subnet_uid, inputs, circuit)
 
-        synapse = ProofOfWeightsHandler._create_synapse(
-            use_batched_pow, subnet_uid, inputs, circuit
-        )
-
-        logging.debug(f"PoW request prepared with model ID: {model_id}")
+        logging.debug(f"PoW request prepared with model ID: {circuit.id}")
         return {
             "synapse": synapse,
             "inputs": inputs,
-            "model_id": model_id,
+            "model_id": circuit.id,
             "aggregation": False,
         }
 
@@ -119,17 +139,15 @@ class ProofOfWeightsHandler:
         return pow_circuit
 
     @staticmethod
-    def _prepare_pow_items(
-        proof_of_weights_queue, use_batched_pow, use_single_pow, uid
-    ) -> list[ProofOfWeightsItem]:
+    def _prepare_pow_items(proof_of_weights_queue, circuit) -> list[ProofOfWeightsItem]:
         """Prepare and pad the PoW items based on the determined PoW type."""
         logging.trace("Preparing PoW items")
-        if use_batched_pow:
+        if circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
             pow_items = ProofOfWeightsItem.pad_items(
                 proof_of_weights_queue, target_item_count=1024
             )
             logging.debug("Prepared batched PoW items")
-        elif use_single_pow:
+        elif circuit.id == SINGLE_PROOF_OF_WEIGHTS_MODEL_ID:
             pow_items = ProofOfWeightsItem.pad_items(
                 proof_of_weights_queue, target_item_count=256
             )
@@ -138,20 +156,17 @@ class ProofOfWeightsHandler:
             pow_items = [ProofOfWeightsItem.empty()] * 256
             logging.debug("Prepared empty PoW items")
 
-        pow_items[-1].validator_uid = torch.tensor(uid, dtype=torch.int64)
-        logging.trace(f"Set validator UID {uid} for last PoW item")
         return pow_items
 
     @staticmethod
     def _create_synapse(
-        use_batched_pow: bool,
         subnet_uid: int,
         inputs: dict,
         circuit: Circuit,
     ) -> ProofOfWeightsSynapse | QueryZkProof:
         """Create the appropriate synapse based on the PoW type."""
         logging.trace("Creating synapse")
-        if use_batched_pow:
+        if circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
             synapse = ProofOfWeightsSynapse(
                 subnet_uid=subnet_uid,
                 verification_key_hash=circuit.id,
@@ -161,12 +176,11 @@ class ProofOfWeightsHandler:
                 public_signals="",
             )
             logging.debug(f"Created batched SN2 PoW synapse with model: {circuit}")
-
         elif subnet_uid == 27:
             synapse = ProofOfWeightsSynapse(
                 subnet_uid=subnet_uid,
                 verification_key_hash=circuit.id,
-                proof_system=ProofSystem.JOLT,
+                proof_system=circuit.proof_system,
                 inputs=inputs,
                 proof="",
                 public_signals="",

@@ -2,31 +2,32 @@ from __future__ import annotations
 
 import asyncio
 import random
-import copy
 import sys
 import time
 import traceback
-
-import secrets
 from typing import NoReturn
 
 import bittensor as bt
 
-from _validator.config.config import ValidatorConfig
+
+from _validator.config import ValidatorConfig
 from _validator.core.response_processor import ResponseProcessor
 from _validator.scoring.score_manager import ScoreManager
-from _validator.utils.proof_of_weights import log_and_commit_proof
-from _validator.utils.uid import get_queryable_uids
-from _validator.pow.proof_of_weights_handler import ProofOfWeightsHandler
-from _validator.utils.axon import query_axons
 from _validator.scoring.weights import WeightsManager
-from utils import AutoUpdate, clean_temp_files, wandb_logger
-from constants import (
-    BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
-    ONCHAIN_PROOF_OF_WEIGHTS_ENABLED,
-    PROOF_OF_WEIGHTS_INTERVAL,
-    REQUEST_DELAY_SECONDS,
+from _validator.utils.axon import query_axons
+from _validator.utils.proof_of_weights import (
+    save_proof_of_weights,
 )
+from _validator.utils.uid import get_queryable_uids
+from _validator.core.api import ValidatorAPI
+from constants import (
+    REQUEST_DELAY_SECONDS,
+    SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
+    SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT,
+)
+from _validator.utils.api import hash_inputs
+from utils import AutoUpdate, clean_temp_files, wandb_logger
+from _validator.core.request_pipeline import RequestPipeline
 
 
 class ValidatorLoop:
@@ -36,21 +37,20 @@ class ValidatorLoop:
     The main loop for the validator. Handles everything from score updates to weight updates.
     """
 
-    def __init__(self, config: bt.config):
+    def __init__(self, config: ValidatorConfig):
         """
         Initialize the ValidatorLoop based on provided configuration.
 
         Args:
             config (bt.config): Bittensor configuration object.
         """
-        self.config = ValidatorConfig(config)
+        self.config = config
         self.config.check_register()
         self.auto_update = AutoUpdate()
         self.score_manager = ScoreManager(self.config.metagraph, self.config.user_uid)
         self.response_processor = ResponseProcessor(
             self.config.metagraph, self.score_manager, self.config.user_uid
         )
-        self.log_pow = False
         self.weights_manager = WeightsManager(
             self.config.subtensor,
             self.config.metagraph,
@@ -58,6 +58,10 @@ class ValidatorLoop:
             self.config.user_uid,
         )
         self.last_pow_commit_block = 0
+        self.api = ValidatorAPI(self.config)
+        self.request_pipeline = RequestPipeline(
+            self.config, self.score_manager, self.api
+        )
 
     def run(self) -> NoReturn:
         """
@@ -78,65 +82,17 @@ class ValidatorLoop:
                 )
             time.sleep(REQUEST_DELAY_SECONDS)
 
-    def prepare_requests(self, filtered_uids):
-        """
-        Prepare requests for querying miners, ensuring all requests are identical
-        except for the last UID in the validator_uid list.
-
-        Args:
-            filtered_uids (list): List of filtered UIDs to query.
-
-        Returns:
-            list: List of prepared requests.
-        """
-
-        subnet_uid = self.config.subnet_uid
-        base_request = ProofOfWeightsHandler.prepare_pow_request(
-            0, self.score_manager.proof_of_weights_queue, subnet_uid
-        )
-
-        requests = []
-        for uid in filtered_uids:
-            axon = self.config.metagraph.axons[uid]
-            pow_request = copy.deepcopy(base_request)
-            # Update the last UID in the validator_uid list with the miner's UID
-            # + replace last 9 with unique and random values
-            if "inputs" in pow_request and "validator_uid" in pow_request["inputs"]:
-                pow_request["inputs"]["validator_uid"][-10:] = [
-                    secrets.randbelow(257) for _ in range(9)
-                ] + [uid]
-            else:
-                bt.logging.warning(
-                    f"Unable to update validator_uid for miner {uid}. Check the structure of pow_request."
-                )
-
-            if "inputs" in pow_request and "nonce" in pow_request["inputs"]:
-                pow_request["inputs"]["nonce"] = secrets.randbits(63)
-            bt.logging.trace(
-                f"Prepared request for miner {uid} with axon {axon}: {pow_request}"
-            )
-            requests.append({"uid": uid, "axon": axon, **pow_request})
-
-        if (
-            requests
-            and requests[0].get("model_id") == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID
-        ):
-            self.score_manager.clear_proof_of_weights_queue()
-
-        return requests
-
     def run_step(self) -> None:
         """
         Execute a single step of the validation process.
         """
-        uids = self.config.metagraph.uids.tolist()
-        self.score_manager.sync_scores_uids(uids)
+        self.score_manager.sync_scores_uids(self.config.metagraph.uids.tolist())
 
-        filtered_uids = list(get_queryable_uids(self.config.metagraph, uids))
+        filtered_uids = list(get_queryable_uids(self.config.metagraph))
 
         random.shuffle(filtered_uids)
 
-        requests = self.prepare_requests(filtered_uids)
+        requests = self.request_pipeline.prepare_requests(filtered_uids)
 
         if len(requests) == 0:
             bt.logging.error("No requests prepared")
@@ -164,10 +120,10 @@ class ValidatorLoop:
 
     def _handle_auto_update(self):
         """Handle automatic updates if enabled."""
-        if not self.config.config.no_auto_update:
+        if not self.config.bt_config.no_auto_update:
             self.auto_update.try_update()
         else:
-            bt.logging.info("Automatic updates are disabled, skipping version check")
+            bt.logging.debug("Automatic updates are disabled, skipping version check")
 
     def _process_requests(self, requests):
         """
@@ -181,36 +137,23 @@ class ValidatorLoop:
         responses = loop.run_until_complete(query_axons(self.config.dendrite, requests))
 
         processed_responses = self.response_processor.process_responses(responses)
+        if requests[0].get("model_id") not in [
+            SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
+            SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT,
+        ]:
+            verified_responses = [
+                r for r in processed_responses if r.verification_result
+            ]
+            if verified_responses:
+                random_verified_response = random.choice(verified_responses)
+                save_proof_of_weights(
+                    public_signals=[random_verified_response.public_json],
+                    proof=[random_verified_response.proof_content],
+                    proof_filename=hash_inputs(requests[0].get("inputs")),
+                )
 
         self.score_manager.update_scores(processed_responses)
-
-        if self.log_pow and self.config.config.get(
-            "enable_pow", ONCHAIN_PROOF_OF_WEIGHTS_ENABLED
-        ):
-            log_and_commit_proof(
-                self.config.wallet.hotkey,
-                self.config.subtensor,
-                self.response_processor.completed_proof_of_weights_queue,
-            )
-            self.last_pow_commit_block = self.config.subtensor.get_current_block()
-            self.response_processor.completed_proof_of_weights_queue = []
-            self.log_pow = False
-
-        if self.weights_manager.update_weights(self.score_manager.scores):
-            if (
-                self.config.config.get("enable_pow", ONCHAIN_PROOF_OF_WEIGHTS_ENABLED)
-                and self.last_pow_commit_block
-                + int(
-                    self.config.config.get(
-                        "pow_target_interval", PROOF_OF_WEIGHTS_INTERVAL
-                    )
-                )
-                < self.config.subtensor.get_current_block()
-                and len(self.response_processor.completed_proof_of_weights_queue)
-                and not self.log_pow
-            ):
-                # Log PoW during the next iteration
-                self.log_pow = True
+        self.weights_manager.update_weights(self.score_manager.scores)
 
     def _log_overhead_time(self, start_time):
         """
@@ -232,5 +175,6 @@ class ValidatorLoop:
     def _handle_keyboard_interrupt(self):
         """Handle keyboard interrupt by cleaning up and exiting."""
         bt.logging.success("Keyboard interrupt detected. Exiting validator.")
+        self.api.stop()
         clean_temp_files()
         sys.exit(0)

@@ -5,6 +5,25 @@ from constants import DEFAULT_NETUID
 from utils import wandb_logger
 
 
+class ApiConfig:
+    """
+    Configuration class for the API.
+
+    Attributes:
+        enabled (bool): Whether the API is enabled.
+        host (str): The host for the API.
+        port (int): The port for the API.
+        workers (int): The number of workers for the API.
+    """
+
+    def __init__(self, config: bt.config):
+        self.enabled = not config.ignore_external_requests
+        self.host = config.external_api_host
+        self.port = config.external_api_port
+        self.workers = config.external_api_workers
+        self.verify_external_signatures = not config.do_not_verify_external_signatures
+
+
 class ValidatorConfig:
     """
     Configuration class for the Validator.
@@ -19,6 +38,7 @@ class ValidatorConfig:
         dendrite (bt.dendrite): The Bittensor dendrite object.
         metagraph (bt.metagraph): The Bittensor metagraph object.
         user_uid (int): The unique identifier for the validator within the subnet's metagraph.
+        api_enabled (bool): Whether the API is enabled.
     """
 
     def __init__(self, config: bt.config):
@@ -28,24 +48,25 @@ class ValidatorConfig:
         Args:
             config (bt.config): The Bittensor configuration object.
         """
-        self.config = config
+        self.bt_config = config
         self.subnet_uid = int(
-            self.config.netuid if self.config.netuid else DEFAULT_NETUID
+            self.bt_config.netuid if self.bt_config.netuid else DEFAULT_NETUID
         )
-        self.wallet = bt.wallet(config=self.config)
-        self.subtensor = bt.subtensor(config=self.config)
+        self.wallet = bt.wallet(config=self.bt_config)
+        self.subtensor = bt.subtensor(config=self.bt_config)
         self.dendrite = bt.dendrite(wallet=self.wallet)
         self.metagraph = self.subtensor.metagraph(self.subnet_uid)
         self.user_uid = int(
             self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
         )
+        self.api = ApiConfig(self.bt_config)
 
         # Initialize wandb logger
         wandb_logger.safe_init(
             "Validator",
             self.wallet,
             self.metagraph,
-            self.config,
+            self.bt_config,
         )
 
     def check_register(self):

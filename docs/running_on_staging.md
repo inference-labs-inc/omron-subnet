@@ -61,7 +61,8 @@ This command will set up and run a local subtensor network.
 ./scripts/localnet.sh
 ```
 
-*Note: Watch for any build or initialization outputs here. If building the project for the first time, this step will take while to finish building depending on your hardware.*
+> [!NOTE]
+> Watch for any build or initialization outputs here. If building the project for the first time, this step will take while to finish building depending on your hardware.
 
 ### 7. Clone and Setup Bittensor Revolution
 
@@ -124,7 +125,7 @@ btcli subnet create --wallet.name owner --subtensor.chain_endpoint ws://127.0.0.
 >> ✅ Registered subnetwork with netuid: 1
 ```
 
-*Note: The local chain will now have a default netuid of 1, the second registration will create netuid 2 and so on until you reach the subnet limit of 8. After this point the subnetwork with the least staked TAO will be replaced the incoming one.*
+_Note: The local chain will now have a default netuid of 1, the second registration will create netuid 2 and so on until you reach the subnet limit of 8. After this point the subnetwork with the least staked TAO will be replaced the incoming one._
 
 ### 11. Register Your Validator and Miner Keys
 
@@ -187,29 +188,21 @@ miner    default  1      True   0.00000  0.00000  0.00000    0.00000    0.00000 
 
 ### 13. Run Miner and Validator
 
-Make sure to specify your subnetwork parameters.
+Use the following commands to run the miner and validator against the local chain.
 
 ```bash
-python neurons/miner.py --netuid 1 --subtensor.chain_endpoint ws://127.0.0.1:9946 --wallet.name miner --wallet.hotkey default --logging.debug
->> ... # Run logs.
-python neurons/validator.py --netuid 1 --subtensor.chain_endpoint ws://127.0.0.1:9946 --wallet.name validator --wallet.hotkey default --logging.debug
->> ... # Run logs.
+pm2 start neurons/miner.py --interpreter python3 --name miner -- --netuid 1 --subtensor.chain_endpoint ws://127.0.0.1:9946 --wallet.name miner --wallet.hotkey default
+pm2 start neurons/validator.py --interpreter python3 --name validator -- --netuid 1 --subtensor.chain_endpoint ws://127.0.0.1:9946 --wallet.name validator --wallet.hotkey default
 ```
 
-### 14. Verify your incentive mechanism is running
+[View all acceptable CLI arguments →]
 
-After a few blocks you validators will set weights this enables the mechanism. Then after the subnet tempo elapses (1000 block ~3hrs ) you should see your incentive mechanism beginning to distribute TAO to your miner.
+### 14. Monitor miner and validator
+
+Use the following command to monitor the miner and validator.
 
 ```bash
-btcli wallet overview --wallet.name miner --subtensor.chain_endpoint ws://127.0.0.1:9946
+pm2 monit
 ```
 
-### Ending Your Session
-
-If you wish to halt your nodes:
-
-```bash
-# Simply use the CTRL + C command in the terminal.
-```
-
----
+[View all acceptable CLI arguments →]: ./command_line_arguments.md

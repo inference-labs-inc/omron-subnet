@@ -4,7 +4,6 @@ from rich.table import Table
 import utils.wandb_logger as wandb_logger
 import torch
 from _validator.models.miner_response import MinerResponse
-import bittensor as bt
 from deployment_layer.circuit_store import circuit_store
 
 
@@ -145,44 +144,6 @@ def log_responses(responses: list[MinerResponse]):
             "proof_size": response.proof_size,
         }
     wandb_logger.safe_log(wandb_log)
-
-
-def log_pow(proof_and_public_signals: dict):
-    """
-    Log proof of weights to a table and Weights & Biases.
-
-    Args:
-        proof_and_public_signals (dict): JSON representation of the proof of weights and public signals.
-    """
-    try:
-        public_signals = proof_and_public_signals["public_signals"]
-        proof = proof_and_public_signals["proof"]
-
-        # Extract block numbers from public signals
-        block_numbers = public_signals[1025:2049]
-        unique_block_numbers = list(set(block_numbers))
-        unique_block_numbers.sort()
-        block_number = "_".join(str(num) for num in unique_block_numbers)
-
-        table = Table(title="Proof of Weights")
-        table.add_column("Public Signals", style="cyan")
-        table.add_column("Proof", style="magenta")
-        table.add_row(str(public_signals), str(proof))
-
-        if bt.logging.get_level() == 10:
-            Console().print(table)
-
-        wandb_logger.safe_log(
-            {
-                "proof_of_weights": {
-                    "block_number": block_number,
-                    "public_signals": public_signals,
-                    "proof": proof,
-                }
-            }
-        )
-    except Exception as e:
-        bt.logging.error(f"Error logging proof of weights: {e}")
 
 
 def log_system_metrics(response_times, verified_count, model_id):

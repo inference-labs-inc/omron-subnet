@@ -4,21 +4,18 @@ import traceback
 from dataclasses import dataclass
 import bittensor as bt
 import torch
+import time
+from typing import Optional
 
 from substrateinterface import ExtrinsicReceipt
-from _validator.models.completed_proof_of_weights import CompletedProofOfWeightsItem
 from _validator.models.miner_response import (
     MinerResponse,
 )
-from _validator.utils.logging import log_pow
 from constants import (
     DEFAULT_MAX_SCORE,
     DEFAULT_PROOF_SIZE,
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-    MAX_PROOFS_TO_LOG,
-    PROOF_OF_WEIGHTS_LIFESPAN,
 )
-from utils import wandb_logger
 
 # Constants
 
@@ -222,7 +219,9 @@ class ProofOfWeightsItem:
         return items
 
 
-def save_proof_of_weights(public_signals: list, proof: str):
+def save_proof_of_weights(
+    public_signals: list, proof: str, proof_filename: Optional[str] = None
+):
     """
     Save the proof of weights to a JSON file.
 
@@ -230,20 +229,13 @@ def save_proof_of_weights(public_signals: list, proof: str):
         public_signals (list): The public signals data as a JSON array.
         proof (str): The proof.
 
-    This function saves the proof of weights as a JSON file and logs them in WandB.
+    This function saves the proof of weights as a JSON file.
     """
     try:
-        log_pow({"public_signals": public_signals, "proof": proof})
-    except Exception as e:
-        bt.logging.error(f"Error logging proof of weights: {e}")
-        traceback.print_exc()
-    try:
-        block_numbers_out = public_signals[1025:2049]
+        if proof_filename is None:
+            proof_filename = str(int(time.time()))
 
-        unique_block_numbers = list(set(block_numbers_out))
-        unique_block_numbers.sort()
-        block_number = "_".join(str(num) for num in unique_block_numbers)
-        file_path = os.path.join(POW_DIRECTORY, f"{block_number}.json")
+        file_path = os.path.join(POW_DIRECTORY, f"{proof_filename}.json")
 
         proof_json = {"public_signals": public_signals, "proof": proof}
 
@@ -253,77 +245,6 @@ def save_proof_of_weights(public_signals: list, proof: str):
     except Exception as e:
         bt.logging.error(f"Error saving proof of weights to file: {e}")
         traceback.print_exc()
-
-
-def log_and_commit_proof(
-    hotkey: bt.Keypair,
-    subtensor: bt.subtensor,
-    proof_list: list[CompletedProofOfWeightsItem],
-):
-    """
-    Log and commit aggregated proofs on-chain for the previous weight setting period.
-
-    Args:
-        hotkey (bt.Keypair): Keypair for signing the transaction.
-        subtensor (bt.subtensor): Subtensor instance for blockchain interaction.
-        proof_list (list[CompletedProofOfWeightsItem]): List of proofs to be included in the transaction.
-
-    This function commits proofs of weights to the chain as a system remark, making PoW immutable.
-    """
-    if len(proof_list) == 0:
-        bt.logging.warning("No proofs to log to the chain.")
-        wandb_logger.safe_log({"on_chain_proof_of_weights_committed": False})
-        return
-    bt.logging.debug(
-        f"Logging and committing proof(s) of weights. Proof count: {len(proof_list)}"
-    )
-
-    remark_bodies = []
-    for i, item in enumerate(proof_list):
-        if i >= MAX_PROOFS_TO_LOG:
-            bt.logging.warning(
-                f"Too many proofs ({len(proof_list)}). Only processing the first {MAX_PROOFS_TO_LOG}."
-            )
-            break
-        remark_bodies.append(item.to_remark())
-    bt.logging.trace(f"Remark bodies: {remark_bodies}")
-    try:
-        bt.logging.debug("Committing on-chain proof of weights aggregation")
-        with subtensor.substrate as substrate:
-            remark_call = substrate.compose_call(
-                call_module="System",
-                call_function="remark",
-                call_params={"remark": json.dumps(remark_bodies)},
-            )
-            extrinsic = substrate.create_signed_extrinsic(
-                call=remark_call,
-                keypair=hotkey,
-                era={"period": PROOF_OF_WEIGHTS_LIFESPAN},
-            )
-            result = substrate.submit_extrinsic(
-                extrinsic, wait_for_inclusion=True, wait_for_finalization=True
-            )
-            result.process_events()
-            bt.logging.info(
-                f"On-chain proof of weights committed. Hash: {result.extrinsic_hash}"
-            )
-            wandb_logger.safe_log(
-                {
-                    "on_chain_proof_of_weights_committed": True,
-                    "pow_cost": result.total_fee_amount,
-                }
-            )
-            save_receipt(result)
-    except Exception as e:
-        bt.logging.error(
-            f"""\033[31m
-Error committing on-chain proof of weights using hotkey: {hotkey.ss58_address}.
-Validators within the Omron subnet are compensated by the subnet for providing on-chain proof of weights.
-Please reach out via Discord to request TAO for proof of weights, which we'll provide to your hotkey.
-\033[0m{e}
-            """
-        )
-        bt.logging.trace(traceback.format_exc())
 
 
 def save_receipt(receipt: ExtrinsicReceipt):
