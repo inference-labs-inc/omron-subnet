@@ -12,3 +12,4 @@ requests
 setuptools
 torch
 wandb
+yarl
