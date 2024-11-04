@@ -50,6 +50,6 @@ ONCHAIN_PROOF_OF_WEIGHTS_ENABLED = False
 # Frequency in terms of blocks at which proof of weights are posted
 PROOF_OF_WEIGHTS_INTERVAL = 1000
 # Maximum number of proofs to log at once
-MAX_PROOFS_TO_LOG = 2
+MAX_PROOFS_TO_LOG = 0
 # Era period for proof of weights (mortality of the pow log)
 PROOF_OF_WEIGHTS_LIFESPAN = 2

@@ -16,14 +16,11 @@ from _validator.scoring.score_manager import ScoreManager
 from _validator.scoring.weights import WeightsManager
 from _validator.utils.axon import query_axons
 from _validator.utils.proof_of_weights import (
-    log_and_commit_proof,
     save_proof_of_weights,
 )
 from _validator.utils.uid import get_queryable_uids
 from _validator.core.api import ValidatorAPI
 from constants import (
-    ONCHAIN_PROOF_OF_WEIGHTS_ENABLED,
-    PROOF_OF_WEIGHTS_INTERVAL,
     REQUEST_DELAY_SECONDS,
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT,
@@ -54,7 +51,6 @@ class ValidatorLoop:
         self.response_processor = ResponseProcessor(
             self.config.metagraph, self.score_manager, self.config.user_uid
         )
-        self.log_pow = False
         self.weights_manager = WeightsManager(
             self.config.subtensor,
             self.config.metagraph,
@@ -157,36 +153,7 @@ class ValidatorLoop:
                 )
 
         self.score_manager.update_scores(processed_responses)
-
-        if self.log_pow and self.config.bt_config.get(
-            "enable_pow", ONCHAIN_PROOF_OF_WEIGHTS_ENABLED
-        ):
-            log_and_commit_proof(
-                self.config.wallet.hotkey,
-                self.config.subtensor,
-                self.response_processor.completed_proof_of_weights_queue,
-            )
-            self.last_pow_commit_block = self.config.subtensor.get_current_block()
-            self.response_processor.completed_proof_of_weights_queue = []
-            self.log_pow = False
-
-        if self.weights_manager.update_weights(self.score_manager.scores):
-            if (
-                self.config.bt_config.get(
-                    "enable_pow", ONCHAIN_PROOF_OF_WEIGHTS_ENABLED
-                )
-                and self.last_pow_commit_block
-                + int(
-                    self.config.bt_config.get(
-                        "pow_target_interval", PROOF_OF_WEIGHTS_INTERVAL
-                    )
-                )
-                < self.config.subtensor.get_current_block()
-                and len(self.response_processor.completed_proof_of_weights_queue)
-                and not self.log_pow
-            ):
-                # Log PoW during the next iteration
-                self.log_pow = True
+        self.weights_manager.update_weights(self.score_manager.scores)
 
     def _log_overhead_time(self, start_time):
         """
