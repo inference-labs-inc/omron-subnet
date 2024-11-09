@@ -4,10 +4,10 @@ include "./rateOfChange.circom";
 include "./calculatedScoreFraction.circom";
 include "./distanceFromScore.circom";
 include "./finalNewScore.circom";
-include "./proofSizeRewardMetric.circom";
+include "./proofSizeIncentiveMetric.circom";
 include "./integerDivision.circom";
-include "./responseTimeNormalized.circom";
-include "./responseTimeMetric.circom";
+include "./MetricNormalized.circom";
+include "./incentiveMetric.circom";
 
 template Reward(n, b){
     var i;
@@ -19,13 +19,18 @@ template Reward(n, b){
     signal input PROOF_SIZE_WEIGHT;
     signal input RESPONSE_TIME_WEIGHT;
     signal input MAXIMUM_RESPONSE_TIME_DECIMAL;
+    signal input ACCURACY_WEIGHT;
     signal input maximum_score[n];
     signal input previous_score[n];
     signal input verified[n];
+    signal input is_competition[n];
     signal input proof_size[n];
     signal input response_time[n];
+    signal input accuracy[n];
     signal input maximum_response_time[n];
     signal input minimum_response_time[n];
+    signal input maximum_accuracy[n];
+    signal input minimum_accuracy[n];
     signal input block_number[n];
     signal input validator_uid[n];
     signal input miner_uid[n];
@@ -45,6 +50,10 @@ template Reward(n, b){
     component int_div_2[n];
     component response_time_normalized_fn[n];
     component response_time_reward_metric_fn[n];
+    component accuracy_normalized_fn[n];
+    component accuracy_reward_metric_fn[n];
+    component proof_size_normalized_fn[n];
+    component proof_size_reward_metric_fn[n];
 
     signal temp_1[n];
     signal temp_2[n];
@@ -59,6 +68,7 @@ template Reward(n, b){
     signal proof_size_reward_metric[n];
     signal response_time_normalized[n];
     signal response_time_reward_metric[n];
+    signal accuracy_reward_metric[n];
 
 
     for (i=0; i<n; i++) {
@@ -74,28 +84,53 @@ template Reward(n, b){
         rate_of_change_comp[i].RATE_OF_DECAY <== RATE_OF_DECAY;
         rate_of_change[i] <== rate_of_change_comp[i].out;
 
-        response_time_normalized_fn[i] = ResponseTimeNormalized(b);
-        response_time_normalized_fn[i].response_time <== response_time[i];
-        response_time_normalized_fn[i].minimum_response_time <== minimum_response_time[i];
-        response_time_normalized_fn[i].maximum_response_time <== maximum_response_time[i];
-        response_time_normalized_fn[i].MAXIMUM_RESPONSE_TIME_DECIMAL <== MAXIMUM_RESPONSE_TIME_DECIMAL;
+        response_time_normalized_fn[i] = MetricNormalized(b);
+        response_time_normalized_fn[i].value <== response_time[i];
+        response_time_normalized_fn[i].minimum_value <== minimum_response_time[i];
+        response_time_normalized_fn[i].maximum_value <== maximum_response_time[i];
+        response_time_normalized_fn[i].MAXIMUM_VALUE_DECIMAL <== MAXIMUM_RESPONSE_TIME_DECIMAL;
         response_time_normalized_fn[i].scaling <== scaling;
 
         response_time_normalized[i] <== response_time_normalized_fn[i].out;
 
-        response_time_reward_metric_fn[i] = ResponseTimeMetric(b);
-        response_time_reward_metric_fn[i].RESPONSE_TIME_WEIGHT <== RESPONSE_TIME_WEIGHT;
-        response_time_reward_metric_fn[i].response_time_normalized <== response_time_normalized[i];
+        response_time_reward_metric_fn[i] = IncentiveMetric(b);
+        response_time_reward_metric_fn[i].WEIGHT <== RESPONSE_TIME_WEIGHT;
+        response_time_reward_metric_fn[i].normalized_value <== response_time_normalized[i];
         response_time_reward_metric_fn[i].scaling <== scaling;
-
 
         response_time_reward_metric[i] <== response_time_reward_metric_fn[i].out;
 
-        proof_size_reward_metric[i] <== 0;
+        accuracy_normalized_fn[i] = MetricNormalized(b);
+        accuracy_normalized_fn[i].value <== accuracy[i];
+        accuracy_normalized_fn[i].minimum_value <== minimum_accuracy[i];
+        accuracy_normalized_fn[i].maximum_value <== maximum_accuracy[i];
+        accuracy_normalized_fn[i].scaling <== scaling;
+        accuracy_normalized[i] <== accuracy_normalized_fn[i].out;
+
+        accuracy_reward_metric_fn[i] = IncentiveMetric(b);
+        accuracy_reward_metric_fn[i].WEIGHT <== ACCURACY_WEIGHT;
+        accuracy_reward_metric_fn[i].normalized_value <== accuracy_normalized[i];
+        accuracy_reward_metric_fn[i].scaling <== scaling;
+        accuracy_reward_metric[i] <== accuracy_reward_metric_fn[i].out;
+
+        proof_size_normalized_fn[i] = MetricNormalized(b);
+        proof_size_normalized_fn[i].value <== proof_size[i];
+        proof_size_normalized_fn[i].minimum_value <== minimum_proof_size[i];
+        proof_size_normalized_fn[i].maximum_value <== maximum_proof_size[i];
+        proof_size_normalized_fn[i].scaling <== scaling;
+
+        proof_size_normalized <== proof_size_normalized_fn[i].out
+
+        proof_size_reward_metric_fn[i] = IncentiveMetric(b);
+        proof_size_reward_metric_fn[i].WEIGHT <== PROOF_SIZE_WEIGHT;
+        proof_size_reward_metric_fn[i].normalized_value <== proof_size_normalized[i];
+        proof_size_reward_metric_fn[i].scaling <== scaling;
+        proof_size_reward_metric[i] <== proof_size_reward_metric_fn[i].out;
 
         calculated_score_fraction_comp[i] = CalculatedScoreFraction(b);
         calculated_score_fraction_comp[i].response_time_reward_metric <== response_time_reward_metric[i];
         calculated_score_fraction_comp[i].proof_size_reward_metric <== proof_size_reward_metric[i];
+        calculated_score_fraction_comp[i].accuracy_reward_metric <== accuracy_reward_metric[i];
         calculated_score_fraction_comp[i].scaling <== scaling;
         calculated_score_fraction[i] <== calculated_score_fraction_comp[i].out;
 
@@ -123,6 +158,8 @@ template Reward(n, b){
         final_new_score[i].verified <== verified[i];
         final_new_score[i].previous_score <== previous_score[i];
         final_new_score[i].change_in_score <== change_in_score[i];
+        final_new_score[i].is_competition <== is_competition[i];
+        final_new_score[i].calculated_score <== calculated_score_fraction[i];
         final_new_score[i].is_positive_change_in_score <== isPositive[i];
 
         new_score[i] <== final_new_score[i].new_score;

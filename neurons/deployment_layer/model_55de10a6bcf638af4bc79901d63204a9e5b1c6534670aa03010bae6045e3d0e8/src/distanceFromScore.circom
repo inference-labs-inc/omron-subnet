@@ -27,8 +27,8 @@ template DistanceFromScore(b){
     temp_sub_2 <== (previous_score - maximum_score)*(1 - isPos);
 
     where = Where();
-    where.a <== verified;
-    where.b <== temp_sub + temp_sub_2;
-    where.c <== previous_score;
+    where.condition <== verified;
+    where.is_true <== temp_sub + temp_sub_2;
+    where.is_false <== previous_score;
     distanceFromScore <== where.out;
 }
