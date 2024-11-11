@@ -69,8 +69,8 @@ class Competition(bt.Synapse):
     A synapse for conveying competition messages
     """
 
-    competition_id: int
-    verification_key: str
+    competition_id: int = 1
+    verification_key: Optional[str] = None
 
 
 class QueryForProofAggregation(bt.Synapse):
