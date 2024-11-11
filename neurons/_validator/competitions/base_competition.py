@@ -67,6 +67,8 @@ class BaseCompetition(ABC):
         """
         Download the circuit.
         """
+        bt.logging.info(f"Downloading circuit for hash {hash} from axon {axon}")
+
         out_path = os.path.join(
             self.competition_directory, f"{self.competition_id}", f"{hash}"
         )
@@ -77,6 +79,7 @@ class BaseCompetition(ABC):
             id=self.competition_id,
         )
 
+        bt.logging.debug("Querying axon for verification key")
         response: Competition = dendrite.query(
             axons=[axon],
             synapse=synapse,
@@ -84,9 +87,12 @@ class BaseCompetition(ABC):
         )[0]
 
         if response.verification_key:
+            bt.logging.info(f"Received verification key, saving to {out_path}")
             with open(out_path, "wb") as f:
                 f.write(response.verification_key)
+            bt.logging.success("Successfully saved verification key")
         else:
+            bt.logging.error("No verification key received from axon")
             raise ValueError(f"No verification key found for {hash}")
 
     def evaluate_circuit(
