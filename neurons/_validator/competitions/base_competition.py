@@ -1,9 +1,10 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
+from abc import ABC
 import torch
 import os
 import time
 import json
+import ezkl
 import bittensor as bt
 from protocol import QueryZkProof, Competition
 from typing import Tuple, Generator
@@ -80,7 +81,6 @@ class BaseCompetition(ABC):
         else:
             raise ValueError(f"No verification key found for {hash}")
 
-    @abstractmethod
     def evaluate_circuit(
         self, miner_axon: bt.axon, verification_key_path: str
     ) -> float:
@@ -128,12 +128,10 @@ class BaseCompetition(ABC):
                         with open("temp_proof.json", "w") as f:
                             json.dump({"proof": proof, "public": public_signals}, f)
 
-                        import ezkl
-
                         verification_result = ezkl.verify(
                             "temp_proof.json",
                             os.path.join(self.competition_directory, "settings.json"),
-                            os.path.join(self.competition_directory, "vk.key"),
+                            verification_key_path,
                         )
                         verification_results.append(verification_result)
 
