@@ -55,9 +55,7 @@ class BaseCompetition(ABC):
                 self.download_circuit(axon, hash)
                 yield (
                     axon,
-                    os.path.join(
-                        self.competition_directory, f"{self.competition_id}", f"{hash}"
-                    ),
+                    os.path.join(self.competition_directory, f"{hash}"),
                 )
             except Exception as e:
                 bt.logging.error(f"Error getting commitment for {hotkey}: {e}")
@@ -69,9 +67,7 @@ class BaseCompetition(ABC):
         """
         bt.logging.info(f"Downloading circuit for hash {hash} from axon {axon}")
 
-        out_path = os.path.join(
-            self.competition_directory, f"{self.competition_id}", f"{hash}"
-        )
+        out_path = os.path.join(self.competition_directory, f"{hash}")
 
         dendrite = bt.dendrite()
 
