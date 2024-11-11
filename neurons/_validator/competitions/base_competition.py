@@ -30,7 +30,7 @@ class BaseCompetition(ABC):
         """
         Load the baseline model.
         """
-        model = torch.load(os.path.join(self.competition_directory, "model.pth"))
+        model = torch.load(os.path.join(self.competition_directory, "model.pt"))
         return model
 
     def sync_and_eval(self):
