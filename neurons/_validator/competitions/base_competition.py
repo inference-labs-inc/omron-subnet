@@ -46,9 +46,13 @@ class BaseCompetition(ABC):
         Sync and return the circuits.
         """
         for hotkey in self.metagraph.hotkeys:
-            hash = self.subtensor.get_commitment(
-                self.metagraph.netuid, self.metagraph.hotkeys.index(hotkey)
-            )
+            try:
+                hash = self.subtensor.get_commitment(
+                    self.metagraph.netuid, self.metagraph.hotkeys.index(hotkey)
+                )
+            except Exception as e:
+                bt.logging.error(f"Error getting commitment for {hotkey}: {e}")
+                continue
             axon = self.metagraph.axons[self.metagraph.hotkeys.index(hotkey)]
             self.download_circuit(axon, hash)
             yield (
