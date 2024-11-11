@@ -20,7 +20,9 @@ class BaseCompetition(ABC):
     ):
         self.competition_id: int = competition_id
         self.competition_directory: str = os.path.join(
-            "competitions", str(competition_id)
+            os.path.dirname(os.path.abspath(__file__)),
+            "competitions",
+            str(competition_id),
         )
         self.baseline_model: torch.nn.Module = self._load_model()
         self.metagraph: bt.metagraph = metagraph
