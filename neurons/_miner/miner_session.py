@@ -69,7 +69,7 @@ class MinerSession:
             blacklist_fn=self.pow_blacklist,
         )
         axon.attach(
-            forward_fn=self.handle_competition_request,
+            forward_fn=self.handleCompetitionRequest,
             blacklist_fn=self.vk_blacklist,
         )
 

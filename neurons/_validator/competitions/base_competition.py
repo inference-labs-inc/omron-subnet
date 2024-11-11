@@ -50,17 +50,18 @@ class BaseCompetition(ABC):
                 hash = self.subtensor.get_commitment(
                     self.metagraph.netuid, self.metagraph.hotkeys.index(hotkey)
                 )
+                bt.logging.success(f"Syncing circuit for {hotkey} with hash {hash}")
+                axon = self.metagraph.axons[self.metagraph.hotkeys.index(hotkey)]
+                self.download_circuit(axon, hash)
+                yield (
+                    axon,
+                    os.path.join(
+                        self.competition_directory, f"{self.competition_id}", f"{hash}"
+                    ),
+                )
             except Exception as e:
                 bt.logging.error(f"Error getting commitment for {hotkey}: {e}")
                 continue
-            axon = self.metagraph.axons[self.metagraph.hotkeys.index(hotkey)]
-            self.download_circuit(axon, hash)
-            yield (
-                axon,
-                os.path.join(
-                    self.competition_directory, f"{self.competition_id}", f"{hash}"
-                ),
-            )
 
     def download_circuit(self, axon: bt.axon, hash: str):
         """
