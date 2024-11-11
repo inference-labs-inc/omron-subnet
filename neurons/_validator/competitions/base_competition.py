@@ -105,7 +105,7 @@ class BaseCompetition(ABC):
         bt.logging.info(f"Evaluating circuit for {miner_axon}")
 
         for _ in range(10):
-            test_inputs = torch.randn(1, self.baseline_model.input_size)
+            test_inputs = torch.randn(4, 2)
             baseline_output = self.baseline_model(test_inputs).tolist()
 
             synapse = QueryZkProof(
