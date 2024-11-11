@@ -75,9 +75,7 @@ class BaseCompetition(ABC):
 
         dendrite = bt.dendrite()
 
-        synapse = Competition(
-            id=self.competition_id,
-        )
+        synapse = Competition(id=self.competition_id, hash=hash)
 
         bt.logging.debug("Querying axon for verification key")
         response: Competition = dendrite.query(

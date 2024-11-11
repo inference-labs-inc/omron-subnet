@@ -254,7 +254,7 @@ class MinerSession:
 
     def handleCompetitionRequest(self, synapse: Competition) -> Competition:
         verification_key_path = os.path.join(
-            COMPETITION_DIR, str(synapse.competition_id)
+            COMPETITION_DIR, str(synapse.competition_id), synapse.hash
         )
 
         if os.path.exists(verification_key_path):

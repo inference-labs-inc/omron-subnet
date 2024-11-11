@@ -70,6 +70,7 @@ class Competition(bt.Synapse):
     """
 
     competition_id: int = 1
+    hash: str = None
     verification_key: Optional[str] = None
 
 
