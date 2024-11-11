@@ -123,27 +123,6 @@ class MinerSession:
                         self.log_batch = []
                     else:
                         bt.logging.debug("No logs to log to WandB")
-
-                    if os.path.exists(CIRCUIT_CID_PATH):
-                        bt.logging.trace("Local CID found.")
-                        with open(CIRCUIT_CID_PATH, "r") as f:
-                            local_cid = f.read()
-                            remote_cid = self.subtensor.get_commitment(
-                                self.config.netuid, self.subnet_uid
-                            )
-                            if local_cid == remote_cid:
-                                bt.logging.debug(
-                                    f"Local CID {local_cid} matches on-chain CID"
-                                )
-                            else:
-                                bt.logging.warning(
-                                    f"Local CID {local_cid} does not match on-chain CID {remote_cid}"
-                                )
-                                self.subtensor.commit(local_cid)
-                                bt.logging.success(
-                                    f"Updated on-chain CID to {local_cid}"
-                                )
-
                 if step % 600 == 0:
                     self.check_register()
 
