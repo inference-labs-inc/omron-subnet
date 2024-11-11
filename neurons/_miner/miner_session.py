@@ -13,7 +13,12 @@ from constants import (
     VALIDATOR_STAKE_THRESHOLD,
 )
 
-from protocol import QueryForProofAggregation, QueryZkProof, ProofOfWeightsSynapse
+from protocol import (
+    QueryForProofAggregation,
+    QueryZkProof,
+    ProofOfWeightsSynapse,
+    Competition,
+)
 from utils import wandb_logger
 import websocket
 from execution_layer.verified_model_session import VerifiedModelSession
@@ -21,6 +26,10 @@ from deployment_layer.circuit_store import circuit_store
 from utils import AutoUpdate, clean_temp_files
 
 CIRCUIT_CID_PATH = os.path.join(os.path.dirname(__file__), "CIRCUIT_CID")
+
+COMPETITION_DIR = os.path.join(
+    os.path.dirname(__file__), "..", "..", "competition_circuit"
+)
 
 
 class MinerSession:
@@ -59,6 +68,11 @@ class MinerSession:
             forward_fn=self.handle_pow_request,
             blacklist_fn=self.pow_blacklist,
         )
+        axon.attach(
+            forward_fn=self.handle_competition_request,
+            blacklist_fn=self.vk_blacklist,
+        )
+
         bt.logging.info("Attached forward functions to axon")
 
         # Serve passes the axon information to the network + netuid we are hosting on.
@@ -191,6 +205,10 @@ class MinerSession:
         """
         return self._blacklist(synapse)
 
+    def vk_blacklist(self, synapse: Competition) -> Tuple[bool, str]:
+
+        return self._blacklist(synapse)
+
     def aggregation_blacklist(
         self, synapse: QueryForProofAggregation
     ) -> Tuple[bool, str]:
@@ -254,6 +272,18 @@ class MinerSession:
         except Exception as e:
             bt.logging.error(f"Error during blacklist {e}")
             return True, "An error occurred while filtering the request"
+
+    def handleCompetitionRequest(self, synapse: Competition) -> Competition:
+        verification_key_path = os.path.join(
+            COMPETITION_DIR, str(synapse.competition_id)
+        )
+
+        if os.path.exists(verification_key_path):
+            synapse.verification_key = open(verification_key_path, "rb").read().hex()
+        else:
+            raise ValueError(f"Competition circuit {synapse.competition_id} not found")
+
+        return synapse
 
     def queryZkProof(self, synapse: QueryZkProof) -> QueryZkProof:
         """

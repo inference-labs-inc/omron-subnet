@@ -31,6 +31,7 @@ from constants import (
 from _validator.utils.api import hash_inputs
 from utils import AutoUpdate, clean_temp_files, wandb_logger
 from _validator.core.request_pipeline import RequestPipeline
+from _validator.competitions.base_competition import BaseCompetition
 
 
 class ValidatorLoop:
@@ -66,6 +67,9 @@ class ValidatorLoop:
         self.request_pipeline = RequestPipeline(
             self.config, self.score_manager, self.api
         )
+        self.competition_manager = BaseCompetition(
+            1, self.config.metagraph, self.config.subtensor
+        )
 
     def run(self) -> NoReturn:
         """
@@ -90,6 +94,9 @@ class ValidatorLoop:
         """
         Execute a single step of the validation process.
         """
+
+        self.competition_manager.sync_and_eval()
+
         self.score_manager.sync_scores_uids(self.config.metagraph.uids.tolist())
 
         filtered_uids = list(get_queryable_uids(self.config.metagraph))

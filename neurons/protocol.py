@@ -64,6 +64,15 @@ class ProofOfWeightsSynapse(bt.Synapse):
         }
 
 
+class Competition(bt.Synapse):
+    """
+    A synapse for conveying competition messages
+    """
+
+    competition_id: int
+    verification_key: str
+
+
 class QueryForProofAggregation(bt.Synapse):
     """
     Query for aggregation of multiple proofs into a single proof
