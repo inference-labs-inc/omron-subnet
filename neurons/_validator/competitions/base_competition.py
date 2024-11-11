@@ -83,7 +83,7 @@ class BaseCompetition(ABC):
         if response.verification_key:
             bt.logging.info(f"Received verification key, saving to {out_path}")
             with open(out_path, "wb") as f:
-                f.write(response.verification_key)
+                f.write(bytes.fromhex(response.verification_key))
             bt.logging.success("Successfully saved verification key")
         else:
             bt.logging.error("No verification key received from axon")
