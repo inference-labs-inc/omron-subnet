@@ -55,7 +55,13 @@ class ScoreManager:
 
     def _create_initial_scores(self):
         """Create initial scores based on metagraph data."""
-        scores = torch.zeros_like(self.metagraph.S, dtype=torch.float32)
+        # Depending on how bittensor was installed, metagraph may be tensor or ndarray
+        total_stake = (
+            self.metagraph.S
+            if isinstance(self.metagraph.S, torch.Tensor)
+            else torch.tensor(self.metagraph.S)
+        )
+        scores = torch.zeros_like(total_stake, dtype=torch.float32)
         return scores * torch.Tensor(
             [
                 # trunk-ignore(bandit/B104)

@@ -25,7 +25,7 @@ import secrets
 
 
 class ProofOfWeightsHandler:
-    use_jolt = False
+    jolt_counter = 0
     use_sn27 = False
 
     @staticmethod
@@ -40,10 +40,12 @@ class ProofOfWeightsHandler:
 
             proof_system = (
                 ProofSystem.JOLT
-                if use_single_pow and ProofOfWeightsHandler.use_jolt
+                if use_single_pow and ProofOfWeightsHandler.jolt_counter % 10 == 0
                 else ProofSystem.CIRCOM
             )
-            ProofOfWeightsHandler.use_jolt = not ProofOfWeightsHandler.use_jolt
+
+            if use_single_pow:
+                ProofOfWeightsHandler.jolt_counter += 1
 
             if use_batched_pow:
                 model_id = BATCHED_PROOF_OF_WEIGHTS_MODEL_ID

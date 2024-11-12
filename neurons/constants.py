@@ -28,7 +28,7 @@ MAXIMUM_SCORE_MEDIAN_SAMPLE = 0.05
 # Shift in seconds to apply to the minimum response time for vertical asymptote adjustment
 MINIMUM_SCORE_SHIFT = 0.0
 # Weights version hyperparameter
-WEIGHTS_VERSION = 1300
+WEIGHTS_VERSION = 1400
 # Rate limit for weight updates
 WEIGHT_RATE_LIMIT: int = 100
 # Delay between requests
@@ -50,7 +50,7 @@ ONCHAIN_PROOF_OF_WEIGHTS_ENABLED = False
 # Frequency in terms of blocks at which proof of weights are posted
 PROOF_OF_WEIGHTS_INTERVAL = 1000
 # Maximum number of proofs to log at once
-MAX_PROOFS_TO_LOG = 2
+MAX_PROOFS_TO_LOG = 0
 # Era period for proof of weights (mortality of the pow log)
 PROOF_OF_WEIGHTS_LIFESPAN = 2
 # Active competition

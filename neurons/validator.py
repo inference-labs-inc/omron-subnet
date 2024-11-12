@@ -40,6 +40,14 @@ def get_config_from_args():
         help="Whether to disable WandB logging.",
         action="store_true",
     )
+
+    parser.add_argument(
+        "--disable-statistic-logging",
+        default=False,
+        help="Whether to disable statistic logging.",
+        action="store_true",
+    )
+
     parser.add_argument(
         "--dev",
         default=False,

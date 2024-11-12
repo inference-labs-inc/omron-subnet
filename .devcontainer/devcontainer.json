@@ -8,7 +8,15 @@
         // Path is relative to the devcontainer.json file.
         "dockerfile": "Dockerfile"
     },
-	"runArgs": ["--platform=linux/amd64" ],
+	"remoteUser": "root",
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"python.defaultInterpreterPath": "/opt/venv/bin/python"
+			}
+		}
+	},
+	"runArgs": ["--platform=linux/amd64"],
 	"features": {
 		"ghcr.io/devcontainers/features/python:1": {
 			"installTools": true,

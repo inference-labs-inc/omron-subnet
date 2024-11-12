@@ -9,29 +9,25 @@ from typing import NoReturn
 
 import bittensor as bt
 
-
 from _validator.config import ValidatorConfig
+from _validator.core.api import ValidatorAPI
+from _validator.core.request_pipeline import RequestPipeline
 from _validator.core.response_processor import ResponseProcessor
+from _validator.models.miner_response import MinerResponse
 from _validator.scoring.score_manager import ScoreManager
 from _validator.scoring.weights import WeightsManager
+from _validator.utils.api import hash_inputs
 from _validator.utils.axon import query_axons
-from _validator.utils.proof_of_weights import (
-    log_and_commit_proof,
-    save_proof_of_weights,
-)
+from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
-from _validator.core.api import ValidatorAPI
 from constants import (
-    ONCHAIN_PROOF_OF_WEIGHTS_ENABLED,
-    PROOF_OF_WEIGHTS_INTERVAL,
     REQUEST_DELAY_SECONDS,
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT,
 )
-from _validator.utils.api import hash_inputs
 from utils import AutoUpdate, clean_temp_files, wandb_logger
-from _validator.core.request_pipeline import RequestPipeline
 from _validator.competitions.base_competition import BaseCompetition
+from utils.gc_logging import log_responses as log_responses_gc
 
 
 class ValidatorLoop:
@@ -53,9 +49,10 @@ class ValidatorLoop:
         self.auto_update = AutoUpdate()
         self.score_manager = ScoreManager(self.config.metagraph, self.config.user_uid)
         self.response_processor = ResponseProcessor(
-            self.config.metagraph, self.score_manager, self.config.user_uid
+            self.config.metagraph,
+            self.score_manager,
+            self.config.user_uid,
         )
-        self.log_pow = False
         self.weights_manager = WeightsManager(
             self.config.subtensor,
             self.config.metagraph,
@@ -115,8 +112,18 @@ class ValidatorLoop:
 
         try:
             start_time = time.time()
-            self._process_requests(requests)
-            self._log_overhead_time(start_time)
+            responses: list[MinerResponse] = self._process_requests(requests)
+            overhead_time: float = self._log_overhead_time(start_time)
+            if not self.config.bt_config.disable_statistic_logging:
+                log_responses_gc(
+                    metagraph=self.config.metagraph,
+                    hotkey=self.config.wallet.hotkey,
+                    uid=self.config.user_uid,
+                    responses=responses,
+                    overhead_time=overhead_time,
+                    block=self.config.subtensor.get_current_block(),
+                    scores=self.score_manager.scores,
+                )
         except RuntimeError as e:
             bt.logging.error(
                 f"A runtime error occurred in the main validator loop\n{e}"
@@ -136,7 +143,7 @@ class ValidatorLoop:
         else:
             bt.logging.debug("Automatic updates are disabled, skipping version check")
 
-    def _process_requests(self, requests):
+    def _process_requests(self, requests) -> list[MinerResponse]:
         """
         Process requests, update scores and weights.
 
@@ -147,7 +154,9 @@ class ValidatorLoop:
 
         responses = loop.run_until_complete(query_axons(self.config.dendrite, requests))
 
-        processed_responses = self.response_processor.process_responses(responses)
+        processed_responses: list[MinerResponse] = (
+            self.response_processor.process_responses(responses)
+        )
         if requests[0].get("model_id") not in [
             SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
             SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT,
@@ -164,38 +173,11 @@ class ValidatorLoop:
                 )
 
         self.score_manager.update_scores(processed_responses)
+        self.weights_manager.update_weights(self.score_manager.scores)
 
-        if self.log_pow and self.config.bt_config.get(
-            "enable_pow", ONCHAIN_PROOF_OF_WEIGHTS_ENABLED
-        ):
-            log_and_commit_proof(
-                self.config.wallet.hotkey,
-                self.config.subtensor,
-                self.response_processor.completed_proof_of_weights_queue,
-            )
-            self.last_pow_commit_block = self.config.subtensor.get_current_block()
-            self.response_processor.completed_proof_of_weights_queue = []
-            self.log_pow = False
+        return processed_responses
 
-        if self.weights_manager.update_weights(self.score_manager.scores):
-            if (
-                self.config.bt_config.get(
-                    "enable_pow", ONCHAIN_PROOF_OF_WEIGHTS_ENABLED
-                )
-                and self.last_pow_commit_block
-                + int(
-                    self.config.bt_config.get(
-                        "pow_target_interval", PROOF_OF_WEIGHTS_INTERVAL
-                    )
-                )
-                < self.config.subtensor.get_current_block()
-                and len(self.response_processor.completed_proof_of_weights_queue)
-                and not self.log_pow
-            ):
-                # Log PoW during the next iteration
-                self.log_pow = True
-
-    def _log_overhead_time(self, start_time):
+    def _log_overhead_time(self, start_time) -> float:
         """
         Log the overhead time for processing.
         This is time that the validator spent verifying proofs, updating scores and performing other tasks.
@@ -211,6 +193,7 @@ class ValidatorLoop:
                 "overhead_time": overhead_time,
             }
         )
+        return overhead_time
 
     def _handle_keyboard_interrupt(self):
         """Handle keyboard interrupt by cleaning up and exiting."""
