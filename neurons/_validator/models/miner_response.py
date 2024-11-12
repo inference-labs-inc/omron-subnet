@@ -9,6 +9,7 @@ from constants import (
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
 )
+from deployment_layer.circuit_store import circuit_store
 
 
 @dataclass
@@ -134,6 +135,25 @@ class MinerResponse:
             raw=None,
             error="Empty response",
         )
+
+    def to_log_dict(self, metagraph: bt.metagraph) -> dict:  # type: ignore
+        """
+        Parse a MinerResponse object into a dictionary.
+        """
+        circuit = circuit_store.get_circuit(self.model_id)
+        return {
+            "miner_key": metagraph.hotkeys[self.uid],
+            "miner_uid": self.uid,
+            "proof_model": (
+                circuit.metadata.name if circuit is not None else str(self.model_id)
+            ),
+            "proof_system": (
+                circuit.metadata.proof_system if circuit is not None else "Unknown"
+            ),
+            "proof_size": self.proof_size,
+            "response_duration": self.response_time,
+            "is_verified": self.verification_result,
+        }
 
     def set_verification_result(self, result: bool):
         """

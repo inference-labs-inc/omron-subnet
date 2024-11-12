@@ -1,20 +1,18 @@
 from __future__ import annotations
-import traceback
-import random
-from _validator.models.completed_proof_of_weights import CompletedProofOfWeightsItem
 
+import random
+import traceback
+
+from bittensor import logging
+from deployment_layer.circuit_store import circuit_store
+from execution_layer.verified_model_session import VerifiedModelSession
+
+from _validator.models.completed_proof_of_weights import CompletedProofOfWeightsItem
 from _validator.models.miner_response import MinerResponse
 from _validator.scoring.score_manager import ScoreManager
 from _validator.utils.logging import log_responses, log_system_metrics
-from deployment_layer.circuit_store import circuit_store
-
-
-# trunk-ignore (pylint/E0611)
-from bittensor import logging
 from _validator.utils.proof_of_weights import save_proof_of_weights
-
 from constants import BATCHED_PROOF_OF_WEIGHTS_MODEL_ID
-from execution_layer.verified_model_session import VerifiedModelSession
 from utils import wandb_logger
 
 
