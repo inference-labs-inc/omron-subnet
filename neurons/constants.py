@@ -1,18 +1,22 @@
 # The model ID for a batched proof of weights model
 BATCHED_PROOF_OF_WEIGHTS_MODEL_ID = (
-    "55de10a6bcf638af4bc79901d63204a9e5b1c6534670aa03010bae6045e3d0e8"
+    "e84b2e5f223621fa20078eb9f920d8d4d3a4ff95fa6e2357646fdbb43a2557c9"
 )
 # The model ID for a single proof of weights model
 SINGLE_PROOF_OF_WEIGHTS_MODEL_ID = (
-    "9998a12b8194d3e57d332b484ede57c3d871d42a176456c4e10da2995791d181"
+    "a849500803abdbb86a9460e18684a6411dc7ae0b75f1f6330e3028081a497dea"
 )
 # The model ID for a single proof of weights model, using the Jolt proof system
 SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT = (
-    "ed8ba401d709ee31f6b9272163c71451da171c7d71800313fe5db58d0f6c483a"
+    "c8ba9534c294939cb8dcb86c21885e517789d1219a8653e3626ef69dc60bc8aa"
 )
 IGNORED_MODEL_HASHES = [
     "0",
     "0a92bc32ea02abe54159da70aeb541d52c3cba27c8708669eda634e096a86f8b",
+    "55de10a6bcf638af4bc79901d63204a9e5b1c6534670aa03010bae6045e3d0e8",
+    "9998a12b8194d3e57d332b484ede57c3d871d42a176456c4e10da2995791d181",
+    "ed8ba401d709ee31f6b9272163c71451da171c7d71800313fe5db58d0f6c483a",
+    "b7d33e7c19360c042d94c5a7360d7dc68c36dd56c449f7c49164a0098769c01f",
 ]
 
 # The maximum timespan allowed for miners to respond to a query

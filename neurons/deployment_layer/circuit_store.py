@@ -3,6 +3,7 @@ import os
 import traceback
 import bittensor as bt
 from execution_layer.circuit import Circuit
+from constants import IGNORED_MODEL_HASHES
 
 
 class CircuitStore:
@@ -37,6 +38,11 @@ class CircuitStore:
 
             if os.path.isdir(folder_path) and folder_name.startswith("model_"):
                 circuit_id = folder_name.split("_")[1]
+
+                if circuit_id in IGNORED_MODEL_HASHES:
+                    bt.logging.info(f"Ignoring circuit {circuit_id}")
+                    continue
+
                 try:
                     bt.logging.debug(f"Attempting to load circuit {circuit_id}")
                     circuit = Circuit(circuit_id)

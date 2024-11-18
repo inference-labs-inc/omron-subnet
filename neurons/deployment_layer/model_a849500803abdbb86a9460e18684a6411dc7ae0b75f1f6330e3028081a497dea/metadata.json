@@ -1,0 +1,10 @@
+{
+    "name": "SN2 Proof of Weights 256",
+    "description": "The validator's reward model for SN2, designed to batch in 4 scoring updates (256 changes per proof).",
+    "author": "Inference Labs",
+    "version": "0.0.4",
+    "proof_system": "CIRCOM",
+    "external_files": {
+        "circuit.zkey": "https://storage.omron.ai/a849500803abdbb86a9460e18684a6411dc7ae0b75f1f6330e3028081a497dea/circuit.zkey"
+    }
+}

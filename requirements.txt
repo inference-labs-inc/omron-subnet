@@ -1,5 +1,5 @@
-starlette>=0.30.0
-pydantic>=2
+starlette>=0.27.0
+pydantic>=1.7
 rich>=13
 pytest>=8
 torch>=2
@@ -7,7 +7,7 @@ numpy>=1
 setuptools>=68
 python-dotenv
 requests
-bittensor==8.2.0
+bittensor==6.9.4
 GitPython
 wandb
 psutil
