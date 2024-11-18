@@ -13,6 +13,7 @@ Arguments that are present within the Omron miner and validator software. The be
 | `--wandb-key`      |    No    | `None`  | String          | A WandB API key for logging purposes                                       |
 | `--disable-wandb`  |    No    | `False` | `True`, `False` | Whether to disable WandB logging.                                          |
 | `--dev`            |    No    | `False` | `True`, `False` | Whether to run the software in development mode. **For internal use only** |
+| `--localnet`       |    No    | `False` | `True`, `False` | Whether to run the validator in localnet mode.                             |
 
 ### Miner specific arguments
 
