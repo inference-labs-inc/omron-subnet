@@ -4,6 +4,7 @@ import traceback
 import bittensor as bt
 from execution_layer.circuit import Circuit
 from constants import IGNORED_MODEL_HASHES
+from packaging import version
 
 
 class CircuitStore:
@@ -71,6 +72,26 @@ class CircuitStore:
         else:
             bt.logging.warning(f"Circuit {circuit_id} not found")
         return circuit
+
+    def get_latest_circuit_for_netuid(self, netuid: int):
+        """
+        Get the latest circuit for a given netuid by comparing semver version strings.
+
+        Args:
+            netuid (int): The subnet ID to find the latest circuit for
+
+        Returns:
+            Circuit | None: The circuit with the highest semver version for the given netuid,
+            or None if no circuits found
+        """
+
+        matching_circuits = [
+            c for c in self.circuits.values() if c.metadata.netuid == netuid
+        ]
+        if not matching_circuits:
+            return None
+
+        return max(matching_circuits, key=lambda c: version.parse(c.metadata.version))
 
     def list_circuits(self) -> list[str]:
         """

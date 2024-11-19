@@ -53,14 +53,7 @@ class ProofOfWeightsHandler:
                 model_id = SINGLE_PROOF_OF_WEIGHTS_MODEL_ID
             else:
                 model_id = (
-                    next(
-                        (
-                            c.id
-                            for c in circuit_store.circuits.values()
-                            if c.metadata.netuid == 27
-                        ),
-                        None,
-                    )
+                    circuit_store.get_latest_circuit_for_netuid(27).id
                     if ProofOfWeightsHandler.use_sn27
                     else SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT
                 )
@@ -71,14 +64,7 @@ class ProofOfWeightsHandler:
 
             circuit = circuit_store.get_circuit(model_id)
         else:
-            circuit = next(
-                (
-                    c
-                    for c in circuit_store.circuits.values()
-                    if c.metadata.netuid == subnet_uid
-                ),
-                None,
-            )
+            circuit = circuit_store.get_latest_circuit_for_netuid(subnet_uid)
 
         if circuit is None:
             raise ValueError(f"No circuit found for subnet_uid: {subnet_uid}")

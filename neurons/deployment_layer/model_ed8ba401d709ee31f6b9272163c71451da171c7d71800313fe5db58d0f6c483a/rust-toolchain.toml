@@ -1,0 +1,3 @@
+[toolchain]
+channel = "nightly-2024-08-01"
+targets = ["riscv32im-unknown-none-elf"]
