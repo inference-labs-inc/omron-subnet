@@ -48,7 +48,7 @@ pub struct ScoreOutput(#[serde(with = "BigArray")] pub [f32; BATCH_SIZE]);
     memory_size = 1_000_000,
     max_input_size = 16384
 )]
-fn score(input: ScoreInput) -> ScoreOutput {
+fn score_sn2_v005(input: ScoreInput) -> ScoreOutput {
     let batch_size = input.maximum_score.len();
     let mut new_scores = [0.0; BATCH_SIZE];
 

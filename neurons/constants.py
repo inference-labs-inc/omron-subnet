@@ -8,7 +8,7 @@ SINGLE_PROOF_OF_WEIGHTS_MODEL_ID = (
 )
 # The model ID for a single proof of weights model, using the Jolt proof system
 SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT = (
-    "c8ba9534c294939cb8dcb86c21885e517789d1219a8653e3626ef69dc60bc8aa"
+    "37320fc74fec80805eedc8e92baf3c58842a2cb2a4ae127ad6e930f0c8441c7a"
 )
 IGNORED_MODEL_HASHES = [
     "0",
