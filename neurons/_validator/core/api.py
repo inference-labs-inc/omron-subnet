@@ -13,6 +13,8 @@ from _validator.models.api import PowInputModel
 from _validator.config import ValidatorConfig
 from fastapi.exceptions import HTTPException
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.requests import Request
+from constants import WHITELISTED_PUBLIC_KEYS
 import base64
 import json
 import os
@@ -61,17 +63,22 @@ class ValidatorAPI:
         except Exception as e:
             bt.logging.error(f"Error serving axon: {e}")
 
-    def process_external_request(
-        self,
-        data: PowInputModel,
-    ):
+    async def verify_request_signature(self, request: Request):
         """
-        Fast API route handler to process external proof of weights requests.
+        Verify the signature of an incoming request.
         """
+        if not self.config.api.verify_external_signatures:
+            return
+
         try:
-            inputs = base64.b64decode(data.inputs)
-            signature = base64.b64decode(data.signature)
-            public_key = substrateinterface.Keypair(ss58_address=data.sender)
+            salt: str = request.headers.get("X-Salt", "")
+            inputs = f"{request.url}{salt}".encode()
+            if request.method.upper() == "POST":
+                inputs += await request.body()
+            encoded_signature: str = request.headers.get("X-Request-Signature", "")
+            signature: bytes = base64.b64decode(encoded_signature)
+            ss58_address = request.headers.get("X-ss58-Address", "")
+            public_key = substrateinterface.Keypair(ss58_address=ss58_address)
         except Exception:
             bt.logging.error(
                 f"Failed to verify incoming request body. {traceback.format_exc()}"
@@ -80,37 +87,55 @@ class ValidatorAPI:
                 status_code=400,
                 detail="Request failed validation.",
             )
-        if self.config.api.verify_external_signatures:
-            if not public_key.verify(data=inputs, signature=signature):
-                raise HTTPException(
-                    status_code=401,
-                    detail="Signature verification failed.",
-                )
-            try:
-                if data.sender not in self.config.metagraph.hotkeys:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Sender is not registered on the origin subnet.",
-                    )
-                sender_id = self.config.metagraph.hotkeys.index(data.sender)
-                if not self.config.metagraph.validator_permit[sender_id]:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Sender does not have a validator permit on the origin subnet.",
-                    )
-            except HTTPException as e:
-                raise e
-            except Exception:
-                bt.logging.error(
-                    f"Unexpected error validating sender: {traceback.format_exc()}"
-                )
-                raise HTTPException(
-                    status_code=500,
-                    detail="An unexpected error occurred while validating the sender.",
-                )
+
+        if not public_key.verify(data=inputs, signature=signature):
+            raise HTTPException(
+                status_code=401,
+                detail="Signature verification failed.",
+            )
+
+        if (
+            ss58_address in self.config.api.whitelisted_public_keys
+            or ss58_address in WHITELISTED_PUBLIC_KEYS
+        ):
+            # if the sender is whitelisted, we don't need to check the key
+            return
 
         try:
-            inputs = json.loads(inputs)
+            if ss58_address not in self.config.metagraph.hotkeys:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Sender is not registered on the origin subnet.",
+                )
+            sender_id = self.config.metagraph.hotkeys.index(ss58_address)
+            if not self.config.metagraph.validator_permit[sender_id]:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Sender does not have a validator permit on the origin subnet.",
+                )
+        except HTTPException as e:
+            raise e
+        except Exception:
+            bt.logging.error(
+                f"Unexpected error validating sender: {traceback.format_exc()}"
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="An unexpected error occurred while validating the sender.",
+            )
+
+    async def process_external_request(
+        self,
+        request: Request,
+        data: PowInputModel,
+    ):
+        """
+        Fast API route handler to process external proof of weights requests.
+        """
+        await self.verify_request_signature(request=request)
+
+        try:
+            inputs = data.inputs
             input_hash = hash_inputs(inputs)
 
             self.external_requests_queue.insert(
@@ -134,10 +159,11 @@ class ValidatorAPI:
 
         return JSONResponse(content={"hash": input_hash})
 
-    def get_proof_of_weights(self, input_hash: str):
+    async def get_proof_of_weights(self, input_hash: str, request: Request):
         """
         Fast API route handler to get proof of weights file for a given input hash.
         """
+        await self.verify_request_signature(request=request)
         filename = f"{input_hash}.json"
         filepath = os.path.join(POW_DIRECTORY, filename)
         if os.path.exists(filepath):
@@ -150,10 +176,11 @@ class ValidatorAPI:
                 detail="The requested proof could not be found.",
             )
 
-    def get_receipt(self, transaction_hash: str):
+    async def get_receipt(self, transaction_hash: str, request: Request):
         """
         Fast API route handler to get receipt file for a given transaction hash.
         """
+        await self.verify_request_signature(request=request)
         filepath = os.path.join(POW_RECEIPT_DIRECTORY, transaction_hash)
         if os.path.exists(filepath):
             return FileResponse(

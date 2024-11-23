@@ -25,7 +25,11 @@ class RequestPipeline:
         Apply a salt to the request.
         """
         if (
-            "validator_uid" in request["inputs"]
+            # FIXME: in case of receiving an external request for non "2" or non "118" netuid
+            #        we gonna have an error here. `request["inputs"]` would be `ProofOfWeightsItem` instance
+            #        or just an empty list.
+            request["inputs"]  # this condition prevents just an empty list
+            and "validator_uid" in request["inputs"]
             and request["inputs"]["validator_uid"] is not None
         ):
             request["inputs"]["validator_uid"][-10:] = [
@@ -57,7 +61,9 @@ class RequestPipeline:
             )
         else:
             base_request = ProofOfWeightsHandler.prepare_pow_request(
-                self.score_manager.proof_of_weights_queue, self.config.subnet_uid
+                self.score_manager.proof_of_weights_queue,
+                self.config.subnet_uid,
+                is_localnet=self.config.localnet,
             )
 
         requests = [

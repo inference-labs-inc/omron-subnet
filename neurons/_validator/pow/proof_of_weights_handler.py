@@ -29,11 +29,11 @@ class ProofOfWeightsHandler:
     use_sn27 = False
 
     @staticmethod
-    def prepare_pow_request(proof_of_weights_queue, subnet_uid):
+    def prepare_pow_request(proof_of_weights_queue, subnet_uid, is_localnet=False):
         logging.debug(f"Preparing PoW request for subnet UID: {subnet_uid}")
         model_id = SINGLE_PROOF_OF_WEIGHTS_MODEL_ID
         circuit = circuit_store.get_circuit(model_id)
-        if subnet_uid in (2, 118):
+        if subnet_uid in (2, 118) or is_localnet:
             use_batched_pow, use_single_pow = ProofOfWeightsHandler._determine_pow_type(
                 proof_of_weights_queue
             )
@@ -77,7 +77,7 @@ class ProofOfWeightsHandler:
         )
         inputs = serialized_items
 
-        if subnet_uid in (2, 118):
+        if subnet_uid in (2, 118) or is_localnet:
             pow_items: list[ProofOfWeightsItem] = (
                 ProofOfWeightsHandler._prepare_pow_items(
                     proof_of_weights_queue, circuit
