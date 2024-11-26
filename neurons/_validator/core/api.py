@@ -1,24 +1,65 @@
+import base64
+import datetime
+import json
+import os
+import traceback
+
+import bittensor as bt
+import substrateinterface
 import uvicorn
 from bittensor.axon import FastAPIThreadedServer
-import traceback
 from fastapi import APIRouter, FastAPI
-import bittensor as bt
+from fastapi.exceptions import HTTPException
+from fastapi.requests import Request
+from fastapi.responses import FileResponse, JSONResponse
+
+from _validator.config import ValidatorConfig
+from _validator.utils.api import hash_inputs
 from _validator.utils.proof_of_weights import (
     POW_DIRECTORY,
     POW_RECEIPT_DIRECTORY,
     ProofOfWeightsItem,
 )
-from _validator.utils.api import hash_inputs
-from _validator.models.api import PowInputModel
-from _validator.config import ValidatorConfig
-from fastapi.exceptions import HTTPException
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.requests import Request
 from constants import WHITELISTED_PUBLIC_KEYS
-import base64
-import json
-import os
-import substrateinterface
+
+
+class ValidatorKeysCache:
+    """
+    A class to cache validator keys. This is used to reduce the number of requests to the Subtensor API.
+    """
+
+    def __init__(self, config: ValidatorConfig) -> None:
+        self.cached_keys: dict[int, list[str]] = {}
+        self.cached_timestamps: dict[int, datetime.datetime] = {}
+        self.config: ValidatorConfig = config
+
+    def fetch_validator_keys(self, netuid: int) -> None:
+        """
+        Fetch the validator keys for a given netuid and cache them.
+        """
+        self.cached_keys[netuid] = [
+            neuron.hotkey
+            for neuron in self.config.subtensor.neurons_lite(netuid)
+            if neuron.validator_permit
+        ]
+        self.cached_timestamps[netuid] = datetime.datetime.now() + datetime.timedelta(
+            hours=12
+        )
+
+    def check_validator_key(self, ss58_address: str, netuid: int) -> bool:
+        """
+        Check if a given key is a validator key for a given netuid.
+        """
+        if (
+            ss58_address in self.config.api.whitelisted_public_keys
+            or ss58_address in WHITELISTED_PUBLIC_KEYS
+        ):
+            # if the sender is whitelisted, we don't need to check the key
+            return True
+        cache_timestamp = self.cached_timestamps.get(netuid, None)
+        if cache_timestamp is None or cache_timestamp > datetime.datetime.now():
+            self.fetch_validator_keys(netuid)
+        return ss58_address in self.cached_keys.get(netuid, [])
 
 
 class ValidatorAPI:
@@ -43,6 +84,7 @@ class ValidatorAPI:
         self.app.include_router(self.router)
         self.api_server_started = False
         self.external_requests_queue: list[(int, list[ProofOfWeightsItem])] = []
+        self.validator_keys_cache = ValidatorKeysCache(config)
 
         if self.config.api.enabled:
             bt.logging.debug("Starting API server...")
@@ -71,13 +113,32 @@ class ValidatorAPI:
             return
 
         try:
-            salt: str = request.headers.get("X-Salt", "")
-            inputs = f"{request.url}{salt}".encode()
+            request_datetime_str: str = request.headers.get("X-Request-Datetime", "")
+            encoded_signature: str = request.headers.get("X-Request-Signature", "")
+            ss58_address = request.headers.get("X-ss58-Address", "")
+            netuid = int(request.headers.get("X-Netuid", ""))
+
+            # check if the request datetime header represents a valid datetime
+            # it's important to check this because the datetime is used to calculate the signature
+            request_datetime: datetime.datetime = datetime.datetime.strptime(
+                request_datetime_str, "%Y-%m-%dT%H:%M:%S.%f%z"
+            )
+            now = datetime.datetime.now(datetime.timezone.utc)
+            if (
+                request_datetime < (now - datetime.timedelta(minutes=1))
+                or request_datetime > now
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Request timestamp is not within the last 1 minute.",
+                )
+
+            # construct the inputs to verify the signature
+            inputs = f"{request.url}{request_datetime_str}{netuid}".encode()
             if request.method.upper() == "POST":
                 inputs += await request.body()
-            encoded_signature: str = request.headers.get("X-Request-Signature", "")
+
             signature: bytes = base64.b64decode(encoded_signature)
-            ss58_address = request.headers.get("X-ss58-Address", "")
             public_key = substrateinterface.Keypair(ss58_address=ss58_address)
         except Exception:
             bt.logging.error(
@@ -94,24 +155,11 @@ class ValidatorAPI:
                 detail="Signature verification failed.",
             )
 
-        if (
-            ss58_address in self.config.api.whitelisted_public_keys
-            or ss58_address in WHITELISTED_PUBLIC_KEYS
-        ):
-            # if the sender is whitelisted, we don't need to check the key
-            return
-
         try:
-            if ss58_address not in self.config.metagraph.hotkeys:
+            if not self.validator_keys_cache.check_validator_key(ss58_address, netuid):
                 raise HTTPException(
                     status_code=403,
-                    detail="Sender is not registered on the origin subnet.",
-                )
-            sender_id = self.config.metagraph.hotkeys.index(ss58_address)
-            if not self.config.metagraph.validator_permit[sender_id]:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Sender does not have a validator permit on the origin subnet.",
+                    detail="Sender is not registered as a validator on the origin subnet.",
                 )
         except HTTPException as e:
             raise e
@@ -127,21 +175,21 @@ class ValidatorAPI:
     async def process_external_request(
         self,
         request: Request,
-        data: PowInputModel,
     ):
         """
         Fast API route handler to process external proof of weights requests.
         """
         await self.verify_request_signature(request=request)
+        inputs = json.loads(await request.body())
+        netuid = int(request.headers.get("X-Netuid", ""))
 
         try:
-            inputs = data.inputs
             input_hash = hash_inputs(inputs)
 
             self.external_requests_queue.insert(
                 0,
                 (
-                    data.netuid,
+                    netuid,
                     inputs,
                 ),
             )
