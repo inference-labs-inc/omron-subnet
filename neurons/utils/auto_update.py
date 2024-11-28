@@ -198,8 +198,13 @@ class AutoUpdate:
             self.repo.head.is_detached
             or self.repo.active_branch.name not in TARGET_BRANCHES
         ):
+            ref_name = (
+                self.repo.active_branch.name
+                if not self.repo.head.is_detached
+                else str(self.repo.head.commit)
+            )
             logging.debug(
-                f"Skipping auto-update on branch {self.repo.active_branch.name} as it is "
+                f"Skipping auto-update on branch {ref_name} as it is "
                 f"{'in a detached head state' if self.repo.head.is_detached else f'not a member of {TARGET_BRANCHES}'}"
             )
             return

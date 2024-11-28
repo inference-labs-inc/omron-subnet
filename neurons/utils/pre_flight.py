@@ -15,7 +15,8 @@ LOCAL_SNARKJS_INSTALL_DIR = os.path.join(os.path.expanduser("~"), ".snarkjs")
 LOCAL_SNARKJS_PATH = os.path.join(
     LOCAL_SNARKJS_INSTALL_DIR, "node_modules", ".bin", "snarkjs"
 )
-TOOLCHAIN = "nightly-2024-08-01"
+TOOLCHAIN = "nightly-2024-09-30"
+JOLT_VERSION = "9f0b9e6d95814dfe15d74ea736b9f89d505e8d07"
 
 
 def run_shared_preflight_checks():
@@ -360,6 +361,8 @@ def ensure_jolt_installed():
                     "install",
                     "--git",
                     "https://github.com/a16z/jolt",
+                    "--rev",
+                    JOLT_VERSION,
                     "--force",
                     "--bins",
                     "jolt",
