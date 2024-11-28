@@ -16,7 +16,6 @@ from execution_layer.circuit import Circuit
 from constants import (
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
     BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
-    SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT,
 )
 from execution_layer.circuit import ProofSystem
 from protocol import ProofOfWeightsSynapse, QueryZkProof
@@ -25,7 +24,6 @@ import secrets
 
 
 class ProofOfWeightsHandler:
-    jolt_counter = 0
     use_sn27 = False
 
     @staticmethod
@@ -38,14 +36,7 @@ class ProofOfWeightsHandler:
                 proof_of_weights_queue
             )
 
-            proof_system = (
-                ProofSystem.JOLT
-                if use_single_pow and ProofOfWeightsHandler.jolt_counter % 10 == 0
-                else ProofSystem.CIRCOM
-            )
-
-            if use_single_pow:
-                ProofOfWeightsHandler.jolt_counter += 1
+            proof_system = ProofSystem.CIRCOM
 
             if use_batched_pow:
                 model_id = BATCHED_PROOF_OF_WEIGHTS_MODEL_ID
@@ -55,7 +46,7 @@ class ProofOfWeightsHandler:
                 model_id = (
                     circuit_store.get_latest_circuit_for_netuid(27).id
                     if ProofOfWeightsHandler.use_sn27
-                    else SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT
+                    else SINGLE_PROOF_OF_WEIGHTS_MODEL_ID
                 )
                 ProofOfWeightsHandler.use_sn27 = not ProofOfWeightsHandler.use_sn27
 
