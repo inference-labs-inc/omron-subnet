@@ -20,7 +20,7 @@ def get_config_from_args():
 
     parser.add_argument(
         "--no-auto-update",
-        default=False,
+        default=bool(os.getenv("OMRON_NO_AUTO_UPDATE", False)),
         action="store_true",
         help="Disable auto update.",
     )

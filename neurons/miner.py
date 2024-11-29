@@ -19,7 +19,7 @@ def get_config_from_args():
     )
     parser.add_argument(
         "--no-auto-update",
-        default=False,
+        default=bool(os.getenv("OMRON_NO_AUTO_UPDATE", False)),
         help="Whether this miner should NOT automatically update upon new release.",
         action="store_true",
     )

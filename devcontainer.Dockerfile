@@ -6,17 +6,19 @@ RUN apt update && \
     python3-dev \
     python3-venv \
     build-essential \
+    jq \
     git \
-    wget \
     curl \
     make \
     clang \
+    pkg-config \
     libssl-dev \
     llvm \
     libudev-dev \
     protobuf-compiler \
     byobu \
     fish \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust
@@ -26,44 +28,33 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 # Install subtensor
 RUN git clone https://github.com/opentensor/subtensor.git && \
     cd subtensor && \
+    git checkout v1.1.6 && \
     cargo build --workspace --profile=release --features pow-faucet --manifest-path "Cargo.toml"
 
-# Install node, npm, and pm2 (version in apt is too old)
+# Install Jolt
+ENV RUST_TOOLCHAIN=nightly-2024-09-30
+RUN rustup toolchain install ${RUST_TOOLCHAIN} && \
+    cargo +${RUST_TOOLCHAIN} install --git https://github.com/a16z/jolt --force --bins jolt
+
+# Install node et al.
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash && \
-    export NVM_DIR="$HOME/.nvm" && \
+    export NVM_DIR="/root/.nvm" && \
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" && \
     [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" && \
     nvm install 20 && \
-    npm install -g pm2
+    npm install --prefix /root/.snarkjs snarkjs@0.7.4
 
 # Use a venv because of https://peps.python.org/pep-0668/
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+RUN python3 -m venv /opt/venv && \
+    /opt/venv/bin/python3 -m pip install --upgrade pip
+ENV PATH="/opt/venv/bin:${PATH}"
+
 # Install Python dependencies, and some more nice to have tools
-RUN pip3 install --upgrade pip
-RUN pip3 install bpython ptpython pipdeptree pysnooper coverage
-# Copy of requirements.txt (Dockerfile can't copy from parent directory)
-RUN pip3 install \
-    starlette>=0.30.0 \
-    pydantic>=2 \
-    rich>=13 \
-    pytest>=8 \
-    torch>=2 \
-    numpy>=1 \
-    setuptools>=68 \
-    python-dotenv \
-    requests \
-    bittensor==8.2.0 \
-    GitPython \
-    wandb \
-    psutil \
-    packaging \
-    wheel \
-    pre-commit \
-    attrs>=24.2.0 \
-    fastapi
-# Install btcli (separate package as of bittensor v8.0.0)
-RUN pip3 install bittensor-cli
+COPY requirements.txt /opt/omron/requirements.txt
+RUN TORCH_VERSION=$(grep "^torch" /opt/omron/requirements.txt) && \
+    pip3 install $TORCH_VERSION --index-url https://download.pytorch.org/whl/cpu && \
+    pip3 install -r /opt/omron/requirements.txt
+RUN pip3 install bittensor-cli==8.3.1 bpython ptpython pipdeptree pysnooper coverage
 
 # Set flags for local subtensor
 ENV WPATH="--wallet.path /root/.bittensor/wallets/"
@@ -82,7 +73,7 @@ RUN cd subtensor && \
     BUILD_BINARY=0 ./scripts/localnet.sh > /dev/null 2>&1 & \
     sleep 5 && \
     yes | btcli wallet faucet --wallet.name owner $WPATH $LOCALNET & \
-    sleep 30 && \
+    sleep 60 && \
     pkill -2 localnet ; \
     pkill -2 subtensor ; \
     sleep 1
@@ -109,7 +100,7 @@ RUN cd subtensor && \
 RUN cd subtensor && \
     BUILD_BINARY=0 ./scripts/localnet.sh --no-purge > /dev/null 2>&1 & \
     sleep 5 && \
-    btcli subnet create   --wallet.name owner     --no-prompt              --wallet.hotkey default $WPATH $LOCALNET && \
+    btcli subnet create   --wallet.name owner     --no-prompt                                      $WPATH $LOCALNET && \
     btcli subnet register --wallet.name miner     --no-prompt --netuid 1   --wallet.hotkey default $WPATH $LOCALNET && \
     btcli subnet register --wallet.name validator --no-prompt --netuid 1   --wallet.hotkey default $WPATH $LOCALNET && \
     btcli root nominate   --wallet.name validator --no-prompt              --wallet.hotkey default $WPATH $LOCALNET && \
