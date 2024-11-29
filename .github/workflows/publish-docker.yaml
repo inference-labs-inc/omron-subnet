@@ -10,7 +10,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: omron
+  IMAGE_NAME: ${{ github.repository_owner }}/omron
 
 jobs:
   build-and-push-image:
