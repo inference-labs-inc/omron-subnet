@@ -48,7 +48,7 @@ class WeightsManager:
             version_key=version_key,
         )
 
-    def update_weights(self, scores: torch.Tensor) -> bool:
+    def update_weights(self, score_dict: dict[torch.Tensor]) -> bool:
         """
         Updates the weights based on the given scores and sets them on the chain.
 
@@ -67,6 +67,12 @@ class WeightsManager:
             return False
 
         bt.logging.info("Updating weights")
+
+        # combine scores for each model by adding them together
+        scores = torch.zeros_like(self.metagraph.S, dtype=torch.float32)
+        for model_id in score_dict:
+            scores += score_dict[model_id]
+        scores /= len(score_dict)
 
         weights = torch.zeros_like(scores)
         weights[scores.nonzero()] = scores[scores.nonzero()]

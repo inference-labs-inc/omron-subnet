@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import collections
 import random
 import traceback
 
@@ -30,16 +30,17 @@ class ResponseProcessor:
             return []
         processed_responses = [self.process_single_response(r) for r in responses]
         log_responses(processed_responses)
-        response_times = [
-            r.response_time
-            for r in processed_responses
-            if r.response_time is not None and r.verification_result
-        ]
-        verified_count = sum(1 for r in processed_responses if r.verification_result)
-        model_id = processed_responses[0].model_id
-        log_system_metrics(response_times, verified_count, model_id)
+        response_times = collections.defaultdict(list)
+        for r in processed_responses:
+            if r.response_time is not None and r.verification_result:
+                response_times[r.model_id].append(r.response_time)
 
-        if not processed_responses[0].model_id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
+        for model_id in response_times:
+            verified_count = len(response_times[model_id])
+            log_system_metrics(response_times[model_id], verified_count, model_id)
+
+        # return early if no proof of weights models are present
+        if all(pr.model_id not in circuit_store.list_circuits() for pr in processed_responses):
             return processed_responses
 
         verified_batched_responses = [

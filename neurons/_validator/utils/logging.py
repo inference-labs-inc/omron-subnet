@@ -110,23 +110,19 @@ def log_responses(responses: list[MinerResponse]):
 
     sorted_responses = sorted(responses, key=lambda x: x.uid)
 
-    circuit = (
-        circuit_store.get_circuit(sorted_responses[0].model_id)
-        if len(sorted_responses) > 0
-        else None
-    )
-
-    rows = [
-        [
-            str(response.uid),
-            str(response.verification_result),
-            str(response.response_time),
-            str(response.proof_size),
-            (circuit.metadata.name if circuit is not None else str(response.model_id)),
-            (circuit.metadata.proof_system if circuit is not None else "Unknown"),
-        ]
-        for response in sorted_responses
-    ]
+    rows = []
+    for response in sorted_responses:
+        circuit = circuit_store.get_circuit(response.model_id)
+        rows.append(
+            [
+                str(response.uid),
+                str(response.verification_result),
+                str(response.response_time),
+                str(response.proof_size),
+                (circuit.metadata.name if circuit is not None else str(response.model_id)),
+                (circuit.metadata.proof_system if circuit is not None else "Unknown"),
+            ]
+        )
     create_and_print_table("Responses", columns, rows)
 
     wandb_log = {"responses": {}}
@@ -146,7 +142,45 @@ def log_responses(responses: list[MinerResponse]):
     wandb_logger.safe_log(wandb_log)
 
 
-def log_system_metrics(response_times, verified_count, model_id):
+def log_pow(proof_and_public_signals: dict):
+    """
+    Log proof of weights to a table and Weights & Biases.
+
+    Args:
+        proof_and_public_signals (dict): JSON representation of the proof of weights and public signals.
+    """
+    try:
+        public_signals = proof_and_public_signals["public_signals"]
+        proof = proof_and_public_signals["proof"]
+
+        # Extract block numbers from public signals
+        block_numbers = public_signals[1025:2049]
+        unique_block_numbers = list(set(block_numbers))
+        unique_block_numbers.sort()
+        block_number = "_".join(str(num) for num in unique_block_numbers)
+
+        table = Table(title="Proof of Weights")
+        table.add_column("Public Signals", style="cyan")
+        table.add_column("Proof", style="magenta")
+        table.add_row(str(public_signals), str(proof))
+
+        if bt.logging.get_level() == 10:
+            Console().print(table)
+
+        wandb_logger.safe_log(
+            {
+                "proof_of_weights": {
+                    "block_number": block_number,
+                    "public_signals": public_signals,
+                    "proof": proof,
+                }
+            }
+        )
+    except Exception as e:
+        bt.logging.error(f"Error logging proof of weights: {e}")
+
+
+def log_system_metrics(response_times: list[float], verified_count: int, model_id: str):
     circuit = circuit_store.get_circuit(model_id)
     circuit_name = model_id
     if circuit:

@@ -15,7 +15,6 @@ from _validator.utils.proof_of_weights import ProofOfWeightsItem
 from constants import (
     MAXIMUM_SCORE_MEDIAN_SAMPLE,
     MINIMUM_SCORE_SHIFT,
-    SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
 )
 from execution_layer.verified_model_session import VerifiedModelSession
@@ -25,7 +24,7 @@ from deployment_layer.circuit_store import circuit_store
 class ScoreManager:
     """Manages the scoring of miners."""
 
-    def __init__(self, metagraph, user_uid):
+    def __init__(self, metagraph: bt.metagraph, user_uid: int):
         """
         Initialize the ScoreManager.
 
@@ -33,27 +32,29 @@ class ScoreManager:
             metagraph: The metagraph of the subnet.
             user_uid: The UID of the current user.
         """
-        self.metagraph = metagraph
-        self.user_uid = user_uid
-        self.scores = self.init_scores()
+        self.metagraph: bt.metagraph = metagraph
+        self.user_uid: int = user_uid
+        self.score_dict: dict[torch.Tensor] = {
+            model_id: self.init_scores(model_id) for model_id in circuit_store.list_circuits()
+        }
         self.proof_of_weights_queue = []
 
-    def init_scores(self):
+    def init_scores(self, model_id: str) -> torch.Tensor:
         """Initialize or load existing scores."""
         bt.logging.info("Initializing validation weights")
         try:
-            scores = torch.load("scores.pt")
+            scores = torch.load(f"scores_{model_id}.pt")
         except FileNotFoundError:
             scores = self._create_initial_scores()
         except Exception as e:
             bt.logging.error(f"Error loading scores: {e}")
             scores = torch.zeros_like(self.metagraph.S, dtype=torch.float32)
 
-        bt.logging.success("Successfully set up scores")
+        bt.logging.success(f"Successfully set up scores for model ID: {model_id}")
         log_scores(scores)
         return scores
 
-    def _create_initial_scores(self):
+    def _create_initial_scores(self) -> torch.Tensor:
         """Create initial scores based on metagraph data."""
         # Depending on how bittensor was installed, metagraph may be tensor or ndarray
         total_stake = (
@@ -77,12 +78,21 @@ class ScoreManager:
         Args:
             responses: List of MinerResponse objects.
         """
-        if not responses or self.scores is None:
-            bt.logging.error("No responses or scores not initialized. Skipping update.")
+        if not responses:
+            bt.logging.error("No responses. Skipping update.")
             return
 
-        max_score = 1 / len(self.scores)
-        responses = self._add_missing_responses(responses)
+        for model_id in circuit_store.list_circuits():
+            responses_for_model = [r for r in responses if r.model_id == model_id]
+            if responses_for_model:
+                self._update_scores_single_model(responses_for_model, model_id)
+
+    def _update_scores_single_model(self, responses: list[MinerResponse], model_id: str):
+        """
+        Update scores for a single model.
+        """
+        max_score = 1 / len(self.score_dict[model_id])
+        responses = self._add_missing_responses(responses, model_id)
 
         sorted_filtered_times = self._get_sorted_filtered_times(responses)
         median_max_response_time, min_response_time = (
@@ -90,20 +100,20 @@ class ScoreManager:
         )
 
         proof_of_weights_items = self._create_pow_items(
-            responses, max_score, median_max_response_time, min_response_time
+            responses, max_score, median_max_response_time, min_response_time, model_id
         )
 
-        self._update_scores_from_witness(proof_of_weights_items)
+        self._update_scores_from_witness(proof_of_weights_items, model_id)
         self._update_pow_queue(proof_of_weights_items)
 
-        log_scores(self.scores)
-        self._try_store_scores()
+        log_scores(self.score_dict[model_id])
+        self._try_store_scores(model_id)
 
     def _add_missing_responses(
-        self, responses: list[MinerResponse]
+        self, responses: list[MinerResponse], model_id: str
     ) -> list[MinerResponse]:
         """Add missing responses for all UIDs not present in the original responses."""
-        all_uids = set(range(len(self.scores) - 1))
+        all_uids = set(range(len(self.score_dict[model_id]) - 1))
         response_uids = set(r.uid for r in responses)
         missing_uids = all_uids - response_uids
         responses.extend(MinerResponse.empty(uid) for uid in missing_uids)
@@ -150,13 +160,14 @@ class ScoreManager:
         max_score: float,
         median_max_response_time: float,
         min_response_time: float,
+        model_id: str,
     ) -> list[ProofOfWeightsItem]:
         """Create ProofOfWeightsItems from responses."""
         return [
             ProofOfWeightsItem.from_miner_response(
                 response,
                 max_score,
-                self.scores[response.uid],
+                self.score_dict[model_id][response.uid],
                 median_max_response_time,
                 min_response_time,
                 self.metagraph.block.item(),
@@ -166,13 +177,13 @@ class ScoreManager:
         ]
 
     def _update_scores_from_witness(
-        self, proof_of_weights_items: list[ProofOfWeightsItem]
+        self, proof_of_weights_items: list[ProofOfWeightsItem], model_id: str
     ):
         """Update scores based on the witness generated from proof of weights items."""
-        pow_circuit = circuit_store.get_circuit(SINGLE_PROOF_OF_WEIGHTS_MODEL_ID)
+        pow_circuit = circuit_store.get_circuit(model_id)
         if not pow_circuit:
             raise ValueError(
-                f"Proof of weights circuit not found for model ID: {SINGLE_PROOF_OF_WEIGHTS_MODEL_ID}"
+                f"Proof of weights circuit not found for model ID: {model_id}"
             )
 
         padded_items = ProofOfWeightsItem.pad_items(proof_of_weights_items, 256)
@@ -199,7 +210,7 @@ class ScoreManager:
         witness = session.generate_witness(return_content=True)
         witness_list = witness if isinstance(witness, list) else list(witness.values())
 
-        self._process_witness_results(witness_list, pow_circuit.settings["scaling"])
+        self._process_witness_results(witness_list, pow_circuit.settings["scaling"], model_id)
 
         session.end()
 
@@ -243,7 +254,7 @@ class ScoreManager:
             "scaling": scaling,
         }
 
-    def _process_witness_results(self, witness: list, scaling: int):
+    def _process_witness_results(self, witness: list, scaling: int, model_id: str):
         """Process the results from the witness."""
         scores = torch.div(
             torch.tensor([float(w) for w in witness[1:257]]), scaling
@@ -251,13 +262,13 @@ class ScoreManager:
         miner_uids = [int(float(w)) for w in witness[513:769]]
 
         bt.logging.debug(
-            f"Proof of weights scores: {scores} for miner UIDs: {miner_uids}, existing scores: {self.scores}"
+            f"Proof of weights scores: {scores} for miner UIDs: {miner_uids} for model ID: {model_id}, existing scores: {self.score_dict[model_id]}"
         )
 
         for uid, score in zip(miner_uids, scores):
-            if uid >= len(self.scores):
+            if uid >= len(self.score_dict[model_id]):
                 continue
-            self.scores[uid] = float(score)
+            self.score_dict[model_id][uid] = float(score)
             bt.logging.debug(f"Updated score for UID {uid}: {score}")
 
     def _update_pow_queue(self, new_items: list[ProofOfWeightsItem]):
@@ -266,10 +277,10 @@ class ScoreManager:
             self.proof_of_weights_queue, new_items
         )
 
-    def _try_store_scores(self):
+    def _try_store_scores(self, model_id: str):
         """Attempt to store scores to disk."""
         try:
-            torch.save(self.scores, "scores.pt")
+            torch.save(self.score_dict[model_id], f"scores_{model_id}.pt")
         except Exception as e:
             bt.logging.info(f"Error storing scores: {e}")
 
@@ -285,10 +296,11 @@ class ScoreManager:
         """
         If there are more uids than scores, add more weights.
         """
-        if len(uids) > len(self.scores):
-            bt.logging.trace(
-                f"Scores length: {len(self.scores)}, UIDs length: {len(uids)}. Adding more weights"
-            )
-            size_difference = len(uids) - len(self.scores)
-            new_scores = torch.zeros(size_difference, dtype=torch.float32)
-            self.scores = torch.cat((self.scores, new_scores))
+        for model_id in circuit_store.list_circuits():
+            if len(uids) > len(self.score_dict[model_id]):
+                bt.logging.trace(
+                    f"Scores length: {len(self.score_dict[model_id])}, UIDs length: {len(uids)}. Adding more weights"
+                )
+                size_difference = len(uids) - len(self.score_dict[model_id])
+                new_scores = torch.zeros(size_difference, dtype=torch.float32)
+                self.score_dict[model_id] = torch.cat((self.score_dict[model_id], new_scores))
