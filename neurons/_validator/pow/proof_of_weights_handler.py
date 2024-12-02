@@ -1,5 +1,4 @@
 import math
-import numpy as np
 import numpy.random as rand
 from bittensor import logging
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
@@ -29,63 +28,60 @@ class ProofOfWeightsHandler:
     @staticmethod
     def prepare_pow_request(proof_of_weights_queue, subnet_uid):
         logging.debug(f"Preparing PoW request for subnet UID: {subnet_uid}")
-        model_id = SINGLE_PROOF_OF_WEIGHTS_MODEL_ID
-        circuit = circuit_store.get_circuit(model_id)
-        if subnet_uid in (2, 118):
-            use_batched_pow, use_single_pow = ProofOfWeightsHandler._determine_pow_type(
-                proof_of_weights_queue
-            )
 
-            proof_system = ProofSystem.CIRCOM
-
-            if use_batched_pow:
-                model_id = BATCHED_PROOF_OF_WEIGHTS_MODEL_ID
-            elif proof_system == ProofSystem.CIRCOM:
-                model_id = SINGLE_PROOF_OF_WEIGHTS_MODEL_ID
-            else:
-                model_id = (
-                    circuit_store.get_latest_circuit_for_netuid(27).id
-                    if ProofOfWeightsHandler.use_sn27
-                    else SINGLE_PROOF_OF_WEIGHTS_MODEL_ID
-                )
-                ProofOfWeightsHandler.use_sn27 = not ProofOfWeightsHandler.use_sn27
-
-            if model_id is None:
-                raise ValueError(f"No circuit found for subnet_uid: {subnet_uid}")
-
-            circuit = circuit_store.get_circuit(model_id)
-        else:
-            circuit = circuit_store.get_latest_circuit_for_netuid(subnet_uid)
-
-        if circuit is None:
-            raise ValueError(f"No circuit found for subnet_uid: {subnet_uid}")
-
-        logging.debug(f"PoW circuit: {circuit}")
-        logging.info(f"Preparing for requests with {circuit}")
-
-        serialized_items = (
-            proof_of_weights_queue[0] if len(proof_of_weights_queue) else []
+        # Get appropriate circuit based on subnet
+        circuit = ProofOfWeightsHandler._get_circuit_for_subnet(
+            subnet_uid, proof_of_weights_queue
         )
-        inputs = serialized_items
+
+        serialized_items = []
+        inputs = []
 
         if subnet_uid in (2, 118):
-            pow_items: list[ProofOfWeightsItem] = (
-                ProofOfWeightsHandler._prepare_pow_items(
-                    proof_of_weights_queue, circuit
-                )
+            pow_items = ProofOfWeightsHandler._prepare_pow_items(
+                proof_of_weights_queue, circuit
             )
             serialized_items = ProofOfWeightsItem.to_dict_list(pow_items)
             inputs = ProofOfWeightsHandler._prepare_inputs(serialized_items, circuit)
+        else:
+            serialized_items = (
+                proof_of_weights_queue[0] if proof_of_weights_queue else []
+            )
+            inputs = serialized_items
 
         synapse = ProofOfWeightsHandler._create_synapse(subnet_uid, inputs, circuit)
 
-        logging.debug(f"PoW request prepared with model ID: {circuit.id}")
         return {
             "synapse": synapse,
             "inputs": inputs,
             "model_id": circuit.id,
             "aggregation": False,
         }
+
+    @staticmethod
+    def _get_circuit_for_subnet(
+        subnet_uid: int, proof_of_weights_queue: list
+    ) -> Circuit:
+        """Get the appropriate circuit based on subnet and queue state."""
+        if subnet_uid not in (2, 118):
+            return circuit_store.get_latest_circuit_for_netuid(subnet_uid)
+
+        use_batched_pow, _ = ProofOfWeightsHandler._determine_pow_type(
+            proof_of_weights_queue
+        )
+
+        if use_batched_pow:
+            return circuit_store.get_circuit(BATCHED_PROOF_OF_WEIGHTS_MODEL_ID)
+
+        if subnet_uid == 27:
+            ProofOfWeightsHandler.use_sn27 = not ProofOfWeightsHandler.use_sn27
+            return (
+                circuit_store.get_latest_circuit_for_netuid(27)
+                if ProofOfWeightsHandler.use_sn27
+                else circuit_store.get_circuit(SINGLE_PROOF_OF_WEIGHTS_MODEL_ID)
+            )
+
+        return circuit_store.get_circuit(SINGLE_PROOF_OF_WEIGHTS_MODEL_ID)
 
     @staticmethod
     def _determine_pow_type(proof_of_weights_queue):
@@ -181,9 +177,21 @@ class ProofOfWeightsHandler:
         circuit: Circuit,
     ) -> dict:
         """Prepare the inputs for the Proof of Weights circuit."""
-        logging.trace(f"Preparing inputs for {circuit}")
         scaling = circuit.settings.get("scaling", 100000000)
-        inputs = {
+
+        if circuit.proof_system == ProofSystem.CIRCOM:
+            return ProofOfWeightsHandler._prepare_circom_inputs(
+                serialized_items, scaling
+            )
+        elif circuit.metadata.netuid == 27:
+            return ProofOfWeightsHandler._prepare_subnet27_inputs(serialized_items)
+
+        return ProofOfWeightsHandler._prepare_base_inputs(serialized_items, scaling)
+
+    @staticmethod
+    def _prepare_base_inputs(serialized_items: dict, scaling: int) -> dict:
+        """Prepare base inputs common to all circuits."""
+        return {
             "maximum_score": [
                 int(score * scaling) for score in serialized_items["max_score"]
             ],
@@ -209,51 +217,77 @@ class ProofOfWeightsHandler:
             "validator_uid": serialized_items["validator_uid"],
             "miner_uid": serialized_items["uid"],
         }
-        if circuit.proof_system == ProofSystem.CIRCOM:
-            inputs["scaling"] = scaling
-            inputs["RATE_OF_DECAY"] = int(RATE_OF_DECAY * scaling)
-            inputs["RATE_OF_RECOVERY"] = int(RATE_OF_RECOVERY * scaling)
-            inputs["FLATTENING_COEFFICIENT"] = int(FLATTENING_COEFFICIENT * scaling)
-            inputs["PROOF_SIZE_WEIGHT"] = int(PROOF_SIZE_WEIGHT * scaling)
-            inputs["PROOF_SIZE_THRESHOLD"] = int(PROOF_SIZE_THRESHOLD * scaling)
-            inputs["RESPONSE_TIME_WEIGHT"] = int(RESPONSE_TIME_WEIGHT * scaling)
-            inputs["MAXIMUM_RESPONSE_TIME_DECIMAL"] = int(
+
+    @staticmethod
+    def _prepare_circom_inputs(serialized_items: dict, scaling: int) -> dict:
+        """Prepare inputs for CIRCOM circuits."""
+        inputs = {
+            "scaling": scaling,
+            "RATE_OF_DECAY": int(RATE_OF_DECAY * scaling),
+            "RATE_OF_RECOVERY": int(RATE_OF_RECOVERY * scaling),
+            "FLATTENING_COEFFICIENT": int(FLATTENING_COEFFICIENT * scaling),
+            "PROOF_SIZE_WEIGHT": int(PROOF_SIZE_WEIGHT * scaling),
+            "PROOF_SIZE_THRESHOLD": int(PROOF_SIZE_THRESHOLD * scaling),
+            "RESPONSE_TIME_WEIGHT": int(RESPONSE_TIME_WEIGHT * scaling),
+            "MAXIMUM_RESPONSE_TIME_DECIMAL": int(
                 MAXIMUM_RESPONSE_TIME_DECIMAL * scaling
-            )
-        if circuit.proof_system == ProofSystem.JOLT:
-            inputs["uid_responsible_for_proof"] = inputs["validator_uid"][-1]
+            ),
+        }
+        return inputs
 
-        if circuit.metadata.netuid == 27:
-            inputs = {
-                "success_weight": rand.uniform(0.8, 1.2),
-                "difficulty_weight": rand.uniform(0.8, 1.2),
-                "time_elapsed_weight": rand.uniform(0.2, 0.4),
-                "failed_penalty_weight": rand.uniform(0.3, 0.5),
-                "allocation_weight": rand.uniform(0.15, 0.25),
-                "pow_min_difficulty": rand.randint(6, 8),
-                "pow_max_difficulty": rand.randint(11, 13),
-                "pow_timeout": rand.uniform(25, 35),
-                "max_score_challenge": rand.uniform(200.0, 300.0),
-                "max_score_allocation": rand.uniform(15.0, 25.0),
-                "max_score": rand.uniform(220.0, 320.0),
-                "failed_penalty_exp": rand.uniform(1.3, 1.7),
-                "validator_uid": serialized_items["validator_uid"],
-                "challenge_attempts": rand.randint(10, 10000, 256).tolist(),
-                "last_20_challenge_failed": rand.randint(0, 11, 256).tolist(),
-                "challenge_elapsed_time_avg": rand.uniform(0.001, 31, 256).tolist(),
-                "challenge_difficulty_avg": rand.uniform(7, 12, 256).tolist(),
-                "has_docker": rand.choice([True, False], 256).tolist(),
-                "allocated_hotkey": rand.choice([True, False], 256).tolist(),
-                "penalized_hotkey_count": rand.randint(0, 10, 256).tolist(),
-                "half_validators": int(rand.randint(1, 10)),
-                "nonce": secrets.randbits(128),
-            }
-            inputs["challenge_successes"] = rand.randint(
-                np.array(inputs["challenge_attempts"]) // 2,
-                inputs["challenge_attempts"],
-            ).tolist()
-            inputs["uid_responsible_for_proof"] = inputs["validator_uid"][-1]
+    @staticmethod
+    def _prepare_subnet48_inputs(serialized_items: dict) -> dict:
+        """Prepare inputs for SN48 circuits."""
+        inputs = {
+            "scores": [rand.random() for _ in range(256)],
+            "top_tier_pct": 0.2,
+            "next_tier_pct": 0.3,
+            "top_tier_weight": 1.0,
+            "next_tier_weight": 0.5,
+            "bottom_tier_weight": 0.1,
+            "validator_uid": serialized_items["validator_uid"],
+            "nonce": secrets.randbits(32),
+        }
+        return inputs
 
-        logging.debug(f"Inputs prepared for {circuit}")
-        logging.trace(f"Inputs: {inputs}")
+    @staticmethod
+    def _prepare_subnet27_inputs(serialized_items: dict) -> dict:
+        """Prepare inputs for SN27 circuits."""
+
+        SUCCESS_WEIGHT = 1
+        DIFFICULTY_WEIGHT = 1
+        TIME_ELAPSED_WEIGHT = 0.3
+        FAILED_PENALTY_WEIGHT = 0.4
+        ALLOCATION_WEIGHT = 0.21
+        POW_TIMEOUT = 30
+        POW_MIN_DIFFICULTY = 7
+        POW_MAX_DIFFICULTY = 12
+
+        inputs = {
+            "challenge_attempts": serialized_items.get("challenge_attempts", 1),
+            "challenge_successes": serialized_items.get("challenge_successes", 0),
+            "last_20_challenge_failed": serialized_items.get(
+                "last_20_challenge_failed", 0
+            ),
+            "challenge_elapsed_time_avg": serialized_items.get(
+                "challenge_elapsed_time_avg", POW_TIMEOUT
+            ),
+            "last_20_difficulty_avg": serialized_items.get(
+                "last_20_difficulty_avg", POW_MIN_DIFFICULTY
+            ),
+            "has_docker": serialized_items.get("has_docker", False),
+            "uid": serialized_items["validator_uid"],
+            "allocated_uids": serialized_items.get("allocated_uids", []),
+            "penalized_uids": serialized_items.get("penalized_uids", []),
+            "validator_uids": serialized_items.get("validator_uids", []),
+            "success_weight": SUCCESS_WEIGHT,
+            "difficulty_weight": DIFFICULTY_WEIGHT,
+            "time_elapsed_weight": TIME_ELAPSED_WEIGHT,
+            "failed_penalty_weight": FAILED_PENALTY_WEIGHT,
+            "allocation_weight": ALLOCATION_WEIGHT,
+            "pow_timeout": POW_TIMEOUT,
+            "pow_min_difficulty": POW_MIN_DIFFICULTY,
+            "pow_max_difficulty": POW_MAX_DIFFICULTY,
+            "nonce": secrets.randbits(32),
+        }
         return inputs
