@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 class EZKLHandler(ProofSystemHandler):
     """
-    Handler for the EZKL (Easy Zero-Knowledge Learning) proof system.
+    Handler for the EZKL proof system.
     This class provides methods for generating and verifying proofs using EZKL.
     """
 
@@ -48,7 +48,6 @@ class EZKLHandler(ProofSystemHandler):
             session.model.paths.compiled_model,
             session.session_storage.witness_path,
             session.model.paths.vk,
-            session.model.paths.srs,
         )
         bt.logging.trace("Generating proof")
         res = ezkl.prove(  # type: ignore
@@ -57,7 +56,6 @@ class EZKLHandler(ProofSystemHandler):
             session.model.paths.pk,
             session.session_storage.proof_path,
             "single",
-            session.model.paths.srs,
         )
         bt.logging.trace(
             f"Proof generated: {session.session_storage.proof_path}, result: {res}"
@@ -79,7 +77,6 @@ class EZKLHandler(ProofSystemHandler):
             session.session_storage.proof_path,
             session.model.paths.settings,
             session.model.paths.vk,
-            session.model.paths.srs,
         )
         return res
 
@@ -98,11 +95,10 @@ class EZKLHandler(ProofSystemHandler):
             session.model.paths.compiled_model,
             session.session_storage.witness_path,
             session.model.paths.vk,
-            session.model.paths.srs,
         )
 
     @staticmethod
-    def gen_witness(input_path, circuit_path, witness_path, vk_path, srs_path):
+    def gen_witness(input_path, circuit_path, witness_path, vk_path):
         """
         Generate a witness for the EZKL proof system.
 
@@ -111,12 +107,11 @@ class EZKLHandler(ProofSystemHandler):
             circuit_path (str): Path to the circuit file.
             witness_path (str): Path to store the generated witness.
             vk_path (str): Path to the verification key.
-            srs_path (str): Path to the SRS (Structured Reference String) file.
 
         Returns:
             The result of the witness generation process.
         """
         bt.logging.trace("Generating witness")
-        res = ezkl.gen_witness(input_path, circuit_path, witness_path, vk_path, srs_path)  # type: ignore
+        res = ezkl.gen_witness(input_path, circuit_path, witness_path, vk_path)  # type: ignore
         bt.logging.trace(f"Gen witness result: {res}")
         return res

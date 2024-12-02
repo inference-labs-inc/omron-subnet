@@ -9,6 +9,7 @@ import requests
 from bittensor import logging
 
 from constants import IGNORED_MODEL_HASHES
+from execution_layer.circuit import ProofSystem
 
 
 LOCAL_SNARKJS_INSTALL_DIR = os.path.join(os.path.expanduser("~"), ".snarkjs")
@@ -142,6 +143,38 @@ def sync_model_files():
                 SYNC_LOG_PREFIX + f"Failed to parse JSON from {metadata_file}"
             )
             continue
+        # If it's an EZKL model, we'll try to download the SRS files
+        if metadata.get("proof_system") == ProofSystem.EZKL:
+            ezkl_settings_file = os.path.join(MODEL_DIR, model_hash, "settings.json")
+            if not os.path.isfile(ezkl_settings_file):
+                logging.error(
+                    f"{SYNC_LOG_PREFIX}Settings file not found at {ezkl_settings_file} for {model_hash}. Skipping sync."
+                )
+                continue
+
+            try:
+                with open(ezkl_settings_file, "r", encoding="utf-8") as f:
+                    logrows = json.load(f).get("run_args", {}).get("logrows")
+                    if logrows:
+                        subprocess.run(
+                            [
+                                "ezkl",
+                                "get-srs",
+                                "--logrows",
+                                str(logrows),
+                                "--commitment",
+                                "kzg",
+                            ],
+                            check=True,
+                        )
+                        logging.info(
+                            f"{SYNC_LOG_PREFIX}Successfully downloaded SRS for logrows={logrows}"
+                        )
+            except (json.JSONDecodeError, subprocess.CalledProcessError) as e:
+                logging.error(
+                    f"{SYNC_LOG_PREFIX}Failed to process settings or download SRS: {e}"
+                )
+                continue
 
         external_files = metadata.get("external_files", {})
         for key, url in external_files.items():

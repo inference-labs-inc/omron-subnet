@@ -17,6 +17,7 @@ class ProofSystem(str, Enum):
     ZKML = "ZKML"
     CIRCOM = "CIRCOM"
     JOLT = "JOLT"
+    EZKL = "EZKL"
 
     def __str__(self):
         return self.value
@@ -67,7 +68,6 @@ class CircuitPaths:
         self.settings = os.path.join(self.base_path, "settings.json")
         self.witness = os.path.join(self.base_path, "witness.json")
         self.proof = os.path.join(self.base_path, "proof.json")
-        self.srs = os.path.join(self.base_path, "kzg.srs")
         self.witness_executable = os.path.join(self.base_path, "witness.js")
         self.pk = os.path.join(self.base_path, "circuit.zkey")
         self.vk = os.path.join(self.base_path, "verification_key.json")
@@ -84,6 +84,10 @@ class CircuitPaths:
             self.compiled_model = os.path.join(
                 self.base_path, "target", "release", "circuit"
             )
+        elif proof_system == ProofSystem.EZKL:
+            self.pk = os.path.join(self.base_path, "pk.key")
+            self.vk = os.path.join(self.base_path, "vk.key")
+            self.compiled_model = os.path.join(self.base_path, "model.compiled")
         else:
             raise ValueError(f"Proof system {proof_system} not supported")
 
