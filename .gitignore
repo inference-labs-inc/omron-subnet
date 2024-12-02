@@ -179,3 +179,11 @@ neurons/_validator/proof_of_weights/
 **.zkey
 **/target/
 *.ptau
+notebooks/input.json
+notebooks/calibration.json
+notebooks/network.onnx
+notebooks/witness.json
+notebooks/proof.json
+notebooks/model.compiled
+notebooks/settings.json
+notebooks/*.key
