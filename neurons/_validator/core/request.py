@@ -14,3 +14,6 @@ class Request:
     circuit: Circuit
     request_type: RequestType
     inputs: dict[str, object] | None = None
+    response_time: float | None = None
+    deserialized: dict[str, object] | None = None
+    result: bt.Synapse | None = None
