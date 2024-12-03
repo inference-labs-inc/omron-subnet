@@ -47,7 +47,7 @@ class RequestPipeline:
 
         netuid = self.config.subnet_uid
         request = None
-        circuit = circuit_store.select_circuit_for_benchmark()
+        circuit = self.select_circuit_for_benchmark()
 
         if request_type == RequestType.RWR:
             netuid, request = self.api.external_requests_queue.pop()
