@@ -12,16 +12,11 @@ from constants import (
     CIRCUIT_WEIGHTS,
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
 )
-from enum import Enum
 from deployment_layer.circuit_store import circuit_store
 from execution_layer.circuit import Circuit, CircuitType
 from _validator.utils.hash_guard import HashGuard
 from utils.wandb_logger import safe_log
-
-
-class RequestType(Enum):
-    BENCHMARK = "benchmark_request"
-    RWR = "real_world_request"
+from _validator.models.request_type import RequestType
 
 
 class RequestPipeline:

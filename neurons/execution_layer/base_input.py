@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 import json
-from _validator.core.request_pipeline import RequestType
+from _validator.models.request_type import RequestType
 
 
 class BaseInput(ABC):
