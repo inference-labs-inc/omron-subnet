@@ -3,9 +3,19 @@ from dataclasses import dataclass, field
 from enum import Enum
 import os
 import json
+from execution_layer.input_registry import InputRegistry
 
 # trunk-ignore(pylint/E0611)
 from bittensor import logging
+
+
+class CircuitType(str, Enum):
+    """
+    Enum representing the type of circuit.
+    """
+
+    PROOF_OF_WEIGHTS = "proof_of_weights"
+    PROOF_OF_COMPUTATION = "proof_of_computation"
 
 
 class ProofSystem(str, Enum):
@@ -103,6 +113,7 @@ class CircuitMetadata:
     author: str
     version: str
     proof_system: str
+    type: CircuitType
     external_files: dict[str, str]
     netuid: int = -1
 
@@ -147,6 +158,7 @@ class Circuit:
             logging.warning(
                 f"Failed to load settings for model {self.id}. Using default settings."
             )
+        self.input_handler = InputRegistry.get_handler(self.id)
 
     def __str__(self):
         return (

@@ -115,3 +115,15 @@ class EZKLHandler(ProofSystemHandler):
         res = ezkl.gen_witness(input_path, circuit_path, witness_path, vk_path)  # type: ignore
         bt.logging.trace(f"Gen witness result: {res}")
         return res
+
+    def aggregate_proofs(
+        self, session: VerifiedModelSession, proofs: list[str]
+    ) -> tuple[str, float]:
+        """
+        Aggregate multiple proofs into a single proof for the given session.
+
+        Returns:
+            tuple[str, float]: A tuple containing the aggregated proof content (str)
+            and the time taken to aggregate the proofs (float).
+        """
+        raise NotImplementedError("Proof aggregation not supported at this time.")

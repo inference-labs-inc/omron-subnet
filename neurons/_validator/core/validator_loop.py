@@ -20,10 +20,9 @@ from _validator.utils.api import hash_inputs
 from _validator.utils.axon import query_axons
 from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
+from execution_layer.circuit import Circuit, CircuitType
 from constants import (
     REQUEST_DELAY_SECONDS,
-    SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
-    SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT,
 )
 from utils import AutoUpdate, clean_temp_files, wandb_logger
 from utils.gc_logging import log_responses as log_responses_gc
@@ -150,10 +149,10 @@ class ValidatorLoop:
         processed_responses: list[MinerResponse] = (
             self.response_processor.process_responses(responses)
         )
-        if requests[0].get("model_id") not in [
-            SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
-            SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT,
-        ]:
+
+        circuit: Circuit = requests[0].get("circuit")
+
+        if circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS:
             verified_responses = [
                 r for r in processed_responses if r.verification_result
             ]

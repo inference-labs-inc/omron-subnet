@@ -5,6 +5,7 @@
     "version": "0.0.6",
     "proof_system": "EZKL",
     "netuid": 27,
+    "type": "proof_of_weights",
     "external_files": {
         "pk.key": "https://storage.omron.ai/a4bcecaf699fd9212600a1f2fcaa40c444e1aeaab409ea240a38c33ed356f4e2/pk.key"
     }

@@ -6,7 +6,6 @@ import bittensor as bt
 from constants import (
     MAX_CONCURRENT_REQUESTS,
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-    VALIDATOR_AGG_REQUEST_TIMEOUT_SECONDS,
 )
 
 
@@ -21,11 +20,7 @@ async def query_axons(dendrite, requests):
             return await dendrite.forward(
                 axons=[axon],
                 synapse=request["synapse"],
-                timeout=(
-                    VALIDATOR_REQUEST_TIMEOUT_SECONDS
-                    if not request["aggregation"]
-                    else VALIDATOR_AGG_REQUEST_TIMEOUT_SECONDS
-                ),
+                timeout=(VALIDATOR_REQUEST_TIMEOUT_SECONDS),
                 deserialize=False,
             )
 
@@ -42,11 +37,7 @@ async def query_axons(dendrite, requests):
                         "response_time": (
                             result.dendrite.process_time
                             if result.dendrite.process_time is not None
-                            else (
-                                VALIDATOR_REQUEST_TIMEOUT_SECONDS
-                                if not requests[i]["aggregation"]
-                                else VALIDATOR_AGG_REQUEST_TIMEOUT_SECONDS
-                            )
+                            else (VALIDATOR_REQUEST_TIMEOUT_SECONDS)
                         ),
                         "deserialized": result.deserialize(),
                     }
@@ -60,11 +51,7 @@ async def query_axons(dendrite, requests):
                 requests[i].update(
                     {
                         "result": result,
-                        "response_time": (
-                            VALIDATOR_REQUEST_TIMEOUT_SECONDS
-                            if not requests[i]["aggregation"]
-                            else VALIDATOR_AGG_REQUEST_TIMEOUT_SECONDS
-                        ),
+                        "response_time": (VALIDATOR_REQUEST_TIMEOUT_SECONDS),
                         "deserialized": None,
                     }
                 )
