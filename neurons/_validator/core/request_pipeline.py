@@ -48,7 +48,7 @@ class RequestPipeline:
 
         netuid = self.config.subnet_uid
         circuit = self.select_circuit_for_benchmark()
-
+        request = None
         if request_type == RequestType.RWR:
             netuid, request = self.api.external_requests_queue.pop()
             bt.logging.debug(f"Processing external request for netuid {netuid}")
