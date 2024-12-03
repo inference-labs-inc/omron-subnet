@@ -47,7 +47,7 @@ class RequestPipeline:
 
         netuid = self.config.subnet_uid
         request = None
-        circuit = circuit_store.get_latest_circuit_for_netuid(netuid)
+        circuit = circuit_store.select_circuit_for_benchmark()
 
         if request_type == RequestType.RWR:
             netuid, request = self.api.external_requests_queue.pop()
@@ -57,10 +57,6 @@ class RequestPipeline:
                 DEFAULT_NETUID if netuid == self.config.subnet_uid else netuid
             )
             circuit = circuit_store.get_latest_circuit_for_netuid(target_netuid)
-
-        else:
-            bt.logging.debug("Processing benchmark request.")
-            circuit = self.select_circuit_for_benchmark()
 
         if circuit is None:
             bt.logging.error(f"Unable to find a circuit for netuid {netuid}")
@@ -128,7 +124,6 @@ class RequestPipeline:
         circuit: Circuit,
         request: dict[str, object] | None = None,
     ) -> ProofOfWeightsSynapse | QueryZkProof:
-        netuid = self.config.subnet_uid
         inputs = (
             circuit.input_handler(request_type)
             if request_type == RequestType.BENCHMARK
@@ -157,7 +152,7 @@ class RequestPipeline:
         ]:
             # We'll forward the responsibility of handling these to the internal proof of weights handler
             return ProofOfWeightsHandler.prepare_pow_request(
-                self.score_manager.proof_of_weights_queue, netuid
+                circuit, self.score_manager.proof_of_weights_queue
             )
 
         # Otherwise, we'll prepare a regular benchmark request depending on the circuit type
