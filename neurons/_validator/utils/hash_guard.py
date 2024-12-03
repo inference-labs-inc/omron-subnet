@@ -13,7 +13,7 @@ class HashGuard:
         self.hashes = []
 
     def check_hash(self, input: BaseInput) -> None:
-        hash_value = hash(frozenset(input.data.items()))
+        hash_value = hash(frozenset(input.items()))
         if hash_value in self.hashes:
             bt.logging.error(f"Hash already exists: {hash_value}. Inputs: {input.data}")
             raise ValueError("Hash already exists")
