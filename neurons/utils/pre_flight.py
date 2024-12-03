@@ -119,13 +119,12 @@ def sync_model_files():
         if not model_hash.startswith("model_"):
             continue
 
-        for ignored_hash in IGNORED_MODEL_HASHES:
-            if model_hash.endswith(ignored_hash):
-                logging.info(
-                    SYNC_LOG_PREFIX
-                    + f"Ignoring model {model_hash} as it is in the ignored list."
-                )
-                continue
+        if model_hash.split("_")[1] in IGNORED_MODEL_HASHES:
+            logging.info(
+                SYNC_LOG_PREFIX
+                + f"Ignoring model {model_hash} as it is in the ignored list."
+            )
+            continue
 
         metadata_file = os.path.join(MODEL_DIR, model_hash, "metadata.json")
         if not os.path.isfile(metadata_file):
