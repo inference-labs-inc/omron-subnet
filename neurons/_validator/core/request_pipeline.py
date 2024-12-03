@@ -115,6 +115,11 @@ class RequestPipeline:
 
         return circuit_store.get_circuit(circuit_id)
 
+    def format_for_query(
+        self, inputs: dict[str, object], circuit: Circuit
+    ) -> dict[str, object]:
+        return {"public_inputs": inputs, "model_id": circuit.id}
+
     def get_synapse_request(
         self,
         uid: int,
@@ -140,7 +145,7 @@ class RequestPipeline:
                 )
             return QueryZkProof(
                 model_id=circuit.id,
-                query_input=inputs.to_json(),
+                query_input=self.format_for_query(inputs, circuit),
                 query_output="",
             )
 
@@ -157,7 +162,7 @@ class RequestPipeline:
         if circuit.metadata.type == CircuitType.PROOF_OF_COMPUTATION:
             return QueryZkProof(
                 model_id=circuit.id,
-                query_input=inputs.to_json(),
+                query_input=self.format_for_query(inputs, circuit),
                 query_output="",
             )
 
