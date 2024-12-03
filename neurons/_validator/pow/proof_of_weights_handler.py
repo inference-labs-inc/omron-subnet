@@ -1,4 +1,3 @@
-import typing
 from bittensor import logging
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
 from execution_layer.circuit import Circuit, CircuitType
@@ -6,9 +5,7 @@ from constants import (
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
 )
 from protocol import ProofOfWeightsSynapse, QueryZkProof
-
-if typing.TYPE_CHECKING:
-    from _validator.models.request_type import RequestType
+from _validator.models.request_type import RequestType
 
 
 class ProofOfWeightsHandler:
