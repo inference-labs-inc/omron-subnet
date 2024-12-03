@@ -45,7 +45,8 @@ class CircuitInput(BaseInput):
     def __init__(
         self, request_type: RequestType, data: dict[str, object] | None = None
     ):
-        data = self._add_missing_constants(data)
+        if request_type == RequestType.RWR and data is not None:
+            data = self._add_missing_constants(data)
         super().__init__(request_type, data)
 
     @staticmethod
