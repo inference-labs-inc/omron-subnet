@@ -58,7 +58,7 @@ class RequestPipeline:
             )
             circuit = circuit_store.get_latest_circuit_for_netuid(target_netuid)
 
-        bt.logging.info(f"The next round of requests will be using {circuit}")
+        bt.logging.info(f"The next round of requests will be for {circuit}")
 
         requests = [
             {
