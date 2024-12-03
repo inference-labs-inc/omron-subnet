@@ -14,6 +14,7 @@ PROOF_SIZE_THRESHOLD = 3648
 PROOF_SIZE_WEIGHT = 0
 RESPONSE_TIME_WEIGHT = 1
 MAXIMUM_RESPONSE_TIME_DECIMAL = 0.99
+SCALING = 100000000
 
 
 class CircuitInputSchema(BaseModel):
@@ -48,7 +49,6 @@ class CircuitInput(BaseInput):
 
     @staticmethod
     def generate() -> dict[str, object]:
-        scale = 1
         return {
             "maximum_score": [1.0 for _ in range(BATCH_SIZE)],
             "previous_score": [random.random() for _ in range(BATCH_SIZE)],
@@ -62,14 +62,16 @@ class CircuitInput(BaseInput):
             "minimum_response_time": [random.random() * 60 for _ in range(BATCH_SIZE)],
             "maximum_response_time": [60.0 for _ in range(BATCH_SIZE)],
             "response_time": [random.random() * 60 for _ in range(BATCH_SIZE)],
-            "scaling": scale,
-            "RATE_OF_DECAY": int(RATE_OF_DECAY * scale),
-            "RATE_OF_RECOVERY": int(RATE_OF_RECOVERY * scale),
-            "FLATTENING_COEFFICIENT": int(FLATTENING_COEFFICIENT * scale),
-            "PROOF_SIZE_WEIGHT": int(PROOF_SIZE_WEIGHT * scale),
-            "PROOF_SIZE_THRESHOLD": int(PROOF_SIZE_THRESHOLD * scale),
-            "RESPONSE_TIME_WEIGHT": int(RESPONSE_TIME_WEIGHT * scale),
-            "MAXIMUM_RESPONSE_TIME_DECIMAL": int(MAXIMUM_RESPONSE_TIME_DECIMAL * scale),
+            "scaling": SCALING,
+            "RATE_OF_DECAY": int(RATE_OF_DECAY * SCALING),
+            "RATE_OF_RECOVERY": int(RATE_OF_RECOVERY * SCALING),
+            "FLATTENING_COEFFICIENT": int(FLATTENING_COEFFICIENT * SCALING),
+            "PROOF_SIZE_WEIGHT": int(PROOF_SIZE_WEIGHT * SCALING),
+            "PROOF_SIZE_THRESHOLD": int(PROOF_SIZE_THRESHOLD * SCALING),
+            "RESPONSE_TIME_WEIGHT": int(RESPONSE_TIME_WEIGHT * SCALING),
+            "MAXIMUM_RESPONSE_TIME_DECIMAL": int(
+                MAXIMUM_RESPONSE_TIME_DECIMAL * SCALING
+            ),
         }
 
     @staticmethod
@@ -80,4 +82,21 @@ class CircuitInput(BaseInput):
     def process(data: dict[str, object]) -> dict[str, object]:
         for i in range(16):
             data["validator_uid"][BATCH_SIZE - 16 + i] = secrets.randbits(16)
+
+        constants = [
+            "RATE_OF_DECAY",
+            "RATE_OF_RECOVERY",
+            "FLATTENING_COEFFICIENT",
+            "PROOF_SIZE_WEIGHT",
+            "PROOF_SIZE_THRESHOLD",
+            "RESPONSE_TIME_WEIGHT",
+            "MAXIMUM_RESPONSE_TIME_DECIMAL",
+        ]
+
+        for constant in constants:
+            if constant not in data:
+                data[constant] = int(globals()[constant] * SCALING)
+
+        if "scaling" not in data:
+            data["scaling"] = SCALING
         return data
