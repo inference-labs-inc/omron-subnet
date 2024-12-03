@@ -1,5 +1,6 @@
 from execution_layer.base_input import BaseInput
 import bittensor as bt
+import json
 
 
 class HashGuard:
@@ -13,7 +14,7 @@ class HashGuard:
         self.hashes = []
 
     def check_hash(self, input: BaseInput) -> None:
-        hash_value = hash(tuple(sorted(input.items())))
+        hash_value = hash(json.dumps(input.data))
         if hash_value in self.hashes:
             bt.logging.error(f"Hash already exists: {hash_value}. Inputs: {input.data}")
             raise ValueError("Hash already exists")
