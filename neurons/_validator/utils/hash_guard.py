@@ -14,9 +14,9 @@ class HashGuard:
         self.hashes = []
 
     def check_hash(self, input: BaseInput) -> None:
-        hash_value = hash(json.dumps(input.data))
+        hash_value = hash(json.dumps(input))
         if hash_value in self.hashes:
-            bt.logging.error(f"Hash already exists: {hash_value}. Inputs: {input.data}")
+            bt.logging.error(f"Hash already exists: {hash_value}. Inputs: {input}")
             raise ValueError("Hash already exists")
 
         self.hashes.append(hash_value)
