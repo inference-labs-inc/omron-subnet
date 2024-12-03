@@ -58,10 +58,6 @@ class RequestPipeline:
             )
             circuit = circuit_store.get_latest_circuit_for_netuid(target_netuid)
 
-        if circuit is None:
-            bt.logging.error(f"Unable to find a circuit for netuid {netuid}")
-            return []
-
         bt.logging.info(f"The next round of requests will be using {circuit}")
 
         requests = [
