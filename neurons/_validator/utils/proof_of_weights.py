@@ -42,58 +42,58 @@ dummy_miner_response = MinerResponse.empty()
 
 @dataclass
 class ProofOfWeightsItem:
-    max_score: torch.Tensor
+    maximum_score: torch.Tensor
     previous_score: torch.Tensor
-    verification_result: torch.Tensor
+    verified: torch.Tensor
     proof_size: torch.Tensor
     response_time: torch.Tensor
-    median_max_response_time: torch.Tensor
-    min_response_time: torch.Tensor
+    maximum_response_time: torch.Tensor
+    minimum_response_time: torch.Tensor
     block_number: torch.Tensor
     validator_uid: torch.Tensor
-    uid: torch.Tensor
+    miner_uid: torch.Tensor
 
     def __post_init__(self):
-        self.max_score = to_tensor(self.max_score, torch.float32)
+        self.maximum_score = to_tensor(self.maximum_score, torch.float32)
         self.previous_score = to_tensor(self.previous_score, torch.float32)
-        self.verification_result = to_tensor(self.verification_result, torch.bool)
+        self.verified = to_tensor(self.verified, torch.bool)
         self.proof_size = to_tensor(self.proof_size, torch.int64)
         self.response_time = to_tensor(self.response_time, torch.float32)
-        self.median_max_response_time = to_tensor(
-            self.median_max_response_time, torch.float32
+        self.maximum_response_time = to_tensor(
+            self.maximum_response_time, torch.float32
         )
-        self.min_response_time = to_tensor(self.min_response_time, torch.float32)
+        self.minimum_response_time = to_tensor(
+            self.minimum_response_time, torch.float32
+        )
         self.block_number = to_tensor(self.block_number, torch.int64)
         self.validator_uid = to_tensor(self.validator_uid, torch.int64)
-        self.uid = to_tensor(self.uid, torch.int64)
+        self.miner_uid = to_tensor(self.miner_uid, torch.int64)
 
     @staticmethod
     def from_miner_response(
         response: MinerResponse,
-        max_score,
+        maximum_score,
         previous_score,
-        median_max_response_time,
-        min_response_time,
+        maximum_response_time,
+        minimum_response_time,
         block_number,
         validator_uid,
     ):
         return ProofOfWeightsItem(
-            max_score=max_score,
+            maximum_score=maximum_score,
             previous_score=previous_score,
-            verification_result=torch.tensor(
-                response.verification_result, dtype=torch.bool
-            ),
+            verified=torch.tensor(response.verified, dtype=torch.bool),
             proof_size=torch.tensor(response.proof_size, dtype=torch.int64),
             response_time=(
                 torch.tensor(response.response_time, dtype=torch.float32)
-                if response.verification_result
-                else median_max_response_time
+                if response.verified
+                else maximum_response_time
             ),
-            median_max_response_time=median_max_response_time,
-            min_response_time=min_response_time,
+            maximum_response_time=maximum_response_time,
+            minimum_response_time=minimum_response_time,
             block_number=block_number,
             validator_uid=validator_uid,
-            uid=torch.tensor(response.uid, dtype=torch.int64),
+            miner_uid=torch.tensor(response.miner_uid, dtype=torch.int64),
         )
 
     @staticmethod
@@ -118,18 +118,18 @@ class ProofOfWeightsItem:
         return ProofOfWeightsItem(
             max_score=torch.tensor(DEFAULT_MAX_SCORE, dtype=torch.float32),
             previous_score=torch.tensor(0, dtype=torch.float32),
-            verification_result=torch.tensor(0, dtype=torch.int64),
+            verified=torch.tensor(0, dtype=torch.int64),
             proof_size=torch.tensor(DEFAULT_PROOF_SIZE, dtype=torch.int64),
             response_time=torch.tensor(
                 VALIDATOR_REQUEST_TIMEOUT_SECONDS, dtype=torch.float32
             ),
-            median_max_response_time=torch.tensor(
+            maximum_response_time=torch.tensor(
                 VALIDATOR_REQUEST_TIMEOUT_SECONDS, dtype=torch.float32
             ),
-            min_response_time=torch.tensor(0, dtype=torch.float32),
+            minimum_response_time=torch.tensor(0, dtype=torch.float32),
             block_number=torch.tensor(0, dtype=torch.int64),
             validator_uid=torch.tensor(0, dtype=torch.int64),
-            uid=torch.tensor(-1, dtype=torch.int64),
+            miner_uid=torch.tensor(-1, dtype=torch.int64),
         )
 
     @staticmethod
@@ -137,14 +137,14 @@ class ProofOfWeightsItem:
         return ProofOfWeightsItem(
             max_score=tensor[0],
             previous_score=tensor[1],
-            verification_result=tensor[2],
+            verified=tensor[2],
             proof_size=tensor[3],
             response_time=tensor[4],
-            median_max_response_time=tensor[5],
-            min_response_time=tensor[6],
+            maximum_response_time=tensor[5],
+            minimum_response_time=tensor[6],
             block_number=tensor[7],
             validator_uid=tensor[8],
-            uid=tensor[9],
+            miner_uid=tensor[9],
         )
 
     def to_tensor(self):
@@ -152,14 +152,14 @@ class ProofOfWeightsItem:
             [
                 self.max_score,
                 self.previous_score,
-                self.verification_result,
+                self.verified,
                 self.proof_size,
                 self.response_time,
-                self.median_max_response_time,
-                self.min_response_time,
+                self.maximum_response_time,
+                self.minimum_response_time,
                 self.block_number,
                 self.validator_uid,
-                self.uid,
+                self.miner_uid,
             ]
         )
 
@@ -174,28 +174,26 @@ class ProofOfWeightsItem:
         result = {
             "max_score": [],
             "previous_score": [],
-            "verification_result": [],
+            "verified": [],
             "proof_size": [],
             "response_time": [],
-            "median_max_response_time": [],
-            "min_response_time": [],
+            "maximum_response_time": [],
+            "minimum_response_time": [],
             "block_number": [],
             "validator_uid": [],
-            "uid": [],
+            "miner_uid": [],
         }
         for item in items:
             result["max_score"].append(item.max_score.item())
             result["previous_score"].append(item.previous_score.item())
-            result["verification_result"].append(item.verification_result.item())
+            result["verified"].append(item.verified.item())
             result["proof_size"].append(item.proof_size.item())
             result["response_time"].append(item.response_time.item())
-            result["median_max_response_time"].append(
-                item.median_max_response_time.item()
-            )
-            result["min_response_time"].append(item.min_response_time.item())
+            result["maximum_response_time"].append(item.maximum_response_time.item())
+            result["minimum_response_time"].append(item.minimum_response_time.item())
             result["block_number"].append(item.block_number.item())
             result["validator_uid"].append(item.validator_uid.item())
-            result["uid"].append(item.uid.item())
+            result["miner_uid"].append(item.miner_uid.item())
         return result
 
     @classmethod
@@ -206,14 +204,14 @@ class ProofOfWeightsItem:
                 cls(
                     max_score=data["max_score"][i],
                     previous_score=data["previous_score"][i],
-                    verification_result=data["verification_result"][i],
+                    verified=data["verified"][i],
                     proof_size=data["proof_size"][i],
                     response_time=data["response_time"][i],
-                    median_max_response_time=data["median_max_response_time"][i],
-                    min_response_time=data["min_response_time"][i],
+                    maximum_response_time=data["maximum_response_time"][i],
+                    minimum_response_time=data["minimum_response_time"][i],
                     block_number=data["block_number"][i],
                     validator_uid=data["validator_uid"][i],
-                    uid=data["uid"][i],
+                    miner_uid=data["miner_uid"][i],
                 )
             )
         return items

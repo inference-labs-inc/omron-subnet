@@ -10,9 +10,11 @@ from execution_layer.verified_model_session import VerifiedModelSession
 from _validator.models.completed_proof_of_weights import CompletedProofOfWeightsItem
 from _validator.models.miner_response import MinerResponse
 from _validator.scoring.score_manager import ScoreManager
+from _validator.core.request import Request
 from _validator.utils.logging import log_responses, log_system_metrics
 from _validator.utils.proof_of_weights import save_proof_of_weights
 from constants import BATCHED_PROOF_OF_WEIGHTS_MODEL_ID
+from execution_layer.base_input import BaseInput
 from utils import wandb_logger
 
 
@@ -24,7 +26,7 @@ class ResponseProcessor:
         self.proof_batches_queue = []
         self.completed_proof_of_weights_queue: list[CompletedProofOfWeightsItem] = []
 
-    def process_responses(self, responses: list[dict]) -> list[MinerResponse]:
+    def process_responses(self, responses: list[Request]) -> list[MinerResponse]:
         if len(responses) == 0:
             logging.error("No responses received")
             return []
@@ -75,7 +77,7 @@ class ResponseProcessor:
 
         return processed_responses
 
-    def process_single_response(self, response: dict) -> MinerResponse:
+    def process_single_response(self, response: Request) -> MinerResponse:
         miner_response = MinerResponse.from_raw_response(response)
         if miner_response.proof_content is None:
             logging.debug(
@@ -86,7 +88,7 @@ class ResponseProcessor:
             logging.debug(f"Attempting to verify proof for UID: {miner_response.uid}")
             try:
                 verification_result = self.verify_proof_string(
-                    miner_response, response["inputs"]
+                    miner_response, response.inputs
                 )
                 miner_response.set_verification_result(verification_result)
                 if not verification_result:
@@ -114,7 +116,8 @@ class ResponseProcessor:
             return False
         try:
             inference_session = VerifiedModelSession(
-                validator_inputs, circuit_store.get_circuit(response.model_id)
+                BaseInput(validator_inputs),
+                circuit_store.get_circuit(response.model_id),
             )
             res: bool = inference_session.verify_proof(
                 response.public_json, response.proof_content

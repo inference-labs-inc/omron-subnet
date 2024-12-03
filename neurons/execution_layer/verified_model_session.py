@@ -6,7 +6,6 @@ import os
 import time
 import traceback
 import uuid
-from collections.abc import Sequence
 
 import bittensor as bt
 from attr import define, field
@@ -14,6 +13,7 @@ from execution_layer.circuit import Circuit
 from execution_layer.proof_handlers.base_handler import ProofSystemHandler
 from execution_layer.proof_handlers.factory import ProofSystemFactory
 from execution_layer.session_storage import SessionStorage
+from execution_layer.base_input import BaseInput
 
 # Ensure new processes do not copy the main process
 multiprocessing.set_start_method("fork", force=True)
@@ -40,19 +40,19 @@ class VerifiedModelSession:
 
     model: Circuit = field()
     session_storage: SessionStorage = field(init=False)
-    inputs: Sequence[float | Sequence[float]] | dict = field(factory=list)
+    inputs: BaseInput | None = field(factory=None)
     session_id: str = field(init=False, factory=lambda: str(uuid.uuid4()))
     proof_handler: ProofSystemHandler = field(init=False)
 
     def __init__(
         self,
-        inputs: Sequence[float | Sequence[float]] | dict | None = None,
+        inputs: BaseInput | None = None,
         model: Circuit | None = None,
     ):
         if model is None:
             raise ValueError("Model must be provided")
         self.model = model
-        self.inputs = inputs or []
+        self.inputs = inputs
         self.session_id = str(uuid.uuid4())
         self.session_storage = SessionStorage(self.model.id, self.session_id)
         self.proof_handler = ProofSystemFactory.get_handler(
@@ -121,11 +121,11 @@ class VerifiedModelSession:
         """
         return session.proof_handler.gen_proof(session)
 
-    def verify_proof(self, public_data: list[str], proof: dict | str) -> bool:
+    def verify_proof(self, validator_inputs: BaseInput, proof: dict | str) -> bool:
         """
         Verify a proven inference.
         """
-        return self.proof_handler.verify_proof(self, public_data, proof)
+        return self.proof_handler.verify_proof(self, validator_inputs, proof)
 
     def generate_witness(self, return_content: bool = False) -> list | dict:
         """

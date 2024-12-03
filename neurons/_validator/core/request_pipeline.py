@@ -15,6 +15,7 @@ from constants import (
 from deployment_layer.circuit_store import circuit_store
 from execution_layer.circuit import Circuit, CircuitType
 from _validator.utils.hash_guard import HashGuard
+from _validator.core.request import Request
 from utils.wandb_logger import safe_log
 from _validator.models.request_type import RequestType
 
@@ -28,7 +29,7 @@ class RequestPipeline:
         self.api = api
         self.hash_guard = HashGuard()
 
-    def prepare_requests(self, filtered_uids) -> list[dict[str, object]]:
+    def prepare_requests(self, filtered_uids) -> list[Request]:
         """
         Prepare a batch of requests for the provided UIDs.
 
@@ -46,7 +47,6 @@ class RequestPipeline:
         )
 
         netuid = self.config.subnet_uid
-        request = None
         circuit = self.select_circuit_for_benchmark()
 
         if request_type == RequestType.RWR:
@@ -63,26 +63,23 @@ class RequestPipeline:
         )
 
         requests = [
-            {
-                "uid": uid,
-                "axon": self.config.metagraph.axons[uid],
-                "synapse": self.get_synapse_request(
-                    uid, request_type, circuit, request
-                ),
-                "circuit": circuit,
-                "request_type": request_type,
-            }
+            Request(
+                uid=uid,
+                axon=self.config.metagraph.axons[uid],
+                synapse=self.get_synapse_request(uid, request_type, circuit, request),
+                circuit=circuit,
+                request_type=request_type,
+            )
             for uid in filtered_uids
         ]
 
         for request in requests:
-            synapse: ProofOfWeightsSynapse | QueryZkProof = request["synapse"]
-            circuit: Circuit = request["circuit"]
             input_data = (
-                synapse.inputs
-                if circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS
-                else synapse.query_input
+                request.synapse.inputs
+                if request.circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS
+                else request.synapse.query_input
             )
+            request.inputs = input_data
             try:
                 self.hash_guard.check_hash(input_data)
             except Exception as e:

@@ -7,9 +7,10 @@ from constants import (
     MAX_CONCURRENT_REQUESTS,
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
 )
+from _validator.core.request import Request
 
 
-async def query_axons(dendrite, requests):
+async def query_axons(dendrite, requests) -> list[Request]:
     bt.logging.trace("Querying axons")
     random.shuffle(requests)
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)

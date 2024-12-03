@@ -45,6 +45,7 @@ class CircuitInput(BaseInput):
     def __init__(
         self, request_type: RequestType, data: dict[str, object] | None = None
     ):
+        data = self._add_missing_constants(data)
         super().__init__(request_type, data)
 
     @staticmethod
@@ -78,8 +79,7 @@ class CircuitInput(BaseInput):
     def validate(data: dict[str, object]) -> None:
         return CircuitInputSchema(**data)
 
-    @staticmethod
-    def process(data: dict[str, object]) -> dict[str, object]:
+    def _add_missing_constants(self, data: dict[str, object]) -> dict[str, object]:
         for i in range(16):
             data["validator_uid"][BATCH_SIZE - 16 + i] = secrets.randbits(16)
 
@@ -99,4 +99,9 @@ class CircuitInput(BaseInput):
 
         if "scaling" not in data:
             data["scaling"] = SCALING
+
+        return data
+
+    @staticmethod
+    def process(data: dict[str, object]) -> dict[str, object]:
         return data

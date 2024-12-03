@@ -20,6 +20,7 @@ from _validator.utils.api import hash_inputs
 from _validator.utils.axon import query_axons
 from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
+from _validator.core.request import Request
 from execution_layer.circuit import Circuit, CircuitType
 from constants import (
     REQUEST_DELAY_SECONDS,
@@ -92,7 +93,7 @@ class ValidatorLoop:
 
         random.shuffle(filtered_uids)
 
-        requests = self.request_pipeline.prepare_requests(filtered_uids)
+        requests: list[Request] = self.request_pipeline.prepare_requests(filtered_uids)
 
         if len(requests) == 0:
             bt.logging.error("No requests prepared")
@@ -144,7 +145,9 @@ class ValidatorLoop:
         """
         loop = asyncio.get_event_loop()
 
-        responses = loop.run_until_complete(query_axons(self.config.dendrite, requests))
+        responses: list[Request] = loop.run_until_complete(
+            query_axons(self.config.dendrite, requests)
+        )
 
         processed_responses: list[MinerResponse] = (
             self.response_processor.process_responses(responses)

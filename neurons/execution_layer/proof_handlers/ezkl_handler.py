@@ -1,11 +1,15 @@
 from __future__ import annotations
+import asyncio
 import json
 import os
 from typing import TYPE_CHECKING
 import ezkl
 import bittensor as bt
+import multiprocessing
+import traceback
 
 from execution_layer.proof_handlers.base_handler import ProofSystemHandler
+from execution_layer.base_input import BaseInput
 
 if TYPE_CHECKING:
     from execution_layer.verified_model_session import VerifiedModelSession
@@ -18,112 +22,119 @@ class EZKLHandler(ProofSystemHandler):
     """
 
     def gen_input_file(self, session: VerifiedModelSession):
-        """
-        Generate an input file for the EZKL proof system.
-
-        Args:
-            session (VerifiedModelSession): The session object containing input data and storage information.
-        """
         bt.logging.trace("Generating input file")
-        data = {"input_data": session.inputs}
+        input_data = session.inputs.to_array()
+        data = {"input_data": input_data}
         os.makedirs(os.path.dirname(session.session_storage.input_path), exist_ok=True)
         with open(session.session_storage.input_path, "w", encoding="utf-8") as f:
             json.dump(data, f)
         bt.logging.trace(f"Generated input.json with data: {data}")
 
-    def gen_proof(self, session: VerifiedModelSession):
-        """
-        Generate a proof using the EZKL proof system.
+    async def _gen_proof_task(self, session: VerifiedModelSession):
+        self.generate_witness(session)
 
-        Args:
-            session (VerifiedModelSession): The session object containing necessary paths and data.
-
-        Returns:
-            str: The content of the generated proof.
-        """
-        self.gen_input_file(session)
-        bt.logging.trace("Generating witness")
-        self.gen_witness(
-            session.session_storage.input_path,
-            session.model.paths.compiled_model,
-            session.session_storage.witness_path,
-            session.model.paths.vk,
-        )
         bt.logging.trace("Generating proof")
-        res = ezkl.prove(  # type: ignore
+        res = ezkl.prove(
             session.session_storage.witness_path,
             session.model.paths.compiled_model,
             session.model.paths.pk,
             session.session_storage.proof_path,
             "single",
+            session.model.paths.srs,
         )
         bt.logging.trace(
             f"Proof generated: {session.session_storage.proof_path}, result: {res}"
         )
-        with open(session.session_storage.proof_path, "r", encoding="utf-8") as f:
-            return f.read()
 
-    def verify_proof(self, session: VerifiedModelSession):
-        """
-        Verify a proof using the EZKL proof system.
+    def _proof_worker(self, session: VerifiedModelSession):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(self._gen_proof_task(session))
+        finally:
+            loop.close()
 
-        Args:
-            session (VerifiedModelSession): The session object containing necessary paths for verification.
+    def gen_proof(self, session: VerifiedModelSession) -> tuple[str, str]:
+        try:
+            self.gen_input_file(session)
+            bt.logging.debug("Starting proof generation process...")
 
-        Returns:
-            bool: The result of the verification process.
-        """
-        res = ezkl.verify(  # type: ignore
+            with multiprocessing.Pool(1) as p:
+                p.apply(func=self._proof_worker, args=[session])
+
+            with open(session.session_storage.proof_path, "r", encoding="utf-8") as f:
+                proof = json.load(f)
+
+            return json.dumps(proof), json.dumps(proof["instances"])
+
+        except Exception as e:
+            bt.logging.error(f"An error occurred during proof generation: {e}")
+            traceback.print_exc()
+            raise
+
+    def verify_proof(
+        self,
+        session: VerifiedModelSession,
+        validator_inputs: BaseInput,
+        proof: str | dict,
+    ) -> bool:
+        if not proof:
+            return False
+
+        if isinstance(proof, str):
+            proof_json = json.loads(proof)
+        else:
+            proof_json = proof
+
+        input_instances = self.translate_inputs_to_instances(session, validator_inputs)
+
+        proof_json["instances"] = (
+            input_instances[: len(input_instances)]
+            + proof_json["instances"][len(input_instances) :]
+        )
+
+        proof_json["transcript_type"] = "EVM"
+
+        with open(session.session_storage.proof_path, "w", encoding="utf-8") as f:
+            json.dump(proof_json, f)
+
+        res = ezkl.verify(
             session.session_storage.proof_path,
             session.model.paths.settings,
             session.model.paths.vk,
+            session.model.paths.srs,
         )
         return res
 
-    def generate_witness(self, session: VerifiedModelSession):
-        """
-        Generate a witness for the EZKL proof system.
-
-        Args:
-            session (VerifiedModelSession): The session object containing necessary paths for witness generation.
-
-        Returns:
-            The result of the witness generation process.
-        """
-        return EZKLHandler.gen_witness(
+    def generate_witness(
+        self, session: VerifiedModelSession, return_content: bool = False
+    ) -> list | dict:
+        bt.logging.trace("Generating witness")
+        res = ezkl.gen_witness(
             session.session_storage.input_path,
             session.model.paths.compiled_model,
             session.session_storage.witness_path,
             session.model.paths.vk,
+            session.model.paths.srs,
         )
-
-    @staticmethod
-    def gen_witness(input_path, circuit_path, witness_path, vk_path):
-        """
-        Generate a witness for the EZKL proof system.
-
-        Args:
-            input_path (str): Path to the input file.
-            circuit_path (str): Path to the circuit file.
-            witness_path (str): Path to store the generated witness.
-            vk_path (str): Path to the verification key.
-
-        Returns:
-            The result of the witness generation process.
-        """
-        bt.logging.trace("Generating witness")
-        res = ezkl.gen_witness(input_path, circuit_path, witness_path, vk_path)  # type: ignore
         bt.logging.trace(f"Gen witness result: {res}")
+
+        if return_content:
+            with open(session.session_storage.witness_path, "r", encoding="utf-8") as f:
+                return json.load(f)
         return res
+
+    def translate_inputs_to_instances(
+        self, session: VerifiedModelSession, validator_inputs: BaseInput
+    ) -> list[int]:
+        scale_map = session.model.settings.get("model_input_scales", [])
+        return [
+            ezkl.float_to_felt(x, scale_map[i])
+            for i, arr in enumerate(validator_inputs.to_array())
+            for x in arr
+        ]
 
     def aggregate_proofs(
         self, session: VerifiedModelSession, proofs: list[str]
     ) -> tuple[str, float]:
-        """
-        Aggregate multiple proofs into a single proof for the given session.
-
-        Returns:
-            tuple[str, float]: A tuple containing the aggregated proof content (str)
-            and the time taken to aggregate the proofs (float).
-        """
         raise NotImplementedError("Proof aggregation not supported at this time.")
