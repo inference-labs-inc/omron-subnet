@@ -2,7 +2,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 from execution_layer.base_input import BaseInput
 from execution_layer.input_registry import InputRegistry
-from _validator.utils.request_type import RequestType
+from _validator.models.request_type import RequestType
 import random
 import secrets
 

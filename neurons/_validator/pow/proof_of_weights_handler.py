@@ -8,7 +8,7 @@ from constants import (
 from protocol import ProofOfWeightsSynapse, QueryZkProof
 
 if typing.TYPE_CHECKING:
-    from _validator.utils.request_type import RequestType
+    from _validator.models.request_type import RequestType
 
 
 class ProofOfWeightsHandler:

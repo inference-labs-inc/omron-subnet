@@ -108,7 +108,12 @@ class RequestPipeline:
         weights = {
             circuit_id: CIRCUIT_WEIGHTS[circuit_id]
             for circuit_id in circuit_store.list_circuits()
+            if circuit_id in CIRCUIT_WEIGHTS
         }
+
+        if not weights:
+            bt.logging.error("No circuits available for benchmarking")
+            return None
 
         circuit_id = random.choices(
             list(weights.keys()), weights=list(weights.values()), k=1
