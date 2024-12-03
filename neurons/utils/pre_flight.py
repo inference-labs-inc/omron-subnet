@@ -436,6 +436,13 @@ def compile_jolt_circuits():
         if not model_hash.startswith("model_"):
             continue
 
+        if model_hash.split("_")[1] in IGNORED_MODEL_HASHES:
+            logging.info(
+                JOLT_LOG_PREFIX
+                + f"Ignoring model {model_hash} as it is in the ignored list."
+            )
+            continue
+
         metadata_file = os.path.join(MODEL_DIR, model_hash, "metadata.json")
         if not os.path.isfile(metadata_file):
             logging.warning(
