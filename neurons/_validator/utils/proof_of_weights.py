@@ -129,7 +129,7 @@ class ProofOfWeightsItem:
             min_response_time=torch.tensor(0, dtype=torch.float32),
             block_number=torch.tensor(0, dtype=torch.int64),
             validator_uid=torch.tensor(0, dtype=torch.int64),
-            uid=torch.tensor(0, dtype=torch.int64),
+            uid=torch.tensor(-1, dtype=torch.int64),
         )
 
     @staticmethod
