@@ -153,7 +153,7 @@ class ValidatorLoop:
             self.response_processor.process_responses(responses)
         )
 
-        circuit: Circuit = requests[0].get("circuit")
+        circuit: Circuit = requests[0].circuit
 
         if circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS:
             verified_responses = [
