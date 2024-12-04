@@ -48,8 +48,6 @@ class EZKLHandler(ProofSystemHandler):
                     session.model.paths.pk,
                     "--proof-path",
                     session.session_storage.proof_path,
-                    "--proof-type",
-                    "single",
                 ],
                 check=True,
                 capture_output=True,
