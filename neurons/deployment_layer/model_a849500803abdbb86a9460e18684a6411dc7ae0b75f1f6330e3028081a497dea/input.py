@@ -6,7 +6,7 @@ from _validator.models.request_type import RequestType
 import random
 import secrets
 
-BATCH_SIZE = 1024
+BATCH_SIZE = 256
 RATE_OF_DECAY = 0.4
 RATE_OF_RECOVERY = 0.1
 FLATTENING_COEFFICIENT = 0.9
