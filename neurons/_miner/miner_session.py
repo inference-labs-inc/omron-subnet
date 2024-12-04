@@ -277,6 +277,7 @@ class MinerSession:
         except Exception as e:
             synapse.query_output = "An error occurred"
             bt.logging.error(f"An error occurred while generating proven output\n{e}")
+            traceback.print_exc()
             proof_time = time.time() - time_in
 
         time_out = time.time()
@@ -338,6 +339,7 @@ class MinerSession:
             bt.logging.error(
                 f"An error occurred while generating proof of weights\n{e}"
             )
+            traceback.print_exc()
             proof_time = time.time() - time_in
 
         time_out = time.time()
