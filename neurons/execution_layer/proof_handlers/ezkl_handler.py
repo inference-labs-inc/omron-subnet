@@ -14,6 +14,8 @@ from execution_layer.base_input import BaseInput
 if TYPE_CHECKING:
     from execution_layer.verified_model_session import VerifiedModelSession
 
+multiprocessing.set_start_method("fork", force=True)
+
 
 class EZKLHandler(ProofSystemHandler):
     """
