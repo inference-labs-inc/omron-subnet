@@ -50,6 +50,49 @@ btcli subnet register --subtensor.network finney --netuid 2 --wallet.name {your_
 
 ### Run the miner
 
+#### With docker compose (recommended)
+
+```yaml
+---
+services:
+
+  omron-miner:
+    image: ghcr.io/inference-labs-inc/omron:latest
+    restart: unless-stopped
+    ports:
+      - 8091:8091
+    volumes:  # Update this path to your .bittensor directory
+      - {path_to_your_.bittensor_directory}:/root/.bittensor
+    labels:
+      - com.centurylinklabs.watchtower.enable=true  # Enables Watchtower for this container
+    command: miner.py --wallet.name {your_miner_key_name} --wallet.hotkey {your_miner_hotkey_name} --netuid 2
+
+  # Use Watchtower automatically update containers
+  watchtower:
+    image: containrrr/watchtower:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: --interval 60 --cleanup --label-enable
+```
+
+#### With docker cli
+
+```console
+docker run -d \
+  --name omron-miner \
+  -p 8091:8091 \
+  -v {path_to_your_.bittensor_directory}:/root/.bittensor \
+  --restart unless-stopped \
+  ghcr.io/inference-labs-inc/omron:latest \
+  miner.py \
+  --wallet.name {your_miner_key_name} \
+  --wallet.hotkey {your_miner_hotkey_name} \
+  --netuid 2
+```
+
+#### With pm2
+
 > [!IMPORTANT]
 > Ensure you are within the `/neurons` directory before using the commands below to start your miner
 >
@@ -57,7 +100,7 @@ btcli subnet register --subtensor.network finney --netuid 2 --wallet.name {your_
 > cd neurons
 > ```
 
-#### Within a virtual environment
+##### Within a virtual environment
 
 ```console
 pm2 start miner.py --name miner --interpreter ../omron-venv/bin/python --kill-timeout 3000 -- \
@@ -66,7 +109,7 @@ pm2 start miner.py --name miner --interpreter ../omron-venv/bin/python --kill-ti
 --wallet.hotkey {your_miner_hotkey_name}
 ```
 
-#### Outside of a virtual environment
+##### Outside of a virtual environment
 
 ```console
 pm2 start miner.py --name miner --interpreter python3 --kill-timeout 3000 -- \
@@ -77,6 +120,49 @@ pm2 start miner.py --name miner --interpreter python3 --kill-timeout 3000 -- \
 
 ### Run the validator
 
+#### With docker compose (recommended)
+
+```yaml
+---
+services:
+
+  omron-validator:
+    image: ghcr.io/inference-labs-inc/omron:latest
+    restart: unless-stopped
+    ports:
+      - 8000:8000
+    volumes:  # Update this path to your .bittensor directory
+      - {path_to_your_.bittensor_directory}:/root/.bittensor
+    labels:
+      - com.centurylinklabs.watchtower.enable=true  # Enables Watchtower for this container
+    command: validator.py --wallet.name {validator_key_name} --wallet.hotkey {validator_hot_key_name} --netuid 2
+
+  # Use Watchtower automatically update containers
+  watchtower:
+    image: containrrr/watchtower:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: --interval 60 --cleanup --label-enable
+```
+
+#### With docker cli
+
+```console
+docker run -d \
+  --name omron-validator \
+  -p 8000:8000 \
+  -v {path_to_your_.bittensor_directory}:/root/.bittensor \
+  --restart unless-stopped \
+  ghcr.io/inference-labs-inc/omron:latest \
+  validator.py \
+  --wallet.name {validator_key_name} \
+  --wallet.hotkey {validator_hot_key_name} \
+  --netuid 2
+```
+
+#### With pm2
+
 > [!IMPORTANT]
 > Ensure you are within the `/neurons` directory before using the commands below to start your validator
 >
@@ -84,7 +170,7 @@ pm2 start miner.py --name miner --interpreter python3 --kill-timeout 3000 -- \
 > cd neurons
 > ```
 
-#### Within a virtual environment
+##### Within a virtual environment
 
 ```console
 pm2 start validator.py --name validator --interpreter ../omron-venv/bin/python --kill-timeout 3000 -- \
@@ -93,7 +179,7 @@ pm2 start validator.py --name validator --interpreter ../omron-venv/bin/python -
 --wallet.hotkey {validator_hot_key_name}
 ```
 
-#### Outside of a virtual environment
+##### Outside of a virtual environment
 
 ```console
 pm2 start validator.py --name validator --interpreter python3 --kill-timeout 3000 -- \
