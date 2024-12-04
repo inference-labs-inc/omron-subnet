@@ -52,11 +52,13 @@ class CircuitInput(BaseInput):
     @staticmethod
     def generate() -> dict[str, object]:
         return {
-            "maximum_score": [1.0 * SCALING for _ in range(BATCH_SIZE)],
-            "previous_score": [random.random() * SCALING for _ in range(BATCH_SIZE)],
+            "maximum_score": [int(1.0 * SCALING) for _ in range(BATCH_SIZE)],
+            "previous_score": [
+                int(random.random() * SCALING) for _ in range(BATCH_SIZE)
+            ],
             "verified": [random.choice([True, False]) for _ in range(BATCH_SIZE)],
             "proof_size": [
-                random.randint(0, 10000) * SCALING for _ in range(BATCH_SIZE)
+                int(random.randint(0, 10000) * SCALING) for _ in range(BATCH_SIZE)
             ],
             "validator_uid": [random.randint(0, 255) for _ in range(BATCH_SIZE)],
             "block_number": [
@@ -64,11 +66,11 @@ class CircuitInput(BaseInput):
             ],
             "miner_uid": [random.randint(0, 255) for _ in range(BATCH_SIZE)],
             "minimum_response_time": [
-                random.random() * 60 * SCALING for _ in range(BATCH_SIZE)
+                int(random.random() * 60 * SCALING) for _ in range(BATCH_SIZE)
             ],
-            "maximum_response_time": [60.0 * SCALING for _ in range(BATCH_SIZE)],
+            "maximum_response_time": [int(60.0 * SCALING) for _ in range(BATCH_SIZE)],
             "response_time": [
-                random.random() * 60 * SCALING for _ in range(BATCH_SIZE)
+                int(random.random() * 60 * SCALING) for _ in range(BATCH_SIZE)
             ],
             "scaling": SCALING,
             "RATE_OF_DECAY": int(RATE_OF_DECAY * SCALING),
@@ -112,11 +114,11 @@ class CircuitInput(BaseInput):
     @staticmethod
     def process(data: dict[str, object]) -> dict[str, object]:
 
-        data["maximum_score"] = data["maximum_score"] * SCALING
-        data["previous_score"] = data["previous_score"] * SCALING
-        data["proof_size"] = data["proof_size"] * SCALING
-        data["minimum_response_time"] = data["minimum_response_time"] * SCALING
-        data["maximum_response_time"] = data["maximum_response_time"] * SCALING
-        data["response_time"] = data["response_time"] * SCALING
+        data["maximum_score"] = int(data["maximum_score"] * SCALING)
+        data["previous_score"] = int(data["previous_score"] * SCALING)
+        data["proof_size"] = int(data["proof_size"] * SCALING)
+        data["minimum_response_time"] = int(data["minimum_response_time"] * SCALING)
+        data["maximum_response_time"] = int(data["maximum_response_time"] * SCALING)
+        data["response_time"] = int(data["response_time"] * SCALING)
 
         return data
