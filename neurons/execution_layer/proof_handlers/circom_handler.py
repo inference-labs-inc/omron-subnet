@@ -152,7 +152,7 @@ class CircomHandler(ProofSystemHandler):
 
             bt.logging.trace("Diff between original and updated public_data:")
             for i, (old, new) in enumerate(
-                zip(validator_inputs.to_json(), updated_public_data)
+                zip(validator_inputs.to_json().values(), updated_public_data)
             ):
                 if old != new:
                     bt.logging.trace(f"Index {i}: {old} -> {new}")

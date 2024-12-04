@@ -43,6 +43,6 @@ class BaseInput(ABC):
         """Converts the data to array format"""
         return list(self.data.values())
 
-    def to_json(self) -> str:
+    def to_json(self) -> dict[str, object]:
         """Returns the data in JSON-compatible format"""
         return self.data
