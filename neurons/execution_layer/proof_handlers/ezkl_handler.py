@@ -22,7 +22,10 @@ class EZKLHandler(ProofSystemHandler):
 
     def gen_input_file(self, session: VerifiedModelSession):
         bt.logging.trace("Generating input file")
-        input_data = session.inputs.to_array()
+        if isinstance(session.inputs, list):
+            input_data = session.inputs
+        else:
+            input_data = session.inputs.to_array()
         data = {"input_data": input_data}
         os.makedirs(os.path.dirname(session.session_storage.input_path), exist_ok=True)
         with open(session.session_storage.input_path, "w", encoding="utf-8") as f:
