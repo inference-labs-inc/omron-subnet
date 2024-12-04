@@ -66,15 +66,9 @@ class CircuitInput(BaseInput):
             ],
             "has_docker": [random.random() < 0.5 for _ in range(BATCH_SIZE)],
             "uid": [random.randint(0, 255) for _ in range(BATCH_SIZE)],
-            "allocated_uids": [
-                [random.randint(0, 255) for _ in range(256)] for _ in range(BATCH_SIZE)
-            ],
-            "penalized_uids": [
-                [random.randint(0, 255) for _ in range(256)] for _ in range(BATCH_SIZE)
-            ],
-            "validator_uids": [
-                [random.randint(0, 255) for _ in range(256)] for _ in range(BATCH_SIZE)
-            ],
+            "allocated_uids": [random.randint(0, 255) for _ in range(256)],
+            "penalized_uids": [random.randint(0, 255) for _ in range(256)],
+            "validator_uids": [random.randint(0, 255) for _ in range(256)],
             "success_weight": [SUCCESS_WEIGHT],
             "difficulty_weight": [DIFFICULTY_WEIGHT],
             "time_elapsed_weight": [TIME_ELAPSED_WEIGHT],
