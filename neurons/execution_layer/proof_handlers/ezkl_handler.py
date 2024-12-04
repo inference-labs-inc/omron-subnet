@@ -4,7 +4,6 @@ import os
 from typing import TYPE_CHECKING
 import ezkl
 import bittensor as bt
-import multiprocessing
 import traceback
 
 from execution_layer.proof_handlers.base_handler import ProofSystemHandler
@@ -12,8 +11,6 @@ from execution_layer.base_input import BaseInput
 
 if TYPE_CHECKING:
     from execution_layer.verified_model_session import VerifiedModelSession
-
-multiprocessing.set_start_method("fork", force=True)
 
 
 class EZKLHandler(ProofSystemHandler):
@@ -31,8 +28,11 @@ class EZKLHandler(ProofSystemHandler):
             json.dump(data, f)
         bt.logging.trace(f"Generated input.json with data: {data}")
 
-    def _proof_worker(self, session: VerifiedModelSession):
+    def gen_proof(self, session: VerifiedModelSession) -> tuple[str, str]:
         try:
+            self.gen_input_file(session)
+            bt.logging.debug("Starting proof generation...")
+
             self.generate_witness(session)
             bt.logging.trace("Generating proof")
             res = ezkl.prove(
@@ -46,17 +46,6 @@ class EZKLHandler(ProofSystemHandler):
             bt.logging.trace(
                 f"Proof generated: {session.session_storage.proof_path}, result: {res}"
             )
-        except Exception as e:
-            bt.logging.error(f"Error in proof worker: {e}")
-            raise
-
-    def gen_proof(self, session: VerifiedModelSession) -> tuple[str, str]:
-        try:
-            self.gen_input_file(session)
-            bt.logging.debug("Starting proof generation process...")
-
-            with multiprocessing.Pool(1) as p:
-                p.apply(func=self._proof_worker, args=[session])
 
             with open(session.session_storage.proof_path, "r", encoding="utf-8") as f:
                 proof = json.load(f)
