@@ -13,8 +13,10 @@ from _validator.scoring.score_manager import ScoreManager
 from _validator.core.request import Request
 from _validator.utils.logging import log_responses, log_system_metrics
 from _validator.utils.proof_of_weights import save_proof_of_weights
+from _validator.models.request_type import RequestType
 from constants import BATCHED_PROOF_OF_WEIGHTS_MODEL_ID
 from execution_layer.generic_input import GenericInput
+
 from utils import wandb_logger
 
 
@@ -115,7 +117,7 @@ class ResponseProcessor:
             return False
         try:
             inference_session = VerifiedModelSession(
-                GenericInput(validator_inputs),
+                GenericInput(RequestType.RWR, validator_inputs),
                 circuit_store.get_circuit(response.model_id),
             )
             res: bool = inference_session.verify_proof(
