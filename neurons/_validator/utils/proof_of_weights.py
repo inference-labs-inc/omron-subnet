@@ -82,18 +82,18 @@ class ProofOfWeightsItem:
         return ProofOfWeightsItem(
             maximum_score=maximum_score,
             previous_score=previous_score,
-            verified=torch.tensor(response.verified, dtype=torch.bool),
+            verified=torch.tensor(response.verification_result, dtype=torch.bool),
             proof_size=torch.tensor(response.proof_size, dtype=torch.int64),
             response_time=(
                 torch.tensor(response.response_time, dtype=torch.float32)
-                if response.verified
+                if response.verification_result
                 else maximum_response_time
             ),
             maximum_response_time=maximum_response_time,
             minimum_response_time=minimum_response_time,
             block_number=block_number,
             validator_uid=validator_uid,
-            miner_uid=torch.tensor(response.miner_uid, dtype=torch.int64),
+            miner_uid=torch.tensor(response.uid, dtype=torch.int64),
         )
 
     @staticmethod
@@ -116,7 +116,7 @@ class ProofOfWeightsItem:
     @staticmethod
     def empty():
         return ProofOfWeightsItem(
-            max_score=torch.tensor(DEFAULT_MAX_SCORE, dtype=torch.float32),
+            maximum_score=torch.tensor(DEFAULT_MAX_SCORE, dtype=torch.float32),
             previous_score=torch.tensor(0, dtype=torch.float32),
             verified=torch.tensor(0, dtype=torch.int64),
             proof_size=torch.tensor(DEFAULT_PROOF_SIZE, dtype=torch.int64),
@@ -135,7 +135,7 @@ class ProofOfWeightsItem:
     @staticmethod
     def from_tensor(tensor: torch.Tensor):
         return ProofOfWeightsItem(
-            max_score=tensor[0],
+            maximum_score=tensor[0],
             previous_score=tensor[1],
             verified=tensor[2],
             proof_size=tensor[3],
@@ -150,7 +150,7 @@ class ProofOfWeightsItem:
     def to_tensor(self):
         return torch.tensor(
             [
-                self.max_score,
+                self.maximum_score,
                 self.previous_score,
                 self.verified,
                 self.proof_size,
@@ -172,7 +172,7 @@ class ProofOfWeightsItem:
     @staticmethod
     def to_dict_list(items: list["ProofOfWeightsItem"]):
         result = {
-            "max_score": [],
+            "maximum_score": [],
             "previous_score": [],
             "verified": [],
             "proof_size": [],
@@ -184,7 +184,7 @@ class ProofOfWeightsItem:
             "miner_uid": [],
         }
         for item in items:
-            result["max_score"].append(item.max_score.item())
+            result["maximum_score"].append(item.maximum_score.item())
             result["previous_score"].append(item.previous_score.item())
             result["verified"].append(item.verified.item())
             result["proof_size"].append(item.proof_size.item())
@@ -199,10 +199,10 @@ class ProofOfWeightsItem:
     @classmethod
     def from_dict_list(cls, data: dict) -> list["ProofOfWeightsItem"]:
         items = []
-        for i in range(len(data["max_score"])):
+        for i in range(len(data["maximum_score"])):
             items.append(
                 cls(
-                    max_score=data["max_score"][i],
+                    maximum_score=data["maximum_score"][i],
                     previous_score=data["previous_score"][i],
                     verified=data["verified"][i],
                     proof_size=data["proof_size"][i],
