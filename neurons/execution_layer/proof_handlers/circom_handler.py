@@ -157,21 +157,41 @@ class CircomHandler(ProofSystemHandler):
                 if old != new:
                     bt.logging.trace(f"Index {i}: {old} -> {new}")
 
-            result = subprocess.run(
-                [
-                    LOCAL_SNARKJS_PATH,
-                    "g16v",
-                    session.model.paths.vk,
-                    session.session_storage.public_path,
-                    session.session_storage.proof_path,
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            bt.logging.trace(f"Proof verification stdout: {result.stdout}")
-            bt.logging.trace(f"Proof verification stderr: {result.stderr}")
-            return "OK!" in result.stdout
+            if session.session_storage.rapidsnark_binary:
+                # rapidSnark binary is provided, use it for proof verification, it's faster
+                self.generate_witness(session)
+                result = subprocess.run(
+                    [
+                        session.session_storage.rapidsnark_binary,
+                        session.model.paths.pk,
+                        session.session_storage.witness_path,
+                        session.session_storage.public_path,
+                        session.session_storage.proof_path,
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                bt.logging.trace(f"Proof verification stdout: {result.stdout}")
+                bt.logging.trace(f"Proof verification stderr: {result.stderr}")
+                return result.returncode == 0
+            else:
+                # No rapidSnark, so use snarkjs for proof verification
+                result = subprocess.run(
+                    [
+                        LOCAL_SNARKJS_PATH,
+                        "g16v",
+                        session.model.paths.vk,
+                        session.session_storage.public_path,
+                        session.session_storage.proof_path,
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                bt.logging.trace(f"Proof verification stdout: {result.stdout}")
+                bt.logging.trace(f"Proof verification stderr: {result.stderr}")
+                return "OK!" in result.stdout
         except subprocess.CalledProcessError as e:
             bt.logging.error(f"Proof verification failed: {e}")
             bt.logging.error(f"Proof verification stdout: {e.stdout}")

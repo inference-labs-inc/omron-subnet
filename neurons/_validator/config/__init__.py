@@ -46,6 +46,7 @@ class ValidatorConfig:
         )
         self.localnet = self.bt_config.localnet
         self.api = ApiConfig(self.bt_config)
+        self.rapidsnark_binary_path = self.bt_config.rapidsnark_binary_path
 
         # Initialize wandb logger
         wandb_logger.safe_init(

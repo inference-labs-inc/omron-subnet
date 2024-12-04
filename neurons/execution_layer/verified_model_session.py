@@ -49,13 +49,18 @@ class VerifiedModelSession:
         self,
         inputs: BaseInput | None = None,
         model: Circuit | None = None,
+        rapidsnark_binary: str | None = None,
     ):
         if model is None:
             raise ValueError("Model must be provided")
         self.model = model
         self.inputs = inputs
         self.session_id = str(uuid.uuid4())
-        self.session_storage = SessionStorage(self.model.id, self.session_id)
+        self.session_storage = SessionStorage(
+            model_id=self.model.id,
+            session_uuid=self.session_id,
+            rapidsnark_binary=rapidsnark_binary,
+        )
         self.proof_handler = ProofSystemFactory.get_handler(
             self.model.metadata.proof_system
         )

@@ -56,9 +56,10 @@ class ValidatorLoop:
             self.config.metagraph, self.config.user_uid, self.config.full_path_score
         )
         self.response_processor = ResponseProcessor(
-            self.config.metagraph,
-            self.score_manager,
-            self.config.user_uid,
+            metagraph=self.config.metagraph,
+            score_manager=self.score_manager,
+            user_uid=self.config.user_uid,
+            rapidsnark_binary=self.config.rapidsnark_binary_path,
         )
         self.weights_manager = WeightsManager(
             self.config.subtensor,

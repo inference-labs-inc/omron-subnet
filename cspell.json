@@ -29,6 +29,7 @@
     "Opentensor",
     "pydantic",
     "rustup",
+    "rapidsnark",
     "setdefaulttimeout",
     "snarkjs",
     "starlette",

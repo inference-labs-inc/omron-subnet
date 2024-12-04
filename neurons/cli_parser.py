@@ -248,6 +248,13 @@ def _validator_config():
         help="The port for the prometheus monitoring.",
     )
 
+    parser.add_argument(
+        "--rapidsnark-binary-path",
+        type=str,
+        default=None,
+        help="Path to the rapid snark binary.",
+    )
+
     bt.subtensor.add_args(parser)
     bt.logging.add_args(parser)
     bt.wallet.add_args(parser)
