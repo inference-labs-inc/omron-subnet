@@ -30,7 +30,6 @@ class EZKLHandler(ProofSystemHandler):
 
     def gen_proof(self, session: VerifiedModelSession) -> tuple[str, str]:
         try:
-            self.gen_input_file(session)
             bt.logging.debug("Starting proof generation...")
 
             self.generate_witness(session)
@@ -99,7 +98,7 @@ class EZKLHandler(ProofSystemHandler):
             session.session_storage.witness_path,
             session.model.paths.vk,
         )
-        bt.logging.trace(f"Gen witness result: {res}")
+        bt.logging.debug(f"Gen witness result: {res}")
 
         if return_content:
             with open(session.session_storage.witness_path, "r", encoding="utf-8") as f:

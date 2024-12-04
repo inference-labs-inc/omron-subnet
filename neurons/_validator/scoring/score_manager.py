@@ -210,7 +210,7 @@ class ScoreManager:
         )
 
         for uid, score in zip(miner_uids, scores):
-            if uid >= len(self.scores):
+            if uid < 0 or uid >= len(self.scores):
                 continue
             self.scores[uid] = float(score)
             bt.logging.debug(f"Updated score for UID {uid}: {score}")
