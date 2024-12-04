@@ -45,8 +45,6 @@ class ProofOfWeightsHandler:
             RequestType.RWR, ProofOfWeightsItem.to_dict_list(pow_items)
         ).to_json()
 
-        logging.debug(f"PoW Queued Inputs: {inputs}")
-
         if circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS:
             return ProofOfWeightsSynapse(
                 subnet_uid=circuit.metadata.netuid,
