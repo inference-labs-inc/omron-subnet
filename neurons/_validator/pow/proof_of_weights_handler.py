@@ -13,7 +13,7 @@ class ProofOfWeightsHandler:
     @staticmethod
     def prepare_pow_request(circuit: Circuit, proof_of_weights_queue):
         if not proof_of_weights_queue:
-            logging.warning("No proof of weights queue found. Defaulting to benchmark.")
+            logging.debug("No proof of weights queue found. Defaulting to benchmark.")
             return (
                 ProofOfWeightsSynapse(
                     subnet_uid=circuit.metadata.netuid,

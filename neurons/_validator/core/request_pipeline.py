@@ -14,6 +14,7 @@ from constants import (
 )
 from deployment_layer.circuit_store import circuit_store
 from execution_layer.circuit import Circuit, CircuitType
+from execution_layer.generic_input import GenericInput
 from _validator.utils.hash_guard import HashGuard
 from _validator.core.request import Request
 from utils.wandb_logger import safe_log
@@ -79,7 +80,7 @@ class RequestPipeline:
                 if request.circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS
                 else request.synapse.query_input
             )
-            request.inputs = input_data
+            request.inputs = GenericInput(request.request_type, input_data)
             try:
                 self.hash_guard.check_hash(input_data)
             except Exception as e:

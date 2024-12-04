@@ -10,7 +10,7 @@ import bittensor as bt
 from constants import FIELD_MODULUS
 from utils.pre_flight import LOCAL_SNARKJS_PATH
 from execution_layer.proof_handlers.base_handler import ProofSystemHandler
-from execution_layer.base_input import BaseInput
+from execution_layer.generic_input import GenericInput
 
 if TYPE_CHECKING:
     from execution_layer.verified_model_session import VerifiedModelSession
@@ -105,7 +105,7 @@ class CircomHandler(ProofSystemHandler):
     def verify_proof(
         self,
         session: "VerifiedModelSession",
-        validator_inputs: BaseInput,
+        validator_inputs: GenericInput,
         proof: dict,
     ) -> bool:
         try:
@@ -123,11 +123,12 @@ class CircomHandler(ProofSystemHandler):
             # the proof was generated against validator-provided inputs
             with open(session.session_storage.input_path, "r", encoding="utf-8") as f:
                 session_inputs = json.load(f)
+
             current_index = 0
-            updated_public_data = validator_inputs.to_json().copy()
+            updated_public_data = session_inputs.to_json().copy()
             for input_name in input_order:
-                if input_name in session_inputs:
-                    value = session_inputs[input_name]
+                if input_name in validator_inputs.to_json():
+                    value = validator_inputs.to_json()[input_name]
                     if isinstance(value, list):
                         for i, item in enumerate(value):
                             if i < input_sizes[input_name]:

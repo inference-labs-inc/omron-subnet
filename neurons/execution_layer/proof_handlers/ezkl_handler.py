@@ -7,7 +7,7 @@ import bittensor as bt
 import traceback
 
 from execution_layer.proof_handlers.base_handler import ProofSystemHandler
-from execution_layer.base_input import BaseInput
+from execution_layer.generic_input import GenericInput
 
 if TYPE_CHECKING:
     from execution_layer.verified_model_session import VerifiedModelSession
@@ -59,7 +59,7 @@ class EZKLHandler(ProofSystemHandler):
     def verify_proof(
         self,
         session: VerifiedModelSession,
-        validator_inputs: BaseInput,
+        validator_inputs: GenericInput,
         proof: str | dict,
     ) -> bool:
         if not proof:
@@ -107,7 +107,7 @@ class EZKLHandler(ProofSystemHandler):
         return res
 
     def translate_inputs_to_instances(
-        self, session: VerifiedModelSession, validator_inputs: BaseInput
+        self, session: VerifiedModelSession, validator_inputs: GenericInput
     ) -> list[int]:
         scale_map = session.model.settings.get("model_input_scales", [])
         return [

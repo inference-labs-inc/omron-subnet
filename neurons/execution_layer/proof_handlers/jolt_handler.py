@@ -5,6 +5,7 @@ import traceback
 from typing import TYPE_CHECKING
 import bittensor as bt
 from execution_layer.proof_handlers.base_handler import ProofSystemHandler
+from execution_layer.generic_input import GenericInput
 
 if TYPE_CHECKING:
     from execution_layer.verified_model_session import VerifiedModelSession
@@ -52,7 +53,7 @@ class JoltHandler(ProofSystemHandler):
     def verify_proof(
         self,
         session: "VerifiedModelSession",
-        public_data: list[str],
+        public_data: GenericInput,
         proof: str,
     ) -> bool:
         try:
@@ -63,7 +64,7 @@ class JoltHandler(ProofSystemHandler):
             with open(
                 session.session_storage.public_path, "w", encoding="utf-8"
             ) as public_file:
-                json.dump(public_data, public_file)
+                json.dump(public_data.to_json(), public_file)
 
             result = subprocess.run(
                 [

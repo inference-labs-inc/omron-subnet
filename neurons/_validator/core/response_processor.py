@@ -109,18 +109,18 @@ class ResponseProcessor:
         return miner_response
 
     def verify_proof_string(
-        self, response: MinerResponse, validator_inputs: list[float] | dict
+        self, response: MinerResponse, validator_inputs: GenericInput
     ) -> bool:
         if not response.proof_content or not response.public_json:
             logging.error(f"Proof or public json not found for UID: {response.uid}")
             return False
         try:
             inference_session = VerifiedModelSession(
-                GenericInput(RequestType.RWR, validator_inputs),
+                GenericInput(RequestType.RWR, response.public_json),
                 response.circuit,
             )
             res: bool = inference_session.verify_proof(
-                response.public_json, response.proof_content
+                validator_inputs, response.proof_content
             )
             inference_session.end()
             return res
