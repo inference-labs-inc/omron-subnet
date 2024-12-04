@@ -1,5 +1,4 @@
 from __future__ import annotations
-import asyncio
 import json
 import os
 from typing import TYPE_CHECKING
@@ -32,29 +31,24 @@ class EZKLHandler(ProofSystemHandler):
             json.dump(data, f)
         bt.logging.trace(f"Generated input.json with data: {data}")
 
-    async def _gen_proof_task(self, session: VerifiedModelSession):
-        self.generate_witness(session)
-
-        bt.logging.trace("Generating proof")
-        res = ezkl.prove(
-            session.session_storage.witness_path,
-            session.model.paths.compiled_model,
-            session.model.paths.pk,
-            session.session_storage.proof_path,
-            "single",
-            session.model.paths.srs,
-        )
-        bt.logging.trace(
-            f"Proof generated: {session.session_storage.proof_path}, result: {res}"
-        )
-
     def _proof_worker(self, session: VerifiedModelSession):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         try:
-            loop.run_until_complete(self._gen_proof_task(session))
-        finally:
-            loop.close()
+            self.generate_witness(session)
+            bt.logging.trace("Generating proof")
+            res = ezkl.prove(
+                session.session_storage.witness_path,
+                session.model.paths.compiled_model,
+                session.model.paths.pk,
+                session.session_storage.proof_path,
+                "single",
+                session.model.paths.srs,
+            )
+            bt.logging.trace(
+                f"Proof generated: {session.session_storage.proof_path}, result: {res}"
+            )
+        except Exception as e:
+            bt.logging.error(f"Error in proof worker: {e}")
+            raise
 
     def gen_proof(self, session: VerifiedModelSession) -> tuple[str, str]:
         try:
