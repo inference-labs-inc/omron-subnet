@@ -136,7 +136,7 @@ class ValidatorLoop:
         else:
             bt.logging.debug("Automatic updates are disabled, skipping version check")
 
-    def _process_requests(self, requests) -> list[MinerResponse]:
+    def _process_requests(self, requests: list[Request]) -> list[MinerResponse]:
         """
         Process requests, update scores and weights.
 
@@ -164,7 +164,7 @@ class ValidatorLoop:
                 save_proof_of_weights(
                     public_signals=[random_verified_response.public_json],
                     proof=[random_verified_response.proof_content],
-                    proof_filename=hash_inputs(requests[0].get("inputs")),
+                    proof_filename=hash_inputs(requests[0].inputs),
                 )
 
         self.score_manager.update_scores(processed_responses)
