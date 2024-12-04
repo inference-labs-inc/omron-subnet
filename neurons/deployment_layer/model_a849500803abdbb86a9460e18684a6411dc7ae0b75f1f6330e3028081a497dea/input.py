@@ -59,11 +59,7 @@ class CircuitInput(BaseInput):
         )
 
         response_time = (
-            int(
-                random.random()
-                * (maximum_response_time - minimum_response_time)
-                * SCALING
-            )
+            int(random.random() * (maximum_response_time - minimum_response_time))
             + minimum_response_time
         )
         max_score = int(1 / 256 * SCALING)

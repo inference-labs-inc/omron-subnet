@@ -187,3 +187,5 @@ docs/notebooks/proof.json
 docs/notebooks/model.compiled
 docs/notebooks/settings.json
 docs/notebooks/*.key
+**/witness.json
+**/input.json
