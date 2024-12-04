@@ -25,8 +25,12 @@ class ProofOfWeightsHandler:
                 )
                 if circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS
                 else QueryZkProof(
-                    model_id=circuit.id,
-                    query_input=circuit.input_handler(RequestType.BENCHMARK).to_json(),
+                    query_input={
+                        "public_inputs": circuit.input_handler(
+                            RequestType.BENCHMARK
+                        ).to_json(),
+                        "model_id": circuit.id,
+                    },
                     query_output="",
                 )
             )
