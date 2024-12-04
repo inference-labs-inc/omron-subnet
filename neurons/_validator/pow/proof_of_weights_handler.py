@@ -57,7 +57,6 @@ class ProofOfWeightsHandler:
                 public_signals="",
             )
         return QueryZkProof(
-            model_id=circuit.id,
-            query_input=inputs,
+            query_input={"public_inputs": inputs, "model_id": circuit.id},
             query_output="",
         )
