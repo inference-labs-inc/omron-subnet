@@ -14,7 +14,7 @@ def hash_inputs(inputs: GenericInput) -> str:
     """
     filtered_inputs = {
         k: v
-        for k, v in inputs.to_dict().items()
+        for k, v in inputs.to_json().items()
         if k not in ["validator_uid", "nonce", "uid_responsible_for_proof"]
     }
     return hashlib.sha256(str(filtered_inputs).encode()).hexdigest()
