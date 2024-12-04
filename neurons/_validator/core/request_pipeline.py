@@ -80,7 +80,7 @@ class RequestPipeline:
                 if request.circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS
                 else request.synapse.query_input
             )
-            request.inputs = GenericInput(request.request_type, input_data)
+            request.inputs = GenericInput(RequestType.RWR, input_data)
             try:
                 self.hash_guard.check_hash(input_data)
             except Exception as e:
