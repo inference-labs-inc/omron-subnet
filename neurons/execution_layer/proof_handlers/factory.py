@@ -8,7 +8,7 @@ class ProofSystemFactory:
     _handlers = {
         ProofSystem.CIRCOM: CircomHandler,
         ProofSystem.JOLT: JoltHandler,
-        ProofSystem.ETH_ZK: EZKLHandler,
+        ProofSystem.EZKL: EZKLHandler,
     }
 
     @classmethod
