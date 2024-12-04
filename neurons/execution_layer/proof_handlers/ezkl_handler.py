@@ -22,8 +22,8 @@ class EZKLHandler(ProofSystemHandler):
 
     def gen_input_file(self, session: VerifiedModelSession):
         bt.logging.trace("Generating input file")
-        if isinstance(session.inputs, list):
-            input_data = session.inputs
+        if isinstance(session.inputs.data, list):
+            input_data = session.inputs.data
         else:
             input_data = session.inputs.to_array()
         data = {"input_data": input_data}
