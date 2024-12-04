@@ -12,6 +12,7 @@ from constants import (
 from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
 from _validator.models.request_type import RequestType
+from execution_layer.generic_input import GenericInput
 
 
 class ScoreManager:
@@ -186,7 +187,7 @@ class ScoreManager:
                 )
                 item.maximum_response_time = item.minimum_response_time + 1
 
-        inputs = pow_circuit.input_handler(
+        inputs = GenericInput(
             RequestType.RWR, ProofOfWeightsItem.to_dict_list(padded_items)
         )
 
