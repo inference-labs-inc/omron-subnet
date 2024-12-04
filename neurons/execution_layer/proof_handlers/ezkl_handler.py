@@ -2,10 +2,10 @@ from __future__ import annotations
 import json
 import os
 from typing import TYPE_CHECKING
-import ezkl
+import subprocess
 import bittensor as bt
 import traceback
-import asyncio
+import ezkl
 
 from execution_layer.proof_handlers.base_handler import ProofSystemHandler
 from execution_layer.generic_input import GenericInput
@@ -35,18 +35,29 @@ class EZKLHandler(ProofSystemHandler):
 
             self.generate_witness(session)
             bt.logging.trace("Generating proof")
-            loop = asyncio.get_event_loop()
-            res = loop.run_until_complete(
-                ezkl.prove(
+
+            result = subprocess.run(
+                [
+                    "ezkl",
+                    "prove",
+                    "--witness",
                     session.session_storage.witness_path,
+                    "--compiled-circuit",
                     session.model.paths.compiled_model,
+                    "--pk-path",
                     session.model.paths.pk,
+                    "--proof-path",
                     session.session_storage.proof_path,
+                    "--proof-type",
                     "single",
-                )
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
             )
+
             bt.logging.trace(
-                f"Proof generated: {session.session_storage.proof_path}, result: {res}"
+                f"Proof generated: {session.session_storage.proof_path}, result: {result.stdout}"
             )
 
             with open(session.session_storage.proof_path, "r", encoding="utf-8") as f:
@@ -85,35 +96,55 @@ class EZKLHandler(ProofSystemHandler):
         with open(session.session_storage.proof_path, "w", encoding="utf-8") as f:
             json.dump(proof_json, f)
 
-        loop = asyncio.get_event_loop()
-        res = loop.run_until_complete(
-            ezkl.verify(
-                session.session_storage.proof_path,
-                session.model.paths.settings,
-                session.model.paths.vk,
+        try:
+            result = subprocess.run(
+                [
+                    "ezkl",
+                    "verify",
+                    "--settings-path",
+                    session.model.paths.settings,
+                    "--proof-path",
+                    session.session_storage.proof_path,
+                    "--vk-path",
+                    session.model.paths.vk,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
             )
-        )
-        return res
+            return "Proof verified successfully" in result.stdout
+        except subprocess.CalledProcessError:
+            return False
 
     def generate_witness(
         self, session: VerifiedModelSession, return_content: bool = False
     ) -> list | dict:
         bt.logging.trace("Generating witness")
-        loop = asyncio.get_event_loop()
-        res = loop.run_until_complete(
-            ezkl.gen_witness(
+
+        result = subprocess.run(
+            [
+                "ezkl",
+                "gen-witness",
+                "--data",
                 session.session_storage.input_path,
+                "--compiled-circuit",
                 session.model.paths.compiled_model,
+                "--output",
                 session.session_storage.witness_path,
+                "--vk-path",
                 session.model.paths.vk,
-            )
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
         )
-        bt.logging.debug(f"Gen witness result: {res}")
+
+        bt.logging.debug(f"Gen witness result: {result.stdout}")
 
         if return_content:
             with open(session.session_storage.witness_path, "r", encoding="utf-8") as f:
                 return json.load(f)
-        return res
+        return result.stdout
 
     def translate_inputs_to_instances(
         self, session: VerifiedModelSession, validator_inputs: GenericInput
