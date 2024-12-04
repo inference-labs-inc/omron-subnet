@@ -18,7 +18,7 @@ import websocket
 from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
 from utils import AutoUpdate, clean_temp_files
-from execution_layer.base_input import BaseInput
+from execution_layer.generic_input import GenericInput
 
 
 class MinerSession:
@@ -256,7 +256,7 @@ class MinerSession:
                     f"Circuit {model_id} not found. This indicates a missing deployment layer folder or invalid request"
                 )
             bt.logging.info(f"Running proof generation for {circuit}")
-            model_session = VerifiedModelSession(BaseInput(public_inputs), circuit)
+            model_session = VerifiedModelSession(GenericInput(public_inputs), circuit)
             bt.logging.debug("Model session created successfully")
             proof, public, proof_time = model_session.gen_proof()
             if isinstance(proof, bytes):
@@ -325,7 +325,7 @@ class MinerSession:
                     "This indicates a missing deployment layer folder or invalid request"
                 )
             bt.logging.info(f"Running proof generation for {circuit}")
-            model_session = VerifiedModelSession(BaseInput(synapse.inputs), circuit)
+            model_session = VerifiedModelSession(GenericInput(synapse.inputs), circuit)
 
             bt.logging.debug("Model session created successfully")
             proof, public, proof_time = model_session.gen_proof()
