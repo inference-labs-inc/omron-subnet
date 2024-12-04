@@ -169,22 +169,22 @@ class ScoreManager:
 
         padded_items = ProofOfWeightsItem.pad_items(proof_of_weights_items, 256)
         for item in padded_items:
-            if item.response_time < item.min_response_time:
+            if item.response_time < item.minimum_response_time:
                 bt.logging.warning(
                     f"Response time {item.response_time.item()} is less than minimum"
-                    f" {item.min_response_time.item()} for UID {item.uid.item()}"
+                    f" {item.minimum_response_time.item()} for UID {item.uid.item()}"
                 )
 
                 item.response_time = torch.max(
-                    item.response_time, item.min_response_time
+                    item.response_time, item.minimum_response_time
                 )
 
             # Ensure there is > 0 spread between min and max response times (usually during testing)
-            if item.median_max_response_time <= item.min_response_time:
+            if item.maximum_response_time <= item.minimum_response_time:
                 bt.logging.warning(
                     f"No spread between min and max response times for UID {item.uid.item()}"
                 )
-                item.median_max_response_time = item.min_response_time + 1
+                item.maximum_response_time = item.minimum_response_time + 1
 
         inputs = pow_circuit.input_handler(
             RequestType.RWR, ProofOfWeightsItem.to_dict_list(padded_items)
