@@ -16,7 +16,7 @@ LOCAL_SNARKJS_PATH = os.path.join(
     LOCAL_SNARKJS_INSTALL_DIR, "node_modules", ".bin", "snarkjs"
 )
 TOOLCHAIN = "nightly-2024-09-30"
-JOLT_VERSION = "9f0b9e6d95814dfe15d74ea736b9f89d505e8d07"
+JOLT_VERSION = "dd9e5c4bcf36ffeb75a576351807f8d86c33ec66"
 
 
 def run_shared_preflight_checks():
