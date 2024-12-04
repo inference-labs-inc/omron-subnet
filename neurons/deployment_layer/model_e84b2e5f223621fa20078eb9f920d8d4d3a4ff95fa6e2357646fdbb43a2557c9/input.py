@@ -51,6 +51,21 @@ class CircuitInput(BaseInput):
 
     @staticmethod
     def generate() -> dict[str, object]:
+
+        minimum_response_time = int(random.random() * 60 * SCALING)
+
+        maximum_response_time = minimum_response_time + int(
+            random.random() * 60 * SCALING
+        )
+
+        response_time = (
+            int(
+                random.random()
+                * (maximum_response_time - minimum_response_time)
+                * SCALING
+            )
+            + minimum_response_time
+        )
         return {
             "maximum_score": [int(1.0 * SCALING) for _ in range(BATCH_SIZE)],
             "previous_score": [
@@ -65,13 +80,9 @@ class CircuitInput(BaseInput):
                 random.randint(3000000, 10000000) for _ in range(BATCH_SIZE)
             ],
             "miner_uid": [random.randint(0, 255) for _ in range(BATCH_SIZE)],
-            "minimum_response_time": [
-                int(random.random() * 60 * SCALING) for _ in range(BATCH_SIZE)
-            ],
-            "maximum_response_time": [int(60.0 * SCALING) for _ in range(BATCH_SIZE)],
-            "response_time": [
-                int(random.random() * 60 * SCALING) for _ in range(BATCH_SIZE)
-            ],
+            "minimum_response_time": [minimum_response_time for _ in range(BATCH_SIZE)],
+            "maximum_response_time": [maximum_response_time for _ in range(BATCH_SIZE)],
+            "response_time": [response_time for _ in range(BATCH_SIZE)],
             "scaling": SCALING,
             "RATE_OF_DECAY": int(RATE_OF_DECAY * SCALING),
             "RATE_OF_RECOVERY": int(RATE_OF_RECOVERY * SCALING),
