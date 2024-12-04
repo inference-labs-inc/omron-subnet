@@ -4,7 +4,6 @@ import random
 import traceback
 
 from bittensor import logging
-from deployment_layer.circuit_store import circuit_store
 from execution_layer.verified_model_session import VerifiedModelSession
 
 from _validator.models.completed_proof_of_weights import CompletedProofOfWeightsItem
@@ -118,7 +117,7 @@ class ResponseProcessor:
         try:
             inference_session = VerifiedModelSession(
                 GenericInput(RequestType.RWR, validator_inputs),
-                circuit_store.get_circuit(response.model_id),
+                response.circuit,
             )
             res: bool = inference_session.verify_proof(
                 response.public_json, response.proof_content
