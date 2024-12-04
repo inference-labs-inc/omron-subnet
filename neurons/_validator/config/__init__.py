@@ -69,6 +69,20 @@ class ValidatorConfig:
             self.bt_config,
         )
 
+        # Get the full_path used for logs from get_config_from_args() to be used for scores.pt path
+        try:
+            self.full_path = config.full_path
+        except:
+            config.full_path = os.path.expanduser(
+                "{}/{}/{}/netuid{}/{}".format(
+                    config.logging.logging_dir,  # type: ignore
+                    config.wallet.name,  # type: ignore
+                    config.wallet.hotkey,  # type: ignore
+                    config.netuid,
+                    "validator",
+                )
+            )
+
     def check_register(self):
         """
         Check if the validator is registered on the subnet.

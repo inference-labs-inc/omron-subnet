@@ -1,3 +1,4 @@
+import os
 import torch
 import bittensor as bt
 from _validator.models.miner_response import MinerResponse
@@ -25,7 +26,7 @@ from deployment_layer.circuit_store import circuit_store
 class ScoreManager:
     """Manages the scoring of miners."""
 
-    def __init__(self, metagraph, user_uid):
+    def __init__(self, metagraph, user_uid, score_path: str):
         """
         Initialize the ScoreManager.
 
@@ -35,6 +36,7 @@ class ScoreManager:
         """
         self.metagraph = metagraph
         self.user_uid = user_uid
+        self.score_path = score_path
         self.scores = self.init_scores()
         self.proof_of_weights_queue = []
 
@@ -42,7 +44,12 @@ class ScoreManager:
         """Initialize or load existing scores."""
         bt.logging.info("Initializing validation weights")
         try:
-            scores = torch.load("scores.pt")
+            if os.path.isfile("scores.pt") and not os.path.isfile(
+                os.path.join(self.score_path, "scores.pt")
+            ):
+                # Migrate the scores file from the old location
+                os.rename("scores.pt", os.path.join(self.score_path, "scores.pt"))
+            scores = torch.load(os.path.join(self.score_path, "scores.pt"))
         except FileNotFoundError:
             scores = self._create_initial_scores()
         except Exception as e:
@@ -269,7 +276,7 @@ class ScoreManager:
     def _try_store_scores(self):
         """Attempt to store scores to disk."""
         try:
-            torch.save(self.scores, "scores.pt")
+            torch.save(self.scores, os.path.join(self.score_path, "scores.pt"))
         except Exception as e:
             bt.logging.info(f"Error storing scores: {e}")
 
