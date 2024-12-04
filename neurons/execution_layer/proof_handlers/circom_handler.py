@@ -125,7 +125,7 @@ class CircomHandler(ProofSystemHandler):
                 session_inputs = json.load(f)
 
             current_index = 0
-            updated_public_data = session_inputs.to_json().copy()
+            updated_public_data = session_inputs.copy()
             for input_name in input_order:
                 if input_name in validator_inputs.to_json():
                     value = validator_inputs.to_json()[input_name]

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import ezkl
 import bittensor as bt
 import traceback
+import asyncio
 
 from execution_layer.proof_handlers.base_handler import ProofSystemHandler
 from execution_layer.generic_input import GenericInput
@@ -34,12 +35,15 @@ class EZKLHandler(ProofSystemHandler):
 
             self.generate_witness(session)
             bt.logging.trace("Generating proof")
-            res = ezkl.prove(
-                session.session_storage.witness_path,
-                session.model.paths.compiled_model,
-                session.model.paths.pk,
-                session.session_storage.proof_path,
-                "single",
+            loop = asyncio.get_event_loop()
+            res = loop.run_until_complete(
+                ezkl.prove(
+                    session.session_storage.witness_path,
+                    session.model.paths.compiled_model,
+                    session.model.paths.pk,
+                    session.session_storage.proof_path,
+                    "single",
+                )
             )
             bt.logging.trace(
                 f"Proof generated: {session.session_storage.proof_path}, result: {res}"
@@ -81,10 +85,13 @@ class EZKLHandler(ProofSystemHandler):
         with open(session.session_storage.proof_path, "w", encoding="utf-8") as f:
             json.dump(proof_json, f)
 
-        res = ezkl.verify(
-            session.session_storage.proof_path,
-            session.model.paths.settings,
-            session.model.paths.vk,
+        loop = asyncio.get_event_loop()
+        res = loop.run_until_complete(
+            ezkl.verify(
+                session.session_storage.proof_path,
+                session.model.paths.settings,
+                session.model.paths.vk,
+            )
         )
         return res
 
@@ -92,11 +99,14 @@ class EZKLHandler(ProofSystemHandler):
         self, session: VerifiedModelSession, return_content: bool = False
     ) -> list | dict:
         bt.logging.trace("Generating witness")
-        res = ezkl.gen_witness(
-            session.session_storage.input_path,
-            session.model.paths.compiled_model,
-            session.session_storage.witness_path,
-            session.model.paths.vk,
+        loop = asyncio.get_event_loop()
+        res = loop.run_until_complete(
+            ezkl.gen_witness(
+                session.session_storage.input_path,
+                session.model.paths.compiled_model,
+                session.session_storage.witness_path,
+                session.model.paths.vk,
+            )
         )
         bt.logging.debug(f"Gen witness result: {res}")
 
