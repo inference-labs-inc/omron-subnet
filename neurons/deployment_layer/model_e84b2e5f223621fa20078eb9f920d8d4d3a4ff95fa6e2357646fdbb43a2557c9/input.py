@@ -66,14 +66,15 @@ class CircuitInput(BaseInput):
             )
             + minimum_response_time
         )
+        max_score = int(1 / 256 * SCALING)
         return {
-            "maximum_score": [int(1.0 * SCALING) for _ in range(BATCH_SIZE)],
+            "maximum_score": [max_score for _ in range(BATCH_SIZE)],
             "previous_score": [
-                int(random.random() * SCALING) for _ in range(BATCH_SIZE)
+                int(random.random() * max_score) for _ in range(BATCH_SIZE)
             ],
             "verified": [random.choice([True, False]) for _ in range(BATCH_SIZE)],
             "proof_size": [
-                int(random.randint(0, 10000) * SCALING) for _ in range(BATCH_SIZE)
+                int(random.randint(0, 5000) * SCALING) for _ in range(BATCH_SIZE)
             ],
             "validator_uid": [random.randint(0, 255) for _ in range(BATCH_SIZE)],
             "block_number": [
