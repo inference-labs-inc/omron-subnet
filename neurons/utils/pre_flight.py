@@ -4,6 +4,7 @@ import subprocess
 import time
 import json
 import requests
+import ezkl
 
 # trunk-ignore(pylint/E0611)
 from bittensor import logging
@@ -155,17 +156,7 @@ def sync_model_files():
                 with open(ezkl_settings_file, "r", encoding="utf-8") as f:
                     logrows = json.load(f).get("run_args", {}).get("logrows")
                     if logrows:
-                        subprocess.run(
-                            [
-                                "ezkl",
-                                "get-srs",
-                                "--logrows",
-                                str(logrows),
-                                "--commitment",
-                                "kzg",
-                            ],
-                            check=True,
-                        )
+                        ezkl.get_srs(logrows=logrows, commitment="kzg")
                         logging.info(
                             f"{SYNC_LOG_PREFIX}Successfully downloaded SRS for logrows={logrows}"
                         )
