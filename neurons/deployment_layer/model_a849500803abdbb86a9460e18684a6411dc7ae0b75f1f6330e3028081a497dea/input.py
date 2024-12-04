@@ -126,11 +126,25 @@ class CircuitInput(BaseInput):
     @staticmethod
     def process(data: dict[str, object]) -> dict[str, object]:
 
-        data["maximum_score"] = int(data["maximum_score"] * SCALING)
-        data["previous_score"] = int(data["previous_score"] * SCALING)
-        data["proof_size"] = int(data["proof_size"] * SCALING)
-        data["minimum_response_time"] = int(data["minimum_response_time"] * SCALING)
-        data["maximum_response_time"] = int(data["maximum_response_time"] * SCALING)
-        data["response_time"] = int(data["response_time"] * SCALING)
+        data["maximum_score"] = [
+            int(max_score * SCALING) for max_score in data["maximum_score"]
+        ]
+        data["previous_score"] = [
+            int(previous_score * SCALING) for previous_score in data["previous_score"]
+        ]
+        data["proof_size"] = [
+            int(proof_size * SCALING) for proof_size in data["proof_size"]
+        ]
+        data["minimum_response_time"] = [
+            int(minimum_response_time * SCALING)
+            for minimum_response_time in data["minimum_response_time"]
+        ]
+        data["maximum_response_time"] = [
+            int(maximum_response_time * SCALING)
+            for maximum_response_time in data["maximum_response_time"]
+        ]
+        data["response_time"] = [
+            int(response_time * SCALING) for response_time in data["response_time"]
+        ]
 
         return data
