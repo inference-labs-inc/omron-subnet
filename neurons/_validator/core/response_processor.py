@@ -38,10 +38,10 @@ class ResponseProcessor:
             if r.response_time is not None and r.verification_result
         ]
         verified_count = sum(1 for r in processed_responses if r.verification_result)
-        model_id = processed_responses[0].model_id
+        model_id = processed_responses[0].circuit.id
         log_system_metrics(response_times, verified_count, model_id)
 
-        if not processed_responses[0].model_id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
+        if not processed_responses[0].circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
             return processed_responses
 
         verified_batched_responses = [
@@ -62,9 +62,7 @@ class ResponseProcessor:
                     selected_response.public_json,
                     selected_response.proof_content,
                     BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
-                    circuit_store.get_circuit(
-                        str(selected_response.model_id)
-                    ).metadata.netuid,
+                    selected_response.circuit.metadata.netuid,
                 )
             )
         else:
