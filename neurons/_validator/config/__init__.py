@@ -60,6 +60,7 @@ class ValidatorConfig:
             self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
         )
         self.api = ApiConfig(self.bt_config)
+        self.rapidsnark_binary_path = self.bt_config.rapidsnark_binary_path
 
         # Initialize wandb logger
         wandb_logger.safe_init(

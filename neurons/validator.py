@@ -109,6 +109,13 @@ def get_config_from_args():
     )
 
     parser.add_argument(
+        "--rapidsnark-binary-path",
+        type=str,
+        default=None,
+        help="Path to the rapid snark binary.",
+    )
+
+    parser.add_argument(
         "--localnet",
         action="store_true",
         default=False,

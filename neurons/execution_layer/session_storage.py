@@ -16,6 +16,7 @@ class SessionStorage:
     proof_path: str = field(init=False)
     aggregated_proof_path: str = field(init=False)
     public_path: str = field(init=False)
+    rapidsnark_binary = field(default=None)
 
     def __attrs_post_init__(self):
         self.input_path = os.path.join(
