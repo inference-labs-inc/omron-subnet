@@ -5,6 +5,7 @@ import time
 import json
 import requests
 import ezkl
+import asyncio
 
 # trunk-ignore(pylint/E0611)
 from bittensor import logging
@@ -156,7 +157,14 @@ def sync_model_files():
                 with open(ezkl_settings_file, "r", encoding="utf-8") as f:
                     logrows = json.load(f).get("run_args", {}).get("logrows")
                     if logrows:
-                        ezkl.get_srs(logrows=logrows, commitment=ezkl.PyCommitments.KZG)
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        loop.run_until_complete(
+                            ezkl.get_srs(
+                                logrows=logrows, commitment=ezkl.PyCommitments.KZG
+                            )
+                        )
+                        loop.close()
                         logging.info(
                             f"{SYNC_LOG_PREFIX}Successfully downloaded SRS for logrows={logrows}"
                         )
