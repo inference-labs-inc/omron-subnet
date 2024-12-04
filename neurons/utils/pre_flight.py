@@ -156,7 +156,7 @@ def sync_model_files():
                 with open(ezkl_settings_file, "r", encoding="utf-8") as f:
                     logrows = json.load(f).get("run_args", {}).get("logrows")
                     if logrows:
-                        ezkl.get_srs(logrows=logrows, commitment="kzg")
+                        ezkl.get_srs(logrows=logrows, commitment=ezkl.PyCommitments.KZG)
                         logging.info(
                             f"{SYNC_LOG_PREFIX}Successfully downloaded SRS for logrows={logrows}"
                         )
