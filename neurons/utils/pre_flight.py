@@ -22,6 +22,10 @@ TOOLCHAIN = "nightly-2024-09-30"
 JOLT_VERSION = "9f0b9e6d95814dfe15d74ea736b9f89d505e8d07"
 
 
+async def download_srs(logrows):
+    await ezkl.get_srs(logrows=logrows, commitment=ezkl.PyCommitments.KZG)
+
+
 def run_shared_preflight_checks():
     """
     This function executes a series of checks to ensure the environment is properly
@@ -157,14 +161,8 @@ def sync_model_files():
                 with open(ezkl_settings_file, "r", encoding="utf-8") as f:
                     logrows = json.load(f).get("run_args", {}).get("logrows")
                     if logrows:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        loop.run_until_complete(
-                            ezkl.get_srs(
-                                logrows=logrows, commitment=ezkl.PyCommitments.KZG
-                            )
-                        )
-                        loop.close()
+                        loop = asyncio.get_event_loop()
+                        loop.run_until_complete(download_srs(logrows))
                         logging.info(
                             f"{SYNC_LOG_PREFIX}Successfully downloaded SRS for logrows={logrows}"
                         )
