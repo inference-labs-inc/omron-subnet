@@ -41,7 +41,6 @@ class EZKLHandler(ProofSystemHandler):
                 session.model.paths.pk,
                 session.session_storage.proof_path,
                 "single",
-                session.model.paths.srs,
             )
             bt.logging.trace(
                 f"Proof generated: {session.session_storage.proof_path}, result: {res}"
@@ -87,7 +86,6 @@ class EZKLHandler(ProofSystemHandler):
             session.session_storage.proof_path,
             session.model.paths.settings,
             session.model.paths.vk,
-            session.model.paths.srs,
         )
         return res
 
@@ -100,7 +98,6 @@ class EZKLHandler(ProofSystemHandler):
             session.model.paths.compiled_model,
             session.session_storage.witness_path,
             session.model.paths.vk,
-            session.model.paths.srs,
         )
         bt.logging.trace(f"Gen witness result: {res}")
 
