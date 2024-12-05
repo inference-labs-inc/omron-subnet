@@ -86,11 +86,21 @@ class EZKLHandler(ProofSystemHandler):
             proof_json = proof
 
         input_instances = self.translate_inputs_to_instances(session, validator_inputs)
+        with open("input_instances.json", "w", encoding="utf-8") as f:
+            json.dump(input_instances, f)
 
-        proof_json["instances"] = (
-            input_instances[: len(input_instances)]
-            + proof_json["instances"][len(input_instances) :]
-        )
+        with open("existing_instances.json", "w", encoding="utf-8") as f:
+            json.dump(proof_json["instances"], f)
+
+        proof_json["instances"] = [
+            (
+                input_instances[: len(input_instances)]
+                + proof_json["instances"][0][len(input_instances) :]
+            )
+        ]
+
+        with open("updated_instances.json", "w", encoding="utf-8") as f:
+            json.dump(proof_json["instances"], f)
 
         proof_json["transcript_type"] = "EVM"
 
