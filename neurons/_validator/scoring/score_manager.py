@@ -182,7 +182,7 @@ class ScoreManager:
             # Ensure there is > 0 spread between min and max response times (usually during testing)
             if item.maximum_response_time <= item.minimum_response_time:
                 bt.logging.warning(
-                    f"No spread between min and max response times for UID {item.uid.item()}"
+                    f"No spread between min and max response times for UID {item.miner_uid.item()}"
                 )
                 item.maximum_response_time = item.minimum_response_time + 1
 
