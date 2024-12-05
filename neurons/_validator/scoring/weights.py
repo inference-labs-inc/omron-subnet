@@ -68,7 +68,7 @@ class WeightsManager:
 
         bt.logging.info("Updating weights")
 
-        weights = torch.zeros_like(scores)
+        weights = torch.zeros_like(self.metagraph.W)
         weights[scores.nonzero()] = scores[scores.nonzero()]
 
         try:
