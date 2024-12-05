@@ -148,7 +148,7 @@ class EZKLHandler(ProofSystemHandler):
     def translate_inputs_to_instances(
         self, session: VerifiedModelSession, validator_inputs: GenericInput
     ) -> list[int]:
-        input_data = {"input_data": [validator_inputs.to_array()]}
+        input_data = {"input_data": validator_inputs.to_array()}
         with open(session.session_storage.input_path, "w", encoding="utf-8") as f:
             json.dump(input_data, f)
 
