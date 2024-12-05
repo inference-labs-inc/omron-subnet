@@ -68,10 +68,13 @@ class WeightsManager:
 
         bt.logging.info("Updating weights")
 
-        weights = torch.zeros_like(self.metagraph.W)
+        bt.logging.info("Updating weights")
+        weights = torch.zeros(self.metagraph.n)
         nonzero_indices = scores.nonzero()
+        print(weights, nonzero_indices, scores)
         if nonzero_indices.sum() > 0:
             weights[nonzero_indices] = scores[nonzero_indices]
+
         try:
             success = self.set_weights(
                 netuid=self.metagraph.netuid,
