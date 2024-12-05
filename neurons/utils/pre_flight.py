@@ -18,6 +18,7 @@ LOCAL_SNARKJS_INSTALL_DIR = os.path.join(os.path.expanduser("~"), ".snarkjs")
 LOCAL_SNARKJS_PATH = os.path.join(
     LOCAL_SNARKJS_INSTALL_DIR, "node_modules", ".bin", "snarkjs"
 )
+LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")
 TOOLCHAIN = "nightly-2024-09-30"
 JOLT_VERSION = "9f0b9e6d95814dfe15d74ea736b9f89d505e8d07"
 
@@ -49,6 +50,7 @@ def run_shared_preflight_checks():
         ("Checking Rust nightly toolchain", ensure_rust_nightly_installed),
         ("Checking Jolt installation", ensure_jolt_installed),
         ("Compiling Jolt circuits", compile_jolt_circuits),
+        ("Checking EZKL installation", ensure_ezkl_installed),
     ]
 
     logging.info(" PreFlight | Running pre-flight checks")
@@ -65,6 +67,48 @@ def run_shared_preflight_checks():
             raise e
 
     logging.info(" PreFlight | Pre-flight checks completed.")
+
+
+def ensure_ezkl_installed():
+    """
+    Ensure EZKL is installed by first checking if it exists, and if not,
+    running the official installation script. Also verifies the version matches.
+    """
+    python_ezkl_version = ezkl.__version__
+    try:
+        if os.path.exists(LOCAL_EZKL_PATH):
+            # Check version matches
+            result = subprocess.run(
+                [LOCAL_EZKL_PATH, "--version"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            if python_ezkl_version in result.stdout:
+                logging.info(
+                    f"EZKL is already installed with correct version: {python_ezkl_version}"
+                )
+                return
+            else:
+                logging.warning("EZKL version mismatch, reinstalling...")
+
+        # trunk-ignore(bandit/B605)
+        subprocess.run(
+            [
+                "curl -s https://raw.githubusercontent.com/zkonduit/ezkl/main/install_ezkl_cli.sh",
+                "|",
+                f"bash -s -- v{python_ezkl_version}",
+            ],
+            shell=True,
+            check=True,
+        )
+        logging.info("EZKL installed successfully")
+
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Failed to install/verify EZKL: {e}")
+        raise RuntimeError(
+            "EZKL installation failed. Please install it manually."
+        ) from e
 
 
 def ensure_snarkjs_installed():
