@@ -172,7 +172,7 @@ class ScoreManager:
             if item.response_time < item.minimum_response_time:
                 bt.logging.warning(
                     f"Response time {item.response_time.item()} is less than minimum"
-                    f" {item.minimum_response_time.item()} for UID {item.uid.item()}"
+                    f" {item.minimum_response_time.item()} for UID {item.miner_uid.item()}"
                 )
 
                 item.response_time = torch.max(
