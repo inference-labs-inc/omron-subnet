@@ -94,11 +94,7 @@ def ensure_ezkl_installed():
 
         # trunk-ignore(bandit/B605)
         subprocess.run(
-            [
-                "curl -s https://raw.githubusercontent.com/zkonduit/ezkl/main/install_ezkl_cli.sh",
-                "|",
-                f"bash -s -- v{python_ezkl_version}",
-            ],
+            f"curl -s https://raw.githubusercontent.com/zkonduit/ezkl/main/install_ezkl_cli.sh | bash -s -- v{python_ezkl_version}",  # noqa
             shell=True,
             check=True,
         )
