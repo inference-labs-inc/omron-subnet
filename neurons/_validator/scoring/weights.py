@@ -69,13 +69,12 @@ class WeightsManager:
         bt.logging.info("Updating weights")
 
         weights = torch.zeros_like(self.metagraph.W)
-        nonzero_indices = scores.nonzero()
-        if nonzero_indices.numel() > 0:
+        nonzero_indices = scores.nonzero().squeeze()
+        if len(nonzero_indices.shape) > 0 and nonzero_indices.numel() > 0:
             weights[nonzero_indices] = scores[nonzero_indices]
         else:
             bt.logging.warning("No non-zero scores found, setting uniform weights")
             weights = torch.ones_like(weights) / len(weights)
-
         try:
             success = self.set_weights(
                 netuid=self.metagraph.netuid,
