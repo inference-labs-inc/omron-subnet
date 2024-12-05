@@ -10,6 +10,7 @@ import bittensor as bt
 from constants import FIELD_MODULUS
 from utils.pre_flight import LOCAL_SNARKJS_PATH
 from execution_layer.proof_handlers.base_handler import ProofSystemHandler
+from execution_layer.generic_input import GenericInput
 
 if TYPE_CHECKING:
     from execution_layer.verified_model_session import VerifiedModelSession
@@ -19,7 +20,7 @@ class CircomHandler(ProofSystemHandler):
     def gen_input_file(self, session):
         bt.logging.trace("Generating input file")
 
-        data = session.inputs
+        data = session.inputs.to_json()
 
         dir_name = os.path.dirname(session.session_storage.input_path)
         os.makedirs(dir_name, exist_ok=True)
@@ -104,7 +105,7 @@ class CircomHandler(ProofSystemHandler):
     def verify_proof(
         self,
         session: "VerifiedModelSession",
-        public_data: list[str],
+        validator_inputs: GenericInput,
         proof: dict,
     ) -> bool:
         try:
@@ -122,11 +123,12 @@ class CircomHandler(ProofSystemHandler):
             # the proof was generated against validator-provided inputs
             with open(session.session_storage.input_path, "r", encoding="utf-8") as f:
                 session_inputs = json.load(f)
+
             current_index = 0
-            updated_public_data = public_data.copy()
+            updated_public_data = session_inputs.copy()
             for input_name in input_order:
-                if input_name in session_inputs:
-                    value = session_inputs[input_name]
+                if input_name in validator_inputs.to_json():
+                    value = validator_inputs.to_json()[input_name]
                     if isinstance(value, list):
                         for i, item in enumerate(value):
                             if i < input_sizes[input_name]:
@@ -149,7 +151,9 @@ class CircomHandler(ProofSystemHandler):
                 json.dump(updated_public_data, public_file)
 
             bt.logging.trace("Diff between original and updated public_data:")
-            for i, (old, new) in enumerate(zip(public_data, updated_public_data)):
+            for i, (old, new) in enumerate(
+                zip(validator_inputs.to_json().values(), updated_public_data)
+            ):
                 if old != new:
                     bt.logging.trace(f"Index {i}: {old} -> {new}")
 

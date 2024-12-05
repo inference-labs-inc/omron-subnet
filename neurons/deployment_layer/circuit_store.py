@@ -68,7 +68,7 @@ class CircuitStore:
         """
         circuit = self.circuits.get(circuit_id)
         if circuit:
-            bt.logging.debug(f"Retrieved circuit {circuit_id}")
+            bt.logging.debug(f"Retrieved circuit {circuit}")
         else:
             bt.logging.warning(f"Circuit {circuit_id} not found")
         return circuit

@@ -10,6 +10,8 @@ from constants import (
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
 )
 from deployment_layer.circuit_store import circuit_store
+from _validator.core.request import Request
+from execution_layer.circuit import ProofSystem, Circuit
 
 
 @dataclass
@@ -22,7 +24,7 @@ class MinerResponse:
         verification_result (bool): Whether the miner's response was verified.
         response_time (float): Time taken by the miner to respond.
         proof_size (int): Size of the proof provided by the miner.
-        model_id (str): Identifier of the model used.
+        circuit (Circuit): Circuit used.
         proof_content (Any): Content of the proof - either a string or a dict.
         raw (str): Deserialized form of the response.
         error (str): Error message, if any occurred during processing.
@@ -32,14 +34,14 @@ class MinerResponse:
     verification_result: bool
     response_time: float
     proof_size: int
-    model_id: str
+    circuit: Circuit
     proof_content: dict | str | None = None
     public_json: list[str] | None = None
     raw: dict | None = None
     error: str | None = None
 
     @classmethod
-    def from_raw_response(cls, response: dict) -> "MinerResponse":
+    def from_raw_response(cls, response: Request) -> "MinerResponse":
         """
         Creates a MinerResponse object from a raw response dictionary.
 
@@ -50,9 +52,7 @@ class MinerResponse:
             MinerResponse: Processed miner response object.
         """
         try:
-            if isinstance(response, str):
-                response = json.loads(response)
-            deserialized_response = response.get("deserialized")
+            deserialized_response = response.deserialized
 
             proof_content = None
             public_json = None
@@ -61,7 +61,7 @@ class MinerResponse:
                     deserialized_response = json.loads(deserialized_response)
                 except json.JSONDecodeError as e:
                     bt.logging.debug(f"JSON decoding error: {e}")
-                    return cls.empty(uid=response.get("uid", 0))
+                    return cls.empty(uid=response.uid)
 
             if isinstance(deserialized_response, dict):
                 proof = deserialized_response.get("proof", "{}")
@@ -84,37 +84,40 @@ class MinerResponse:
             if isinstance(proof_content, str):
                 proof_size = len(proof_content)
             else:
-                proof_size = (
-                    sum(
-                        len(str(value))
-                        for key in ("pi_a", "pi_b", "pi_c")
-                        for element in proof_content.get(key, [])
-                        for value in (
-                            element if isinstance(element, list) else [element]
+                if response.circuit.proof_system == ProofSystem.CIRCOM:
+                    proof_size = (
+                        sum(
+                            len(str(value))
+                            for key in ("pi_a", "pi_b", "pi_c")
+                            for element in proof_content.get(key, [])
+                            for value in (
+                                element if isinstance(element, list) else [element]
+                            )
                         )
+                        if proof_content
+                        else DEFAULT_PROOF_SIZE
                     )
-                    if proof_content
-                    else DEFAULT_PROOF_SIZE
-                )
+                elif response.circuit.proof_system == ProofSystem.EZKL:
+                    proof_size = len(proof_content["proof"])
+                else:
+                    proof_size = DEFAULT_PROOF_SIZE
 
             return cls(
-                uid=response.get("uid", 0),
+                uid=response.uid,
                 verification_result=False,
-                response_time=response.get(
-                    "response_time", VALIDATOR_REQUEST_TIMEOUT_SECONDS
-                ),
+                response_time=response.response_time,
                 proof_size=proof_size,
-                model_id=response.get("model_id", SINGLE_PROOF_OF_WEIGHTS_MODEL_ID),
+                circuit=response.circuit,
                 proof_content=proof_content,
                 public_json=public_json,
                 raw=deserialized_response,
             )
         except json.JSONDecodeError as e:
             bt.logging.error(f"JSON decoding error: {e}")
-            return cls.empty(uid=response.get("uid", 0))
+            return cls.empty(uid=response.uid)
         except Exception as e:
             bt.logging.error(f"Error processing miner response: {e}")
-            return cls.empty(uid=response.get("uid", 0))
+            return cls.empty(uid=response.uid)
 
     @classmethod
     def empty(cls, uid: int = 0) -> "MinerResponse":
@@ -129,7 +132,7 @@ class MinerResponse:
             verification_result=False,
             response_time=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
             proof_size=DEFAULT_PROOF_SIZE,
-            model_id=SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
+            circuit=circuit_store.get_circuit(SINGLE_PROOF_OF_WEIGHTS_MODEL_ID),
             proof_content=None,
             public_json=None,
             raw=None,
@@ -140,15 +143,18 @@ class MinerResponse:
         """
         Parse a MinerResponse object into a dictionary.
         """
-        circuit = circuit_store.get_circuit(self.model_id)
         return {
             "miner_key": metagraph.hotkeys[self.uid],
             "miner_uid": self.uid,
             "proof_model": (
-                circuit.metadata.name if circuit is not None else str(self.model_id)
+                self.circuit.metadata.name
+                if self.circuit is not None
+                else str(self.circuit.id)
             ),
             "proof_system": (
-                circuit.metadata.proof_system if circuit is not None else "Unknown"
+                self.circuit.metadata.proof_system
+                if self.circuit is not None
+                else "Unknown"
             ),
             "proof_size": self.proof_size,
             "response_duration": self.response_time,

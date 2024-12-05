@@ -20,10 +20,10 @@ from _validator.utils.api import hash_inputs
 from _validator.utils.axon import query_axons
 from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
+from _validator.core.request import Request
+from execution_layer.circuit import Circuit, CircuitType
 from constants import (
     REQUEST_DELAY_SECONDS,
-    SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
-    SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT,
 )
 from utils import AutoUpdate, clean_temp_files, wandb_logger
 from utils.gc_logging import log_responses as log_responses_gc
@@ -46,7 +46,9 @@ class ValidatorLoop:
         self.config = config
         self.config.check_register()
         self.auto_update = AutoUpdate()
-        self.score_manager = ScoreManager(self.config.metagraph, self.config.user_uid, self.config.full_path)
+        self.score_manager = ScoreManager(
+            self.config.metagraph, self.config.user_uid, self.config.full_path
+        )
         self.response_processor = ResponseProcessor(
             self.config.metagraph,
             self.score_manager,
@@ -93,7 +95,7 @@ class ValidatorLoop:
 
         random.shuffle(filtered_uids)
 
-        requests = self.request_pipeline.prepare_requests(filtered_uids)
+        requests: list[Request] = self.request_pipeline.prepare_requests(filtered_uids)
 
         if len(requests) == 0:
             bt.logging.error("No requests prepared")
@@ -136,7 +138,7 @@ class ValidatorLoop:
         else:
             bt.logging.debug("Automatic updates are disabled, skipping version check")
 
-    def _process_requests(self, requests) -> list[MinerResponse]:
+    def _process_requests(self, requests: list[Request]) -> list[MinerResponse]:
         """
         Process requests, update scores and weights.
 
@@ -145,15 +147,17 @@ class ValidatorLoop:
         """
         loop = asyncio.get_event_loop()
 
-        responses = loop.run_until_complete(query_axons(self.config.dendrite, requests))
+        responses: list[Request] = loop.run_until_complete(
+            query_axons(self.config.dendrite, requests)
+        )
 
         processed_responses: list[MinerResponse] = (
             self.response_processor.process_responses(responses)
         )
-        if requests[0].get("model_id") not in [
-            SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
-            SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT,
-        ]:
+
+        circuit: Circuit = requests[0].circuit
+
+        if circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS:
             verified_responses = [
                 r for r in processed_responses if r.verification_result
             ]
@@ -162,7 +166,7 @@ class ValidatorLoop:
                 save_proof_of_weights(
                     public_signals=[random_verified_response.public_json],
                     proof=[random_verified_response.proof_content],
-                    proof_filename=hash_inputs(requests[0].get("inputs")),
+                    proof_filename=hash_inputs(requests[0].inputs),
                 )
 
         self.score_manager.update_scores(processed_responses)

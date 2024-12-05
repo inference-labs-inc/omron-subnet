@@ -4,15 +4,18 @@ import random
 import traceback
 
 from bittensor import logging
-from deployment_layer.circuit_store import circuit_store
 from execution_layer.verified_model_session import VerifiedModelSession
 
 from _validator.models.completed_proof_of_weights import CompletedProofOfWeightsItem
 from _validator.models.miner_response import MinerResponse
 from _validator.scoring.score_manager import ScoreManager
+from _validator.core.request import Request
 from _validator.utils.logging import log_responses, log_system_metrics
 from _validator.utils.proof_of_weights import save_proof_of_weights
+from _validator.models.request_type import RequestType
 from constants import BATCHED_PROOF_OF_WEIGHTS_MODEL_ID
+from execution_layer.generic_input import GenericInput
+
 from utils import wandb_logger
 
 
@@ -24,7 +27,7 @@ class ResponseProcessor:
         self.proof_batches_queue = []
         self.completed_proof_of_weights_queue: list[CompletedProofOfWeightsItem] = []
 
-    def process_responses(self, responses: list[dict]) -> list[MinerResponse]:
+    def process_responses(self, responses: list[Request]) -> list[MinerResponse]:
         if len(responses) == 0:
             logging.error("No responses received")
             return []
@@ -36,10 +39,11 @@ class ResponseProcessor:
             if r.response_time is not None and r.verification_result
         ]
         verified_count = sum(1 for r in processed_responses if r.verification_result)
-        model_id = processed_responses[0].model_id
-        log_system_metrics(response_times, verified_count, model_id)
+        log_system_metrics(
+            response_times, verified_count, processed_responses[0].circuit
+        )
 
-        if not processed_responses[0].model_id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
+        if not processed_responses[0].circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
             return processed_responses
 
         verified_batched_responses = [
@@ -60,9 +64,7 @@ class ResponseProcessor:
                     selected_response.public_json,
                     selected_response.proof_content,
                     BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
-                    circuit_store.get_circuit(
-                        str(selected_response.model_id)
-                    ).metadata.netuid,
+                    selected_response.circuit.metadata.netuid,
                 )
             )
         else:
@@ -75,7 +77,7 @@ class ResponseProcessor:
 
         return processed_responses
 
-    def process_single_response(self, response: dict) -> MinerResponse:
+    def process_single_response(self, response: Request) -> MinerResponse:
         miner_response = MinerResponse.from_raw_response(response)
         if miner_response.proof_content is None:
             logging.debug(
@@ -86,7 +88,7 @@ class ResponseProcessor:
             logging.debug(f"Attempting to verify proof for UID: {miner_response.uid}")
             try:
                 verification_result = self.verify_proof_string(
-                    miner_response, response["inputs"]
+                    miner_response, response.inputs
                 )
                 miner_response.set_verification_result(verification_result)
                 if not verification_result:
@@ -107,17 +109,18 @@ class ResponseProcessor:
         return miner_response
 
     def verify_proof_string(
-        self, response: MinerResponse, validator_inputs: list[float] | dict
+        self, response: MinerResponse, validator_inputs: GenericInput
     ) -> bool:
         if not response.proof_content or not response.public_json:
             logging.error(f"Proof or public json not found for UID: {response.uid}")
             return False
         try:
             inference_session = VerifiedModelSession(
-                validator_inputs, circuit_store.get_circuit(response.model_id)
+                GenericInput(RequestType.RWR, response.public_json),
+                response.circuit,
             )
             res: bool = inference_session.verify_proof(
-                response.public_json, response.proof_content
+                validator_inputs, response.proof_content
             )
             inference_session.end()
             return res
