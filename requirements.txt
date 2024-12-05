@@ -1,7 +1,7 @@
 attrs==24.2.0
 bittensor==6.9.4
 black==23.7.0
-ezkl==15.6.3
+ezkl==15.6.6
 fastapi==0.99.1
 numpy==1.26.4
 packaging==24.1

@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 import subprocess
 import bittensor as bt
 import traceback
-import ezkl
 
 from execution_layer.proof_handlers.base_handler import ProofSystemHandler
 from execution_layer.generic_input import GenericInput
@@ -86,21 +85,10 @@ class EZKLHandler(ProofSystemHandler):
             proof_json = proof
 
         input_instances = self.translate_inputs_to_instances(session, validator_inputs)
-        with open("input_instances.json", "w", encoding="utf-8") as f:
-            json.dump(input_instances, f)
-
-        with open("existing_instances.json", "w", encoding="utf-8") as f:
-            json.dump(proof_json["instances"], f)
 
         proof_json["instances"] = [
-            (
-                input_instances[: len(input_instances)]
-                + proof_json["instances"][0][len(input_instances) :]
-            )
+            (input_instances + proof_json["instances"][0][len(input_instances) :])
         ]
-
-        with open("updated_instances.json", "w", encoding="utf-8") as f:
-            json.dump(proof_json["instances"], f)
 
         proof_json["transcript_type"] = "EVM"
 
@@ -123,7 +111,7 @@ class EZKLHandler(ProofSystemHandler):
                 capture_output=True,
                 text=True,
             )
-            return "Proof verified successfully" in result.stdout
+            return "verified: true" in result.stdout
         except subprocess.CalledProcessError:
             return False
 
@@ -160,12 +148,15 @@ class EZKLHandler(ProofSystemHandler):
     def translate_inputs_to_instances(
         self, session: VerifiedModelSession, validator_inputs: GenericInput
     ) -> list[int]:
-        scale_map = session.model.settings.get("model_input_scales", [])
-        return [
-            ezkl.float_to_felt(x, scale_map[i])
-            for i, arr in enumerate(validator_inputs.to_array())
-            for x in arr
-        ]
+        input_data = {"input_data": [validator_inputs.to_array()]}
+        with open(session.session_storage.input_path, "w", encoding="utf-8") as f:
+            json.dump(input_data, f)
+
+        self.generate_witness(session)
+
+        with open(session.session_storage.witness_path, "r", encoding="utf-8") as f:
+            witness = json.load(f)
+            return witness["inputs"][0]
 
     def aggregate_proofs(
         self, session: VerifiedModelSession, proofs: list[str]
