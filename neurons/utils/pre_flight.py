@@ -27,6 +27,10 @@ async def download_srs(logrows):
     await ezkl.get_srs(logrows=logrows, commitment=ezkl.PyCommitments.KZG)
 
 
+async def download_srs(logrows):
+    await ezkl.get_srs(logrows=logrows, commitment=ezkl.PyCommitments.KZG)
+
+
 def run_shared_preflight_checks():
     """
     This function executes a series of checks to ensure the environment is properly
