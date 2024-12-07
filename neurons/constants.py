@@ -53,3 +53,7 @@ PROOF_OF_WEIGHTS_INTERVAL = 1000
 MAX_PROOFS_TO_LOG = 0
 # Era period for proof of weights (mortality of the pow log)
 PROOF_OF_WEIGHTS_LIFESPAN = 2
+
+# White-listed public keys (ss58 addresses) we accept external requests from
+# (even if an address is not in the metagraph)
+WHITELISTED_PUBLIC_KEYS = []

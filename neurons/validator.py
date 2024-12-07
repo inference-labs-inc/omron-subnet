@@ -77,6 +77,13 @@ def get_config_from_args():
     )
 
     parser.add_argument(
+        "--whitelisted-public-keys",
+        type=str,
+        default="",
+        help="Comma separated list of public keys to whitelist for external requests.",
+    )
+
+    parser.add_argument(
         "--external-api-host",
         type=str,
         default="0.0.0.0",
@@ -143,7 +150,6 @@ def get_config_from_args():
         )
         config.external_api_workers = config.external_api_workers or 1
         config.external_api_port = config.external_api_port or 8000
-        config.do_not_verify_external_signatures = True
 
     config.full_path = os.path.expanduser(
         "{}/{}/{}/netuid{}/{}".format(
