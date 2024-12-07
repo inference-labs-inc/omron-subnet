@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 import traceback
+from typing import Optional
 
 from bittensor import logging
 from deployment_layer.circuit_store import circuit_store
@@ -17,12 +18,19 @@ from utils import wandb_logger
 
 
 class ResponseProcessor:
-    def __init__(self, metagraph, score_manager: ScoreManager, user_uid):
+    def __init__(
+        self,
+        metagraph,
+        score_manager: ScoreManager,
+        user_uid: int,
+        rapidsnark_binary: Optional[str] = None,
+    ):
         self.metagraph = metagraph
         self.score_manager = score_manager
         self.user_uid = user_uid
         self.proof_batches_queue = []
         self.completed_proof_of_weights_queue: list[CompletedProofOfWeightsItem] = []
+        self.rapidsnark_binary = rapidsnark_binary
 
     def process_responses(self, responses: list[dict]) -> list[MinerResponse]:
         if len(responses) == 0:
@@ -114,7 +122,9 @@ class ResponseProcessor:
             return False
         try:
             inference_session = VerifiedModelSession(
-                validator_inputs, circuit_store.get_circuit(response.model_id)
+                inputs=validator_inputs,
+                model=circuit_store.get_circuit(response.model_id),
+                rapidsnark_binary=self.rapidsnark_binary,
             )
             res: bool = inference_session.verify_proof(
                 response.public_json, response.proof_content
