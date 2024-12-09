@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import subprocess
 import bittensor as bt
 import traceback
+import ezkl
 
 from execution_layer.proof_handlers.base_handler import ProofSystemHandler
 from execution_layer.generic_input import GenericInput
@@ -148,15 +149,12 @@ class EZKLHandler(ProofSystemHandler):
     def translate_inputs_to_instances(
         self, session: VerifiedModelSession, validator_inputs: GenericInput
     ) -> list[int]:
-        input_data = {"input_data": validator_inputs.to_array()}
-        with open(session.session_storage.input_path, "w", encoding="utf-8") as f:
-            json.dump(input_data, f)
-
-        self.generate_witness(session)
-
-        with open(session.session_storage.witness_path, "r", encoding="utf-8") as f:
-            witness = json.load(f)
-            return witness["inputs"][0]
+        scale_map = session.model.settings.get("model_input_scales", [])
+        return [
+            ezkl.float_to_felt(x, scale_map[i])
+            for i, arr in enumerate(validator_inputs.to_array())
+            for x in arr
+        ]
 
     def aggregate_proofs(
         self, session: VerifiedModelSession, proofs: list[str]
