@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from _validator.models.request_type import RequestType
+import json
 
 
 class BaseInput(ABC):
@@ -46,3 +47,6 @@ class BaseInput(ABC):
     def to_json(self) -> dict[str, object]:
         """Returns the data in JSON-compatible format"""
         return self.data
+
+    def __str__(self) -> str:
+        return json.dumps(self.data)
