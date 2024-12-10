@@ -151,7 +151,7 @@ class RequestPipeline:
         if circuit.metadata.type == CircuitType.PROOF_OF_COMPUTATION:
             return QueryZkProof(
                 model_id=circuit.id,
-                query_input=self.format_for_query(inputs, circuit),
+                query_input=self.format_for_query(inputs.to_json(), circuit),
                 query_output="",
             )
 
