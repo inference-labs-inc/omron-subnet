@@ -162,7 +162,7 @@ class EZKLHandler(ProofSystemHandler):
         scale_map = session.model.settings.get("model_input_scales", [])
         type_map = session.model.settings.get("model_input_types", [])
         return [
-            ezkl.float_to_felt(x, scale_map[i], EZKLInputType[type_map[i]])
+            ezkl.float_to_felt(x, scale_map[i], EZKLInputType[type_map[i]].value)
             for i, arr in enumerate(validator_inputs.to_array())
             for x in arr
         ]
