@@ -13,7 +13,7 @@ class CircuitInputSchema(BaseModel):
 
 
 @InputRegistry.register(
-    "0d185e479d84a05e5186ebf20301ef0ff12d9defb583603215aa5297812b92e9"
+    "8dcff627a782525ea86196941a694ffbead179905f0cd4550ddc3df9e2b90924"
 )
 class CircuitInput(BaseInput):
     def __init__(

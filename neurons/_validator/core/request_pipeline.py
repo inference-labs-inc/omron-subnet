@@ -78,7 +78,7 @@ class RequestPipeline:
             input_data = (
                 request.synapse.inputs
                 if request.circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS
-                else request.synapse.query_input
+                else request.synapse.query_input["public_inputs"]
             )
             request.inputs = GenericInput(RequestType.RWR, input_data)
             try:

@@ -8,8 +8,8 @@
         "param_scale": 13,
         "scale_rebase_multiplier": 1,
         "lookup_range": [
-            -13922,
-            23360
+            -4394,
+            19162
         ],
         "logrows": 18,
         "num_inner_cols": 2,
@@ -19,9 +19,9 @@
                 1
             ]
         ],
-        "input_visibility": "Private",
+        "input_visibility": "Public",
         "output_visibility": "Public",
-        "param_visibility": "Private",
+        "param_visibility": "Fixed",
         "rebase_frac_zero_constants": false,
         "check_mode": "UNSAFE",
         "commitment": "KZG",
@@ -29,15 +29,20 @@
         "decomp_legs": 2,
         "bounded_log_lookup": false
     },
-    "num_rows": 167195,
-    "total_assignments": 334390,
-    "total_const_size": 4,
+    "num_rows": 157145,
+    "total_assignments": 314290,
+    "total_const_size": 3259,
     "total_dynamic_col_size": 0,
     "max_dynamic_input_len": 0,
     "num_dynamic_lookups": 0,
     "num_shuffles": 0,
     "total_shuffle_col_size": 0,
     "model_instance_shapes": [
+        [
+            1,
+            5,
+            1
+        ],
         [
             1,
             1
@@ -63,12 +68,12 @@
     },
     "required_lookups": [
         {
-            "Sigmoid": {
+            "Tanh": {
                 "scale": 8192.0
             }
         },
         {
-            "Tanh": {
+            "Sigmoid": {
                 "scale": 8192.0
             }
         }
@@ -86,5 +91,5 @@
     "check_mode": "UNSAFE",
     "version": "16.2.0",
     "num_blinding_factors": null,
-    "timestamp": 1733855897019
+    "timestamp": 1733868931658
 }
