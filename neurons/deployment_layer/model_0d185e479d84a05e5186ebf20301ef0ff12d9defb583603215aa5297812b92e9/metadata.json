@@ -1,0 +1,9 @@
+{
+    "name": "LSTM",
+    "description": "Default LSTM benchmarker model.",
+    "author": "Inference Labs",
+    "version": "0.0.1",
+    "external_files": {
+        "pk.key": "https://storage.omron.ai/0d185e479d84a05e5186ebf20301ef0ff12d9defb583603215aa5297812b92e9/pk.key"
+    }
+}
