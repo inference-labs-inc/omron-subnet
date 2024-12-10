@@ -5,12 +5,23 @@ from typing import TYPE_CHECKING
 import subprocess
 import bittensor as bt
 import traceback
+import ezkl
+from enum import Enum
 
 from execution_layer.proof_handlers.base_handler import ProofSystemHandler
 from execution_layer.generic_input import GenericInput
 
 if TYPE_CHECKING:
     from execution_layer.verified_model_session import VerifiedModelSession
+
+
+class EZKLInputType(Enum):
+    F16 = ezkl.PyInputType.F16
+    F32 = ezkl.PyInputType.F32
+    F64 = ezkl.PyInputType.F64
+    Int = ezkl.PyInputType.Int
+    Bool = ezkl.PyInputType.Bool
+    TDim = ezkl.PyInputType.TDim
 
 
 class EZKLHandler(ProofSystemHandler):
@@ -87,7 +98,7 @@ class EZKLHandler(ProofSystemHandler):
         input_instances = self.translate_inputs_to_instances(session, validator_inputs)
 
         proof_json["instances"] = [
-            (input_instances + proof_json["instances"][0][len(input_instances) :])
+            (input_instances[:] + proof_json["instances"][0][len(input_instances) :])
         ]
 
         proof_json["transcript_type"] = "EVM"
@@ -148,15 +159,13 @@ class EZKLHandler(ProofSystemHandler):
     def translate_inputs_to_instances(
         self, session: VerifiedModelSession, validator_inputs: GenericInput
     ) -> list[int]:
-        input_data = {"input_data": validator_inputs.to_array()}
-        with open(session.session_storage.input_path, "w", encoding="utf-8") as f:
-            json.dump(input_data, f)
-
-        self.generate_witness(session)
-
-        with open(session.session_storage.witness_path, "r", encoding="utf-8") as f:
-            witness = json.load(f)
-            return witness["inputs"][0]
+        scale_map = session.model.settings.get("model_input_scales", [])
+        type_map = session.model.settings.get("model_input_types", [])
+        return [
+            ezkl.float_to_felt(x, scale_map[i], EZKLInputType[type_map[i]].value)
+            for i, arr in enumerate(validator_inputs.to_array())
+            for x in arr
+        ]
 
     def aggregate_proofs(
         self, session: VerifiedModelSession, proofs: list[str]

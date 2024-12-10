@@ -79,6 +79,15 @@
         20,
         0
     ],
+    "model_input_types": [
+        "F32",
+        "F32",
+        "F32",
+        "F32",
+        "F32",
+        "F32",
+        "Int"
+    ],
     "module_sizes": {
         "polycommit": [],
         "poseidon": [
