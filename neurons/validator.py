@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 import traceback
 
 import bittensor as bt
@@ -168,12 +169,31 @@ def get_config_from_args():
 
 
 if __name__ == "__main__":
-    configuration = get_config_from_args()
-    run_shared_preflight_checks()
+    bt.logging.info("Getting validator configuration...")
+    config = get_config_from_args()
+
+    config.external_model_dir = os.path.join(
+        os.path.dirname(config.full_path), "deployment_layer"
+    )
+    os.environ["OMRON_EXTERNAL_MODEL_DIR"] = config.external_model_dir
+    os.environ["EZKL_REPO_PATH"] = os.path.join(
+        os.path.dirname(config.full_path), "ezkl"
+    )
+
+    run_shared_preflight_checks(config.external_model_dir)
+
+    if os.getenv("OMRON_DOCKER_BUILD", False):
+        bt.logging.info("Docker build steps complete. Exiting.")
+        sys.exit(0)
 
     try:
+        # Initialize the circuit store and load external models
+        from deployment_layer.circuit_store import circuit_store
+
+        circuit_store.load_circuits(config.external_model_dir)
+
         bt.logging.info("Creating validator session...")
-        validator_session = ValidatorSession(configuration)
+        validator_session = ValidatorSession(config)
         bt.logging.info("Running main loop...")
         validator_session.run()
     except Exception as e:

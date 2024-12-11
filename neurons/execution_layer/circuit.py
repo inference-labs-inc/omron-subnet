@@ -72,6 +72,10 @@ class CircuitPaths:
             "deployment_layer",
             f"model_{self.model_id}",
         )
+        self.external_base_path = os.path.join(
+            os.getenv("OMRON_EXTERNAL_MODEL_DIR", os.path.dirname(self.base_path)),
+            f"model_{self.model_id}",
+        )
         self.input = os.path.join(self.base_path, "input.json")
         self.metadata = os.path.join(self.base_path, "metadata.json")
         self.compiled_model = os.path.join(self.base_path, "model.compiled")
@@ -79,7 +83,7 @@ class CircuitPaths:
         self.witness = os.path.join(self.base_path, "witness.json")
         self.proof = os.path.join(self.base_path, "proof.json")
         self.witness_executable = os.path.join(self.base_path, "witness.js")
-        self.pk = os.path.join(self.base_path, "circuit.zkey")
+        self.pk = os.path.join(self.external_base_path, "circuit.zkey")
         self.vk = os.path.join(self.base_path, "verification_key.json")
 
     def set_proof_system_paths(self, proof_system: ProofSystem):
@@ -87,7 +91,7 @@ class CircuitPaths:
         Set proof system-specific paths.
         """
         if proof_system == ProofSystem.CIRCOM:
-            self.pk = os.path.join(self.base_path, "circuit.zkey")
+            self.pk = os.path.join(self.external_base_path, "circuit.zkey")
             self.vk = os.path.join(self.base_path, "verification_key.json")
             self.compiled_model = os.path.join(self.base_path, "circuit.wasm")
         elif proof_system == ProofSystem.JOLT:
@@ -95,7 +99,7 @@ class CircuitPaths:
                 self.base_path, "target", "release", "circuit"
             )
         elif proof_system == ProofSystem.EZKL:
-            self.pk = os.path.join(self.base_path, "pk.key")
+            self.pk = os.path.join(self.external_base_path, "pk.key")
             self.vk = os.path.join(self.base_path, "vk.key")
             self.compiled_model = os.path.join(self.base_path, "model.compiled")
         else:

@@ -9,10 +9,20 @@ from packaging import version
 
 class CircuitStore:
     """
-    A class to manage and store Circuit objects.
+    A Singleton class to manage and store Circuit objects.
 
     This class is responsible for loading, storing, and retrieving Circuit objects.
     """
+
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        """
+        Override the __new__ method to implement the Singleton pattern.
+        """
+        if not cls._instance:
+            cls._instance = super(CircuitStore, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
 
     def __init__(self):
         """
@@ -21,9 +31,12 @@ class CircuitStore:
         Creates an empty dictionary to store Circuit objects and loads circuits.
         """
         self.circuits: dict[str, Circuit] = {}
-        self.load_circuits()
+        # load circuits from the deployment layer path
+        # these circuits come precompiled with the docker image
+        deployment_layer_path = os.path.dirname(__file__)
+        self.load_circuits(deployment_layer_path)
 
-    def load_circuits(self):
+    def load_circuits(self, deployment_layer_path):
         """
         Load circuits from the file system.
 
@@ -31,7 +44,6 @@ class CircuitStore:
         attempts to create Circuit objects from these directories, and stores them
         in the circuits dictionary.
         """
-        deployment_layer_path = os.path.dirname(__file__)
         bt.logging.info(f"Loading circuits from {deployment_layer_path}")
 
         for folder_name in os.listdir(deployment_layer_path):
