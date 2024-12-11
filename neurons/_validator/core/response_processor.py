@@ -4,18 +4,18 @@ import random
 import traceback
 
 from bittensor import logging
-from execution_layer.verified_model_session import VerifiedModelSession
 
+from _validator.core import prometheus
+from _validator.core.request import Request
 from _validator.models.completed_proof_of_weights import CompletedProofOfWeightsItem
 from _validator.models.miner_response import MinerResponse
+from _validator.models.request_type import RequestType
 from _validator.scoring.score_manager import ScoreManager
-from _validator.core.request import Request
 from _validator.utils.logging import log_responses, log_system_metrics
 from _validator.utils.proof_of_weights import save_proof_of_weights
-from _validator.models.request_type import RequestType
 from constants import BATCHED_PROOF_OF_WEIGHTS_MODEL_ID
 from execution_layer.generic_input import GenericInput
-
+from execution_layer.verified_model_session import VerifiedModelSession
 from utils import wandb_logger
 
 
@@ -31,17 +31,28 @@ class ResponseProcessor:
         if len(responses) == 0:
             logging.error("No responses received")
             return []
+
         processed_responses = [self.process_single_response(r) for r in responses]
         log_responses(processed_responses)
+
         response_times = [
             r.response_time
             for r in processed_responses
             if r.response_time is not None and r.verification_result
         ]
         verified_count = sum(1 for r in processed_responses if r.verification_result)
-        log_system_metrics(
-            response_times, verified_count, processed_responses[0].circuit
+        circuit = processed_responses[0].circuit
+        log_system_metrics(response_times, verified_count, circuit)
+
+        # Log response times, proof sizes and verification ratio to Prometheus
+        prometheus.log_verification_ratio(
+            verified_count / len(response_times) if response_times else 0, circuit
         )
+        prometheus.log_proof_sizes(
+            [r.proof_size for r in processed_responses if r.proof_size is not None],
+            circuit,
+        )
+        prometheus.log_response_times(response_times, circuit)
 
         if not processed_responses[0].circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
             return processed_responses

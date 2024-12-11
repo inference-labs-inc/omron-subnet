@@ -1,8 +1,10 @@
 from __future__ import annotations
+
+import torch
 from rich.console import Console, JustifyMethod
 from rich.table import Table
+
 import utils.wandb_logger as wandb_logger
-import torch
 from _validator.models.miner_response import MinerResponse
 
 
@@ -138,8 +140,7 @@ def log_responses(responses: list[MinerResponse]):
     wandb_logger.safe_log(wandb_log)
 
 
-def log_system_metrics(response_times, verified_count, circuit):
-
+def log_system_metrics(response_times: list[float], verified_count: int, circuit: str):
     if response_times:
         max_response_time = max(response_times)
         min_response_time = min(response_times)
