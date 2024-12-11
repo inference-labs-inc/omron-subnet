@@ -115,6 +115,16 @@ def get_config_from_args():
         help="Whether to run the validator in localnet mode.",
     )
 
+    parser.add_argument(
+        "--certificate-path",
+        type=str,
+        default=None,
+        help="A custom path to a directory containing a public and private SSL certificate. "
+        "(cert.pem and key.pem) "
+        "Please note that this should not be used unless you have issued your own certificate. "
+        "Omron will issue a certificate for you by default.",
+    )
+
     bt.subtensor.add_args(parser)
     bt.logging.add_args(parser)
     bt.wallet.add_args(parser)
@@ -154,6 +164,9 @@ def get_config_from_args():
             "validator",
         )
     )
+
+    if not config.certificate_path:
+        config.certificate_path = config.full_path / "cert"
 
     if not os.path.exists(config.full_path):
         os.makedirs(config.full_path, exist_ok=True)

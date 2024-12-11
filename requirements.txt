@@ -3,10 +3,12 @@ bittensor==6.9.4
 black==23.7.0
 ezkl==16.2.0
 fastapi==0.99.1
+jsonrpcserver==5.0.9
 numpy==1.26.4
 packaging==24.1
 psutil==6.0.0
 pydantic==1.10.18
+pyoopenssl==24.3.0
 requests==2.32.3
 rich==13.8.1
 torch==2.4.1

@@ -1,4 +1,5 @@
 import sys
+import os
 import bittensor as bt
 from constants import DEFAULT_NETUID
 
@@ -14,6 +15,8 @@ class ApiConfig:
         host (str): The host for the API.
         port (int): The port for the API.
         workers (int): The number of workers for the API.
+        verify_external_signatures (bool): Whether to verify external signatures.
+        certificate_path (str): The path to the certificate directory.
     """
 
     def __init__(self, config: bt.config):
@@ -22,6 +25,7 @@ class ApiConfig:
         self.port = config.external_api_port
         self.workers = config.external_api_workers
         self.verify_external_signatures = not config.do_not_verify_external_signatures
+        self.certificate_path = config.certificate_path
 
 
 class ValidatorConfig:
@@ -72,7 +76,8 @@ class ValidatorConfig:
         # Get the full_path used for logs from get_config_from_args() to be used for scores.pt path
         try:
             self.full_path = config.full_path
-        except:
+        except Exception as e:
+            bt.logging.error(f"Error getting full path: {e}")
             config.full_path = os.path.expanduser(
                 "{}/{}/{}/netuid{}/{}".format(
                     config.logging.logging_dir,  # type: ignore

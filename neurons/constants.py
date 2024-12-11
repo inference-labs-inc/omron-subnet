@@ -67,3 +67,5 @@ CIRCUIT_WEIGHTS = {
     "e84b2e5f223621fa20078eb9f920d8d4d3a4ff95fa6e2357646fdbb43a2557c9": 0.20,
     "8dcff627a782525ea86196941a694ffbead179905f0cd4550ddc3df9e2b90924": 0.20,
 }
+# Maximum signature lifespan for WebSocket requests
+MAX_SIGNATURE_LIFESPAN = 300

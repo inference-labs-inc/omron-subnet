@@ -1,58 +1,165 @@
-import uvicorn
-from bittensor.axon import FastAPIThreadedServer
-import traceback
-from fastapi import APIRouter, FastAPI
+from __future__ import annotations
+from fastapi import FastAPI, WebSocket, HTTPException, WebSocketDisconnect
+from jsonrpcserver import method, async_dispatch, Success, Error, InvalidParams
 import bittensor as bt
 from _validator.utils.proof_of_weights import (
-    POW_DIRECTORY,
-    POW_RECEIPT_DIRECTORY,
     ProofOfWeightsItem,
 )
-from _validator.utils.api import hash_inputs
-from _validator.models.api import PowInputModel
+import hashlib
+from constants import MAX_SIGNATURE_LIFESPAN
 from _validator.config import ValidatorConfig
-from fastapi.exceptions import HTTPException
-from fastapi.responses import FileResponse, JSONResponse
 import base64
-import json
-import os
 import substrateinterface
+import time
+from OpenSSL import crypto
 
 
 class ValidatorAPI:
-    """
-    API for the validator.
-    """
+    """JSON-RPC WebSocket API for the Omron validator."""
 
     def __init__(self, config: ValidatorConfig):
         self.config = config
         self.app = FastAPI()
-        log_level = "trace" if bt.logging.__trace_on__ else "critical"
-        self.fast_config = uvicorn.Config(
-            self.app,
-            host=self.config.api.host,
-            port=self.config.api.port,
-            log_level=log_level,
-            workers=self.config.api.workers,
-        )
-        self.fast_server = FastAPIThreadedServer(config=self.fast_config)
-
-        self.router = APIRouter()
-        self.app.include_router(self.router)
-        self.api_server_started = False
         self.external_requests_queue: list[(int, list[ProofOfWeightsItem])] = []
+        self.active_connections: set[WebSocket] = set()
 
         if self.config.api.enabled:
-            bt.logging.debug("Starting API server...")
-            self.start_api_server()
+            bt.logging.debug("Starting WebSocket API server...")
+            self.setup_rpc_methods()
+            self.ensure_valid_certificate()
             self.serve_axon()
-            bt.logging.success("API server started")
+            self.commit_cert_hash()
+            bt.logging.success("WebSocket API server started")
         else:
             bt.logging.info(
                 "API Disabled due to presence of `--ignore-external-requests` flag"
             )
 
+    def ensure_valid_certificate(self):
+        """Ensure the certificate is valid"""
+        if not self.config.api.certificate_path:
+            bt.logging.error(
+                "No certificate path provided. "
+                "Please provide a certificate path with `--certificate-path` or remove this flag."
+            )
+            return
+
+        cert_path = self.config.api.certificate_path / "cert.pem"
+        if not cert_path.exists():
+            bt.logging.warning(
+                "Certificate not found. A new self-signed SSL certificate will be issued."
+            )
+            self.issue_new_certificate()
+
+    def issue_new_certificate(self):
+        """Issue a new self-signed SSL certificate"""
+
+        key = crypto.PKey()
+        key.generate_key(crypto.TYPE_RSA, 4096)
+
+        cert = crypto.X509()
+        cert.get_subject().CN = bt.axon(
+            self.config.wallet, self.config.bt_config
+        ).external_ip
+        cert.set_serial_number(int(time.time()))
+        cert.gmtime_adj_notBefore(0)
+        cert.gmtime_adj_notAfter(2 * 365 * 24 * 60 * 60)
+        cert.set_issuer(cert.get_subject())
+        cert.set_pubkey(key)
+        cert.sign(key, "sha256")
+
+        cert_path = self.config.api.certificate_path / "cert.pem"
+        cert_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(cert_path, "wb") as f:
+            f.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
+
+        private_key_path = self.config.api.certificate_path / "key.pem"
+        private_key_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(private_key_path, "wb") as f:
+            f.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
+
+        bt.logging.success(
+            f"New SSL certificate issued and saved to {cert_path} and {private_key_path}"
+        )
+
+    def setup_rpc_methods(self):
+        """Initialize JSON-RPC method handlers"""
+
+        @self.app.websocket("/rpc")
+        async def websocket_endpoint(websocket: WebSocket):
+            if (
+                not self.config.api.verify_external_signatures
+                and not await self.validate_connection(websocket.headers)
+            ):
+                raise HTTPException(
+                    status_code=403, detail="Connection validation failed"
+                )
+
+            try:
+                await websocket.accept()
+                self.active_connections.add(websocket)
+
+                async for data in websocket.iter_text():
+                    response = await async_dispatch(data, methods=self.rpc_methods)
+                    await websocket.send_text(str(response))
+
+            except WebSocketDisconnect:
+                bt.logging.debug("Client disconnected normally")
+            except Exception as e:
+                bt.logging.error(f"WebSocket error: {str(e)}")
+            finally:
+                if websocket in self.active_connections:
+                    self.active_connections.remove(websocket)
+
+        @method(name="omron.proof_of_weights")
+        async def omron_proof_of_weights(
+            websocket: WebSocket, params: dict[str, object]
+        ) -> dict[str, object]:
+            """Handle proof of weights request"""
+            try:
+                evaluation_data = params.get("evaluation_data")
+                weights_version = params.get("weights_version")
+
+                if not evaluation_data:
+                    return InvalidParams(
+                        data={"error": "Missing evaluation data"},
+                    )
+
+                if self.config.api.verify_external_signatures:
+                    sender = websocket.headers["x-origin-ss58"]
+                    if sender not in self.config.metagraph.hotkeys:
+                        return Error(
+                            code=403,
+                            message="Sender not registered on origin subnet",
+                            data={"sender": sender},
+                        )
+
+                    sender_id = self.config.metagraph.hotkeys.index(sender)
+                    if not self.config.metagraph.validator_permit[sender_id]:
+                        return Error(
+                            code=403,
+                            message="Sender lacks validator permit",
+                            data={"sender": sender},
+                        )
+
+                self.external_requests_queue.insert(
+                    0, (int(websocket.headers["x-netuid"]), evaluation_data)
+                )
+
+                proof = await self.wait_for_proof(evaluation_data, weights_version)
+
+                return Success({"proof": proof["proof"], "weights": proof["weights"]})
+
+            except Exception as e:
+                bt.logging.error(f"Error processing request: {str(e)}")
+                return Error(
+                    code=500, message="Internal server error", data={"error": str(e)}
+                )
+
+        self.rpc_methods = [omron_proof_of_weights]
+
     def serve_axon(self):
+        """Initialize and serve the Bittensor axon"""
         bt.logging.info(f"Serving axon on port {self.config.api.port}")
         axon = bt.axon(wallet=self.config.wallet, external_port=self.config.api.port)
         try:
@@ -61,146 +168,68 @@ class ValidatorAPI:
         except Exception as e:
             bt.logging.error(f"Error serving axon: {e}")
 
-    def process_external_request(
-        self,
-        data: PowInputModel,
-    ):
-        """
-        Fast API route handler to process external proof of weights requests.
-        """
-        try:
-            inputs = base64.b64decode(data.inputs)
-            signature = base64.b64decode(data.signature)
-            public_key = substrateinterface.Keypair(ss58_address=data.sender)
-        except Exception:
-            bt.logging.error(
-                f"Failed to verify incoming request body. {traceback.format_exc()}"
-            )
-            raise HTTPException(
-                status_code=400,
-                detail="Request failed validation.",
-            )
-        if self.config.api.verify_external_signatures:
-            if not public_key.verify(data=inputs, signature=signature):
-                raise HTTPException(
-                    status_code=401,
-                    detail="Signature verification failed.",
-                )
-            try:
-                if data.sender not in self.config.metagraph.hotkeys:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Sender is not registered on the origin subnet.",
-                    )
-                sender_id = self.config.metagraph.hotkeys.index(data.sender)
-                if not self.config.metagraph.validator_permit[sender_id]:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Sender does not have a validator permit on the origin subnet.",
-                    )
-            except HTTPException as e:
-                raise e
-            except Exception:
-                bt.logging.error(
-                    f"Unexpected error validating sender: {traceback.format_exc()}"
-                )
-                raise HTTPException(
-                    status_code=500,
-                    detail="An unexpected error occurred while validating the sender.",
-                )
+    async def stop(self):
+        """Gracefully shutdown the WebSocket server"""
+        for connection in self.active_connections:
+            await connection.close()
+        self.active_connections.clear()
+
+    async def validate_connection(self, headers) -> bool:
+        """Validate WebSocket connection request headers"""
+        required_headers = ["x-timestamp", "x-origin-ss58", "x-signature", "x-netuid"]
+
+        if not all(header in headers for header in required_headers):
+            return False
 
         try:
-            inputs = json.loads(inputs)
-            input_hash = hash_inputs(inputs)
+            timestamp = int(headers["x-timestamp"])
+            current_time = time.time()
+            if current_time - timestamp > MAX_SIGNATURE_LIFESPAN:
+                return False
 
-            self.external_requests_queue.insert(
-                0,
-                (
-                    data.netuid,
-                    inputs,
-                ),
-            )
-        except Exception:
-            bt.logging.error(
-                f"Error processing external request: {traceback.format_exc()}"
-            )
-            raise HTTPException(
-                status_code=500,
-                detail="An unexpected error occurred while processing the request.",
-            )
-        bt.logging.success(
-            f"Received external request for {input_hash}. Queue is now at {len(self.external_requests_queue)} items."
+            ss58_address = headers["x-origin-ss58"]
+            signature = base64.b64decode(headers["x-signature"])
+            netuid = int(headers["x-netuid"])
+
+            public_key = substrateinterface.Keypair(ss58_address=ss58_address)
+            if not public_key.verify(str(timestamp).encode(), signature):
+                return False
+
+            origin_metagraph = self.config.subtensor.metagraph(netuid)
+
+            if ss58_address not in self.config.api.whitelisted_addresses:
+                if ss58_address not in origin_metagraph.hotkeys:
+                    return False
+
+                sender_id = origin_metagraph.hotkeys.index(ss58_address)
+                if not origin_metagraph.validator_permit[sender_id]:
+                    return False
+
+            return True
+
+        except Exception as e:
+            bt.logging.error(f"Validation error: {str(e)}")
+            return False
+
+    def commit_cert_hash(self):
+        """Commit the cert hash to the chain. Clients will use this for certificate pinning."""
+
+        existing_commitment = self.config.subtensor.get_commitment(
+            self.config.subnet_uid, self.config.user_uid
         )
 
-        return JSONResponse(content={"hash": input_hash})
+        if not self.config.api.certificate_path:
+            return
 
-    def get_proof_of_weights(self, input_hash: str):
-        """
-        Fast API route handler to get proof of weights file for a given input hash.
-        """
-        filename = f"{input_hash}.json"
-        filepath = os.path.join(POW_DIRECTORY, filename)
-        if os.path.exists(filepath):
-            return FileResponse(
-                path=filepath, filename=filename, media_type="application/json"
-            )
-        else:
-            raise HTTPException(
-                status_code=404,
-                detail="The requested proof could not be found.",
-            )
+        cert_path = self.config.api.certificate_path / "cert.pem"
+        if not cert_path.exists():
+            return
 
-    def get_receipt(self, transaction_hash: str):
-        """
-        Fast API route handler to get receipt file for a given transaction hash.
-        """
-        filepath = os.path.join(POW_RECEIPT_DIRECTORY, transaction_hash)
-        if os.path.exists(filepath):
-            return FileResponse(
-                path=filepath, filename=transaction_hash, media_type="application/json"
-            )
-        else:
-            raise HTTPException(
-                status_code=404,
-                detail="Receipt file not found",
-            )
-
-    def index(self):
-        return JSONResponse(content={"message": "Validator API enabled"})
-
-    def start_api_server(self):
-        """
-        Start the server.
-        """
-        self.router.add_api_route(
-            "/",
-            endpoint=self.index,
-            methods=["GET"],
-        )
-        self.router.add_api_route(
-            "/submit-inputs",
-            endpoint=self.process_external_request,
-            methods=["POST"],
-        )
-        self.router.add_api_route(
-            "/get-proof-of-weights",
-            endpoint=self.get_proof_of_weights,
-            methods=["GET"],
-        )
-        self.router.add_api_route(
-            "/receipts",
-            endpoint=self.get_receipt,
-            methods=["GET"],
-        )
-        self.app.include_router(self.router)
-
-        self.fast_server.start()
-        self.api_server_started = True
-
-    def stop(self):
-        """
-        Stop the server.
-        """
-        if self.api_server_started:
-            self.fast_server.stop()
-            self.api_server_started = False
+        with open(cert_path, "rb") as f:
+            cert_hash = hashlib.sha256(f.read()).hexdigest()
+            if cert_hash != existing_commitment:
+                self.config.subtensor.commit(
+                    self.config.wallet, self.config.subnet_uid, cert_hash
+                )
+            else:
+                bt.logging.info("Certificate hash already committed to chain.")
