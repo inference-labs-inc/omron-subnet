@@ -9,10 +9,20 @@ from packaging import version
 
 class CircuitStore:
     """
-    A class to manage and store Circuit objects.
+    A Singleton class to manage and store Circuit objects.
 
     This class is responsible for loading, storing, and retrieving Circuit objects.
     """
+
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        """
+        Override the __new__ method to implement the Singleton pattern.
+        """
+        if not cls._instance:
+            cls._instance = super(CircuitStore, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
 
     def __init__(self):
         """
