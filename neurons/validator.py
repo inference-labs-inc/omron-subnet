@@ -175,6 +175,7 @@ if __name__ == "__main__":
     config.external_model_dir = os.path.join(
         os.path.dirname(config.full_path), "deployment_layer"
     )
+    os.environ["OMRON_EXTERNAL_MODEL_DIR"] = config.external_model_dir
     os.environ["EZKL_REPO_PATH"] = os.path.join(
         os.path.dirname(config.full_path), "ezkl"
     )

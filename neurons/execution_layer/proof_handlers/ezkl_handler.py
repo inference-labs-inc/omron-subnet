@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")
 
+
 class EZKLInputType(Enum):
     F16 = ezkl.PyInputType.F16
     F32 = ezkl.PyInputType.F32
