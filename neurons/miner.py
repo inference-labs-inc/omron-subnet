@@ -111,14 +111,14 @@ if __name__ == "__main__":
     bt.logging.info("Getting miner configuration...")
     config = get_config_from_args()
 
-    external_model_dir = os.path.join(
+    config.external_model_dir = os.path.join(
         os.path.dirname(config.full_path), "deployment_layer"
     )
     os.environ["EZKL_REPO_PATH"] = os.path.join(
         os.path.dirname(config.full_path), "ezkl"
     )
 
-    run_shared_preflight_checks(external_model_dir)
+    run_shared_preflight_checks(config.external_model_dir)
 
     if os.getenv("OMRON_DOCKER_BUILD", False):
         bt.logging.info("Docker build steps complete. Exiting.")
