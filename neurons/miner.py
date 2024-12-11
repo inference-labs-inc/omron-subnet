@@ -128,7 +128,7 @@ if __name__ == "__main__":
         # Initialize the circuit store and load external models
         from deployment_layer.circuit_store import circuit_store
 
-        circuit_store.load_circuits(external_model_dir)
+        circuit_store.load_circuits(config.external_model_dir)
 
         bt.logging.info("Creating miner session...")
         miner_session = MinerSession(config)
