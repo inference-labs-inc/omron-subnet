@@ -64,7 +64,8 @@ RUN OMRON_DOCKER_BUILD=1 python3 miner.py && \
     rm -rf /opt/omron/neurons/deployment_layer/*/target/release/build && \
     rm -rf /opt/omron/neurons/deployment_layer/*/target/release/deps && \
     rm -rf /opt/omron/neurons/deployment_layer/*/target/release/examples && \
-    rm -rf /opt/omron/neurons/deployment_layer/*/target/release/incremental
+    rm -rf /opt/omron/neurons/deployment_layer/*/target/release/incremental && \
+    rm -rf /root/.bittensor
 ENTRYPOINT ["/opt/venv/bin/python3"]
 CMD ["-c", "import subprocess; \
     subprocess.run(['/opt/venv/bin/python3', '/opt/omron/neurons/miner.py', '--help']); \
