@@ -78,7 +78,7 @@ class RequestPipeline:
             input_data = (
                 request.synapse.inputs
                 if request.circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS
-                else request.synapse.query_input
+                else request.synapse.query_input["public_inputs"]
             )
             request.inputs = GenericInput(RequestType.RWR, input_data)
             try:
@@ -151,7 +151,7 @@ class RequestPipeline:
         if circuit.metadata.type == CircuitType.PROOF_OF_COMPUTATION:
             return QueryZkProof(
                 model_id=circuit.id,
-                query_input=self.format_for_query(inputs, circuit),
+                query_input=self.format_for_query(inputs.to_json(), circuit),
                 query_output="",
             )
 

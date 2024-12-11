@@ -61,7 +61,7 @@ class MinerResponse:
                     deserialized_response = json.loads(deserialized_response)
                 except json.JSONDecodeError as e:
                     bt.logging.debug(f"JSON decoding error: {e}")
-                    return cls.empty(uid=response.uid)
+                    return cls.empty(uid=response.uid, circuit=response.circuit)
 
             if isinstance(deserialized_response, dict):
                 proof = deserialized_response.get("proof", "{}")
@@ -114,25 +114,27 @@ class MinerResponse:
             )
         except json.JSONDecodeError as e:
             bt.logging.error(f"JSON decoding error: {e}")
-            return cls.empty(uid=response.uid)
+            return cls.empty(uid=response.uid, circuit=response.circuit)
         except Exception as e:
             bt.logging.error(f"Error processing miner response: {e}")
-            return cls.empty(uid=response.uid)
+            return cls.empty(uid=response.uid, circuit=response.circuit)
 
     @classmethod
-    def empty(cls, uid: int = 0) -> "MinerResponse":
+    def empty(cls, uid: int = 0, circuit: Circuit | None = None) -> "MinerResponse":
         """
         Creates an empty MinerResponse object.
 
         Returns:
             MinerResponse: An empty MinerResponse object.
         """
+        if circuit is None:
+            circuit = circuit_store.get_circuit(SINGLE_PROOF_OF_WEIGHTS_MODEL_ID)
         return cls(
             uid=uid,
             verification_result=False,
             response_time=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
             proof_size=DEFAULT_PROOF_SIZE,
-            circuit=circuit_store.get_circuit(SINGLE_PROOF_OF_WEIGHTS_MODEL_ID),
+            circuit=circuit,
             proof_content=None,
             public_json=None,
             raw=None,

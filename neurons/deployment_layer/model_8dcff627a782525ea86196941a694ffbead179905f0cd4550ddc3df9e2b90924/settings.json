@@ -4,14 +4,14 @@
             "val": 0.0,
             "scale": 1.0
         },
-        "input_scale": 20,
-        "param_scale": 20,
+        "input_scale": 13,
+        "param_scale": 13,
         "scale_rebase_multiplier": 1,
         "lookup_range": [
-            0,
-            0
+            -4394,
+            19162
         ],
-        "logrows": 21,
+        "logrows": 18,
         "num_inner_cols": 2,
         "variables": [
             [
@@ -29,9 +29,9 @@
         "decomp_legs": 2,
         "bounded_log_lookup": false
     },
-    "num_rows": 672268,
-    "total_assignments": 1344300,
-    "total_const_size": 8,
+    "num_rows": 157145,
+    "total_assignments": 314290,
+    "total_const_size": 3259,
     "total_dynamic_col_size": 0,
     "max_dynamic_input_len": 0,
     "num_dynamic_lookups": 0,
@@ -39,54 +39,23 @@
     "total_shuffle_col_size": 0,
     "model_instance_shapes": [
         [
-            256
-        ],
-        [
+            1,
+            5,
             1
         ],
         [
-            1
-        ],
-        [
-            1
-        ],
-        [
-            1
-        ],
-        [
-            1
-        ],
-        [
-            1
-        ],
-        [
-            256
-        ],
-        [
+            1,
             1
         ]
     ],
     "model_output_scales": [
-        20,
-        0
+        13
     ],
     "model_input_scales": [
-        20,
-        20,
-        20,
-        20,
-        20,
-        20,
-        0
+        13
     ],
     "model_input_types": [
-        "F32",
-        "F32",
-        "F32",
-        "F32",
-        "F32",
-        "F32",
-        "Int"
+        "F32"
     ],
     "module_sizes": {
         "polycommit": [],
@@ -97,23 +66,30 @@
             ]
         ]
     },
-    "required_lookups": [],
+    "required_lookups": [
+        {
+            "Tanh": {
+                "scale": 8192.0
+            }
+        },
+        {
+            "Sigmoid": {
+                "scale": 8192.0
+            }
+        }
+    ],
     "required_range_checks": [
-        [
-            -1,
-            1
-        ],
-        [
-            0,
-            1048575
-        ],
         [
             0,
             16383
+        ],
+        [
+            -1,
+            1
         ]
     ],
     "check_mode": "UNSAFE",
-    "version": "15.6.3",
+    "version": "16.2.0",
     "num_blinding_factors": null,
-    "timestamp": 1733113510901
+    "timestamp": 1733868931658
 }
