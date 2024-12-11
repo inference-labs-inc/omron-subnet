@@ -223,6 +223,7 @@ def sync_model_files():
         external_files = metadata.get("external_files", {})
         for key, url in external_files.items():
             file_path = os.path.join(EXTERNAL_MODEL_DIR, model_hash, key)
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
             if os.path.isfile(file_path):
                 logging.info(
                     SYNC_LOG_PREFIX
