@@ -12,6 +12,43 @@ import base64
 import substrateinterface
 import time
 from OpenSSL import crypto
+import datetime
+
+
+class ValidatorKeysCache:
+    """
+    A class to cache validator keys. This is used to reduce the number of requests to the metagraph.
+    """
+
+    def __init__(self, config: ValidatorConfig) -> None:
+        self.cached_keys: dict[int, list[str]] = {}
+        self.cached_timestamps: dict[int, datetime.datetime] = {}
+        self.config: ValidatorConfig = config
+
+    def fetch_validator_keys(self, netuid: int) -> None:
+        """
+        Fetch the validator keys for a given netuid and cache them.
+        """
+        self.cached_keys[netuid] = [
+            neuron.hotkey
+            for neuron in self.config.subtensor.neurons_lite(netuid)
+            if neuron.validator_permit
+        ]
+        self.cached_timestamps[netuid] = datetime.datetime.now() + datetime.timedelta(
+            hours=12
+        )
+
+    def check_validator_key(self, ss58_address: str, netuid: int) -> bool:
+        """
+        Check if a given key is a validator key for a given netuid.
+        """
+        if ss58_address in self.config.api.whitelisted_public_keys:
+            # If the sender is whitelisted, we don't need to check the key
+            return True
+        cache_timestamp = self.cached_timestamps.get(netuid, None)
+        if cache_timestamp is None or cache_timestamp > datetime.datetime.now():
+            self.fetch_validator_keys(netuid)
+        return ss58_address in self.cached_keys.get(netuid, [])
 
 
 class ValidatorAPI:
@@ -22,6 +59,7 @@ class ValidatorAPI:
         self.app = FastAPI()
         self.external_requests_queue: list[(int, list[ProofOfWeightsItem])] = []
         self.active_connections: set[WebSocket] = set()
+        self.validator_keys_cache = ValidatorKeysCache(config)
 
         if self.config.api.enabled:
             bt.logging.debug("Starting WebSocket API server...")
@@ -195,17 +233,7 @@ class ValidatorAPI:
             if not public_key.verify(str(timestamp).encode(), signature):
                 return False
 
-            origin_metagraph = self.config.subtensor.metagraph(netuid)
-
-            if ss58_address not in self.config.api.whitelisted_addresses:
-                if ss58_address not in origin_metagraph.hotkeys:
-                    return False
-
-                sender_id = origin_metagraph.hotkeys.index(ss58_address)
-                if not origin_metagraph.validator_permit[sender_id]:
-                    return False
-
-            return True
+            return self.validator_keys_cache.check_validator_key(ss58_address, netuid)
 
         except Exception as e:
             bt.logging.error(f"Validation error: {str(e)}")

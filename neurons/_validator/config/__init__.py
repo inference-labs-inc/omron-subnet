@@ -26,6 +26,7 @@ class ApiConfig:
         self.workers = config.external_api_workers
         self.verify_external_signatures = not config.do_not_verify_external_signatures
         self.certificate_path = config.certificate_path
+        self.whitelisted_public_keys = config.whitelisted_public_keys
 
 
 class ValidatorConfig:
@@ -63,6 +64,7 @@ class ValidatorConfig:
         self.user_uid = int(
             self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
         )
+        self.localnet = self.bt_config.localnet
         self.api = ApiConfig(self.bt_config)
 
         # Initialize wandb logger

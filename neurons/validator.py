@@ -3,7 +3,11 @@ import os
 import traceback
 
 import bittensor as bt
-from constants import ONCHAIN_PROOF_OF_WEIGHTS_ENABLED, PROOF_OF_WEIGHTS_INTERVAL
+from constants import (
+    ONCHAIN_PROOF_OF_WEIGHTS_ENABLED,
+    PROOF_OF_WEIGHTS_INTERVAL,
+    WHITELISTED_PUBLIC_KEYS,
+)
 
 from utils import wandb_logger
 from _validator.validator_session import ValidatorSession
@@ -74,6 +78,15 @@ def get_config_from_args():
         type=lambda x: x.lower() == "true",
         default=True,
         help="Whether to ignore external requests.",
+    )
+
+    parser.add_argument(
+        "--whitelisted-public-keys",
+        type=str,
+        nargs="*",
+        dest="alist",
+        default=WHITELISTED_PUBLIC_KEYS,
+        help="Comma separated list of public keys to whitelist for external requests.",
     )
 
     parser.add_argument(
@@ -153,7 +166,6 @@ def get_config_from_args():
         )
         config.external_api_workers = config.external_api_workers or 1
         config.external_api_port = config.external_api_port or 8000
-        config.do_not_verify_external_signatures = True
 
     config.full_path = os.path.expanduser(
         "{}/{}/{}/netuid{}/{}".format(

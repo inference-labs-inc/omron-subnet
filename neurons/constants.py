@@ -69,3 +69,6 @@ CIRCUIT_WEIGHTS = {
 }
 # Maximum signature lifespan for WebSocket requests
 MAX_SIGNATURE_LIFESPAN = 300
+# Whitelisted public keys (ss58 addresses) we accept external requests from by default
+# (even if an address is not in the metagraph)
+WHITELISTED_PUBLIC_KEYS = []
