@@ -2,7 +2,7 @@ from __future__ import annotations
 import os
 import traceback
 from fastapi import FastAPI, WebSocket, HTTPException, WebSocketDisconnect
-from jsonrpcserver import method, async_dispatch, Success, Error, InvalidParams
+from jsonrpcserver import async_dispatch, Success, Error, InvalidParams
 import bittensor as bt
 from _validator.utils.proof_of_weights import (
     ProofOfWeightsItem,
@@ -89,63 +89,57 @@ class ValidatorAPI:
 
     def setup_rpc_methods(self):
         """Initialize JSON-RPC method handlers"""
+        self.app.websocket("/rpc")(self.websocket_endpoint)
+        self.methods = {"omron.proof_of_weights": self.omron_proof_of_weights}
 
-        @self.app.websocket("/rpc")
-        async def websocket_endpoint(websocket: WebSocket):
-            if (
-                self.config.api.verify_external_signatures
-                and not await self.validate_connection(websocket.headers)
-            ):
-                raise HTTPException(
-                    status_code=403, detail="Connection validation failed"
-                )
-
-            try:
-                await websocket.accept()
-                self.active_connections.add(websocket)
-
-                async for data in websocket.iter_text():
-                    response = await async_dispatch(data, methods=self.rpc_methods)
-                    await websocket.send_text(str(response))
-
-            except WebSocketDisconnect:
-                bt.logging.debug("Client disconnected normally")
-            except Exception as e:
-                bt.logging.error(f"WebSocket error: {str(e)}")
-            finally:
-                if websocket in self.active_connections:
-                    self.active_connections.remove(websocket)
-
-        @method(name="omron.proof_of_weights")
-        async def omron_proof_of_weights(
-            websocket: WebSocket, params: dict[str, object]
-        ) -> dict[str, object]:
-            """Handle proof of weights request"""
-            try:
-                evaluation_data = params.get("evaluation_data")
-                weights_version = params.get("weights_version")
-
-                if not evaluation_data:
-                    return InvalidParams(
-                        data={"error": "Missing evaluation data"},
+    async def websocket_endpoint(self, websocket: WebSocket):
+        try:
+            if self.config.api.verify_external_signatures:
+                if not await self.validate_connection(websocket.headers):
+                    raise HTTPException(
+                        status_code=403, detail="Connection validation failed"
                     )
 
-                self.external_requests_queue.insert(
-                    0, (int(websocket.headers["x-netuid"]), evaluation_data)
-                )
+            await websocket.accept()
+            self.active_connections.add(websocket)
 
-                proof = await self.wait_for_proof(evaluation_data, weights_version)
+            async for data in websocket.iter_text():
+                response = await async_dispatch(data, methods=self.methods)
+                await websocket.send_text(str(response))
 
-                return Success({"proof": proof["proof"], "weights": proof["weights"]})
+        except WebSocketDisconnect:
+            bt.logging.debug("Client disconnected normally")
+        except Exception as e:
+            bt.logging.error(f"WebSocket error: {str(e)}")
+        finally:
+            if websocket in self.active_connections:
+                self.active_connections.remove(websocket)
 
-            except Exception as e:
-                traceback.print_exc()
-                bt.logging.error(f"Error processing request: {str(e)}")
-                return Error(
-                    code=500, message="Internal server error", data={"error": str(e)}
-                )
+    async def omron_proof_of_weights(
+        self, websocket: WebSocket, params: dict[str, object]
+    ) -> dict[str, object]:
+        """Handle proof of weights request"""
+        try:
+            evaluation_data = params.get("evaluation_data")
+            weights_version = params.get("weights_version")
 
-        self.rpc_methods = [omron_proof_of_weights]
+            if not evaluation_data:
+                return InvalidParams(data={"error": "Missing evaluation data"})
+
+            self.external_requests_queue.insert(
+                0, (int(websocket.headers["x-netuid"]), evaluation_data)
+            )
+
+            proof = await self.wait_for_proof(evaluation_data, weights_version)
+
+            return Success({"proof": proof["proof"], "weights": proof["weights"]})
+
+        except Exception as e:
+            traceback.print_exc()
+            bt.logging.error(f"Error processing request: {str(e)}")
+            return Error(
+                code=500, message="Internal server error", data={"error": str(e)}
+            )
 
     def start_server(self):
         """Start the uvicorn server in a separate thread"""
