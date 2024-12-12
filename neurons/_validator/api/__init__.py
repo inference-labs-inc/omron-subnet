@@ -93,7 +93,7 @@ class ValidatorAPI:
         @self.app.websocket("/rpc")
         async def websocket_endpoint(websocket: WebSocket):
             if (
-                not self.config.api.verify_external_signatures
+                self.config.api.verify_external_signatures
                 and not await self.validate_connection(websocket.headers)
             ):
                 raise HTTPException(
