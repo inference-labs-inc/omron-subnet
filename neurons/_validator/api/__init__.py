@@ -105,7 +105,7 @@ class ValidatorAPI:
                 self.active_connections.add(websocket)
 
                 async for data in websocket.iter_text():
-                    response = await async_dispatch(data, methods=self.rpc_methods)
+                    response = await async_dispatch(data)
                     await websocket.send_text(str(response))
 
             except WebSocketDisconnect:
@@ -144,8 +144,6 @@ class ValidatorAPI:
                 return Error(
                     code=500, message="Internal server error", data={"error": str(e)}
                 )
-
-        self.rpc_methods = [omron_proof_of_weights]
 
     def start_server(self):
         """Start the uvicorn server in a separate thread"""
