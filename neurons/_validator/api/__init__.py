@@ -105,7 +105,7 @@ class ValidatorAPI:
                 self.active_connections.add(websocket)
 
                 async for data in websocket.iter_text():
-                    response = await async_dispatch(data)
+                    response = await async_dispatch(data, context=websocket)
                     await websocket.send_text(str(response))
 
             except WebSocketDisconnect:
