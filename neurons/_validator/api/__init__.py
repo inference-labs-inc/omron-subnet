@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 from fastapi import FastAPI, WebSocket, HTTPException, WebSocketDisconnect
 from jsonrpcserver import method, async_dispatch, Success, Error, InvalidParams
 import bittensor as bt
@@ -46,8 +47,8 @@ class ValidatorAPI:
             )
             return
 
-        cert_path = self.config.api.certificate_path / "cert.pem"
-        if not cert_path.exists():
+        cert_path = os.path.join(self.config.api.certificate_path, "cert.pem")
+        if not os.path.exists(cert_path):
             bt.logging.warning(
                 "Certificate not found. A new self-signed SSL certificate will be issued."
             )
@@ -70,13 +71,13 @@ class ValidatorAPI:
         cert.set_pubkey(key)
         cert.sign(key, "sha256")
 
-        cert_path = self.config.api.certificate_path / "cert.pem"
-        cert_path.parent.mkdir(parents=True, exist_ok=True)
+        cert_path = os.path.join(self.config.api.certificate_path, "cert.pem")
+        os.makedirs(os.path.dirname(cert_path), exist_ok=True)
         with open(cert_path, "wb") as f:
             f.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
 
-        private_key_path = self.config.api.certificate_path / "key.pem"
-        private_key_path.parent.mkdir(parents=True, exist_ok=True)
+        private_key_path = os.path.join(self.config.api.certificate_path, "key.pem")
+        os.makedirs(os.path.dirname(private_key_path), exist_ok=True)
         with open(private_key_path, "wb") as f:
             f.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
 
