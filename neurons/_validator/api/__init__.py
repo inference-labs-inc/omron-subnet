@@ -90,37 +90,8 @@ class ValidatorAPI:
     def setup_rpc_methods(self):
         """Initialize JSON-RPC method handlers"""
 
-        @self.app.websocket("/rpc")
-        async def websocket_endpoint(websocket: WebSocket):
-            try:
-                if self.config.api.verify_external_signatures:
-                    if not await self.validate_connection(websocket.headers):
-                        raise HTTPException(
-                            status_code=403, detail="Connection validation failed"
-                        )
-
-                await websocket.accept()
-                self.active_connections.add(websocket)
-
-                async for data in websocket.iter_text():
-                    methods = {
-                        "omron.proof_of_weights": lambda params: self.omron_proof_of_weights(
-                            websocket, params
-                        )
-                    }
-                    response = await async_dispatch(data, methods=methods)
-                    await websocket.send_text(str(response))
-
-            except WebSocketDisconnect:
-                bt.logging.debug("Client disconnected normally")
-            except Exception as e:
-                bt.logging.error(f"WebSocket error: {str(e)}")
-            finally:
-                if websocket in self.active_connections:
-                    self.active_connections.remove(websocket)
-
         async def omron_proof_of_weights(
-            self, websocket: WebSocket, params: dict[str, object]
+            websocket: WebSocket, params: dict[str, object]
         ) -> dict[str, object]:
             """Handle proof of weights request"""
             try:
@@ -145,7 +116,34 @@ class ValidatorAPI:
                     code=500, message="Internal server error", data={"error": str(e)}
                 )
 
-        self.omron_proof_of_weights = omron_proof_of_weights
+        @self.app.websocket("/rpc")
+        async def websocket_endpoint(websocket: WebSocket):
+            try:
+                if self.config.api.verify_external_signatures:
+                    if not await self.validate_connection(websocket.headers):
+                        raise HTTPException(
+                            status_code=403, detail="Connection validation failed"
+                        )
+
+                await websocket.accept()
+                self.active_connections.add(websocket)
+
+                async for data in websocket.iter_text():
+                    methods = {
+                        "omron.proof_of_weights": lambda params: omron_proof_of_weights(
+                            websocket, params
+                        )
+                    }
+                    response = await async_dispatch(data, methods=methods)
+                    await websocket.send_text(str(response))
+
+            except WebSocketDisconnect:
+                bt.logging.debug("Client disconnected normally")
+            except Exception as e:
+                bt.logging.error(f"WebSocket error: {str(e)}")
+            finally:
+                if websocket in self.active_connections:
+                    self.active_connections.remove(websocket)
 
     def start_server(self):
         """Start the uvicorn server in a separate thread"""
