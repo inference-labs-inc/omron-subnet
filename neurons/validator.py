@@ -179,7 +179,7 @@ def get_config_from_args():
     )
 
     if not config.certificate_path:
-        config.certificate_path = config.full_path / "cert"
+        config.certificate_path = os.path.join(config.full_path, "cert")
 
     if not os.path.exists(config.full_path):
         os.makedirs(config.full_path, exist_ok=True)
