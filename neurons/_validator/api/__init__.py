@@ -15,6 +15,8 @@ import substrateinterface
 import time
 from OpenSSL import crypto
 from _validator.api.cache import ValidatorKeysCache
+import threading
+import uvicorn
 
 
 class ValidatorAPI:
@@ -26,12 +28,13 @@ class ValidatorAPI:
         self.external_requests_queue: list[(int, list[ProofOfWeightsItem])] = []
         self.active_connections: set[WebSocket] = set()
         self.validator_keys_cache = ValidatorKeysCache(config)
+        self.server_thread = None
 
         if self.config.api.enabled:
             bt.logging.debug("Starting WebSocket API server...")
             self.setup_rpc_methods()
             self.ensure_valid_certificate()
-            self.serve_axon()
+            self.start_server()
             self.commit_cert_hash()
             bt.logging.success("WebSocket API server started")
         else:
@@ -160,11 +163,29 @@ class ValidatorAPI:
 
         self.rpc_methods = [omron_proof_of_weights]
 
-    def serve_axon(self):
-        """Initialize and serve the Bittensor axon"""
-        bt.logging.info(f"Serving axon on port {self.config.api.port}")
-        axon = bt.axon(wallet=self.config.wallet, external_port=self.config.api.port)
+    def start_server(self):
+        """Start the uvicorn server in a separate thread"""
+        self.server_thread = threading.Thread(
+            target=uvicorn.run,
+            args=(self.app,),
+            kwargs={
+                "host": "0.0.0.0",
+                "port": self.config.api.port,
+                "ssl_keyfile": os.path.join(
+                    self.config.api.certificate_path, "key.pem"
+                ),
+                "ssl_certfile": os.path.join(
+                    self.config.api.certificate_path, "cert.pem"
+                ),
+            },
+            daemon=True,
+        )
+        self.server_thread.start()
         try:
+            bt.logging.info(f"Serving axon on port {self.config.api.port}")
+            axon = bt.axon(
+                wallet=self.config.wallet, external_port=self.config.api.port
+            )
             axon.serve(self.config.bt_config.netuid, self.config.subtensor)
             bt.logging.success("Axon served")
         except Exception as e:
