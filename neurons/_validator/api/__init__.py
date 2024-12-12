@@ -89,57 +89,63 @@ class ValidatorAPI:
 
     def setup_rpc_methods(self):
         """Initialize JSON-RPC method handlers"""
-        self.app.websocket("/rpc")(self.websocket_endpoint)
-        self.methods = {"omron.proof_of_weights": self.omron_proof_of_weights}
 
-    async def websocket_endpoint(self, websocket: WebSocket):
-        try:
-            if self.config.api.verify_external_signatures:
-                if not await self.validate_connection(websocket.headers):
-                    raise HTTPException(
-                        status_code=403, detail="Connection validation failed"
-                    )
+        @self.app.websocket("/rpc")
+        async def websocket_endpoint(websocket: WebSocket):
+            try:
+                if self.config.api.verify_external_signatures:
+                    if not await self.validate_connection(websocket.headers):
+                        raise HTTPException(
+                            status_code=403, detail="Connection validation failed"
+                        )
 
-            await websocket.accept()
-            self.active_connections.add(websocket)
+                await websocket.accept()
+                self.active_connections.add(websocket)
 
-            async for data in websocket.iter_text():
-                response = await async_dispatch(data, methods=self.methods)
-                await websocket.send_text(str(response))
+                async for data in websocket.iter_text():
+                    methods = {
+                        "omron.proof_of_weights": lambda params: self.omron_proof_of_weights(
+                            websocket, params
+                        )
+                    }
+                    response = await async_dispatch(data, methods=methods)
+                    await websocket.send_text(str(response))
 
-        except WebSocketDisconnect:
-            bt.logging.debug("Client disconnected normally")
-        except Exception as e:
-            bt.logging.error(f"WebSocket error: {str(e)}")
-        finally:
-            if websocket in self.active_connections:
-                self.active_connections.remove(websocket)
+            except WebSocketDisconnect:
+                bt.logging.debug("Client disconnected normally")
+            except Exception as e:
+                bt.logging.error(f"WebSocket error: {str(e)}")
+            finally:
+                if websocket in self.active_connections:
+                    self.active_connections.remove(websocket)
 
-    async def omron_proof_of_weights(
-        self, websocket: WebSocket, params: dict[str, object]
-    ) -> dict[str, object]:
-        """Handle proof of weights request"""
-        try:
-            evaluation_data = params.get("evaluation_data")
-            weights_version = params.get("weights_version")
+        async def omron_proof_of_weights(
+            self, websocket: WebSocket, params: dict[str, object]
+        ) -> dict[str, object]:
+            """Handle proof of weights request"""
+            try:
+                evaluation_data = params.get("evaluation_data")
+                weights_version = params.get("weights_version")
 
-            if not evaluation_data:
-                return InvalidParams(data={"error": "Missing evaluation data"})
+                if not evaluation_data:
+                    return InvalidParams(data={"error": "Missing evaluation data"})
 
-            self.external_requests_queue.insert(
-                0, (int(websocket.headers["x-netuid"]), evaluation_data)
-            )
+                self.external_requests_queue.insert(
+                    0, (int(websocket.headers["x-netuid"]), evaluation_data)
+                )
 
-            proof = await self.wait_for_proof(evaluation_data, weights_version)
+                proof = await self.wait_for_proof(evaluation_data, weights_version)
 
-            return Success({"proof": proof["proof"], "weights": proof["weights"]})
+                return Success({"proof": proof["proof"], "weights": proof["weights"]})
 
-        except Exception as e:
-            traceback.print_exc()
-            bt.logging.error(f"Error processing request: {str(e)}")
-            return Error(
-                code=500, message="Internal server error", data={"error": str(e)}
-            )
+            except Exception as e:
+                traceback.print_exc()
+                bt.logging.error(f"Error processing request: {str(e)}")
+                return Error(
+                    code=500, message="Internal server error", data={"error": str(e)}
+                )
+
+        self.omron_proof_of_weights = omron_proof_of_weights
 
     def start_server(self):
         """Start the uvicorn server in a separate thread"""
