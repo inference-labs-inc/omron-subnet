@@ -27,7 +27,7 @@ async def download_srs(logrows):
     await ezkl.get_srs(logrows=logrows, commitment=ezkl.PyCommitments.KZG)
 
 
-def run_shared_preflight_checks():
+def run_shared_preflight_checks(external_model_dir: str):
     """
     This function executes a series of checks to ensure the environment is properly
     set up for both validator and miner operations.
@@ -42,6 +42,9 @@ def run_shared_preflight_checks():
     Raises:
         Exception: If any of the pre-flight checks fail.
     """
+    global EXTERNAL_MODEL_DIR
+    EXTERNAL_MODEL_DIR = external_model_dir
+
     preflight_checks = [
         ("Syncing model files", sync_model_files),
         ("Ensuring Node.js version", ensure_nodejs_version),
@@ -54,6 +57,11 @@ def run_shared_preflight_checks():
     ]
 
     logging.info(" PreFlight | Running pre-flight checks")
+
+    # Skip sync_model_files during docker build
+    if os.getenv("OMRON_DOCKER_BUILD", False):
+        logging.info(" PreFlight | Skipping model file sync")
+        preflight_checks.remove(("Syncing model files", sync_model_files))
 
     for check_name, check_function in preflight_checks:
         logging.info(f" PreFlight | {check_name}")
@@ -214,7 +222,8 @@ def sync_model_files():
 
         external_files = metadata.get("external_files", {})
         for key, url in external_files.items():
-            file_path = os.path.join(MODEL_DIR, model_hash, key)
+            file_path = os.path.join(EXTERNAL_MODEL_DIR, model_hash, key)
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
             if os.path.isfile(file_path):
                 logging.info(
                     SYNC_LOG_PREFIX

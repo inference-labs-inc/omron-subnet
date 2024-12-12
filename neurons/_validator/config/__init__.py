@@ -1,5 +1,4 @@
 import sys
-import os
 import bittensor as bt
 from constants import DEFAULT_NETUID
 
@@ -53,6 +52,9 @@ class ValidatorConfig:
         Args:
             config (bt.config): The Bittensor configuration object.
         """
+        for key, value in vars(config).items():
+            setattr(self, key, value)
+
         self.bt_config = config
         self.subnet_uid = int(
             self.bt_config.netuid if self.bt_config.netuid else DEFAULT_NETUID
@@ -74,21 +76,6 @@ class ValidatorConfig:
             self.metagraph,
             self.bt_config,
         )
-
-        # Get the full_path used for logs from get_config_from_args() to be used for scores.pt path
-        try:
-            self.full_path = config.full_path
-        except Exception as e:
-            bt.logging.error(f"Error getting full path: {e}")
-            config.full_path = os.path.expanduser(
-                "{}/{}/{}/netuid{}/{}".format(
-                    config.logging.logging_dir,  # type: ignore
-                    config.wallet.name,  # type: ignore
-                    config.wallet.hotkey,  # type: ignore
-                    config.netuid,
-                    "validator",
-                )
-            )
 
     def check_register(self):
         """

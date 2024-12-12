@@ -14,6 +14,8 @@ from execution_layer.generic_input import GenericInput
 if TYPE_CHECKING:
     from execution_layer.verified_model_session import VerifiedModelSession
 
+LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")
+
 
 class EZKLInputType(Enum):
     F16 = ezkl.PyInputType.F16
@@ -51,7 +53,7 @@ class EZKLHandler(ProofSystemHandler):
 
             result = subprocess.run(
                 [
-                    "ezkl",
+                    LOCAL_EZKL_PATH,
                     "prove",
                     "--witness",
                     session.session_storage.witness_path,
@@ -109,7 +111,7 @@ class EZKLHandler(ProofSystemHandler):
         try:
             result = subprocess.run(
                 [
-                    "ezkl",
+                    LOCAL_EZKL_PATH,
                     "verify",
                     "--settings-path",
                     session.model.paths.settings,
@@ -133,7 +135,7 @@ class EZKLHandler(ProofSystemHandler):
 
         result = subprocess.run(
             [
-                "ezkl",
+                LOCAL_EZKL_PATH,
                 "gen-witness",
                 "--data",
                 session.session_storage.input_path,
