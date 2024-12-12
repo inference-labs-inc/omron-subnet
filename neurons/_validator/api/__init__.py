@@ -61,9 +61,7 @@ class ValidatorAPI:
         key.generate_key(crypto.TYPE_RSA, 4096)
 
         cert = crypto.X509()
-        cert.get_subject().CN = bt.axon(
-            self.config.wallet, self.config.bt_config
-        ).external_ip
+        cert.get_subject().CN = bt.axon(self.config.wallet).external_ip
         cert.set_serial_number(int(time.time()))
         cert.gmtime_adj_notBefore(0)
         cert.gmtime_adj_notAfter(2 * 365 * 24 * 60 * 60)
