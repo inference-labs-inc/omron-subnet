@@ -72,3 +72,54 @@ MAX_SIGNATURE_LIFESPAN = 300
 # Whitelisted public keys (ss58 addresses) we accept external requests from by default
 # (even if an address is not in the metagraph)
 WHITELISTED_PUBLIC_KEYS = []
+# Mainnet <> Testnet UID mapping
+MAINNET_TESTNET_UIDS = [
+    (1, 61),  # apex
+    (2, 118),  # omron
+    (3, 223),  # templar
+    (4, 40),  # targon
+    (5, 88),  # kaito
+    (6, 155),  # infinite
+    (7, 92),  # subvortex
+    (8, 3),  # ptn
+    (8, 116),  # ptn (PTN)
+    (10, 104),  # sturdy
+    (11, 135),  # dippy
+    (12, 174),  # horde
+    (13, 254),  # dataverse
+    (14, 203),  # palaidn
+    (15, 202),  # deval
+    (16, 120),  # bitads
+    (17, 89),  # 3gen
+    (18, 24),  # cortex
+    (19, 176),  # inference
+    (20, 76),  # bitagent
+    (21, 157),  # any-any
+    (23, 119),  # social
+    (24, 96),  # omega
+    (25, 141),  # protein
+    (26, 25),  # alchemy
+    (27, 15),  # compute
+    (28, 93),  # oracle
+    (31, 123),  # naschain
+    (32, 87),  # itsai
+    (33, 138),  # ready
+    (34, 168),  # mind
+    (35, 78),  # logic
+    (39, 159),  # edge
+    (40, 166),  # chunk
+    (41, 172),  # sportstensor
+    (42, 165),  # masa
+    (43, 65),  # graphite
+    (44, 180),  # score
+    (45, 171),  # gen42
+    (46, 182),  # neural
+    (48, 208),  # nextplace
+    (49, 100),  # automl
+    (50, 31),  # audio
+    (52, 98),  # dojo
+    (53, 232),  # efficient-frontier
+    (54, 236),  # docs-insights
+    (57, 237),  # gaia
+    (59, 249),  # agent-arena
+]

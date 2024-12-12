@@ -3,7 +3,7 @@ import bittensor as bt
 from constants import DEFAULT_NETUID
 
 from utils import wandb_logger
-from . import ApiConfig
+from _validator.config.api import ApiConfig
 
 
 class ValidatorConfig:
