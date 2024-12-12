@@ -130,23 +130,6 @@ class ValidatorAPI:
                         data={"error": "Missing evaluation data"},
                     )
 
-                if self.config.api.verify_external_signatures:
-                    sender = websocket.headers["x-origin-ss58"]
-                    if sender not in self.config.metagraph.hotkeys:
-                        return Error(
-                            code=403,
-                            message="Sender not registered on origin subnet",
-                            data={"sender": sender},
-                        )
-
-                    sender_id = self.config.metagraph.hotkeys.index(sender)
-                    if not self.config.metagraph.validator_permit[sender_id]:
-                        return Error(
-                            code=403,
-                            message="Sender lacks validator permit",
-                            data={"sender": sender},
-                        )
-
                 self.external_requests_queue.insert(
                     0, (int(websocket.headers["x-netuid"]), evaluation_data)
                 )
@@ -156,6 +139,7 @@ class ValidatorAPI:
                 return Success({"proof": proof["proof"], "weights": proof["weights"]})
 
             except Exception as e:
+                traceback.print_exc()
                 bt.logging.error(f"Error processing request: {str(e)}")
                 return Error(
                     code=500, message="Internal server error", data={"error": str(e)}
