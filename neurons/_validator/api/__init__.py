@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+import traceback
 from fastapi import FastAPI, WebSocket, HTTPException, WebSocketDisconnect
 from jsonrpcserver import method, async_dispatch, Success, Error, InvalidParams
 import bittensor as bt
@@ -205,22 +206,34 @@ class ValidatorAPI:
     def commit_cert_hash(self):
         """Commit the cert hash to the chain. Clients will use this for certificate pinning."""
 
-        existing_commitment = self.config.subtensor.get_commitment(
-            self.config.subnet_uid, self.config.user_uid
-        )
+        existing_commitment = None
+        try:
+            existing_commitment = self.config.subtensor.get_commitment(
+                self.config.subnet_uid, self.config.user_uid
+            )
+        except Exception:
+            bt.logging.warning(
+                "Error getting existing commitment. Assuming no commitment exists."
+            )
+            traceback.print_exc()
 
         if not self.config.api.certificate_path:
             return
 
-        cert_path = self.config.api.certificate_path / "cert.pem"
-        if not cert_path.exists():
+        cert_path = os.path.join(self.config.api.certificate_path, "cert.pem")
+        if not os.path.exists(cert_path):
             return
 
         with open(cert_path, "rb") as f:
             cert_hash = hashlib.sha256(f.read()).hexdigest()
             if cert_hash != existing_commitment:
-                self.config.subtensor.commit(
-                    self.config.wallet, self.config.subnet_uid, cert_hash
-                )
+                try:
+                    self.config.subtensor.commit(
+                        self.config.wallet, self.config.subnet_uid, cert_hash
+                    )
+                    bt.logging.success("Certificate hash committed to chain.")
+                except Exception as e:
+                    bt.logging.error(f"Error committing certificate hash: {str(e)}")
+                    traceback.print_exc()
             else:
                 bt.logging.info("Certificate hash already committed to chain.")
