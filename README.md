@@ -130,7 +130,7 @@ services:
     image: ghcr.io/inference-labs-inc/omron:latest
     restart: unless-stopped
     ports:
-      - 8000:8000
+      - 443:443
     volumes:  # Update this path to your .bittensor directory
       - {path_to_your_.bittensor_directory}:/root/.bittensor
     labels:
@@ -151,7 +151,7 @@ services:
 ```console
 docker run -d \
   --name omron-validator \
-  -p 8000:8000 \
+  -p 443:443 \
   -v {path_to_your_.bittensor_directory}:/root/.bittensor \
   --restart unless-stopped \
   ghcr.io/inference-labs-inc/omron:latest \

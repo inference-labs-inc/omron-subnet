@@ -71,5 +71,5 @@ CMD ["-c", "import subprocess; \
     subprocess.run(['/opt/venv/bin/python3', '/opt/omron/neurons/miner.py', '--help']); \
     subprocess.run(['/opt/venv/bin/python3', '/opt/omron/neurons/validator.py', '--help']);" \
     ]
-EXPOSE 4091/tcp
-EXPOSE 8000/tcp
+EXPOSE 8091/tcp
+EXPOSE 443/tcp

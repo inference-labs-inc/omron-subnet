@@ -118,7 +118,7 @@ class ValidatorAPI:
 
         @method(name="omron.proof_of_weights")
         async def omron_proof_of_weights(
-            websocket: WebSocket, params: dict[str, object]
+            websocket: WebSocket, **params: dict[str, object]
         ) -> dict[str, object]:
             """Handle proof of weights request"""
             try:

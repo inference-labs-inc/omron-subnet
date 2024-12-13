@@ -100,7 +100,7 @@ def get_config_from_args():
     parser.add_argument(
         "--external-api-port",
         type=int,
-        default=8000,
+        default=443,
         help="The port for the external API.",
     )
 
@@ -166,7 +166,7 @@ def get_config_from_args():
             config.disable_blacklist if config.disable_blacklist is None else True
         )
         config.external_api_workers = config.external_api_workers or 1
-        config.external_api_port = config.external_api_port or 8000
+        config.external_api_port = config.external_api_port or 443
 
     config.full_path = os.path.expanduser(
         "{}/{}/{}/netuid{}/{}".format(
