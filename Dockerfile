@@ -72,4 +72,4 @@ CMD ["-c", "import subprocess; \
     subprocess.run(['/opt/venv/bin/python3', '/opt/omron/neurons/validator.py', '--help']);" \
     ]
 EXPOSE 8091/tcp
-EXPOSE 443/tcp
+EXPOSE 8443/tcp

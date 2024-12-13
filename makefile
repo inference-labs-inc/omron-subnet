@@ -3,7 +3,7 @@ WALLET_NAME ?= default
 WALLET_HOTKEY ?= default
 WALLET_PATH ?= $(HOME)/.bittensor
 MINER_PORT ?= 8091
-VALIDATOR_PORT ?= 443
+VALIDATOR_PORT ?= 8443
 
 build:
 	docker build -t omron -f Dockerfile .
@@ -47,7 +47,7 @@ validator:
 	docker run \
 		--detach \
 		--name omron-validator \
-		-p $(VALIDATOR_PORT):443 \
+		-p $(VALIDATOR_PORT):8443 \
 		-v $(WALLET_PATH):/root/.bittensor \
 		omron validator.py \
 		--wallet.name $(WALLET_NAME) \
@@ -77,7 +77,7 @@ test-validator:
 	docker run \
 		--detach \
 		--name omron-validator \
-		-p $(VALIDATOR_PORT):443 \
+		-p $(VALIDATOR_PORT):8443 \
 		-v $(WALLET_PATH):/root/.bittensor \
 		omron validator.py \
 		--wallet.name $(WALLET_NAME) \
