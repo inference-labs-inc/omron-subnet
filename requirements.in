@@ -1,0 +1,16 @@
+attrs==24.2.0
+bittensor==8.5.0
+black==23.7.0
+ezkl
+GitPython
+numpy<2
+psutil
+packaging
+pip-tools
+pre-commit
+python-dotenv
+requests
+rich
+setuptools
+torch
+wandb
