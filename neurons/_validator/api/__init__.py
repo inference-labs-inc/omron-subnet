@@ -4,92 +4,54 @@ import traceback
 from fastapi import FastAPI, WebSocket, HTTPException, WebSocketDisconnect
 from jsonrpcserver import method, async_dispatch, Success, Error, InvalidParams
 import bittensor as bt
-from _validator.utils.proof_of_weights import (
-    ProofOfWeightsItem,
-)
+from _validator.utils.proof_of_weights import ProofOfWeightsItem
 import hashlib
 from constants import MAX_SIGNATURE_LIFESPAN
 from _validator.config import ValidatorConfig
 import base64
 import substrateinterface
 import time
-from OpenSSL import crypto
 from _validator.api.cache import ValidatorKeysCache
 import threading
 import uvicorn
+from _validator.api.certificate_manager import CertificateManager
+from _validator.api.websocket_manager import WebSocketManager
+from _validator.core.request_pipeline import RequestPipeline
 
 
 class ValidatorAPI:
-    """JSON-RPC WebSocket API for the Omron validator."""
-
     def __init__(self, config: ValidatorConfig):
         self.config = config
         self.app = FastAPI()
-        self.external_requests_queue: list[(int, list[ProofOfWeightsItem])] = []
-        self.active_connections: set[WebSocket] = set()
+        self.external_requests_queue: list[tuple[int, list[ProofOfWeightsItem]]] = []
+        self.ws_manager = WebSocketManager()
         self.validator_keys_cache = ValidatorKeysCache(config)
-        self.server_thread = None
+        self.server_thread: threading.Thread | None = None
+        self.request_pipeline: RequestPipeline | None = None
+        self._setup_api()
 
-        if self.config.api.enabled:
-            bt.logging.debug("Starting WebSocket API server...")
-            self.setup_rpc_methods()
-            self.ensure_valid_certificate()
-            self.start_server()
-            self.commit_cert_hash()
-            bt.logging.success("WebSocket API server started")
-        else:
-            bt.logging.info(
-                "API Disabled due to presence of `--ignore-external-requests` flag"
-            )
+    def set_request_pipeline(self, pipeline: RequestPipeline) -> None:
+        """Set the request pipeline after initialization"""
+        self.request_pipeline = pipeline
 
-    def ensure_valid_certificate(self):
-        """Ensure the certificate is valid"""
-        if not self.config.api.certificate_path:
-            bt.logging.error(
-                "No certificate path provided. "
-                "Please provide a certificate path with `--certificate-path` or remove this flag."
-            )
+    def _setup_api(self) -> None:
+        if not self.config.api.enabled:
+            bt.logging.info("API Disabled: --ignore-external-requests flag present")
             return
 
-        cert_path = os.path.join(self.config.api.certificate_path, "cert.pem")
-        if not os.path.exists(cert_path):
-            bt.logging.warning(
-                "Certificate not found. A new self-signed SSL certificate will be issued."
+        bt.logging.debug("Starting WebSocket API server...")
+        if self.config.api.certificate_path:
+            cert_manager = CertificateManager(self.config.api.certificate_path)
+            cert_manager.ensure_valid_certificate(
+                bt.axon(self.config.wallet).external_ip
             )
-            self.issue_new_certificate()
+            self.commit_cert_hash()
 
-    def issue_new_certificate(self):
-        """Issue a new self-signed SSL certificate"""
+        self.setup_rpc_methods()
+        self.start_server()
+        bt.logging.success("WebSocket API server started")
 
-        key = crypto.PKey()
-        key.generate_key(crypto.TYPE_RSA, 4096)
-
-        cert = crypto.X509()
-        cert.get_subject().CN = bt.axon(self.config.wallet).external_ip
-        cert.set_serial_number(int(time.time()))
-        cert.gmtime_adj_notBefore(0)
-        cert.gmtime_adj_notAfter(2 * 365 * 24 * 60 * 60)
-        cert.set_issuer(cert.get_subject())
-        cert.set_pubkey(key)
-        cert.sign(key, "sha256")
-
-        cert_path = os.path.join(self.config.api.certificate_path, "cert.pem")
-        os.makedirs(os.path.dirname(cert_path), exist_ok=True)
-        with open(cert_path, "wb") as f:
-            f.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
-
-        private_key_path = os.path.join(self.config.api.certificate_path, "key.pem")
-        os.makedirs(os.path.dirname(private_key_path), exist_ok=True)
-        with open(private_key_path, "wb") as f:
-            f.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
-
-        bt.logging.success(
-            f"New SSL certificate issued and saved to {cert_path} and {private_key_path}"
-        )
-
-    def setup_rpc_methods(self):
-        """Initialize JSON-RPC method handlers"""
-
+    def setup_rpc_methods(self) -> None:
         @self.app.websocket("/rpc")
         async def websocket_endpoint(websocket: WebSocket):
             if (
@@ -101,45 +63,33 @@ class ValidatorAPI:
                 )
 
             try:
-                await websocket.accept()
-                self.active_connections.add(websocket)
-
+                await self.ws_manager.connect(websocket)
                 async for data in websocket.iter_text():
                     response = await async_dispatch(data, context=websocket)
                     await websocket.send_text(str(response))
-
             except WebSocketDisconnect:
                 bt.logging.debug("Client disconnected normally")
             except Exception as e:
                 bt.logging.error(f"WebSocket error: {str(e)}")
             finally:
-                if websocket in self.active_connections:
-                    self.active_connections.remove(websocket)
+                await self.ws_manager.disconnect(websocket)
 
         @method(name="omron.proof_of_weights")
         async def omron_proof_of_weights(
             websocket: WebSocket, **params: dict[str, object]
         ) -> dict[str, object]:
-            """Handle proof of weights request"""
+            evaluation_data = params.get("evaluation_data")
+            _ = params.get("weights_version")
+
+            if not evaluation_data:
+                return InvalidParams(data={"error": "Missing evaluation data"})
+
             try:
-                evaluation_data = params.get("evaluation_data")
-                weights_version = params.get("weights_version")
-
-                if not evaluation_data:
-                    return InvalidParams(
-                        data={"error": "Missing evaluation data"},
-                    )
-
-                self.external_requests_queue.insert(
-                    0, (int(websocket.headers["x-netuid"]), evaluation_data)
-                )
-
-                proof = await self.wait_for_proof(evaluation_data, weights_version)
-
-                return Success({"proof": proof["proof"], "weights": proof["weights"]})
+                netuid = int(websocket.headers["x-netuid"])
+                self.external_requests_queue.insert(0, (netuid, evaluation_data))
+                return Success(data={"status": "Request received"})
 
             except Exception as e:
-                traceback.print_exc()
                 bt.logging.error(f"Error processing request: {str(e)}")
                 return Error(
                     code=500, message="Internal server error", data={"error": str(e)}
@@ -175,9 +125,9 @@ class ValidatorAPI:
 
     async def stop(self):
         """Gracefully shutdown the WebSocket server"""
-        for connection in self.active_connections:
+        for connection in self.ws_manager.active_connections:
             await connection.close()
-        self.active_connections.clear()
+        self.ws_manager.active_connections.clear()
 
     async def validate_connection(self, headers) -> bool:
         """Validate WebSocket connection request headers"""
