@@ -16,7 +16,6 @@ import threading
 import uvicorn
 from _validator.api.certificate_manager import CertificateManager
 from _validator.api.websocket_manager import WebSocketManager
-from _validator.core.request_pipeline import RequestPipeline
 
 
 class ValidatorAPI:
@@ -27,12 +26,7 @@ class ValidatorAPI:
         self.ws_manager = WebSocketManager()
         self.validator_keys_cache = ValidatorKeysCache(config)
         self.server_thread: threading.Thread | None = None
-        self.request_pipeline: RequestPipeline | None = None
         self._setup_api()
-
-    def set_request_pipeline(self, pipeline: RequestPipeline) -> None:
-        """Set the request pipeline after initialization"""
-        self.request_pipeline = pipeline
 
     def _setup_api(self) -> None:
         if not self.config.api.enabled:
