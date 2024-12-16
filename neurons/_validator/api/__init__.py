@@ -2,7 +2,13 @@ from __future__ import annotations
 import os
 import traceback
 from fastapi import FastAPI, WebSocket, HTTPException, WebSocketDisconnect
-from jsonrpcserver import method, async_dispatch, Success, Error, InvalidParams
+from jsonrpcserver import (
+    method,
+    async_dispatch,
+    Success,
+    InvalidParams,
+    InternalErrorResult,
+)
 import bittensor as bt
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
 import hashlib
@@ -81,13 +87,11 @@ class ValidatorAPI:
             try:
                 netuid = int(websocket.headers["x-netuid"])
                 self.external_requests_queue.insert(0, (netuid, evaluation_data))
-                return Success(data={"status": "Request received"})
+                return Success(("status", "Request received"))
 
             except Exception as e:
                 bt.logging.error(f"Error processing request: {str(e)}")
-                return Error(
-                    code=500, message="Internal server error", data={"error": str(e)}
-                )
+                return InternalErrorResult(data={"error": str(e)})
 
     def start_server(self):
         """Start the uvicorn server in a separate thread"""
