@@ -58,7 +58,8 @@ class WeightsManager:
             bt.logging.info(
                 f"Next weight update in {blocks_until_update} blocks (approximately {minutes_until_update:.1f} minutes)"
             )
-            return False
+            # This is a success because we are not updating weights
+            return True
 
         bt.logging.info("Updating weights")
 
