@@ -89,6 +89,8 @@ class WeightsManager:
                 weights=weights.tolist(),
                 version_key=WEIGHTS_VERSION,
             )
+            if message:
+                bt.logging.info(f"Set weights message: {message}")
             if success:
                 log_weights(weights)
                 self.last_update_weights_block = int(self.metagraph.block.item())
@@ -96,11 +98,12 @@ class WeightsManager:
             new_blocks_since_last_update = self.subtensor.blocks_since_last_update(
                 self.metagraph.netuid, self.user_uid
             )
-            if new_blocks_since_last_update > blocks_since_last_update:
+            if new_blocks_since_last_update < blocks_since_last_update:
                 bt.logging.success(
                     f"Blocks since last update is now {new_blocks_since_last_update}, "
-                    "which is greater than {blocks_since_last_update}. Weights were set."
+                    "which is less than {blocks_since_last_update}. Weights were set."
                 )
+                self.last_update_weights_block = int(self.metagraph.block.item())
                 return True
             bt.logging.warning("Failed to set weights")
             return False
