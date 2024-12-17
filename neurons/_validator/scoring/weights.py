@@ -89,12 +89,16 @@ class WeightsManager:
                 weights=weights.tolist(),
                 version_key=WEIGHTS_VERSION,
             )
+
             if message:
                 bt.logging.info(f"Set weights message: {message}")
+
             if success:
+                bt.logging.success("Weights were set successfully")
                 log_weights(weights)
                 self.last_update_weights_block = int(self.metagraph.block.item())
                 return True
+
             new_blocks_since_last_update = self.subtensor.blocks_since_last_update(
                 self.metagraph.netuid, self.user_uid
             )
