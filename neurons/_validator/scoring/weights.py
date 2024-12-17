@@ -40,37 +40,24 @@ class WeightsManager:
             version_key=version_key,
         )
 
-    @timeout_with_multiprocess_retry(seconds=60, retries=3)
-    def update_weights(self, scores: torch.Tensor) -> bool:
-        """
-        Updates the weights based on the given scores and sets them on the chain.
-
-        Args:
-            scores (torch.Tensor): The scores tensor used to calculate new weights.
-        """
+    def should_update_weights(self) -> tuple[bool, str]:
+        """Check if weights should be updated based on rate limiting."""
         blocks_since_last_update = self.subtensor.blocks_since_last_update(
             self.metagraph.netuid, self.user_uid
         )
-        should_update_weights = blocks_since_last_update >= WEIGHT_RATE_LIMIT
-        if not should_update_weights:
+        if blocks_since_last_update < WEIGHT_RATE_LIMIT:
             blocks_until_update = WEIGHT_RATE_LIMIT - blocks_since_last_update
             minutes_until_update = round((blocks_until_update * 12) / 60, 1)
-            bt.logging.info(
-                f"Next weight update in {blocks_until_update} blocks (approximately {minutes_until_update:.1f} minutes)"
+            return (
+                False,
+                f"Next weight update in {blocks_until_update} blocks "
+                f"(approximately {minutes_until_update:.1f} minutes)",
             )
-            # This is a success because we are not updating weights
-            return True
+        return True, ""
 
-        bt.logging.info("Updating weights")
-
-        weights = torch.zeros(self.metagraph.n)
-        nonzero_indices = scores.nonzero()
-        bt.logging.debug(
-            f"Weights: {weights}, Nonzero indices: {nonzero_indices}, Scores: {scores}"
-        )
-        if nonzero_indices.sum() > 0:
-            weights[nonzero_indices] = scores[nonzero_indices]
-
+    @timeout_with_multiprocess_retry(seconds=60, retries=3)
+    def _set_weights_with_retry(self, weights: torch.Tensor) -> bool:
+        """Internal method to set weights with retry logic."""
         try:
             success, message = self.set_weights(
                 netuid=self.metagraph.netuid,
@@ -89,18 +76,37 @@ class WeightsManager:
                 self.last_update_weights_block = int(self.metagraph.block.item())
                 return True
 
-            new_blocks_since_last_update = self.subtensor.blocks_since_last_update(
+            blocks_since_last_update = self.subtensor.blocks_since_last_update(
                 self.metagraph.netuid, self.user_uid
             )
-            if new_blocks_since_last_update < blocks_since_last_update:
+            if blocks_since_last_update < WEIGHT_RATE_LIMIT:
                 bt.logging.success(
-                    f"Blocks since last update is now {new_blocks_since_last_update}, "
-                    "which is less than {blocks_since_last_update}. Weights were set."
+                    f"Blocks since last update is now {blocks_since_last_update}, "
+                    f"which is less than {WEIGHT_RATE_LIMIT}. Weights were set."
                 )
                 self.last_update_weights_block = int(self.metagraph.block.item())
                 return True
+
             bt.logging.warning("Failed to set weights")
             return False
         except Exception as e:
             bt.logging.warning(f"Failed to set weights on chain with exception: {e}")
             return False
+
+    def update_weights(self, scores: torch.Tensor) -> bool:
+        """Updates the weights based on the given scores and sets them on the chain."""
+        should_update, message = self.should_update_weights()
+        if not should_update:
+            bt.logging.info(message)
+            return True
+
+        bt.logging.info("Updating weights")
+        weights = torch.zeros(self.metagraph.n)
+        nonzero_indices = scores.nonzero()
+        bt.logging.debug(
+            f"Weights: {weights}, Nonzero indices: {nonzero_indices}, Scores: {scores}"
+        )
+        if nonzero_indices.sum() > 0:
+            weights[nonzero_indices] = scores[nonzero_indices]
+
+        return self._set_weights_with_retry(weights)
