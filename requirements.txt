@@ -1,5 +1,5 @@
 attrs==24.2.0
-bittensor==8.5.0
+bittensor==8.5.1
 black==23.7.0
 ezkl==16.2.0
 fastapi==0.110.1
