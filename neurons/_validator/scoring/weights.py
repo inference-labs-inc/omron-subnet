@@ -30,12 +30,6 @@ class WeightsManager:
     last_update_weights_block: int = 0
     proof_of_weights_queue: list[ProofOfWeightsItem] = field(default_factory=list)
 
-    def should_update_weights(self) -> bool:
-        current_block = self.subtensor.get_current_block()
-        bt.logging.trace(f"Current block: {current_block}")
-        bt.logging.trace(f"Last update weights block: {self.last_update_weights_block}")
-        return current_block - self.last_update_weights_block >= WEIGHT_RATE_LIMIT
-
     def set_weights(self, netuid, wallet, uids, weights, version_key):
         return self.subtensor.set_weights(
             netuid=netuid,
@@ -54,11 +48,12 @@ class WeightsManager:
         Args:
             scores (torch.Tensor): The scores tensor used to calculate new weights.
         """
-        if not self.should_update_weights():
-            current_block = self.subtensor.get_current_block()
-            blocks_until_update = WEIGHT_RATE_LIMIT - (
-                current_block - self.last_update_weights_block
-            )
+        blocks_since_last_update = self.subtensor.blocks_since_last_update(
+            self.metagraph.netuid, self.user_uid
+        )
+        should_update_weights = blocks_since_last_update >= WEIGHT_RATE_LIMIT
+        if not should_update_weights:
+            blocks_until_update = WEIGHT_RATE_LIMIT - blocks_since_last_update
             minutes_until_update = round((blocks_until_update * 12) / 60, 1)
             bt.logging.info(
                 f"Next weight update in {blocks_until_update} blocks (approximately {minutes_until_update:.1f} minutes)"
@@ -66,12 +61,6 @@ class WeightsManager:
             return False
 
         bt.logging.info("Updating weights")
-        blocks_since_last_update = self.subtensor.blocks_since_last_update(
-            self.metagraph.netuid, self.user_uid
-        )
-        bt.logging.info(
-            f"Blocks since last weights were set: {blocks_since_last_update}"
-        )
 
         weights = torch.zeros(self.metagraph.n)
         nonzero_indices = scores.nonzero()
