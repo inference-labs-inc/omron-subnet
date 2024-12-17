@@ -31,36 +31,60 @@ def clean_temp_files():
         shutil.rmtree(folder_path)
 
 
-def timeout_with_multiprocess(seconds):
+def timeout_with_multiprocess(seconds, retries=3):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            def target_func(result_dict, *args, **kwargs):
-                try:
-                    result_dict["result"] = func(*args, **kwargs)
-                except Exception as e:
-                    result_dict["exception"] = e
+            for attempt in range(retries):
+                logging.info(f"Attempt {attempt + 1} of {retries}")
 
-            manager = multiprocessing.Manager()
-            result_dict = manager.dict()
-            process = multiprocessing.Process(
-                target=target_func, args=(result_dict, *args), kwargs=kwargs
-            )
-            process.start()
-            process.join(seconds)
+                def target_func(result_dict, *args, **kwargs):
+                    try:
+                        result_dict["result"] = func(*args, **kwargs)
+                    except Exception as e:
+                        result_dict["exception"] = e
 
-            if process.is_alive():
-                process.terminate()
-                process.join()
-                logging.warning(
-                    f"Function '{func.__name__}' timed out after {seconds} seconds"
+                manager = multiprocessing.Manager()
+                result_dict = manager.dict()
+                process = multiprocessing.Process(
+                    target=target_func, args=(result_dict, *args), kwargs=kwargs
+                )
+                process.start()
+                process.join(seconds)
+
+                if process.is_alive():
+                    process.terminate()
+                    process.join()
+                    logging.warning(
+                        f"Function '{func.__name__}' timed out after {seconds} seconds"
+                    )
+                    if attempt < retries - 1:
+                        logging.info(f"Retrying... ({attempt + 1}/{retries})")
+                        continue
+                    return None
+
+                if "exception" in result_dict:
+                    if attempt < retries - 1:
+                        logging.info(
+                            f"Retrying due to exception... ({attempt + 1}/{retries})"
+                        )
+                        continue
+                    raise result_dict["exception"]
+
+                result = result_dict.get("result", None)
+                if result:
+                    return result
+                elif attempt < retries - 1:
+                    logging.info(
+                        f"Retrying due to falsy result... ({attempt + 1}/{retries})"
+                    )
+                    continue
+                logging.error(
+                    f"Function '{func.__name__}' returned {result} after {retries} attempts"
                 )
                 return None
 
-            if "exception" in result_dict:
-                raise result_dict["exception"]
-
-            return result_dict.get("result", None)
+            return None
 
         return wrapper
 

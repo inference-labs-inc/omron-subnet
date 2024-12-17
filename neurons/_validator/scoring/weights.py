@@ -6,8 +6,6 @@ from constants import WEIGHT_RATE_LIMIT, WEIGHTS_VERSION
 from _validator.utils.logging import log_weights
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
 
-from utils.system import timeout_with_multiprocess
-
 
 @dataclass
 class WeightsManager:
@@ -37,7 +35,6 @@ class WeightsManager:
         bt.logging.trace(f"Last update weights block: {self.last_update_weights_block}")
         return current_block - self.last_update_weights_block >= WEIGHT_RATE_LIMIT
 
-    @timeout_with_multiprocess(seconds=60)
     def set_weights(self, netuid, wallet, uids, weights, version_key):
         return self.subtensor.set_weights(
             netuid=netuid,
@@ -67,6 +64,12 @@ class WeightsManager:
             return False
 
         bt.logging.info("Updating weights")
+        blocks_since_last_update = self.subtensor.blocks_since_last_update(
+            self.metagraph.netuid, self.user_uid
+        )
+        bt.logging.info(
+            f"Blocks since last weights were set: {blocks_since_last_update}"
+        )
 
         weights = torch.zeros(self.metagraph.n)
         nonzero_indices = scores.nonzero()
@@ -77,7 +80,7 @@ class WeightsManager:
             weights[nonzero_indices] = scores[nonzero_indices]
 
         try:
-            success = self.set_weights(
+            success, message = self.set_weights(
                 netuid=self.metagraph.netuid,
                 wallet=self.wallet,
                 uids=self.metagraph.uids.tolist(),
@@ -87,6 +90,15 @@ class WeightsManager:
             if success:
                 log_weights(weights)
                 self.last_update_weights_block = int(self.metagraph.block.item())
+                return True
+            new_blocks_since_last_update = self.subtensor.blocks_since_last_update(
+                self.metagraph.netuid, self.user_uid
+            )
+            if new_blocks_since_last_update > blocks_since_last_update:
+                bt.logging.info(
+                    f"Blocks since last update is now {new_blocks_since_last_update}, "
+                    "which is greater than {blocks_since_last_update}. Weights were set."
+                )
                 return True
             bt.logging.error("Failed to set weights")
             return False
