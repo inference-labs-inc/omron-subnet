@@ -79,9 +79,15 @@ def timeout_with_multiprocess_retry(seconds, retries=3):
                         f"Retrying due to falsy result... ({attempt + 1}/{retries})"
                     )
                     continue
-                logging.error(
-                    f"Function '{func.__name__}' returned {result} after {retries} attempts"
-                )
+                if func.__name__ == "update_weights":
+                    logging.error(
+                        f"Failed to set weights after {retries} attempts. "
+                        "Another attempt will be made after the next request cycle."
+                    )
+                else:
+                    logging.error(
+                        f"Function '{func.__name__}' returned {result} after {retries} attempts"
+                    )
                 return None
 
             return None
