@@ -31,7 +31,7 @@ def clean_temp_files():
         shutil.rmtree(folder_path)
 
 
-def timeout_with_multiprocess(seconds, retries=3):
+def timeout_with_multiprocess_retry(seconds, retries=3):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):

@@ -5,6 +5,7 @@ import bittensor as bt
 from constants import WEIGHT_RATE_LIMIT, WEIGHTS_VERSION
 from _validator.utils.logging import log_weights
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
+from utils.system import timeout_with_multiprocess_retry
 
 
 @dataclass
@@ -45,6 +46,7 @@ class WeightsManager:
             version_key=version_key,
         )
 
+    @timeout_with_multiprocess_retry(seconds=60, retries=3)
     def update_weights(self, scores: torch.Tensor) -> bool:
         """
         Updates the weights based on the given scores and sets them on the chain.
@@ -95,13 +97,13 @@ class WeightsManager:
                 self.metagraph.netuid, self.user_uid
             )
             if new_blocks_since_last_update > blocks_since_last_update:
-                bt.logging.info(
+                bt.logging.success(
                     f"Blocks since last update is now {new_blocks_since_last_update}, "
                     "which is greater than {blocks_since_last_update}. Weights were set."
                 )
                 return True
-            bt.logging.error("Failed to set weights")
+            bt.logging.warning("Failed to set weights")
             return False
         except Exception as e:
-            bt.logging.error(f"Failed to set weights on chain with exception: {e}")
+            bt.logging.warning(f"Failed to set weights on chain with exception: {e}")
             return False
