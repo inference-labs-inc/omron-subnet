@@ -17,6 +17,8 @@ IGNORED_MODEL_HASHES = [
     "55de10a6bcf638af4bc79901d63204a9e5b1c6534670aa03010bae6045e3d0e8",
     "9998a12b8194d3e57d332b484ede57c3d871d42a176456c4e10da2995791d181",
     "ed8ba401d709ee31f6b9272163c71451da171c7d71800313fe5db58d0f6c483a",
+    "1d60d545b7c5123fd60524dcbaf57081ca7dc4a9ec36c892927a3153328d17c0",
+    "37320fc74fec80805eedc8e92baf3c58842a2cb2a4ae127ad6e930f0c8441c7a",
 ]
 
 # The maximum timespan allowed for miners to respond to a query
@@ -32,7 +34,7 @@ MAXIMUM_SCORE_MEDIAN_SAMPLE = 0.05
 # Shift in seconds to apply to the minimum response time for vertical asymptote adjustment
 MINIMUM_SCORE_SHIFT = 0.0
 # Weights version hyperparameter
-WEIGHTS_VERSION = 1600
+WEIGHTS_VERSION = 1621
 # Rate limit for weight updates
 WEIGHT_RATE_LIMIT: int = 100
 # Delay between requests
