@@ -10,7 +10,7 @@ from typing import NoReturn
 import bittensor as bt
 
 from _validator.config import ValidatorConfig
-from _validator.core.api import ValidatorAPI
+from _validator.api import ValidatorAPI
 from _validator.core.request_pipeline import RequestPipeline
 from _validator.core.response_processor import ResponseProcessor
 from _validator.models.miner_response import MinerResponse

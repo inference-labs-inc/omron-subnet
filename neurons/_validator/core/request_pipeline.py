@@ -4,7 +4,7 @@ import random
 from protocol import ProofOfWeightsSynapse, QueryZkProof
 
 from _validator.scoring.score_manager import ScoreManager
-from _validator.core.api import ValidatorAPI
+from _validator.api import ValidatorAPI
 from _validator.config import ValidatorConfig
 from constants import (
     BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
