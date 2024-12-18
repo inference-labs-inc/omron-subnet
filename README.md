@@ -131,6 +131,7 @@ services:
     restart: unless-stopped
     ports:
       - 8000:8000
+      - 9090:9090  # In case you use prometheus monitoring
     volumes:  # Update this path to your .bittensor directory
       - {path_to_your_.bittensor_directory}:/root/.bittensor
     labels:
@@ -152,6 +153,7 @@ services:
 docker run -d \
   --name omron-validator \
   -p 8000:8000 \
+  -p 9090:9090 \
   -v {path_to_your_.bittensor_directory}:/root/.bittensor \
   --restart unless-stopped \
   ghcr.io/inference-labs-inc/omron:latest \

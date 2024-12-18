@@ -116,6 +116,20 @@ def get_config_from_args():
         help="Whether to run the validator in localnet mode.",
     )
 
+    parser.add_argument(
+        "--prometheus-monitoring",
+        action="store_true",
+        default=False,
+        help="Whether to enable prometheus monitoring.",
+    )
+
+    parser.add_argument(
+        "--prometheus-port",
+        type=int,
+        default=9090,
+        help="The port for the prometheus monitoring.",
+    )
+
     bt.subtensor.add_args(parser)
     bt.logging.add_args(parser)
     bt.wallet.add_args(parser)
