@@ -97,6 +97,7 @@ def get_config_from_args():
     )
 
     bt.logging(config=config, logging_dir=config.full_path)
+    bt.logging.enable_info()
 
     if not os.path.exists(config.full_path):
         os.makedirs(config.full_path, exist_ok=True)
