@@ -27,8 +27,8 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Install Jolt
-ENV JOLT_VERSION=dd9e5c4bcf36ffeb75a576351807f8d86c33ec66
-RUN cargo +${RUST_TOOLCHAIN} install --git https://github.com/a16z/jolt --rev ${JOLT_VERSION} --force --bins jolt
+#ENV JOLT_VERSION=dd9e5c4bcf36ffeb75a576351807f8d86c33ec66
+#RUN cargo +${RUST_TOOLCHAIN} install --git https://github.com/a16z/jolt --rev ${JOLT_VERSION} --force --bins jolt
 
 # Install node et al.
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash && \
