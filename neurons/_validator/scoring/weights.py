@@ -5,7 +5,6 @@ import bittensor as bt
 from constants import WEIGHT_RATE_LIMIT, WEIGHTS_VERSION
 from _validator.utils.logging import log_weights
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
-from utils.system import timeout_with_multiprocess_retry
 
 
 @dataclass
@@ -55,9 +54,22 @@ class WeightsManager:
             )
         return True, ""
 
-    @timeout_with_multiprocess_retry(seconds=60, retries=3)
-    def _set_weights_with_retry(self, weights: torch.Tensor) -> bool:
-        """Internal method to set weights with retry logic."""
+    def update_weights(self, scores: torch.Tensor) -> bool:
+        """Updates the weights based on the given scores and sets them on the chain."""
+        should_update, message = self.should_update_weights()
+        if not should_update:
+            bt.logging.info(message)
+            return True
+
+        bt.logging.info("Updating weights")
+        weights = torch.zeros(self.metagraph.n)
+        nonzero_indices = scores.nonzero()
+        bt.logging.debug(
+            f"Weights: {weights}, Nonzero indices: {nonzero_indices}, Scores: {scores}"
+        )
+        if nonzero_indices.sum() > 0:
+            weights[nonzero_indices] = scores[nonzero_indices]
+
         try:
             success, message = self.set_weights(
                 netuid=self.metagraph.netuid,
@@ -75,38 +87,8 @@ class WeightsManager:
                 log_weights(weights)
                 self.last_update_weights_block = int(self.metagraph.block.item())
                 return True
-
-            blocks_since_last_update = self.subtensor.blocks_since_last_update(
-                self.metagraph.netuid, self.user_uid
-            )
-            if blocks_since_last_update < WEIGHT_RATE_LIMIT:
-                bt.logging.success(
-                    f"Blocks since last update is now {blocks_since_last_update}, "
-                    f"which is less than {WEIGHT_RATE_LIMIT}. Weights were set."
-                )
-                self.last_update_weights_block = int(self.metagraph.block.item())
-                return True
-
-            bt.logging.warning("Failed to set weights")
             return False
+
         except Exception as e:
-            bt.logging.warning(f"Failed to set weights on chain with exception: {e}")
+            bt.logging.error(f"Failed to set weights on chain with exception: {e}")
             return False
-
-    def update_weights(self, scores: torch.Tensor) -> bool:
-        """Updates the weights based on the given scores and sets them on the chain."""
-        should_update, message = self.should_update_weights()
-        if not should_update:
-            bt.logging.info(message)
-            return True
-
-        bt.logging.info("Updating weights")
-        weights = torch.zeros(self.metagraph.n)
-        nonzero_indices = scores.nonzero()
-        bt.logging.debug(
-            f"Weights: {weights}, Nonzero indices: {nonzero_indices}, Scores: {scores}"
-        )
-        if nonzero_indices.sum() > 0:
-            weights[nonzero_indices] = scores[nonzero_indices]
-
-        return self._set_weights_with_retry(weights)
