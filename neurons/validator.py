@@ -174,6 +174,7 @@ def get_config_from_args():
         os.makedirs(config.full_path, exist_ok=True)
 
     bt.logging(config=config, logging_dir=config.full_path)
+    bt.logging.enable_info()
 
     if config.wandb_key:
         wandb_logger.safe_login(api_key=config.wandb_key)

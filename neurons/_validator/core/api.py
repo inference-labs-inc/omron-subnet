@@ -1,5 +1,5 @@
 import uvicorn
-from bittensor.axon import FastAPIThreadedServer
+from bittensor.core.axon import FastAPIThreadedServer
 import traceback
 from fastapi import APIRouter, FastAPI
 import bittensor as bt

@@ -1,12 +1,12 @@
 attrs==24.2.0
-bittensor==6.9.4
+bittensor==8.5.1
 black==23.7.0
 ezkl==16.2.0
-fastapi==0.99.1
-numpy==1.26.4
+fastapi==0.110.1
+numpy==2.0.1
 packaging==24.1
 psutil==6.0.0
-pydantic==1.10.18
+pydantic==2.10.3
 requests==2.32.3
 rich==13.8.1
 torch==2.4.1
