@@ -73,3 +73,5 @@ CMD ["-c", "import subprocess; \
     ]
 EXPOSE 4091/tcp
 EXPOSE 8000/tcp
+# for prometheus monitoring server:
+EXPOSE 9090/tcp
