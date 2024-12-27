@@ -72,7 +72,7 @@ CMD ["-c", "import subprocess; \
     subprocess.run(['/opt/venv/bin/python3', '/opt/omron/neurons/validator.py', '--help']);" \
     ]
 # Axon server
-    EXPOSE 8091/tcp
+EXPOSE 8091/tcp
 # API server
 EXPOSE 8443/tcp
 # Prometheus server
