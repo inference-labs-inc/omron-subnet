@@ -49,10 +49,6 @@ def run_shared_preflight_checks(external_model_dir: str):
         ("Syncing model files", sync_model_files),
         ("Ensuring Node.js version", ensure_nodejs_version),
         ("Checking SnarkJS installation", ensure_snarkjs_installed),
-        ("Checking Rust and Cargo installation", ensure_rust_cargo_installed),
-        ("Checking Rust nightly toolchain", ensure_rust_nightly_installed),
-        ("Checking Jolt installation", ensure_jolt_installed),
-        ("Compiling Jolt circuits", compile_jolt_circuits),
         ("Checking EZKL installation", ensure_ezkl_installed),
     ]
 

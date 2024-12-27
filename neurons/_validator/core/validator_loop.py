@@ -11,6 +11,12 @@ import bittensor as bt
 
 from _validator.config import ValidatorConfig
 from _validator.api import ValidatorAPI
+from _validator.core.prometheus import (
+    log_validation_time,
+    start_prometheus_logging,
+    stop_prometheus_logging,
+)
+from _validator.core.request import Request
 from _validator.core.request_pipeline import RequestPipeline
 from _validator.core.response_processor import ResponseProcessor
 from _validator.models.miner_response import MinerResponse
@@ -20,11 +26,10 @@ from _validator.utils.api import hash_inputs
 from _validator.utils.axon import query_axons
 from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
-from _validator.core.request import Request
-from execution_layer.circuit import Circuit, CircuitType
 from constants import (
     REQUEST_DELAY_SECONDS,
 )
+from execution_layer.circuit import Circuit, CircuitType
 from utils import AutoUpdate, clean_temp_files, wandb_logger
 from utils.gc_logging import log_responses as log_responses_gc
 
@@ -65,6 +70,9 @@ class ValidatorLoop:
         self.request_pipeline = RequestPipeline(
             self.config, self.score_manager, self.api
         )
+
+        if self.config.bt_config.prometheus_monitoring:
+            start_prometheus_logging(self.config.bt_config.prometheus_port)
 
     def run(self) -> NoReturn:
         """
@@ -190,11 +198,13 @@ class ValidatorLoop:
                 "overhead_time": overhead_time,
             }
         )
+        log_validation_time(overhead_time)
         return overhead_time
 
     def _handle_keyboard_interrupt(self):
         """Handle keyboard interrupt by cleaning up and exiting."""
         bt.logging.success("Keyboard interrupt detected. Exiting validator.")
         self.api.stop()
+        stop_prometheus_logging()
         clean_temp_files()
         sys.exit(0)

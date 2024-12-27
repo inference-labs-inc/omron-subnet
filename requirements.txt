@@ -15,3 +15,4 @@ rich==13.8.1
 torch==2.4.1
 uvicorn==0.22.0
 wandb==0.18.1
+prometheus_client==0.21.1

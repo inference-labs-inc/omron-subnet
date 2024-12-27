@@ -138,6 +138,18 @@ def get_config_from_args():
         "Please note that this should not be used unless you have issued your own certificate. "
         "Omron will issue a certificate for you by default.",
     )
+    parser.add_argument(
+        "--prometheus-monitoring",
+        action="store_true",
+        default=False,
+        help="Whether to enable prometheus monitoring.",
+    )
+    parser.add_argument(
+        "--prometheus-port",
+        type=int,
+        default=9090,
+        help="The port for the prometheus monitoring.",
+    )
 
     bt.subtensor.add_args(parser)
     bt.logging.add_args(parser)
