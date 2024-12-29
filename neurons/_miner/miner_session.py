@@ -7,7 +7,7 @@ from typing import Tuple, Union
 import bittensor as bt
 import websocket
 
-import config
+import cli_parser
 from _validator.models.request_type import RequestType
 from constants import (
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
@@ -27,12 +27,11 @@ class MinerSession:
     axon: Union[bt.axon, None] = None
 
     def __init__(self):
-        self.config = config.config
         self.configure()
         self.check_register(should_exit=True)
         self.auto_update = AutoUpdate()
         self.log_batch = []
-        if self.config.disable_blacklist:
+        if cli_parser.config.disable_blacklist:
             bt.logging.warning(
                 "Blacklist disabled, allowing all requests. Consider enabling to filter requests."
             )
@@ -42,10 +41,10 @@ class MinerSession:
         bt.logging.info(
             "Starting axon. Custom arguments include the following.\n"
             "Note that any null values will fallback to defaults, "
-            f"which are usually sufficient. {self.config.axon}"
+            f"which are usually sufficient. {cli_parser.config.axon}"
         )
 
-        axon = bt.axon(wallet=self.wallet, config=self.config)
+        axon = bt.axon(wallet=self.wallet, config=cli_parser.config)
         bt.logging.info(f"Axon created: {axon.info()}")
 
         # Attach determines which functions are called when a request is received.
@@ -60,11 +59,11 @@ class MinerSession:
         # Serve passes the axon information to the network + netuid we are hosting on.
         # This will auto-update if the axon port of external ip has changed.
         bt.logging.info(
-            f"Serving axon on network: {self.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
+            f"Serving axon on network: {self.subtensor.chain_endpoint} with netuid: {cli_parser.config.netuid}"
         )
-        axon.serve(netuid=self.config.netuid, subtensor=self.subtensor)
+        axon.serve(netuid=cli_parser.config.netuid, subtensor=self.subtensor)
         bt.logging.info(
-            f"Served axon on network: {self.subtensor.chain_endpoint} with netuid: {self.config.netuid}"
+            f"Served axon on network: {self.subtensor.chain_endpoint} with netuid: {cli_parser.config.netuid}"
         )
 
         # Start the miner's axon, making it active on the network.
@@ -88,7 +87,7 @@ class MinerSession:
             step += 1
             try:
                 if step % 10 == 0:
-                    if not self.config.no_auto_update:
+                    if not cli_parser.config.no_auto_update:
                         self.auto_update.try_update()
                     else:
                         bt.logging.info(
@@ -111,7 +110,9 @@ class MinerSession:
 
                 if step % 24 == 0 and self.subnet_uid is not None:
                     try:
-                        self.metagraph = self.subtensor.metagraph(self.config.netuid)
+                        self.metagraph = self.subtensor.metagraph(
+                            cli_parser.config.netuid
+                        )
                         bt.logging.info(
                             f"Step:{step} | "
                             f"Block:{self.metagraph.block.item()} | "
@@ -156,10 +157,10 @@ class MinerSession:
 
     def configure(self):
         # === Configure Bittensor objects ====
-        self.wallet = bt.wallet(config=self.config)
-        self.subtensor = bt.subtensor(config=self.config)
-        self.metagraph = self.subtensor.metagraph(self.config.netuid)
-        wandb_logger.safe_init("Miner", self.wallet, self.metagraph, self.config)
+        self.wallet = bt.wallet(config=cli_parser.config)
+        self.subtensor = bt.subtensor(config=cli_parser.config)
+        self.metagraph = self.subtensor.metagraph(cli_parser.config.netuid)
+        wandb_logger.safe_init("Miner", self.wallet, self.metagraph, cli_parser.config)
 
     def proof_blacklist(self, synapse: QueryZkProof) -> Tuple[bool, str]:
         """
@@ -197,7 +198,7 @@ class MinerSession:
         returns: (is_blacklisted, reason)
         """
         try:
-            if self.config.disable_blacklist:
+            if cli_parser.config.disable_blacklist:
                 bt.logging.trace("Blacklist disabled, allowing request.")
                 return False, "Allowed"
 

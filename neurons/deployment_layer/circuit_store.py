@@ -1,12 +1,14 @@
 from __future__ import annotations
+
 import os
 import traceback
+
 import bittensor as bt
-from execution_layer.circuit import Circuit
-from constants import IGNORED_MODEL_HASHES
 from packaging import version
 
-import config
+import cli_parser
+from constants import IGNORED_MODEL_HASHES
+from execution_layer.circuit import Circuit
 
 
 class CircuitStore:
@@ -47,7 +49,7 @@ class CircuitStore:
         in the circuits dictionary.
         """
         deployment_layer_path = (
-            deployment_layer_path or config.config.external_model_dir
+            deployment_layer_path or cli_parser.config.external_model_dir
         )
         bt.logging.info(f"Loading circuits from {deployment_layer_path}")
 

@@ -9,10 +9,10 @@ from functools import partial
 
 # trunk-ignore(pylint/E0611)
 import bittensor as bt
-import config
 import ezkl
 import requests
 
+import cli_parser
 from constants import IGNORED_MODEL_HASHES
 from execution_layer.circuit import ProofSystem
 
@@ -46,7 +46,7 @@ def run_shared_preflight_checks(is_validator=False):
     """
 
     preflight_checks = [
-        ("Init configs", partial(config.init_config, is_validator=is_validator)),
+        ("Init configs", partial(cli_parser.init_config, is_validator=is_validator)),
         ("Syncing model files", sync_model_files),
         ("Ensuring Node.js version", ensure_nodejs_version),
         ("Checking SnarkJS installation", ensure_snarkjs_installed),
@@ -85,7 +85,7 @@ def ensure_ezkl_installed():
     """
     python_ezkl_version = ezkl.__version__
     os.environ["EZKL_REPO_PATH"] = os.path.join(
-        os.path.dirname(config.config.full_path), "ezkl"
+        os.path.dirname(cli_parser.config.full_path), "ezkl"
     )
     try:
         if os.path.exists(LOCAL_EZKL_PATH):
@@ -226,7 +226,9 @@ def sync_model_files():
 
         external_files = metadata.get("external_files", {})
         for key, url in external_files.items():
-            file_path = os.path.join(config.config.external_model_dir, model_hash, key)
+            file_path = os.path.join(
+                cli_parser.config.external_model_dir, model_hash, key
+            )
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             if os.path.isfile(file_path):
                 bt.logging.info(
