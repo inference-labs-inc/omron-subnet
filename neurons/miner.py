@@ -1,7 +1,6 @@
 import traceback
 
 import bittensor as bt
-import settings
 
 from _miner.miner_session import MinerSession
 from utils import run_shared_preflight_checks
@@ -13,10 +12,10 @@ if __name__ == "__main__":
         # Initialize the circuit store and load external models
         from deployment_layer.circuit_store import circuit_store
 
-        circuit_store.load_circuits(settings.config.external_model_dir)
+        circuit_store.load_circuits()
 
         bt.logging.info("Creating miner session...")
-        miner_session = MinerSession(settings.config)
+        miner_session = MinerSession()
         bt.logging.info("Running main loop...")
         miner_session.run()
     except Exception:

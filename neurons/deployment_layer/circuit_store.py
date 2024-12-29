@@ -6,6 +6,8 @@ from execution_layer.circuit import Circuit
 from constants import IGNORED_MODEL_HASHES
 from packaging import version
 
+import config
+
 
 class CircuitStore:
     """
@@ -36,7 +38,7 @@ class CircuitStore:
         deployment_layer_path = os.path.dirname(__file__)
         self.load_circuits(deployment_layer_path)
 
-    def load_circuits(self, deployment_layer_path):
+    def load_circuits(self, deployment_layer_path: Optional[str] = None):
         """
         Load circuits from the file system.
 
@@ -44,6 +46,9 @@ class CircuitStore:
         attempts to create Circuit objects from these directories, and stores them
         in the circuits dictionary.
         """
+        deployment_layer_path = (
+            deployment_layer_path or config.config.external_model_dir
+        )
         bt.logging.info(f"Loading circuits from {deployment_layer_path}")
 
         for folder_name in os.listdir(deployment_layer_path):

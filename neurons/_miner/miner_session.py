@@ -1,33 +1,33 @@
 # from __future__ import annotations
+import json
 import time
 import traceback
-import json
 from typing import Tuple, Union
 
 import bittensor as bt
+import websocket
+
+import config
+from _validator.models.request_type import RequestType
 from constants import (
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
     STEAK,
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
     VALIDATOR_STAKE_THRESHOLD,
 )
-
-from protocol import QueryForProofAggregation, QueryZkProof, ProofOfWeightsSynapse
-from utils import wandb_logger
-import websocket
-from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
-from utils import AutoUpdate, clean_temp_files
 from execution_layer.generic_input import GenericInput
-from _validator.models.request_type import RequestType
+from execution_layer.verified_model_session import VerifiedModelSession
+from protocol import ProofOfWeightsSynapse, QueryForProofAggregation, QueryZkProof
+from utils import AutoUpdate, clean_temp_files, wandb_logger
 
 
 class MinerSession:
 
     axon: Union[bt.axon, None] = None
 
-    def __init__(self, config):
-        self.config = config
+    def __init__(self):
+        self.config = config.config
         self.configure()
         self.check_register(should_exit=True)
         self.auto_update = AutoUpdate()

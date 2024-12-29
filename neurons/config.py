@@ -53,6 +53,11 @@ def init_config(is_validator: bool):
         default=False,
         help="Whether to run the miner in localnet mode.",
     )
+    parser.add_argument(
+        "--external-model-dir",
+        default=None,
+        help="Custom location for storing models data (optional)",
+    )
 
     if is_validator:
         # CLI arguments specific to the validator
@@ -95,9 +100,10 @@ def init_config(is_validator: bool):
     if not os.path.exists(config.full_path):
         os.makedirs(config.full_path, exist_ok=True)
 
-    config.external_model_dir = os.path.join(
-        os.path.dirname(config.full_path), "deployment_layer"
-    )
+    if config.external_model_dir is None:
+        config.external_model_dir = os.path.join(
+            os.path.dirname(config.full_path), "deployment_layer"
+        )
 
     if config.wandb_key:
         wandb_logger.safe_login(api_key=config.wandb_key)
