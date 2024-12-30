@@ -3,10 +3,11 @@ import traceback
 import bittensor as bt
 
 from _validator.validator_session import ValidatorSession
+from constants import Roles
 from utils import run_shared_preflight_checks
 
 if __name__ == "__main__":
-    run_shared_preflight_checks(is_validator=True)
+    run_shared_preflight_checks(Roles.VALIDATOR)
 
     try:
         # Initialize the circuit store and load external models

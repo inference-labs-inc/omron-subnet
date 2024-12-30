@@ -3,10 +3,11 @@ import traceback
 import bittensor as bt
 
 from _miner.miner_session import MinerSession
+from constants import Roles
 from utils import run_shared_preflight_checks
 
 if __name__ == "__main__":
-    run_shared_preflight_checks(is_validator=False)
+    run_shared_preflight_checks(Roles.MINER)
 
     try:
         # Initialize the circuit store and load external models

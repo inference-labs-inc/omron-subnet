@@ -4,13 +4,13 @@ from typing import Optional
 
 import bittensor as bt
 
-from constants import ONCHAIN_PROOF_OF_WEIGHTS_ENABLED, PROOF_OF_WEIGHTS_INTERVAL
+from constants import ONCHAIN_PROOF_OF_WEIGHTS_ENABLED, PROOF_OF_WEIGHTS_INTERVAL, Roles
 
 parser: Optional[argparse.ArgumentParser]
 config: Optional[bt.config]
 
 
-def init_config(is_validator: bool):
+def init_config(role: Optional[str]):
     """
     Initialize the configuration for the node.
     Config is based on CLI arguments, some of which are common to both miner and validator,
@@ -59,12 +59,17 @@ def init_config(is_validator: bool):
         help="Custom location for storing models data (optional)",
     )
 
-    if is_validator:
+    if role == Roles.VALIDATOR:
         # CLI arguments specific to the validator
         _validator_config()
-    else:
+    elif role == Roles.MINER:
         # CLI arguments specific to the miner
         _miner_config()
+    else:
+        bt.subtensor.add_args(parser)
+        bt.logging.add_args(parser)
+        bt.wallet.add_args(parser)
+        config = bt.config(parser)
 
     if config.localnet:
         # quick localnet configuration set up for testing (common params for both miner and validator)
@@ -85,12 +90,14 @@ def init_config(is_validator: bool):
         config.max_workers = config.max_workers or 1
 
     config.full_path = os.path.expanduser(
-        "{}/{}/{}/netuid{}/{}".format(
+        "{}/{}/{}/netuid{}".format(
             config.logging.logging_dir,  # type: ignore
             config.wallet.name,  # type: ignore
             config.wallet.hotkey,  # type: ignore
             config.netuid,
-            "validator" if is_validator else "miner",
+            # here was one more subfolder - "miner" or "validator" (role)
+            # but during docker build we don't know the role yet
+            # not sure about all implications of this change
         )
     )
 

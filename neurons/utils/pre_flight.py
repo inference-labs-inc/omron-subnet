@@ -2,10 +2,10 @@ import asyncio
 import json
 import os
 import subprocess
-import sys
 import time
 import traceback
 from functools import partial
+from typing import Optional
 
 # trunk-ignore(pylint/E0611)
 import bittensor as bt
@@ -29,7 +29,7 @@ async def download_srs(logrows):
     await ezkl.get_srs(logrows=logrows, commitment=ezkl.PyCommitments.KZG)
 
 
-def run_shared_preflight_checks(is_validator=False):
+def run_shared_preflight_checks(role: Optional[str] = None):
     """
     This function executes a series of checks to ensure the environment is properly
     set up for both validator and miner operations.
@@ -46,7 +46,7 @@ def run_shared_preflight_checks(is_validator=False):
     """
 
     preflight_checks = [
-        ("Init configs", partial(cli_parser.init_config, is_validator=is_validator)),
+        ("Init configs", partial(cli_parser.init_config, role=role)),
         ("Syncing model files", sync_model_files),
         ("Ensuring Node.js version", ensure_nodejs_version),
         ("Checking SnarkJS installation", ensure_snarkjs_installed),
@@ -72,10 +72,6 @@ def run_shared_preflight_checks(is_validator=False):
             raise e
 
     bt.logging.info(" PreFlight | Pre-flight checks completed.")
-
-    if os.getenv("OMRON_DOCKER_BUILD", False):
-        bt.logging.info("Docker build steps complete. Exiting.")
-        sys.exit(0)
 
 
 def ensure_ezkl_installed():
@@ -239,10 +235,11 @@ def sync_model_files():
 
             bt.logging.info(SYNC_LOG_PREFIX + f"Downloading {url} to {file_path}...")
             try:
-                response = requests.get(url, timeout=600)
-                response.raise_for_status()
-                with open(file_path, "wb") as f:
-                    f.write(response.content)
+                with requests.get(url, timeout=600, stream=True) as response:
+                    response.raise_for_status()
+                    with open(file_path, "wb") as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
             except requests.RequestException as e:
                 bt.logging.error(
                     SYNC_LOG_PREFIX + f"Failed to download {url} to {file_path}: {e}"

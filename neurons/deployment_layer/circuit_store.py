@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import traceback
+from typing import Optional
 
 import bittensor as bt
 from packaging import version
@@ -35,10 +36,6 @@ class CircuitStore:
         Creates an empty dictionary to store Circuit objects and loads circuits.
         """
         self.circuits: dict[str, Circuit] = {}
-        # load circuits from the deployment layer path
-        # these circuits come precompiled with the docker image
-        deployment_layer_path = os.path.dirname(__file__)
-        self.load_circuits(deployment_layer_path)
 
     def load_circuits(self, deployment_layer_path: Optional[str] = None):
         """
