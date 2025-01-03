@@ -31,51 +31,39 @@ class RequestPipeline:
 
     def prepare_requests(self, filtered_uids) -> list[Request]:
         """
-        Prepare a batch of requests for the provided UIDs.
+        Prepare requests for the current validation step.
+        This includes both regular benchmark requests and any external requests.
 
         Args:
-            filtered_uids (list): List of filtered UIDs to query.
+            filtered_uids (list): List of UIDs to send requests to.
 
         Returns:
-            list: List of prepared requests.
+            list[Request]: List of prepared requests.
         """
+        if len(filtered_uids) == 0:
+            bt.logging.error("No UIDs to query")
+            return []
 
-        request_type = (
-            RequestType.BENCHMARK
-            if not self.api.external_requests_queue
-            else RequestType.RWR
-        )
+        if self.api.external_requests_queue:
+            return self._prepare_real_world_requests(filtered_uids)
+        return self._prepare_benchmark_requests(filtered_uids)
 
-        netuid = self.config.subnet_uid
-        circuit = self.select_circuit_for_benchmark()
-        request = None
-        if request_type == RequestType.RWR:
-            request = self.api.external_requests_queue.pop()
-            bt.logging.debug(f"Processing external request for netuid {netuid}")
-            circuit = request.circuit
+    def _prepare_real_world_requests(self, filtered_uids: list[int]) -> list[Request]:
+        external_request = self.api.external_requests_queue.pop()
+        requests = []
 
-        bt.logging.info(
-            f"The next round of requests will be for {circuit} in {request_type} mode"
-        )
-
-        requests = [
-            Request(
-                uid=uid,
-                axon=self.config.metagraph.axons[uid],
-                synapse=self.get_synapse_request(uid, request_type, circuit, request),
-                circuit=circuit,
-                request_type=request_type,
+        for uid in filtered_uids:
+            synapse = self.get_synapse_request(
+                uid, RequestType.RWR, external_request.circuit, external_request
             )
-            for uid in filtered_uids
-        ]
 
-        for request in requests:
             input_data = (
-                request.synapse.inputs
-                if request.circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS
-                else request.synapse.query_input["public_inputs"]
+                synapse.inputs
+                if external_request.circuit.metadata.type
+                == CircuitType.PROOF_OF_WEIGHTS
+                else synapse.query_input["public_inputs"]
             )
-            request.inputs = GenericInput(RequestType.RWR, input_data)
+
             try:
                 self.hash_guard.check_hash(input_data)
             except Exception as e:
@@ -83,8 +71,53 @@ class RequestPipeline:
                 safe_log({"hash_guard_error": 1})
                 continue
 
+            request = Request(
+                uid=uid,
+                axon=self.config.metagraph.axons[uid],
+                synapse=synapse,
+                circuit=external_request.circuit,
+                request_type=RequestType.RWR,
+                inputs=GenericInput(RequestType.RWR, input_data),
+                request_hash=external_request.hash,
+            )
+            requests.append(request)
+        return requests
+
+    def _prepare_benchmark_requests(self, filtered_uids: list[int]) -> list[Request]:
+        circuit = self.select_circuit_for_benchmark()
+        if circuit is None:
+            bt.logging.error("No circuit selected")
+            return []
+
         if circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
             self.score_manager.clear_proof_of_weights_queue()
+
+        requests = []
+        for uid in filtered_uids:
+            synapse = self.get_synapse_request(uid, RequestType.BENCHMARK, circuit)
+
+            input_data = (
+                synapse.inputs
+                if circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS
+                else synapse.query_input["public_inputs"]
+            )
+
+            try:
+                self.hash_guard.check_hash(input_data)
+            except Exception as e:
+                bt.logging.error(f"Hash already exists: {e}")
+                safe_log({"hash_guard_error": 1})
+                continue
+
+            request = Request(
+                uid=uid,
+                axon=self.config.metagraph.axons[uid],
+                synapse=synapse,
+                circuit=circuit,
+                request_type=RequestType.BENCHMARK,
+                inputs=GenericInput(RequestType.BENCHMARK, input_data),
+            )
+            requests.append(request)
 
         return requests
 

@@ -23,6 +23,7 @@ import threading
 import uvicorn
 from _validator.api.certificate_manager import CertificateManager
 from _validator.api.websocket_manager import WebSocketManager
+import asyncio
 
 
 class ValidatorAPI:
@@ -35,6 +36,8 @@ class ValidatorAPI:
         self.ws_manager = WebSocketManager()
         self.validator_keys_cache = ValidatorKeysCache(config)
         self.server_thread: threading.Thread | None = None
+        self.pending_requests: dict[str, asyncio.Event] = {}
+        self.request_results: dict[str, dict[str, any]] = {}
         self._setup_api()
 
     def _setup_api(self) -> None:
@@ -82,15 +85,37 @@ class ValidatorAPI:
             websocket: WebSocket, **params: dict[str, object]
         ) -> dict[str, object]:
             evaluation_data = params.get("evaluation_data")
-            _ = params.get("weights_version")
+            weights_version = params.get("weights_version")
 
             if not evaluation_data:
                 return InvalidParams(data={"error": "Missing evaluation data"})
 
             try:
                 netuid = int(websocket.headers["x-netuid"])
-                self.external_requests_queue.insert(0, (netuid, evaluation_data))
-                return Success(("status", "Request received"))
+                external_request = ProofOfWeightsRPCRequest(
+                    netuid=netuid,
+                    evaluation_data=evaluation_data,
+                    weights_version=weights_version,
+                )
+
+                self.pending_requests[external_request.hash] = asyncio.Event()
+                self.external_requests_queue.insert(0, external_request)
+
+                try:
+                    await asyncio.wait_for(
+                        self.pending_requests[external_request.hash].wait(),
+                        timeout=300,
+                    )
+                    result = self.request_results.pop(external_request.hash, None)
+                    if result:
+                        return Success(result)
+                    return InternalErrorResult(
+                        data={"error": "Request processing failed"}
+                    )
+                except asyncio.TimeoutError:
+                    return InternalErrorResult(data={"error": "Request timed out"})
+                finally:
+                    self.pending_requests.pop(external_request.hash, None)
 
             except Exception as e:
                 bt.logging.error(f"Error processing request: {str(e)}")
@@ -191,3 +216,9 @@ class ValidatorAPI:
                     traceback.print_exc()
             else:
                 bt.logging.info("Certificate hash already committed to chain.")
+
+    def set_request_result(self, request_hash: str, result: dict[str, any]):
+        """Set the result for a pending request and signal its completion."""
+        if request_hash in self.pending_requests:
+            self.request_results[request_hash] = result
+            self.pending_requests[request_hash].set()
