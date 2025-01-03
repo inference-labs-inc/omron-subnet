@@ -1,19 +1,15 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from execution_layer.circuit import Circuit
+from execution_layer.generic_input import GenericInput
 from _validator.utils.api import hash_inputs
 
 
 class RealWorldRequest(BaseModel):
-    """
-    Base class for all incoming RPC requests.
-    """
+    circuit: Circuit
+    inputs: GenericInput
 
-    circuit: Circuit = Field(
-        ..., description="The circuit selected to handle the request"
-    )
-    inputs: dict[str, any] = Field(..., description="The inputs to the circuit")
-    hash: str = Field(..., description="The hash of request inputs")
+    model_config = {"arbitrary_types_allowed": True}
 
-    def __init__(self, circuit: Circuit, inputs: dict[str, any]):
-        super().__init__(circuit=circuit, inputs=inputs)
-        self.hash = hash_inputs(inputs)
+    @property
+    def hash(self) -> str:
+        return hash_inputs(self.inputs)
