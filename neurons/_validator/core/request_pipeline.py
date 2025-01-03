@@ -8,7 +8,6 @@ from _validator.api import ValidatorAPI
 from _validator.config import ValidatorConfig
 from constants import (
     BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
-    DEFAULT_NETUID,
     CIRCUIT_WEIGHTS,
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
 )
@@ -51,13 +50,9 @@ class RequestPipeline:
         circuit = self.select_circuit_for_benchmark()
         request = None
         if request_type == RequestType.RWR:
-            netuid, request = self.api.external_requests_queue.pop()
+            request = self.api.external_requests_queue.pop()
             bt.logging.debug(f"Processing external request for netuid {netuid}")
-
-            target_netuid = (
-                DEFAULT_NETUID if netuid == self.config.subnet_uid else netuid
-            )
-            circuit = circuit_store.get_latest_circuit_for_netuid(target_netuid)
+            circuit = request.circuit
 
         bt.logging.info(
             f"The next round of requests will be for {circuit} in {request_type} mode"

@@ -105,6 +105,46 @@ class CircuitStore:
 
         return max(matching_circuits, key=lambda c: version.parse(c.metadata.version))
 
+    def get_circuit_for_netuid_and_version(
+        self, netuid: int, version: int
+    ) -> Circuit | None:
+        """
+        Get the circuit for a given netuid and version.
+        """
+        matching_circuits = [
+            c
+            for c in self.circuits.values()
+            if c.metadata.netuid == netuid and c.metadata.weights_version == version
+        ]
+        if not matching_circuits:
+            bt.logging.warning(
+                f"No circuit found for netuid {netuid} and weights version {version}"
+            )
+            return None
+        return matching_circuits[0]
+
+    def get_latest_circuit_by_name(self, circuit_name: str) -> Circuit | None:
+        """
+        Get the latest circuit by name.
+        """
+        matching_circuits = [
+            c for c in self.circuits.values() if c.metadata.name == circuit_name
+        ]
+        return max(matching_circuits, key=lambda c: version.parse(c.metadata.version))
+
+    def get_circuit_by_name_and_version(
+        self, circuit_name: str, version: int
+    ) -> Circuit | None:
+        """
+        Get the circuit by name and version.
+        """
+        matching_circuits = [
+            c
+            for c in self.circuits.values()
+            if c.metadata.name == circuit_name and c.metadata.version == version
+        ]
+        return matching_circuits[0] if matching_circuits else None
+
     def list_circuits(self) -> list[str]:
         """
         Get a list of all circuit IDs.

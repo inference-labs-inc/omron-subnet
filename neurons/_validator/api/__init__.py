@@ -10,7 +10,8 @@ from jsonrpcserver import (
     InternalErrorResult,
 )
 import bittensor as bt
-from _validator.utils.proof_of_weights import ProofOfWeightsItem
+from _validator.models.poc_rpc_request import ProofOfComputationRPCRequest
+from _validator.models.pow_rpc_request import ProofOfWeightsRPCRequest
 import hashlib
 from constants import MAX_SIGNATURE_LIFESPAN
 from _validator.config import ValidatorConfig
@@ -28,7 +29,9 @@ class ValidatorAPI:
     def __init__(self, config: ValidatorConfig):
         self.config = config
         self.app = FastAPI()
-        self.external_requests_queue: list[tuple[int, list[ProofOfWeightsItem]]] = []
+        self.external_requests_queue: list[
+            ProofOfWeightsRPCRequest | ProofOfComputationRPCRequest
+        ] = []
         self.ws_manager = WebSocketManager()
         self.validator_keys_cache = ValidatorKeysCache(config)
         self.server_thread: threading.Thread | None = None
