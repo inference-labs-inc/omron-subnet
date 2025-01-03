@@ -7,8 +7,9 @@ from jsonrpcserver import (
     async_dispatch,
     Success,
     InvalidParams,
-    InternalErrorResult,
 )
+from jsonrpcserver.result import InternalErrorResult
+
 import bittensor as bt
 from _validator.models.poc_rpc_request import ProofOfComputationRPCRequest
 from _validator.models.pow_rpc_request import ProofOfWeightsRPCRequest
