@@ -115,7 +115,7 @@ class RequestPipeline:
                 synapse=synapse,
                 circuit=circuit,
                 request_type=RequestType.BENCHMARK,
-                inputs=GenericInput(RequestType.BENCHMARK, input_data),
+                inputs=GenericInput(RequestType.RWR, input_data),
             )
             requests.append(request)
 
