@@ -92,12 +92,19 @@ class ValidatorAPI:
                 return InvalidParams(data={"error": "Missing evaluation data"})
 
             try:
-                netuid = int(websocket.headers["x-netuid"])
-                external_request = ProofOfWeightsRPCRequest(
-                    netuid=netuid,
-                    evaluation_data=evaluation_data,
-                    weights_version=weights_version,
-                )
+                netuid = websocket.headers.get("x-netuid")
+                if netuid is None:
+                    return InvalidParams(data={"error": "Missing x-netuid header"})
+
+                netuid = int(netuid)
+                try:
+                    external_request = ProofOfWeightsRPCRequest(
+                        evaluation_data=evaluation_data,
+                        netuid=netuid,
+                        weights_version=weights_version,
+                    )
+                except ValueError as e:
+                    return InvalidParams(data={"error": str(e)})
 
                 self.pending_requests[external_request.hash] = asyncio.Event()
                 self.external_requests_queue.insert(0, external_request)
