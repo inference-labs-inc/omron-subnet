@@ -2,6 +2,8 @@ from __future__ import annotations
 from _validator.models.base_rpc_request import RealWorldRequest
 from pydantic import Field
 from deployment_layer.circuit_store import circuit_store
+from execution_layer.generic_input import GenericInput
+from _validator.models.request_type import RequestType
 
 
 class ProofOfWeightsRPCRequest(RealWorldRequest):
@@ -32,4 +34,8 @@ class ProofOfWeightsRPCRequest(RealWorldRequest):
             raise ValueError(
                 f"No circuit found for netuid {netuid} and weights version {weights_version}"
             )
-        super().__init__(circuit=circuit, inputs=evaluation_data)
+        self.circuit = circuit
+        self.inputs = GenericInput(RequestType.RWR, evaluation_data)
+        super().__init__(
+            circuit=circuit, inputs=GenericInput(RequestType.RWR, evaluation_data)
+        )
