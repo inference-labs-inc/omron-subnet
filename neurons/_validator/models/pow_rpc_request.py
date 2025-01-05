@@ -15,13 +15,15 @@ class ProofOfWeightsRPCRequest(RealWorldRequest):
         None, description="The version of weights in use by the origin subnet"
     )
     netuid: int = Field(..., description="The origin subnet UID")
+    evaluation_data: dict[str, any] = Field(
+        ..., description="The evaluation data for the request"
+    )
 
-    def __init__(
-        self,
-        evaluation_data: dict[str, any],
-        netuid: int,
-        weights_version: int | None = None,
-    ):
+    def __init__(self, **data):
+        netuid = data.get("netuid")
+        weights_version = data.get("weights_version")
+        evaluation_data = data.get("evaluation_data")
+
         circuit = None
         if weights_version is None:
             circuit = circuit_store.get_latest_circuit_for_netuid(netuid)
@@ -34,8 +36,9 @@ class ProofOfWeightsRPCRequest(RealWorldRequest):
             raise ValueError(
                 f"No circuit found for netuid {netuid} and weights version {weights_version}"
             )
+
         super().__init__(
-            circuit=circuit, inputs=GenericInput(RequestType.RWR, evaluation_data)
+            circuit=circuit,
+            inputs=GenericInput(RequestType.RWR, evaluation_data),
+            **data,
         )
-        self.netuid = netuid
-        self.weights_version = weights_version
