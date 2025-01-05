@@ -34,8 +34,8 @@ class ProofOfWeightsRPCRequest(RealWorldRequest):
             raise ValueError(
                 f"No circuit found for netuid {netuid} and weights version {weights_version}"
             )
-        self.circuit = circuit
-        self.inputs = GenericInput(RequestType.RWR, evaluation_data)
         super().__init__(
             circuit=circuit, inputs=GenericInput(RequestType.RWR, evaluation_data)
         )
+        self.netuid = netuid
+        self.weights_version = weights_version
