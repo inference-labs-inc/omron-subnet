@@ -1,3 +1,4 @@
+from __future__ import annotations
 from _validator.pow.proof_of_weights_handler import ProofOfWeightsHandler
 import bittensor as bt
 import random
