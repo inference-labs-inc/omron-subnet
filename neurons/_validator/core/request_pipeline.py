@@ -54,15 +54,13 @@ class RequestPipeline:
 
         for uid in filtered_uids:
             synapse = self.get_synapse_request(
-                uid, RequestType.RWR, external_request.circuit, external_request
+                RequestType.RWR, external_request.circuit, external_request
             )
 
-            input_data = (
-                synapse.inputs
-                if external_request.circuit.metadata.type
-                == CircuitType.PROOF_OF_WEIGHTS
-                else synapse.query_input["public_inputs"]
-            )
+            if isinstance(synapse, ProofOfWeightsSynapse):
+                input_data = synapse.inputs
+            else:
+                input_data = synapse.query_input["public_inputs"]
 
             try:
                 self.hash_guard.check_hash(input_data)
@@ -94,13 +92,12 @@ class RequestPipeline:
 
         requests = []
         for uid in filtered_uids:
-            synapse = self.get_synapse_request(uid, RequestType.BENCHMARK, circuit)
+            synapse = self.get_synapse_request(RequestType.BENCHMARK, circuit)
 
-            input_data = (
-                synapse.inputs
-                if circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS
-                else synapse.query_input["public_inputs"]
-            )
+            if isinstance(synapse, ProofOfWeightsSynapse):
+                input_data = synapse.inputs
+            else:
+                input_data = synapse.query_input["public_inputs"]
 
             try:
                 self.hash_guard.check_hash(input_data)
@@ -139,15 +136,17 @@ class RequestPipeline:
 
     def get_synapse_request(
         self,
-        uid: int,
         request_type: RequestType,
         circuit: Circuit,
-        request: dict[str, object] | None = None,
+        request: any | None = None,
     ) -> ProofOfWeightsSynapse | QueryZkProof:
         inputs = (
             circuit.input_handler(request_type)
             if request_type == RequestType.BENCHMARK
-            else circuit.input_handler(RequestType.RWR, request["inputs"])
+            else circuit.input_handler(
+                RequestType.RWR,
+                request.inputs if hasattr(request, "inputs") else request["inputs"],
+            )
         )
 
         if request_type == RequestType.RWR:
@@ -170,12 +169,10 @@ class RequestPipeline:
             SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
             BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
         ]:
-            # We'll forward the responsibility of handling these to the internal proof of weights handler
             return ProofOfWeightsHandler.prepare_pow_request(
                 circuit, self.score_manager.proof_of_weights_queue
             )
 
-        # Otherwise, we'll prepare a regular benchmark request depending on the circuit type
         if circuit.metadata.type == CircuitType.PROOF_OF_COMPUTATION:
             return QueryZkProof(
                 model_id=circuit.id,

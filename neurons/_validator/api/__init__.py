@@ -108,19 +108,31 @@ class ValidatorAPI:
 
                 self.pending_requests[external_request.hash] = asyncio.Event()
                 self.external_requests_queue.insert(0, external_request)
-
+                bt.logging.success(
+                    f"External request with hash {external_request.hash} added to queue"
+                )
                 try:
                     await asyncio.wait_for(
                         self.pending_requests[external_request.hash].wait(),
                         timeout=300,
                     )
                     result = self.request_results.pop(external_request.hash, None)
+
                     if result:
+                        bt.logging.success(
+                            f"External request with hash {external_request.hash} processed successfully"
+                        )
                         return Success(result)
+                    bt.logging.error(
+                        f"External request with hash {external_request.hash} failed to process"
+                    )
                     return InternalErrorResult(
                         data={"error": "Request processing failed"}
                     )
                 except asyncio.TimeoutError:
+                    bt.logging.error(
+                        f"External request with hash {external_request.hash} timed out"
+                    )
                     return InternalErrorResult(data={"error": "Request timed out"})
                 finally:
                     self.pending_requests.pop(external_request.hash, None)
