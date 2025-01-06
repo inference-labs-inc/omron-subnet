@@ -25,9 +25,9 @@ class CircuitInputSchema(BaseModel):
     last_20_difficulty_avg: list[float]
     has_docker: list[bool]
     uid: list[int]
-    allocated_uids: list[list[int]]
-    penalized_uids: list[list[int]]
-    validator_uids: list[list[int]]
+    allocated_uids: list[int]
+    penalized_uids: list[int]
+    validator_uids: list[int]
     success_weight: list[float]
     difficulty_weight: list[float]
     time_elapsed_weight: list[float]
@@ -89,5 +89,5 @@ class CircuitInput(BaseInput):
         """
         Add a random nonce to ensure that the request is not reused.
         """
-        data["nonce"] = secrets.randbits(32)
+        data["nonce"] = [secrets.randbits(32)]
         return data
