@@ -15,9 +15,11 @@ class ProofOfWeightsRPCRequest(RealWorldRequest):
         None, description="The version of weights in use by the origin subnet"
     )
     netuid: int = Field(..., description="The origin subnet UID")
-    evaluation_data: dict[str, any] = Field(
-        ..., description="The evaluation data for the request"
-    )
+    evaluation_data: dict = Field(default_factory=dict)
+
+    class Config:
+        arbitrary_types_allowed = True
+        extra = "allow"
 
     def __init__(self, **data):
         netuid = data.get("netuid")
@@ -40,5 +42,7 @@ class ProofOfWeightsRPCRequest(RealWorldRequest):
         super().__init__(
             circuit=circuit,
             inputs=GenericInput(RequestType.RWR, evaluation_data),
-            **data,
+            evaluation_data=evaluation_data,
+            netuid=netuid,
+            weights_version=weights_version,
         )
