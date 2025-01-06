@@ -146,7 +146,7 @@ class RequestPipeline:
             if request_type == RequestType.BENCHMARK
             else circuit.input_handler(
                 RequestType.RWR,
-                (request["inputs"]),
+                (request.inputs),
             )
         )
 
