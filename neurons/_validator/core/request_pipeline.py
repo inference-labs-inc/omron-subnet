@@ -146,11 +146,7 @@ class RequestPipeline:
             if request_type == RequestType.BENCHMARK
             else circuit.input_handler(
                 RequestType.RWR,
-                (
-                    request.inputs.to_json()
-                    if hasattr(request, "inputs")
-                    else request["inputs"]
-                ),
+                (request["inputs"]),
             )
         )
 
