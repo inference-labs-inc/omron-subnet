@@ -25,6 +25,7 @@ import uvicorn
 from _validator.api.certificate_manager import CertificateManager
 from _validator.api.websocket_manager import WebSocketManager
 import asyncio
+from OpenSSL import crypto
 
 
 class ValidatorAPI:
@@ -222,7 +223,10 @@ class ValidatorAPI:
             return
 
         with open(cert_path, "rb") as f:
-            cert_hash = hashlib.sha256(f.read()).hexdigest()
+            cert_data = f.read()
+            cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_data)
+            cert_der = crypto.dump_certificate(crypto.FILETYPE_ASN1, cert)
+            cert_hash = hashlib.sha256(cert_der).hexdigest()
             if cert_hash != existing_commitment:
                 try:
                     self.config.subtensor.commit(
