@@ -6,9 +6,9 @@ from jsonrpcserver import (
     method,
     async_dispatch,
     Success,
+    Error,
     InvalidParams,
 )
-from jsonrpcserver.result import InternalErrorResult
 
 import bittensor as bt
 from _validator.models.poc_rpc_request import ProofOfComputationRPCRequest
@@ -89,12 +89,12 @@ class ValidatorAPI:
             weights_version = params.get("weights_version")
 
             if not evaluation_data:
-                return InvalidParams(data={"error": "Missing evaluation data"})
+                return InvalidParams("Missing evaluation data")
 
             try:
                 netuid = websocket.headers.get("x-netuid")
                 if netuid is None:
-                    return InvalidParams(data={"error": "Missing x-netuid header"})
+                    return InvalidParams("Missing x-netuid header")
 
                 netuid = int(netuid)
                 try:
@@ -104,7 +104,7 @@ class ValidatorAPI:
                         weights_version=weights_version,
                     )
                 except ValueError as e:
-                    return InvalidParams(data={"error": str(e)})
+                    return InvalidParams(str(e))
 
                 self.pending_requests[external_request.hash] = asyncio.Event()
                 self.external_requests_queue.insert(0, external_request)
@@ -126,20 +126,18 @@ class ValidatorAPI:
                     bt.logging.error(
                         f"External request with hash {external_request.hash} failed to process"
                     )
-                    return InternalErrorResult(
-                        data={"error": "Request processing failed"}
-                    )
+                    return Error(9, "Request processing failed")
                 except asyncio.TimeoutError:
                     bt.logging.error(
                         f"External request with hash {external_request.hash} timed out"
                     )
-                    return InternalErrorResult(data={"error": "Request timed out"})
+                    return Error(9, "Request processing failed", "Request timed out")
                 finally:
                     self.pending_requests.pop(external_request.hash, None)
 
             except Exception as e:
                 bt.logging.error(f"Error processing request: {str(e)}")
-                return InternalErrorResult(data={"error": str(e)})
+                return Error(9, "Request processing failed", str(e))
 
     def start_server(self):
         """Start the uvicorn server in a separate thread"""
