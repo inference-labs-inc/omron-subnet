@@ -19,6 +19,7 @@ from _validator.utils.hash_guard import HashGuard
 from _validator.core.request import Request
 from utils.wandb_logger import safe_log
 from _validator.models.request_type import RequestType
+import copy
 
 
 class RequestPipeline:
@@ -146,7 +147,7 @@ class RequestPipeline:
             if request_type == RequestType.BENCHMARK
             else circuit.input_handler(
                 RequestType.RWR,
-                (request.inputs),
+                copy.deepcopy(request.inputs),
             )
         )
 
