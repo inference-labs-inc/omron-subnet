@@ -2,7 +2,6 @@ from __future__ import annotations
 from _validator.models.base_rpc_request import RealWorldRequest
 from pydantic import Field
 from deployment_layer.circuit_store import circuit_store
-from _validator.models.request_type import RequestType
 
 
 class ProofOfWeightsRPCRequest(RealWorldRequest):
@@ -40,7 +39,7 @@ class ProofOfWeightsRPCRequest(RealWorldRequest):
 
         super().__init__(
             circuit=circuit,
-            inputs=circuit.input_handler(RequestType.RWR, evaluation_data),
+            inputs=evaluation_data,
             evaluation_data=evaluation_data,
             netuid=netuid,
             weights_version=weights_version,
