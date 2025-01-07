@@ -176,6 +176,18 @@ class BaseCompetition(ABC):
 
     def compare_outputs(self, expected: list[float], actual: list[float]) -> float:
         """
-        Compare expected and actual outputs and return a score.
+        Compare expected and actual DQN outputs using KL divergence.
         """
-        return (expected == actual).mean()
+
+        expected_array = torch.tensor(expected).reshape(10, 7)
+        actual_array = torch.tensor(actual).reshape(10, 7)
+
+        expected_probs = torch.softmax(expected_array, dim=1)
+        actual_probs = torch.softmax(actual_array, dim=1)
+
+        kl_divs = torch.nn.functional.kl_div(
+            actual_probs.log(), expected_probs, reduction="none"
+        ).sum(dim=1)
+        avg_kl = kl_divs.mean().item()
+
+        return 1.0 / (1.0 + avg_kl)
