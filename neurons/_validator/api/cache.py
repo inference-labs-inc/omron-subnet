@@ -1,5 +1,5 @@
 import datetime
-import threading
+import asyncio
 from _validator.config import ValidatorConfig
 
 
@@ -12,7 +12,7 @@ class ValidatorKeysCache:
         self.cached_keys: dict[int, list[str]] = {}
         self.cached_timestamps: dict[int, datetime.datetime] = {}
         self.config: ValidatorConfig = config
-        self._lock = threading.Lock()
+        self._lock = asyncio.Lock()
 
     def fetch_validator_keys(self, netuid: int) -> None:
         """

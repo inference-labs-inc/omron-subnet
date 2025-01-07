@@ -206,7 +206,9 @@ class ValidatorAPI:
             if not public_key.verify(str(timestamp).encode(), signature):
                 return False
 
-            return self.validator_keys_cache.check_validator_key(ss58_address, netuid)
+            return await self.validator_keys_cache.check_validator_key(
+                ss58_address, netuid
+            )
 
         except Exception as e:
             bt.logging.error(f"Validation error: {str(e)}")
