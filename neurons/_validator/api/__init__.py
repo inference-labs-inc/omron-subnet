@@ -14,7 +14,7 @@ import bittensor as bt
 from _validator.models.poc_rpc_request import ProofOfComputationRPCRequest
 from _validator.models.pow_rpc_request import ProofOfWeightsRPCRequest
 import hashlib
-from constants import MAX_SIGNATURE_LIFESPAN
+from constants import MAX_SIGNATURE_LIFESPAN, MAINNET_TESTNET_UIDS
 from _validator.config import ValidatorConfig
 import base64
 import substrateinterface
@@ -40,6 +40,7 @@ class ValidatorAPI:
         self.server_thread: threading.Thread | None = None
         self.pending_requests: dict[str, asyncio.Event] = {}
         self.request_results: dict[str, dict[str, any]] = {}
+        self.is_testnet = config.bt_config.network == "test"
         self._setup_api()
 
     def _setup_api(self) -> None:
@@ -96,6 +97,16 @@ class ValidatorAPI:
                 netuid = websocket.headers.get("x-netuid")
                 if netuid is None:
                     return InvalidParams("Missing x-netuid header")
+
+                if self.is_testnet:
+                    testnet_uids = [
+                        uid[0] for uid in MAINNET_TESTNET_UIDS if uid[1] == int(netuid)
+                    ]
+                    if not testnet_uids:
+                        return InvalidParams(
+                            f"No testnet UID mapping found for mainnet UID {netuid}"
+                        )
+                    netuid = testnet_uids[0]
 
                 netuid = int(netuid)
                 try:
