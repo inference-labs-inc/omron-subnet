@@ -154,6 +154,7 @@ class ValidatorAPI:
 
             except Exception as e:
                 bt.logging.error(f"Error processing request: {str(e)}")
+                traceback.print_exc()
                 return Error(9, "Request processing failed", str(e))
 
     def start_server(self):

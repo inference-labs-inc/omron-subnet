@@ -218,7 +218,7 @@ class ValidatorLoop:
     def _handle_keyboard_interrupt(self):
         """Handle keyboard interrupt by cleaning up and exiting."""
         bt.logging.success("Keyboard interrupt detected. Exiting validator.")
-        self.api.stop()
+        asyncio.run(self.api.stop())
         stop_prometheus_logging()
         clean_temp_files()
         sys.exit(0)

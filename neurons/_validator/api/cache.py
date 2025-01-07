@@ -1,6 +1,7 @@
 import datetime
 import asyncio
 from _validator.config import ValidatorConfig
+import bittensor as bt
 
 
 class ValidatorKeysCache:
@@ -19,15 +20,15 @@ class ValidatorKeysCache:
         Fetch the validator keys for a given netuid and cache them.
         Thread-safe implementation using a lock.
         """
-        async with self._lock:
-            self.cached_keys[netuid] = [
-                neuron.hotkey
-                for neuron in self.config.subtensor.neurons_lite(netuid)
-                if neuron.validator_permit
-            ]
-            self.cached_timestamps[netuid] = (
-                datetime.datetime.now() + datetime.timedelta(hours=12)
-            )
+        subtensor = bt.subtensor(config=self.config.bt_config)
+        self.cached_keys[netuid] = [
+            neuron.hotkey
+            for neuron in subtensor.neurons_lite(netuid)
+            if neuron.validator_permit
+        ]
+        self.cached_timestamps[netuid] = datetime.datetime.now() + datetime.timedelta(
+            hours=12
+        )
 
     async def check_validator_key(self, ss58_address: str, netuid: int) -> bool:
         """
@@ -40,8 +41,7 @@ class ValidatorKeysCache:
             # If the sender is whitelisted, we don't need to check the key
             return True
 
-        async with self._lock:
-            cache_timestamp = self.cached_timestamps.get(netuid, None)
-            if cache_timestamp is None or cache_timestamp < datetime.datetime.now():
-                await self.fetch_validator_keys(netuid)
-            return ss58_address in self.cached_keys.get(netuid, [])
+        cache_timestamp = self.cached_timestamps.get(netuid, None)
+        if cache_timestamp is None or cache_timestamp < datetime.datetime.now():
+            await self.fetch_validator_keys(netuid)
+        return ss58_address in self.cached_keys.get(netuid, [])
