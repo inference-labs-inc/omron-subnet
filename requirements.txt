@@ -2,14 +2,13 @@ attrs==24.2.0
 bittensor==8.5.1
 black==23.7.0
 ezkl==16.2.0
-fastapi==0.99.1
+fastapi~=0.110.1
 jsonrpcserver==5.0.9
-fastapi==0.110.1
 numpy==2.0.1
 packaging==24.1
 psutil==6.0.0
 pydantic==2.10.3
-pyoopenssl==24.3.0
+pyOpenSSL==24.3.0
 requests==2.32.3
 rich==13.8.1
 torch==2.4.1
