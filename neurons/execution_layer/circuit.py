@@ -3,9 +3,19 @@ from dataclasses import dataclass, field
 from enum import Enum
 import os
 import json
+from execution_layer.input_registry import InputRegistry
 
 # trunk-ignore(pylint/E0611)
 from bittensor import logging
+
+
+class CircuitType(str, Enum):
+    """
+    Enum representing the type of circuit.
+    """
+
+    PROOF_OF_WEIGHTS = "proof_of_weights"
+    PROOF_OF_COMPUTATION = "proof_of_computation"
 
 
 class ProofSystem(str, Enum):
@@ -17,6 +27,7 @@ class ProofSystem(str, Enum):
     ZKML = "ZKML"
     CIRCOM = "CIRCOM"
     JOLT = "JOLT"
+    EZKL = "EZKL"
 
     def __str__(self):
         return self.value
@@ -61,15 +72,18 @@ class CircuitPaths:
             "deployment_layer",
             f"model_{self.model_id}",
         )
+        self.external_base_path = os.path.join(
+            os.getenv("OMRON_EXTERNAL_MODEL_DIR", os.path.dirname(self.base_path)),
+            f"model_{self.model_id}",
+        )
         self.input = os.path.join(self.base_path, "input.json")
         self.metadata = os.path.join(self.base_path, "metadata.json")
         self.compiled_model = os.path.join(self.base_path, "model.compiled")
         self.settings = os.path.join(self.base_path, "settings.json")
         self.witness = os.path.join(self.base_path, "witness.json")
         self.proof = os.path.join(self.base_path, "proof.json")
-        self.srs = os.path.join(self.base_path, "kzg.srs")
         self.witness_executable = os.path.join(self.base_path, "witness.js")
-        self.pk = os.path.join(self.base_path, "circuit.zkey")
+        self.pk = os.path.join(self.external_base_path, "circuit.zkey")
         self.vk = os.path.join(self.base_path, "verification_key.json")
 
     def set_proof_system_paths(self, proof_system: ProofSystem):
@@ -77,13 +91,17 @@ class CircuitPaths:
         Set proof system-specific paths.
         """
         if proof_system == ProofSystem.CIRCOM:
-            self.pk = os.path.join(self.base_path, "circuit.zkey")
+            self.pk = os.path.join(self.external_base_path, "circuit.zkey")
             self.vk = os.path.join(self.base_path, "verification_key.json")
             self.compiled_model = os.path.join(self.base_path, "circuit.wasm")
         elif proof_system == ProofSystem.JOLT:
             self.compiled_model = os.path.join(
                 self.base_path, "target", "release", "circuit"
             )
+        elif proof_system == ProofSystem.EZKL:
+            self.pk = os.path.join(self.external_base_path, "pk.key")
+            self.vk = os.path.join(self.base_path, "vk.key")
+            self.compiled_model = os.path.join(self.base_path, "model.compiled")
         else:
             raise ValueError(f"Proof system {proof_system} not supported")
 
@@ -99,8 +117,10 @@ class CircuitMetadata:
     author: str
     version: str
     proof_system: str
+    type: CircuitType
     external_files: dict[str, str]
-    netuid: int = -1
+    netuid: int | None = None
+    weights_version: int | None = None
 
     @classmethod
     def from_file(cls, metadata_path: str) -> CircuitMetadata:
@@ -143,6 +163,7 @@ class Circuit:
             logging.warning(
                 f"Failed to load settings for model {self.id}. Using default settings."
             )
+        self.input_handler = InputRegistry.get_handler(self.id)
 
     def __str__(self):
         return (

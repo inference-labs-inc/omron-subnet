@@ -13,6 +13,7 @@ Arguments that are present within the Omron miner and validator software. The be
 | `--wandb-key`      |    No    | `None`  | String          | A WandB API key for logging purposes                                       |
 | `--disable-wandb`  |    No    | `False` | `True`, `False` | Whether to disable WandB logging.                                          |
 | `--dev`            |    No    | `False` | `True`, `False` | Whether to run the software in development mode. **For internal use only** |
+| `--localnet`       |    No    | `False` | `True`, `False` | Whether to run the validator in localnet mode.                             |
 
 ### Miner specific arguments
 
@@ -32,7 +33,7 @@ The below arguments are specific to validator software and have no effect on min
 | `--enable-pow`                        |    No    | `False`   | `True`, `False` | Whether on-chain proof of weights is enabled                                                                                                                                                |
 | `--pow-target-interval`               |    No    | `1000`    | Integer         | The target block interval for committing proof of weights to the chain                                                                                                                      |
 | `--ignore-external-requests`          |    No    | `True`    | `True`, `False` | Whether the validator should ignore external requests through it's API.                                                                                                                     |
-| `--external-api-port`                 |    No    | `8000`    | Integer         | The port for the validator's external API.                                                                                                                                                  |
+| `--external-api-port`                 |    No    | `8443`    | Integer         | The port for the validator's external API.                                                                                                                                                  |
 | `--external-api-workers`              |    No    | `1`       | Integer         | The number of workers for the validator's external API.                                                                                                                                     |
 | `--external-api-host`                 |    No    | `0.0.0.0` | String          | The host for the validator's external API.                                                                                                                                                  |
 | `--do-not-verify-external-signatures` |    No    | `False`   | `True`, `False` | External PoW requests are signed by validator's (sender's) wallet. By default, these are checked to ensure legitimacy. This should only be disabled in controlled development environments. |

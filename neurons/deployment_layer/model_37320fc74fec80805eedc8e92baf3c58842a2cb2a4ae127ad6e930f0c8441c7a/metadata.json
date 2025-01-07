@@ -1,0 +1,9 @@
+{
+    "name": "SN2 PoW 256",
+    "description": "Generates weights based on miner evaluation data from SN2.",
+    "author": "Inference Labs",
+    "version": "0.0.5",
+    "proof_system": "JOLT",
+    "type": "proof_of_computation",
+    "external_files": {}
+}

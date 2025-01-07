@@ -24,6 +24,8 @@ import websocket
 from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
 from utils import AutoUpdate, clean_temp_files
+from execution_layer.generic_input import GenericInput
+from _validator.models.request_type import RequestType
 
 CIRCUIT_CID_PATH = os.path.join(os.path.dirname(__file__), "CIRCUIT_CID")
 
@@ -61,9 +63,6 @@ class MinerSession:
         # Attach determines which functions are called when a request is received.
         bt.logging.info("Attaching forward functions to axon...")
         axon.attach(forward_fn=self.queryZkProof, blacklist_fn=self.proof_blacklist)
-        axon.attach(
-            forward_fn=self.aggregateProof, blacklist_fn=self.aggregation_blacklist
-        )
         axon.attach(
             forward_fn=self.handle_pow_request,
             blacklist_fn=self.pow_blacklist,
@@ -290,7 +289,9 @@ class MinerSession:
                     f"Circuit {model_id} not found. This indicates a missing deployment layer folder or invalid request"
                 )
             bt.logging.info(f"Running proof generation for {circuit}")
-            model_session = VerifiedModelSession(public_inputs, circuit)
+            model_session = VerifiedModelSession(
+                GenericInput(RequestType.RWR, public_inputs), circuit
+            )
             bt.logging.debug("Model session created successfully")
             proof, public, proof_time = model_session.gen_proof()
             if isinstance(proof, bytes):
@@ -311,6 +312,7 @@ class MinerSession:
         except Exception as e:
             synapse.query_output = "An error occurred"
             bt.logging.error(f"An error occurred while generating proven output\n{e}")
+            traceback.print_exc()
             proof_time = time.time() - time_in
 
         time_out = time.time()
@@ -359,7 +361,9 @@ class MinerSession:
                     "This indicates a missing deployment layer folder or invalid request"
                 )
             bt.logging.info(f"Running proof generation for {circuit}")
-            model_session = VerifiedModelSession(synapse.inputs, circuit)
+            model_session = VerifiedModelSession(
+                GenericInput(RequestType.RWR, synapse.inputs), circuit
+            )
 
             bt.logging.debug("Model session created successfully")
             proof, public, proof_time = model_session.gen_proof()
@@ -372,6 +376,7 @@ class MinerSession:
             bt.logging.error(
                 f"An error occurred while generating proof of weights\n{e}"
             )
+            traceback.print_exc()
             proof_time = time.time() - time_in
 
         time_out = time.time()
@@ -403,62 +408,4 @@ class MinerSession:
         """
         Generates an aggregate proof for the provided proofs.
         """
-        time_in = time.time()
-        bt.logging.debug(f"Aggregation input: {synapse.proofs} \n")
-        bt.logging.info(
-            f"Received proof aggregation request with {len(synapse.proofs)}"
-        )
-
-        if not synapse.proofs or not synapse.model_id:
-            bt.logging.error(
-                "Received proof aggregation request with no proofs or model_id"
-            )
-            synapse.aggregation_proof = "Missing critical data"
-            return synapse
-        aggregation_time = 0
-
-        model_id = synapse.model_id
-
-        # Run proofs through the aggregate circuit
-        try:
-            circuit = circuit_store.get_circuit(str(model_id))
-            if not circuit:
-                raise ValueError(
-                    f"Circuit {model_id} not found."
-                    "This indicates a missing deployment layer folder or invalid request."
-                )
-            model_session = VerifiedModelSession(None, circuit)
-            bt.logging.debug("Model session created successfully")
-            synapse.aggregation_proof, aggregation_time = (
-                model_session.aggregate_proofs(synapse.proofs)
-            )
-            model_session.end()
-            try:
-                bt.logging.info("✅ Aggregation completed \n")
-            except UnicodeEncodeError:
-                bt.logging.info("Aggregation completed \n")
-        except Exception as e:
-            synapse.aggregation_proof = "An error occurred"
-            bt.logging.error(f"An error occurred while aggregating proofs\n{e}")
-
-        time_out = time.time()
-        delta_t = time_out - time_in
-        overhead_time = delta_t - aggregation_time
-        bt.logging.info(
-            f"Total response time {delta_t}s. Aggregation time: {aggregation_time}s. "
-            f"Overhead time: {overhead_time}s."
-        )
-        self.log_batch.append(
-            {
-                "aggregation_time": aggregation_time,
-                "overhead_time": overhead_time,
-                "total_response_time": delta_t,
-            }
-        )
-
-        if delta_t > 300:
-            bt.logging.error(
-                "Response time is greater than validator timeout. "
-                "This indicates your hardware is not processing validator's requests in time."
-            )
-        return synapse
+        raise NotImplementedError("Proof aggregation not supported at this time.")

@@ -1,0 +1,13 @@
+{
+    "name": "SN2 PoW 1024",
+    "description": "Generates weights based on four rounds of miner evaluation data from SN2.",
+    "author": "Inference Labs",
+    "version": "0.0.6",
+    "netuid": 2,
+    "weights_version": 1623,
+    "proof_system": "CIRCOM",
+    "type": "proof_of_weights",
+    "external_files": {
+        "circuit.zkey": "https://storage.omron.ai/e84b2e5f223621fa20078eb9f920d8d4d3a4ff95fa6e2357646fdbb43a2557c9/circuit.zkey"
+    }
+}

@@ -1,10 +1,11 @@
 from __future__ import annotations
+
+import torch
 from rich.console import Console, JustifyMethod
 from rich.table import Table
+
 import utils.wandb_logger as wandb_logger
-import torch
 from _validator.models.miner_response import MinerResponse
-from deployment_layer.circuit_store import circuit_store
 
 
 def create_and_print_table(
@@ -110,11 +111,9 @@ def log_responses(responses: list[MinerResponse]):
 
     sorted_responses = sorted(responses, key=lambda x: x.uid)
 
-    circuit = (
-        circuit_store.get_circuit(sorted_responses[0].model_id)
-        if len(sorted_responses) > 0
-        else None
-    )
+    circuit = sorted_responses[0].circuit if len(sorted_responses) > 0 else None
+    circuit_name = circuit.metadata.name if circuit is not None else "Unknown"
+    proof_system = circuit.metadata.proof_system if circuit is not None else "Unknown"
 
     rows = [
         [
@@ -122,8 +121,8 @@ def log_responses(responses: list[MinerResponse]):
             str(response.verification_result),
             str(response.response_time),
             str(response.proof_size),
-            (circuit.metadata.name if circuit is not None else str(response.model_id)),
-            (circuit.metadata.proof_system if circuit is not None else "Unknown"),
+            circuit_name,
+            proof_system,
         ]
         for response in sorted_responses
     ]
@@ -131,11 +130,6 @@ def log_responses(responses: list[MinerResponse]):
 
     wandb_log = {"responses": {}}
     for response in sorted_responses:
-        model_id = response.model_id
-        circuit = circuit_store.get_circuit(model_id)
-        circuit_name = model_id
-        if circuit:
-            circuit_name = circuit.metadata.name
         if response.uid not in wandb_log["responses"]:
             wandb_log["responses"][response.uid] = {}
         wandb_log["responses"][response.uid][circuit_name] = {
@@ -146,11 +140,7 @@ def log_responses(responses: list[MinerResponse]):
     wandb_logger.safe_log(wandb_log)
 
 
-def log_system_metrics(response_times, verified_count, model_id):
-    circuit = circuit_store.get_circuit(model_id)
-    circuit_name = model_id
-    if circuit:
-        circuit_name = circuit.metadata.name
+def log_system_metrics(response_times: list[float], verified_count: int, circuit: str):
     if response_times:
         max_response_time = max(response_times)
         min_response_time = min(response_times)
@@ -158,7 +148,7 @@ def log_system_metrics(response_times, verified_count, model_id):
         median_response_time = sorted(response_times)[len(response_times) // 2]
         wandb_logger.safe_log(
             {
-                f"{circuit_name}": {
+                f"{circuit}": {
                     "max_response_time": max_response_time,
                     "min_response_time": min_response_time,
                     "mean_response_time": mean_response_time,

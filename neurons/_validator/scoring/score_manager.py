@@ -1,15 +1,7 @@
+import os
 import torch
 import bittensor as bt
 from _validator.models.miner_response import MinerResponse
-from _validator.scoring.reward import (
-    FLATTENING_COEFFICIENT,
-    MAXIMUM_RESPONSE_TIME_DECIMAL,
-    PROOF_SIZE_THRESHOLD,
-    PROOF_SIZE_WEIGHT,
-    RATE_OF_DECAY,
-    RATE_OF_RECOVERY,
-    RESPONSE_TIME_WEIGHT,
-)
 from _validator.utils.logging import log_scores
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
 from constants import (
@@ -20,12 +12,13 @@ from constants import (
 )
 from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
+from _validator.models.request_type import RequestType
 
 
 class ScoreManager:
     """Manages the scoring of miners."""
 
-    def __init__(self, metagraph, user_uid):
+    def __init__(self, metagraph, user_uid, score_path: str):
         """
         Initialize the ScoreManager.
 
@@ -35,6 +28,7 @@ class ScoreManager:
         """
         self.metagraph = metagraph
         self.user_uid = user_uid
+        self.score_path = score_path
         self.scores = self.init_scores()
         self.proof_of_weights_queue = []
 
@@ -42,7 +36,12 @@ class ScoreManager:
         """Initialize or load existing scores."""
         bt.logging.info("Initializing validation weights")
         try:
-            scores = torch.load("scores.pt")
+            if os.path.isfile("scores.pt") and not os.path.isfile(
+                os.path.join(self.score_path, "scores.pt")
+            ):
+                # Migrate the scores file from the old location
+                os.rename("scores.pt", os.path.join(self.score_path, "scores.pt"))
+            scores = torch.load(os.path.join(self.score_path, "scores.pt"))
         except FileNotFoundError:
             scores = self._create_initial_scores()
         except Exception as e:
@@ -177,23 +176,26 @@ class ScoreManager:
 
         padded_items = ProofOfWeightsItem.pad_items(proof_of_weights_items, 256)
         for item in padded_items:
-            if item.response_time < item.min_response_time:
+            if item.response_time < item.minimum_response_time:
                 bt.logging.warning(
                     f"Response time {item.response_time.item()} is less than minimum"
-                    f" {item.min_response_time.item()} for UID {item.uid.item()}"
+                    f" {item.minimum_response_time.item()} for UID {item.miner_uid.item()}"
                 )
 
                 item.response_time = torch.max(
-                    item.response_time, item.min_response_time
+                    item.response_time, item.minimum_response_time
                 )
 
             # Ensure there is > 0 spread between min and max response times (usually during testing)
-            if item.median_max_response_time <= item.min_response_time:
+            if item.maximum_response_time <= item.minimum_response_time:
                 bt.logging.warning(
-                    f"No spread between min and max response times for UID {item.uid.item()}"
+                    f"No spread between min and max response times for UID {item.miner_uid.item()}"
                 )
-                item.median_max_response_time = item.min_response_time + 1
-        inputs = self._prepare_pow_inputs(padded_items, pow_circuit.settings["scaling"])
+                item.maximum_response_time = item.minimum_response_time + 1
+
+        inputs = pow_circuit.input_handler(
+            RequestType.RWR, ProofOfWeightsItem.to_dict_list(padded_items)
+        )
 
         session = VerifiedModelSession(inputs, pow_circuit)
         witness = session.generate_witness(return_content=True)
@@ -202,46 +204,6 @@ class ScoreManager:
         self._process_witness_results(witness_list, pow_circuit.settings["scaling"])
 
         session.end()
-
-    def _prepare_pow_inputs(
-        self, items: list[ProofOfWeightsItem], scaling: int
-    ) -> dict:
-        """Prepare inputs for the proof of weights circuit."""
-        return {
-            "RATE_OF_DECAY": int(RATE_OF_DECAY * scaling),
-            "RATE_OF_RECOVERY": int(RATE_OF_RECOVERY * scaling),
-            "FLATTENING_COEFFICIENT": int(FLATTENING_COEFFICIENT * scaling),
-            "PROOF_SIZE_WEIGHT": int(PROOF_SIZE_WEIGHT * scaling),
-            "PROOF_SIZE_THRESHOLD": int(PROOF_SIZE_THRESHOLD * scaling),
-            "RESPONSE_TIME_WEIGHT": int(RESPONSE_TIME_WEIGHT * scaling),
-            "MAXIMUM_RESPONSE_TIME_DECIMAL": int(
-                MAXIMUM_RESPONSE_TIME_DECIMAL * scaling
-            ),
-            "maximum_score": [int(item.max_score.item() * scaling) for item in items],
-            "previous_score": [
-                (
-                    int(item.previous_score.item() * scaling)
-                    if not torch.isnan(item.previous_score)
-                    else 0
-                )
-                for item in items
-            ],
-            "verified": [item.verification_result.item() for item in items],
-            "proof_size": [int(item.proof_size.item() * scaling) for item in items],
-            "response_time": [
-                int(item.response_time.item() * scaling) for item in items
-            ],
-            "maximum_response_time": [
-                int(item.median_max_response_time.item() * scaling) for item in items
-            ],
-            "minimum_response_time": [
-                int(item.min_response_time.item() * scaling) for item in items
-            ],
-            "block_number": [item.block_number.item() for item in items],
-            "validator_uid": [item.validator_uid.item() for item in items],
-            "miner_uid": [item.uid.item() for item in items],
-            "scaling": scaling,
-        }
 
     def _process_witness_results(self, witness: list, scaling: int):
         """Process the results from the witness."""
@@ -255,7 +217,7 @@ class ScoreManager:
         )
 
         for uid, score in zip(miner_uids, scores):
-            if uid >= len(self.scores):
+            if uid < 0 or uid >= len(self.scores):
                 continue
             self.scores[uid] = float(score)
             bt.logging.debug(f"Updated score for UID {uid}: {score}")
@@ -269,7 +231,7 @@ class ScoreManager:
     def _try_store_scores(self):
         """Attempt to store scores to disk."""
         try:
-            torch.save(self.scores, "scores.pt")
+            torch.save(self.scores, os.path.join(self.score_path, "scores.pt"))
         except Exception as e:
             bt.logging.info(f"Error storing scores: {e}")
 

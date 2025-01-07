@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 import traceback
 
 import bittensor as bt
@@ -19,7 +20,7 @@ def get_config_from_args():
     )
     parser.add_argument(
         "--no-auto-update",
-        default=False,
+        default=bool(os.getenv("OMRON_NO_AUTO_UPDATE", False)),
         help="Whether this miner should NOT automatically update upon new release.",
         action="store_true",
     )
@@ -44,6 +45,12 @@ def get_config_from_args():
         help="Whether to run the miner in development mode for internal testing.",
         action="store_true",
     )
+    parser.add_argument(
+        "--localnet",
+        action="store_true",
+        default=False,
+        help="Whether to run the miner in localnet mode.",
+    )
 
     bt.subtensor.add_args(parser)
     bt.logging.add_args(parser)
@@ -51,6 +58,33 @@ def get_config_from_args():
     bt.axon.add_args(parser)
 
     config = bt.config(parser)
+
+    if config.localnet:
+        # quick localnet configuration set up for testing
+        if (
+            config.subtensor.chain_endpoint
+            == "wss://entrypoint-finney.opentensor.ai:443"
+        ):
+            # in case of default value, change to localnet
+            config.subtensor.chain_endpoint = "ws://127.0.0.1:9946"
+        if config.wallet.name == "default":
+            config.wallet.name = "miner"
+        if config.subtensor.network == "finney":
+            config.subtensor.network = "local"
+        config.eth_wallet = (
+            config.eth_wallet if config.eth_wallet is not None else "0x002"
+        )
+        if not config.axon:
+            config.axon = bt.config()
+            config.axon.ip = "127.0.0.1"
+            config.axon.external_ip = "127.0.0.1"
+        config.timeout = config.timeout if config.timeout is None else 120
+        config.disable_wandb = True
+        config.verbose = config.verbose if config.verbose is None else True
+        config.disable_blacklist = (
+            config.disable_blacklist if config.disable_blacklist is None else True
+        )
+        config.max_workers = config.max_workers or 1
 
     config.full_path = os.path.expanduser(
         "{}/{}/{}/netuid{}/{}".format(
@@ -63,6 +97,7 @@ def get_config_from_args():
     )
 
     bt.logging(config=config, logging_dir=config.full_path)
+    bt.logging.enable_info()
 
     if not os.path.exists(config.full_path):
         os.makedirs(config.full_path, exist_ok=True)
@@ -77,9 +112,26 @@ if __name__ == "__main__":
     bt.logging.info("Getting miner configuration...")
     config = get_config_from_args()
 
-    run_shared_preflight_checks()
+    config.external_model_dir = os.path.join(
+        os.path.dirname(config.full_path), "deployment_layer"
+    )
+    os.environ["OMRON_EXTERNAL_MODEL_DIR"] = config.external_model_dir
+    os.environ["EZKL_REPO_PATH"] = os.path.join(
+        os.path.dirname(config.full_path), "ezkl"
+    )
+
+    run_shared_preflight_checks(config.external_model_dir)
+
+    if os.getenv("OMRON_DOCKER_BUILD", False):
+        bt.logging.info("Docker build steps complete. Exiting.")
+        sys.exit(0)
 
     try:
+        # Initialize the circuit store and load external models
+        from deployment_layer.circuit_store import circuit_store
+
+        circuit_store.load_circuits(config.external_model_dir)
+
         bt.logging.info("Creating miner session...")
         miner_session = MinerSession(config)
         bt.logging.info("Running main loop...")
