@@ -65,6 +65,10 @@ class BaseCompetition(ABC):
         """
         Download the circuit.
         """
+        if not hash:
+            bt.logging.error(f"No hash provided for axon {axon}. Skipping...")
+            return
+
         bt.logging.info(f"Downloading circuit for hash {hash} from axon {axon}")
 
         out_path = os.path.join(self.competition_directory, f"{hash}")
@@ -157,15 +161,15 @@ class BaseCompetition(ABC):
             else:
                 scores.append(0.0)
 
-        bt.logging.info(f"Average accuracy score: {sum(scores)/len(scores)}")
+        bt.logging.info(f"Average accuracy score: {sum(scores) / len(scores)}")
         bt.logging.info(
-            f"Average proof size: {sum(proof_sizes)/len(proof_sizes)} bytes"
+            f"Average proof size: {sum(proof_sizes) / len(proof_sizes)} bytes"
         )
         bt.logging.info(
-            f"Average response time: {sum(response_times)/len(response_times)}s"
+            f"Average response time: {sum(response_times) / len(response_times)}s"
         )
         bt.logging.info(
-            f"Verification success rate: {sum(verification_results)/len(verification_results)}"
+            f"Verification success rate: {sum(verification_results) / len(verification_results)}"
         )
 
         return sum(scores) / len(scores)
