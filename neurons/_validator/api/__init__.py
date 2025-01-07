@@ -210,6 +210,7 @@ class ValidatorAPI:
 
         except Exception as e:
             bt.logging.error(f"Validation error: {str(e)}")
+            traceback.print_exc()
             return False
 
     def commit_cert_hash(self):
