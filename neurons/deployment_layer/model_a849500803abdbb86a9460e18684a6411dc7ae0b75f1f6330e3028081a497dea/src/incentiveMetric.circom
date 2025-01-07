@@ -5,12 +5,8 @@ include "./integerDivision.circom";
 
 template ScoringFunction(b) {
     var i;
-<<<<<<<< HEAD:neurons/deployment_layer/model_a849500803abdbb86a9460e18684a6411dc7ae0b75f1f6330e3028081a497dea/src/incentiveMetric.circom
     signal input value_normalized;
     signal input scaling;
-========
-    signal input response_time_normalized;
->>>>>>>> f89a076334b7df3b8f410937696e28ac51b54784:neurons/deployment_layer/model_a849500803abdbb86a9460e18684a6411dc7ae0b75f1f6330e3028081a497dea/src/responseTimeMetric.circom
     signal output out;
 
     component temp_sub[2];
@@ -81,12 +77,8 @@ template IncentiveMetric(b){
 
 
     scoring_function = ScoringFunction(b);
-<<<<<<<< HEAD:neurons/deployment_layer/model_a849500803abdbb86a9460e18684a6411dc7ae0b75f1f6330e3028081a497dea/src/incentiveMetric.circom
     scoring_function.value_normalized <== normalized_value;
     scoring_function.scaling <== scaling;
-========
-    scoring_function.response_time_normalized <== response_time_normalized;
->>>>>>>> f89a076334b7df3b8f410937696e28ac51b54784:neurons/deployment_layer/model_a849500803abdbb86a9460e18684a6411dc7ae0b75f1f6330e3028081a497dea/src/responseTimeMetric.circom
 
     subtract = Subtract();
     subtract.a <== scaling;

@@ -17,7 +17,6 @@ template IncentiveMechansim(batch_size, bits){
     signal input PROOF_SIZE_WEIGHT;
     signal input RESPONSE_TIME_WEIGHT;
     signal input MAXIMUM_RESPONSE_TIME_DECIMAL;
-<<<<<<< HEAD:neurons/deployment_layer/model_55de10a6bcf638af4bc79901d63204a9e5b1c6534670aa03010bae6045e3d0e8/src/reward.circom
     signal input ACCURACY_WEIGHT;
     signal input maximum_score[n];
     signal input previous_score[n];
@@ -33,18 +32,6 @@ template IncentiveMechansim(batch_size, bits){
     signal input block_number[n];
     signal input validator_uid[n];
     signal input miner_uid[n];
-=======
-    signal input maximum_score[batch_size];
-    signal input previous_score[batch_size];
-    signal input verified[batch_size];
-    signal input proof_size[batch_size];
-    signal input response_time[batch_size];
-    signal input maximum_response_time[batch_size];
-    signal input minimum_response_time[batch_size];
-    signal input block_number[batch_size];
-    signal input validator_uid[batch_size];
-    signal input miner_uid[batch_size];
->>>>>>> f89a076334b7df3b8f410937696e28ac51b54784:neurons/deployment_layer/model_a849500803abdbb86a9460e18684a6411dc7ae0b75f1f6330e3028081a497dea/src/circuit.circom
     signal input scaling;
 
     signal output new_score[batch_size];
@@ -57,7 +44,6 @@ template IncentiveMechansim(batch_size, bits){
     component distance_from_score_fn[batch_size];
     component final_new_score[batch_size];
 
-<<<<<<< HEAD:neurons/deployment_layer/model_55de10a6bcf638af4bc79901d63204a9e5b1c6534670aa03010bae6045e3d0e8/src/reward.circom
     component int_div[n];
     component int_div_2[n];
     component response_time_normalized_fn[n];
@@ -81,24 +67,6 @@ template IncentiveMechansim(batch_size, bits){
     signal response_time_normalized[n];
     signal response_time_reward_metric[n];
     signal accuracy_reward_metric[n];
-=======
-    component int_div[batch_size];
-    component int_div_2[batch_size];
-    component response_time_normalized_fn[batch_size];
-    component response_time_reward_metric_fn[batch_size];
-
-    signal temp_1[batch_size];
-    signal temp_2[batch_size];
-    signal isPositive[batch_size];
-    signal rate_of_change[batch_size];
-    signal calculated_score_fraction[batch_size];
-    signal maximum_score_out[batch_size];
-    signal distance_from_score[batch_size];
-    signal change_in_score[batch_size];
-    signal proof_size_reward_metric[batch_size];
-    signal response_time_normalized[batch_size];
-    signal response_time_reward_metric[batch_size];
->>>>>>> f89a076334b7df3b8f410937696e28ac51b54784:neurons/deployment_layer/model_a849500803abdbb86a9460e18684a6411dc7ae0b75f1f6330e3028081a497dea/src/circuit.circom
 
 
     for (var i=0; i<batch_size; i++) {
@@ -114,32 +82,18 @@ template IncentiveMechansim(batch_size, bits){
         rate_of_change_comp[i].RATE_OF_DECAY <== RATE_OF_DECAY;
         rate_of_change[i] <== rate_of_change_comp[i].out;
 
-<<<<<<< HEAD:neurons/deployment_layer/model_55de10a6bcf638af4bc79901d63204a9e5b1c6534670aa03010bae6045e3d0e8/src/reward.circom
         response_time_normalized_fn[i] = MetricNormalized(b);
         response_time_normalized_fn[i].value <== response_time[i];
         response_time_normalized_fn[i].minimum_value <== minimum_response_time[i];
         response_time_normalized_fn[i].maximum_value <== maximum_response_time[i];
         response_time_normalized_fn[i].MAXIMUM_VALUE_DECIMAL <== MAXIMUM_RESPONSE_TIME_DECIMAL;
-=======
-        response_time_normalized_fn[i] = ResponseTimeNormalized(bits);
-        response_time_normalized_fn[i].response_time <== response_time[i];
-        response_time_normalized_fn[i].minimum_response_time <== minimum_response_time[i];
-        response_time_normalized_fn[i].maximum_response_time <== maximum_response_time[i];
-        response_time_normalized_fn[i].MAXIMUM_RESPONSE_TIME_DECIMAL <== MAXIMUM_RESPONSE_TIME_DECIMAL;
->>>>>>> f89a076334b7df3b8f410937696e28ac51b54784:neurons/deployment_layer/model_a849500803abdbb86a9460e18684a6411dc7ae0b75f1f6330e3028081a497dea/src/circuit.circom
         response_time_normalized_fn[i].scaling <== scaling;
 
         response_time_normalized[i] <== response_time_normalized_fn[i].out;
 
-<<<<<<< HEAD:neurons/deployment_layer/model_55de10a6bcf638af4bc79901d63204a9e5b1c6534670aa03010bae6045e3d0e8/src/reward.circom
         response_time_reward_metric_fn[i] = IncentiveMetric(b);
         response_time_reward_metric_fn[i].WEIGHT <== RESPONSE_TIME_WEIGHT;
         response_time_reward_metric_fn[i].normalized_value <== response_time_normalized[i];
-=======
-        response_time_reward_metric_fn[i] = ResponseTimeMetric(bits);
-        response_time_reward_metric_fn[i].RESPONSE_TIME_WEIGHT <== RESPONSE_TIME_WEIGHT;
-        response_time_reward_metric_fn[i].response_time_normalized <== response_time_normalized[i];
->>>>>>> f89a076334b7df3b8f410937696e28ac51b54784:neurons/deployment_layer/model_a849500803abdbb86a9460e18684a6411dc7ae0b75f1f6330e3028081a497dea/src/circuit.circom
         response_time_reward_metric_fn[i].scaling <== scaling;
 
         response_time_reward_metric[i] <== response_time_reward_metric_fn[i].out;
