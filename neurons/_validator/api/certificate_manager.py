@@ -15,6 +15,7 @@ class CertificateManager:
             bt.logging.warning(
                 "Certificate not found. Generating new self-signed certificate."
             )
+            os.makedirs(self.cert_path, exist_ok=True)
             self._generate_certificate(external_ip)
 
     def _generate_certificate(self, cn: str) -> None:
@@ -30,10 +31,8 @@ class CertificateManager:
         cert.set_pubkey(key)
         cert.sign(key, "sha256")
 
-        os.makedirs(os.path.dirname(self.cert_file), exist_ok=True)
         with open(self.cert_file, "wb") as f:
             f.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
 
-        os.makedirs(os.path.dirname(self.key_path), exist_ok=True)
         with open(self.key_path, "wb") as f:
             f.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
