@@ -95,22 +95,24 @@ def init_config(role: Optional[str]):
             config.wallet.name,  # type: ignore
             config.wallet.hotkey,  # type: ignore
             config.netuid,
-            # here was one more subfolder - "miner" or "validator" (role)
-            # but during docker build we don't know the role yet
-            # not sure about all implications of this change
         )
     )
 
-    bt.logging(config=config, logging_dir=config.full_path)
+    os.makedirs(config.full_path, exist_ok=True)
+    if role:
+        config.full_path_role = os.path.join(config.full_path, role)
+        os.makedirs(config.full_path_role, exist_ok=True)
+    else:
+        # no role specified, so we assume it's a docker image build call
+        config.full_path_role = config.full_path
+
+    bt.logging(config=config, logging_dir=config.full_path_role)
     bt.logging.enable_info()
 
-    if not os.path.exists(config.full_path):
-        os.makedirs(config.full_path, exist_ok=True)
-
     if config.external_model_dir is None:
-        config.external_model_dir = os.path.join(
-            os.path.dirname(config.full_path), "deployment_layer"
-        )
+        # user might have specified a custom location for storing models data
+        # if not, we use the default location
+        config.external_model_dir = os.path.join(config.full_path, "deployment_layer")
 
     if config.wandb_key:
         wandb_logger.safe_login(api_key=config.wandb_key)

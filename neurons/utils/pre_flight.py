@@ -80,9 +80,7 @@ def ensure_ezkl_installed():
     running the official installation script. Also verifies the version matches.
     """
     python_ezkl_version = ezkl.__version__
-    os.environ["EZKL_REPO_PATH"] = os.path.join(
-        os.path.dirname(cli_parser.config.full_path), "ezkl"
-    )
+    os.environ["EZKL_REPO_PATH"] = os.path.join(cli_parser.config.full_path, "ezkl")
     try:
         if os.path.exists(LOCAL_EZKL_PATH):
             # Check version matches
