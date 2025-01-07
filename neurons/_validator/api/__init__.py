@@ -45,7 +45,7 @@ class ValidatorAPI:
         self.server_thread: threading.Thread | None = None
         self.pending_requests: dict[str, asyncio.Event] = {}
         self.request_results: dict[str, dict[str, any]] = {}
-        self.is_testnet = config.bt_config.network == "test"
+        self.is_testnet = config.bt_config.subtensor.network == "test"
         self._setup_api()
 
     def _setup_api(self) -> None:
