@@ -43,5 +43,5 @@ class ValidatorKeysCache:
         async with self._lock:
             cache_timestamp = self.cached_timestamps.get(netuid, None)
             if cache_timestamp is None or cache_timestamp < datetime.datetime.now():
-                self.fetch_validator_keys(netuid)
+                await self.fetch_validator_keys(netuid)
             return ss58_address in self.cached_keys.get(netuid, [])
