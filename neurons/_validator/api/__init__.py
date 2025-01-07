@@ -1,7 +1,12 @@
 from __future__ import annotations
 import os
 import traceback
-from fastapi import FastAPI, WebSocket, HTTPException, WebSocketDisconnect
+from fastapi import (
+    FastAPI,
+    WebSocket,
+    WebSocketDisconnect,
+    WebSocketException,
+)
 from jsonrpcserver import (
     method,
     async_dispatch,
@@ -67,8 +72,8 @@ class ValidatorAPI:
                 self.config.api.verify_external_signatures
                 and not await self.validate_connection(websocket.headers)
             ):
-                raise HTTPException(
-                    status_code=403, detail="Connection validation failed"
+                raise WebSocketException(
+                    code=3000, reason="Connection validation failed"
                 )
 
             try:
