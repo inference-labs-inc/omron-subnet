@@ -37,6 +37,7 @@ The below arguments are specific to validator software and have no effect on min
 | `--external-api-workers`              |    No    | `1`       | Integer         | The number of workers for the validator's external API.                                                                                                                                     |
 | `--external-api-host`                 |    No    | `0.0.0.0` | String          | The host for the validator's external API.                                                                                                                                                  |
 | `--do-not-verify-external-signatures` |    No    | `False`   | `True`, `False` | External PoW requests are signed by validator's (sender's) wallet. By default, these are checked to ensure legitimacy. This should only be disabled in controlled development environments. |
+| `--competition-sync-interval`         |    No    | `86400`   | Integer         | The interval for syncing the competition in seconds. Defaults to 86400 (1 day).                                                                                                             |
 
 ## Built-in Arguments
 

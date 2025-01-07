@@ -61,6 +61,8 @@ MAX_PROOFS_TO_LOG = 0
 PROOF_OF_WEIGHTS_LIFESPAN = 2
 # Active competition
 ACTIVE_COMPETITION = 1
+# Frequency in terms of seconds at which the competition is synced and evaluated
+COMPETITION_SYNC_INTERVAL = 60 * 60 * 24
 # Weights that determine the probability of selecting a circuit for benchmarking
 CIRCUIT_WEIGHTS = {
     "1d60d545b7c5123fd60524dcbaf57081ca7dc4a9ec36c892927a3153328d17c0": 0,

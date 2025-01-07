@@ -8,6 +8,7 @@ from constants import (
     ONCHAIN_PROOF_OF_WEIGHTS_ENABLED,
     PROOF_OF_WEIGHTS_INTERVAL,
     WHITELISTED_PUBLIC_KEYS,
+    COMPETITION_SYNC_INTERVAL,
 )
 
 from utils import wandb_logger
@@ -109,6 +110,13 @@ def get_config_from_args():
         type=int,
         default=1,
         help="The number of workers for the external API.",
+    )
+
+    parser.add_argument(
+        "--competition-sync-interval",
+        type=int,
+        default=COMPETITION_SYNC_INTERVAL,
+        help="The interval for syncing the competition in seconds. Defaults to 86400 (1 day).",
     )
 
     parser.add_argument(

@@ -27,9 +27,7 @@ from _validator.utils.axon import query_axons
 from _validator.models.request_type import RequestType
 from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
-from constants import (
-    REQUEST_DELAY_SECONDS,
-)
+from constants import REQUEST_DELAY_SECONDS
 from execution_layer.circuit import Circuit, CircuitType
 from utils import AutoUpdate, clean_temp_files, wandb_logger
 from _validator.competitions.base_competition import BaseCompetition
@@ -72,6 +70,7 @@ class ValidatorLoop:
         self.request_pipeline = RequestPipeline(
             self.config, self.score_manager, self.api
         )
+        self.last_competition_sync = 0
         self.competition_manager = BaseCompetition(
             1, self.config.metagraph, self.config.subtensor
         )
@@ -103,7 +102,12 @@ class ValidatorLoop:
         Execute a single step of the validation process.
         """
 
-        self.competition_manager.sync_and_eval()
+        if (
+            time.time() - self.last_competition_sync
+            > self.config.competition_sync_interval
+        ):
+            self.competition_manager.sync_and_eval()
+            self.last_competition_sync = time.time()
 
         self.score_manager.sync_scores_uids(self.config.metagraph.uids.tolist())
 

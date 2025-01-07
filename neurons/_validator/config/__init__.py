@@ -1,6 +1,6 @@
 import sys
 import bittensor as bt
-from constants import DEFAULT_NETUID
+from constants import DEFAULT_NETUID, COMPETITION_SYNC_INTERVAL
 
 from utils import wandb_logger
 from _validator.config.api import ApiConfig
@@ -46,6 +46,11 @@ class ValidatorConfig:
         )
         self.localnet = self.bt_config.localnet
         self.api = ApiConfig(self.bt_config)
+        self.competition_sync_interval = (
+            COMPETITION_SYNC_INTERVAL
+            if self.bt_config.competition_sync_interval is None
+            else self.bt_config.competition_sync_interval
+        )
 
         # Initialize wandb logger
         wandb_logger.safe_init(
