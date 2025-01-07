@@ -29,7 +29,10 @@ class ValidatorKeysCache:
         """
         Check if a given key is a validator key for a given netuid.
         """
-        if ss58_address in self.config.api.whitelisted_public_keys:
+        if (
+            self.config.api.whitelisted_public_keys
+            and ss58_address in self.config.api.whitelisted_public_keys
+        ):
             # If the sender is whitelisted, we don't need to check the key
             return True
         cache_timestamp = self.cached_timestamps.get(netuid, None)
