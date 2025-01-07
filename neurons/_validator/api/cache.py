@@ -14,12 +14,12 @@ class ValidatorKeysCache:
         self.config: ValidatorConfig = config
         self._lock = asyncio.Lock()
 
-    def fetch_validator_keys(self, netuid: int) -> None:
+    async def fetch_validator_keys(self, netuid: int) -> None:
         """
         Fetch the validator keys for a given netuid and cache them.
         Thread-safe implementation using a lock.
         """
-        with self._lock:
+        async with self._lock:
             self.cached_keys[netuid] = [
                 neuron.hotkey
                 for neuron in self.config.subtensor.neurons_lite(netuid)
@@ -29,7 +29,7 @@ class ValidatorKeysCache:
                 datetime.datetime.now() + datetime.timedelta(hours=12)
             )
 
-    def check_validator_key(self, ss58_address: str, netuid: int) -> bool:
+    async def check_validator_key(self, ss58_address: str, netuid: int) -> bool:
         """
         Thread-safe check if a given key is a validator key for a given netuid.
         """
@@ -40,7 +40,7 @@ class ValidatorKeysCache:
             # If the sender is whitelisted, we don't need to check the key
             return True
 
-        with self._lock:
+        async with self._lock:
             cache_timestamp = self.cached_timestamps.get(netuid, None)
             if cache_timestamp is None or cache_timestamp < datetime.datetime.now():
                 self.fetch_validator_keys(netuid)
