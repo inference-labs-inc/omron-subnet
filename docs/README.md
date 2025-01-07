@@ -60,6 +60,7 @@ Information about Omron's versioning system and how to stay up-to-date with the 
 [View mainnet instructions →]: ./running_on_mainnet.md
 [View testnet instructions →]: ./running_on_testnet.md
 [View local instructions →]: ./running_on_staging.md
+[Analysing metrics with Prometheus and Grafana →]: ./prometheus.md
 [Versioning]: ./versioning.md
 [View versioning →]: ./versioning.md
 [← Back to home]: ../
