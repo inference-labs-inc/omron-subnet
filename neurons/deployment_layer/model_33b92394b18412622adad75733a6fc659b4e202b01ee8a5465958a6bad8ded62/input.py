@@ -54,5 +54,5 @@ class CircuitInput(BaseInput):
         """
         Add a random nonce to ensure that the request is not reused.
         """
-        data["nonce"] = secrets.randbits(32)
+        data["nonce"] = [secrets.randbits(32)]
         return data

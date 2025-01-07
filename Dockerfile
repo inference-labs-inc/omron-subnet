@@ -71,7 +71,9 @@ CMD ["-c", "import subprocess; \
     subprocess.run(['/opt/venv/bin/python3', '/opt/omron/neurons/miner.py', '--help']); \
     subprocess.run(['/opt/venv/bin/python3', '/opt/omron/neurons/validator.py', '--help']);" \
     ]
-EXPOSE 4091/tcp
-EXPOSE 8000/tcp
-# for prometheus monitoring server:
+# Axon server
+EXPOSE 8091/tcp
+# API server
+EXPOSE 8443/tcp
+# Prometheus server
 EXPOSE 9090/tcp

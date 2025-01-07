@@ -4,7 +4,11 @@ import sys
 import traceback
 
 import bittensor as bt
-from constants import ONCHAIN_PROOF_OF_WEIGHTS_ENABLED, PROOF_OF_WEIGHTS_INTERVAL
+from constants import (
+    ONCHAIN_PROOF_OF_WEIGHTS_ENABLED,
+    PROOF_OF_WEIGHTS_INTERVAL,
+    WHITELISTED_PUBLIC_KEYS,
+)
 
 from utils import wandb_logger
 from _validator.validator_session import ValidatorSession
@@ -78,6 +82,15 @@ def get_config_from_args():
     )
 
     parser.add_argument(
+        "--whitelisted-public-keys",
+        type=str,
+        nargs="*",
+        dest="alist",
+        default=WHITELISTED_PUBLIC_KEYS,
+        help="Comma separated list of public keys to whitelist for external requests.",
+    )
+
+    parser.add_argument(
         "--external-api-host",
         type=str,
         default="0.0.0.0",
@@ -87,7 +100,7 @@ def get_config_from_args():
     parser.add_argument(
         "--external-api-port",
         type=int,
-        default=8000,
+        default=8443,
         help="The port for the external API.",
     )
 
@@ -117,12 +130,20 @@ def get_config_from_args():
     )
 
     parser.add_argument(
+        "--certificate-path",
+        type=str,
+        default=None,
+        help="A custom path to a directory containing a public and private SSL certificate. "
+        "(cert.pem and key.pem) "
+        "Please note that this should not be used unless you have issued your own certificate. "
+        "Omron will issue a certificate for you by default.",
+    )
+    parser.add_argument(
         "--prometheus-monitoring",
         action="store_true",
         default=False,
         help="Whether to enable prometheus monitoring.",
     )
-
     parser.add_argument(
         "--prometheus-port",
         type=int,
@@ -157,8 +178,7 @@ def get_config_from_args():
             config.disable_blacklist if config.disable_blacklist is None else True
         )
         config.external_api_workers = config.external_api_workers or 1
-        config.external_api_port = config.external_api_port or 8000
-        config.do_not_verify_external_signatures = True
+        config.external_api_port = config.external_api_port or 8443
 
     config.full_path = os.path.expanduser(
         "{}/{}/{}/netuid{}/{}".format(
@@ -169,6 +189,9 @@ def get_config_from_args():
             "validator",
         )
     )
+
+    if not config.certificate_path:
+        config.certificate_path = os.path.join(config.full_path, "cert")
 
     if not os.path.exists(config.full_path):
         os.makedirs(config.full_path, exist_ok=True)

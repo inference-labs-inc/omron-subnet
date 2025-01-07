@@ -9,6 +9,11 @@ from _validator.models.request_type import RequestType
 
 
 class ProofOfWeightsHandler:
+    """
+    Handles internal proof of weights
+    This covers the case where the origin validator is a validator on Omron;
+    no external requests are needed as this internal mechanism is used to generate the proof of weights.
+    """
 
     @staticmethod
     def prepare_pow_request(circuit: Circuit, proof_of_weights_queue):

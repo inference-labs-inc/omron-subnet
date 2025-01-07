@@ -10,7 +10,7 @@ from typing import NoReturn
 import bittensor as bt
 
 from _validator.config import ValidatorConfig
-from _validator.core.api import ValidatorAPI
+from _validator.api import ValidatorAPI
 from _validator.core.prometheus import (
     log_validation_time,
     start_prometheus_logging,
@@ -24,6 +24,7 @@ from _validator.scoring.score_manager import ScoreManager
 from _validator.scoring.weights import WeightsManager
 from _validator.utils.api import hash_inputs
 from _validator.utils.axon import query_axons
+from _validator.models.request_type import RequestType
 from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
 from constants import (
@@ -171,11 +172,24 @@ class ValidatorLoop:
             ]
             if verified_responses:
                 random_verified_response = random.choice(verified_responses)
+                request_hash = requests[0].request_hash or hash_inputs(
+                    requests[0].inputs
+                )
                 save_proof_of_weights(
                     public_signals=[random_verified_response.public_json],
                     proof=[random_verified_response.proof_content],
-                    proof_filename=hash_inputs(requests[0].inputs),
+                    proof_filename=request_hash,
                 )
+
+                if requests[0].request_type == RequestType.RWR:
+                    self.api.set_request_result(
+                        request_hash,
+                        {
+                            "hash": request_hash,
+                            "public_signals": random_verified_response.public_json,
+                            "proof": random_verified_response.proof_content,
+                        },
+                    )
 
         self.score_manager.update_scores(processed_responses)
         self.weights_manager.update_weights(self.score_manager.scores)
@@ -204,7 +218,8 @@ class ValidatorLoop:
     def _handle_keyboard_interrupt(self):
         """Handle keyboard interrupt by cleaning up and exiting."""
         bt.logging.success("Keyboard interrupt detected. Exiting validator.")
-        self.api.stop()
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.api.stop())
         stop_prometheus_logging()
         clean_temp_files()
         sys.exit(0)

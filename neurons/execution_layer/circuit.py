@@ -119,7 +119,8 @@ class CircuitMetadata:
     proof_system: str
     type: CircuitType
     external_files: dict[str, str]
-    netuid: int = -1
+    netuid: int | None = None
+    weights_version: int | None = None
 
     @classmethod
     def from_file(cls, metadata_path: str) -> CircuitMetadata:
