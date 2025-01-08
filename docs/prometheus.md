@@ -1,13 +1,27 @@
 # Setting Up Prometheus and Grafana for Metrics Analysis
 
+## Important Port Configuration
+
+> ⚠️ **Port Conflict Warning**: By default, both Prometheus and the validator use port 9090. If installing on the same machine, you must either:
+>
+> - Change validator metrics port: `--prometheus-port <port>`
+> - Change Prometheus port: `--web.listen-address=:<port>`
+
+## Installation Options
+
+Choose one of two approaches:
+
+1. [Manual Installation](#manual-installation) - Step-by-step setup of individual components
+2. [Docker Installation](#docker-installation) - Quick setup using Docker Compose
+
+## Manual Installation
+
 Our application provides the ability for validators to analyze some metrics with Prometheus. Validation metrics such as validation time, request times, proof sizes, ratio of verified results, and response times are served by default on port `9090`. Follow these step-by-step instructions to set up a basic Grafana UI for Prometheus metrics exposed by the validator instance.
 
 For enabling metrics serving add `--prometheus-monitoring` flag to the validator command line.
 For changing the port of the metrics server add `--prometheus-port {port_number}` flag to the validator command line.
 
 Take a note by default Prometheus and validator data source use the same port. So in case you want to install Prometheus to the same machine as the validator, you need to change the port of the validator metrics server (with `--prometheus-port {port_number}` flag) or for Prometheus itself (with `--web.listen-address=:{port_number}` flag).
-
-## Step-by-Step Instructions for Setting Up Prometheus and Grafana
 
 ### Step 1: Install Prometheus
 
@@ -22,9 +36,9 @@ Take a note by default Prometheus and validator data source use the same port. S
 
 ```yaml
 scrape_configs:
-  - job_name: 'omron-validator-metrics'
-  static_configs:
-    - targets: ['localhost:9090']  # or use validator instance IP address here
+  - job_name: "omron-validator-metrics"
+    static_configs:
+      - targets: ["localhost:9090"] # Replace with validator IP if needed
 ```
 
 3. Save the `prometheus.yml` file.
@@ -83,7 +97,19 @@ Take a look at the [Prometheus documentation](https://prometheus.io/docs/introdu
 
 Your Grafana dashboard is now set up to display Prometheus metrics exposed by the validator instance. You can further customize the dashboard by adding alerts, annotations, and more.
 
-## (Optional) Use Docker Compose for Prometheus and Grafana
+## Docker Installation
+
+Create a project directory with:
+
+```
+project/
+├── docker-compose.yml
+├── prometheus.yml
+├── grafana_data/    # Will be created automatically
+└── certs/           # Will be created automatically
+```
+
+## Docker Compose Configuration
 
 Instead of installing Prometheus and Grafana manually, you can use Docker Compose to set up both services easily. Create a `docker-compose.yml` file with the following configuration:
 
@@ -106,7 +132,7 @@ services:
     ports:
       - 3000:3000
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin  # set admin password for grafana here
+      - GF_SECURITY_ADMIN_PASSWORD=admin # set admin password for grafana here
     networks:
       - monitoring
 networks:
@@ -123,3 +149,26 @@ docker-compose up
 Prometheus will be available at `http://localhost:9095` and Grafana at `http://localhost:3000`. You can access both services in your web browser and set up the data source and dashboard as described in the previous steps.
 
 For more information on using Docker Compose with Prometheus and Grafana, refer to the [official Prometheus Docker documentation](https://prometheus.io/docs/prometheus/latest/installation/).
+
+## Security Considerations
+
+> ⚠️ **Production Deployment Warning**: The setup described above is suitable for local development. For production deployments:
+>
+> - Use strong passwords for Grafana
+> - Configure TLS/SSL for both Prometheus and Grafana
+> - Implement proper authentication mechanisms
+> - Consider network isolation using Docker networks or firewalls
+
+## Troubleshooting
+
+1. **Verify Metrics Collection**
+
+   - Check Prometheus targets: `http://localhost:9090/targets`
+   - Confirm metrics endpoint: `curl http://localhost:9090/metrics`
+
+2. **Common Issues**
+   - Port conflicts: Check if ports 9090/3000 are already in use
+   - Connection refused: Ensure validator metrics are enabled
+   - No data in Grafana: Verify Prometheus data source configuration
+
+For additional help, consult the [Prometheus troubleshooting guide](https://prometheus.io/docs/prometheus/latest/troubleshooting/).
