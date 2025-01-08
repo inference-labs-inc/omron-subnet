@@ -1,14 +1,14 @@
+from __future__ import annotations
 from _validator.pow.proof_of_weights_handler import ProofOfWeightsHandler
 import bittensor as bt
 import random
 from protocol import ProofOfWeightsSynapse, QueryZkProof
 
 from _validator.scoring.score_manager import ScoreManager
-from _validator.core.api import ValidatorAPI
+from _validator.api import ValidatorAPI
 from _validator.config import ValidatorConfig
 from constants import (
     BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
-    DEFAULT_NETUID,
     CIRCUIT_WEIGHTS,
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
 )
@@ -19,6 +19,7 @@ from _validator.utils.hash_guard import HashGuard
 from _validator.core.request import Request
 from utils.wandb_logger import safe_log
 from _validator.models.request_type import RequestType
+import copy
 
 
 class RequestPipeline:
@@ -32,55 +33,37 @@ class RequestPipeline:
 
     def prepare_requests(self, filtered_uids) -> list[Request]:
         """
-        Prepare a batch of requests for the provided UIDs.
+        Prepare requests for the current validation step.
+        This includes both regular benchmark requests and any external requests.
 
         Args:
-            filtered_uids (list): List of filtered UIDs to query.
+            filtered_uids (list): List of UIDs to send requests to.
 
         Returns:
-            list: List of prepared requests.
+            list[Request]: List of prepared requests.
         """
+        if len(filtered_uids) == 0:
+            bt.logging.error("No UIDs to query")
+            return []
 
-        request_type = (
-            RequestType.BENCHMARK
-            if not self.api.external_requests_queue
-            else RequestType.RWR
-        )
+        if self.api.external_requests_queue:
+            return self._prepare_real_world_requests(filtered_uids)
+        return self._prepare_benchmark_requests(filtered_uids)
 
-        netuid = self.config.subnet_uid
-        circuit = self.select_circuit_for_benchmark()
-        request = None
-        if request_type == RequestType.RWR:
-            netuid, request = self.api.external_requests_queue.pop()
-            bt.logging.debug(f"Processing external request for netuid {netuid}")
+    def _prepare_real_world_requests(self, filtered_uids: list[int]) -> list[Request]:
+        external_request = self.api.external_requests_queue.pop()
+        requests = []
 
-            target_netuid = (
-                DEFAULT_NETUID if netuid == self.config.subnet_uid else netuid
+        for uid in filtered_uids:
+            synapse = self.get_synapse_request(
+                RequestType.RWR, external_request.circuit, external_request
             )
-            circuit = circuit_store.get_latest_circuit_for_netuid(target_netuid)
 
-        bt.logging.info(
-            f"The next round of requests will be for {circuit} in {request_type} mode"
-        )
+            if isinstance(synapse, ProofOfWeightsSynapse):
+                input_data = synapse.inputs
+            else:
+                input_data = synapse.query_input["public_inputs"]
 
-        requests = [
-            Request(
-                uid=uid,
-                axon=self.config.metagraph.axons[uid],
-                synapse=self.get_synapse_request(uid, request_type, circuit, request),
-                circuit=circuit,
-                request_type=request_type,
-            )
-            for uid in filtered_uids
-        ]
-
-        for request in requests:
-            input_data = (
-                request.synapse.inputs
-                if request.circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS
-                else request.synapse.query_input["public_inputs"]
-            )
-            request.inputs = GenericInput(RequestType.RWR, input_data)
             try:
                 self.hash_guard.check_hash(input_data)
             except Exception as e:
@@ -88,8 +71,52 @@ class RequestPipeline:
                 safe_log({"hash_guard_error": 1})
                 continue
 
+            request = Request(
+                uid=uid,
+                axon=self.config.metagraph.axons[uid],
+                synapse=synapse,
+                circuit=external_request.circuit,
+                request_type=RequestType.RWR,
+                inputs=GenericInput(RequestType.RWR, input_data),
+                request_hash=external_request.hash,
+            )
+            requests.append(request)
+        return requests
+
+    def _prepare_benchmark_requests(self, filtered_uids: list[int]) -> list[Request]:
+        circuit = self.select_circuit_for_benchmark()
+        if circuit is None:
+            bt.logging.error("No circuit selected")
+            return []
+
         if circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
             self.score_manager.clear_proof_of_weights_queue()
+
+        requests = []
+        for uid in filtered_uids:
+            synapse = self.get_synapse_request(RequestType.BENCHMARK, circuit)
+
+            if isinstance(synapse, ProofOfWeightsSynapse):
+                input_data = synapse.inputs
+            else:
+                input_data = synapse.query_input["public_inputs"]
+
+            try:
+                self.hash_guard.check_hash(input_data)
+            except Exception as e:
+                bt.logging.error(f"Hash already exists: {e}")
+                safe_log({"hash_guard_error": 1})
+                continue
+
+            request = Request(
+                uid=uid,
+                axon=self.config.metagraph.axons[uid],
+                synapse=synapse,
+                circuit=circuit,
+                request_type=RequestType.BENCHMARK,
+                inputs=GenericInput(RequestType.RWR, input_data),
+            )
+            requests.append(request)
 
         return requests
 
@@ -111,15 +138,17 @@ class RequestPipeline:
 
     def get_synapse_request(
         self,
-        uid: int,
         request_type: RequestType,
         circuit: Circuit,
-        request: dict[str, object] | None = None,
+        request: any | None = None,
     ) -> ProofOfWeightsSynapse | QueryZkProof:
         inputs = (
             circuit.input_handler(request_type)
             if request_type == RequestType.BENCHMARK
-            else circuit.input_handler(RequestType.RWR, request["inputs"])
+            else circuit.input_handler(
+                RequestType.RWR,
+                copy.deepcopy(request.inputs),
+            )
         )
 
         if request_type == RequestType.RWR:
@@ -142,12 +171,10 @@ class RequestPipeline:
             SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
             BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
         ]:
-            # We'll forward the responsibility of handling these to the internal proof of weights handler
             return ProofOfWeightsHandler.prepare_pow_request(
                 circuit, self.score_manager.proof_of_weights_queue
             )
 
-        # Otherwise, we'll prepare a regular benchmark request depending on the circuit type
         if circuit.metadata.type == CircuitType.PROOF_OF_COMPUTATION:
             return QueryZkProof(
                 model_id=circuit.id,

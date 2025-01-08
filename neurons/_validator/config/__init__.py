@@ -3,25 +3,7 @@ import bittensor as bt
 from constants import DEFAULT_NETUID
 
 from utils import wandb_logger
-
-
-class ApiConfig:
-    """
-    Configuration class for the API.
-
-    Attributes:
-        enabled (bool): Whether the API is enabled.
-        host (str): The host for the API.
-        port (int): The port for the API.
-        workers (int): The number of workers for the API.
-    """
-
-    def __init__(self, config: bt.config):
-        self.enabled = not config.ignore_external_requests
-        self.host = config.external_api_host
-        self.port = config.external_api_port
-        self.workers = config.external_api_workers
-        self.verify_external_signatures = not config.do_not_verify_external_signatures
+from _validator.config.api import ApiConfig
 
 
 class ValidatorConfig:
@@ -62,6 +44,7 @@ class ValidatorConfig:
         self.user_uid = int(
             self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
         )
+        self.localnet = self.bt_config.localnet
         self.api = ApiConfig(self.bt_config)
 
         # Initialize wandb logger
