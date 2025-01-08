@@ -1,3 +1,5 @@
+import os
+
 # The model ID for a batched proof of weights model
 BATCHED_PROOF_OF_WEIGHTS_MODEL_ID = (
     "e84b2e5f223621fa20078eb9f920d8d4d3a4ff95fa6e2357646fdbb43a2557c9"
@@ -129,3 +131,5 @@ MAINNET_TESTNET_UIDS = [
     (57, 237),  # gaia
     (59, 249),  # agent-arena
 ]
+# EZKL path
+LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")

@@ -4,10 +4,23 @@ import torch
 import os
 import time
 import json
-import ezkl
 import bittensor as bt
 from protocol import QueryZkProof, Competition
 from typing import Tuple, Generator
+from neurons.constants import LOCAL_EZKL_PATH
+import subprocess
+from pydantic import BaseModel
+
+
+class NeuronState(BaseModel):
+    hotkey: str
+    uid: int
+    score: float
+    proof_size: int
+    response_time: float
+    verification_result: bool
+    accuracy: float
+    hash: str
 
 
 class BaseCompetition(ABC):
@@ -26,6 +39,7 @@ class BaseCompetition(ABC):
         self.baseline_model: torch.nn.Module = self._load_model()
         self.metagraph: bt.metagraph = metagraph
         self.subtensor: bt.subtensor = subtensor
+        self.miner_states: list[NeuronState] = []
 
     def _load_model(self) -> torch.nn.Module:
         """
@@ -45,14 +59,26 @@ class BaseCompetition(ABC):
         """
         Sync and return the circuits.
         """
-        for hotkey in self.metagraph.hotkeys:
+        hotkeys = self.metagraph.hotkeys
+        # Purge miner states for deregged neurons
+        self.miner_states = [
+            state for state in self.miner_states if state.hotkey in hotkeys
+        ]
+        # Sync circuits
+        for hotkey in [
+            h
+            for h in hotkeys
+            if not self.metagraph.validator_permit[self.metagraph.hotkeys.index(h)]
+        ]:
             try:
                 hash = self.subtensor.get_commitment(
                     self.metagraph.netuid, self.metagraph.hotkeys.index(hotkey)
                 )
-                bt.logging.success(f"Syncing circuit for {hotkey} with hash {hash}")
-                axon = self.metagraph.axons[self.metagraph.hotkeys.index(hotkey)]
-                self.download_circuit(axon, hash)
+                if self.miner_states[hotkey].hash != hash:
+                    bt.logging.success(f"Syncing circuit for {hotkey} with hash {hash}")
+                    axon = self.metagraph.axons[self.metagraph.hotkeys.index(hotkey)]
+                    self.download_circuit(axon, hash)
+                    self.miner_states[hotkey].hash = hash
                 yield (
                     axon,
                     os.path.join(self.competition_directory, f"{hash}"),
@@ -140,10 +166,21 @@ class BaseCompetition(ABC):
                         with open("temp_proof.json", "w") as f:
                             json.dump({"proof": proof, "public": public_signals}, f)
 
-                        verification_result = ezkl.verify(
-                            "temp_proof.json",
-                            os.path.join(self.competition_directory, "settings.json"),
-                            verification_key_path,
+                        verification_result = subprocess.run(
+                            [
+                                LOCAL_EZKL_PATH,
+                                "verify",
+                                "--proof-path",
+                                "temp_proof.json",
+                                "--settings-path",
+                                os.path.join(
+                                    self.competition_directory, "settings.json"
+                                ),
+                                "--vk-path",
+                                verification_key_path,
+                            ],
+                            capture_output=True,
+                            text=True,
                         )
                         verification_results.append(verification_result)
 

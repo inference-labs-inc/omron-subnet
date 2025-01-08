@@ -7,14 +7,13 @@ import bittensor as bt
 import traceback
 import ezkl
 from enum import Enum
+from neurons.constants import LOCAL_EZKL_PATH
 
 from execution_layer.proof_handlers.base_handler import ProofSystemHandler
 from execution_layer.generic_input import GenericInput
 
 if TYPE_CHECKING:
     from execution_layer.verified_model_session import VerifiedModelSession
-
-LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")
 
 
 class EZKLInputType(Enum):
