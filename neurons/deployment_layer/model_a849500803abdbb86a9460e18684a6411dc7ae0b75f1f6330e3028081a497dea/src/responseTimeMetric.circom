@@ -5,9 +5,7 @@ include "./integerDivision.circom";
 
 template ScoringFunction(b) {
     var i;
-
-    signal input value_normalized;
-    signal input scaling;
+    signal input response_time_normalized;
     signal output out;
 
     component temp_sub[2];
@@ -24,23 +22,23 @@ template ScoringFunction(b) {
     term[0] <== 41735537;
 
     int_div[0] = IntDiv(b);
-    int_div[0].in[0] <== value_normalized * 20;
+    int_div[0].in[0] <== response_time_normalized * 20;
     int_div[0].in[1] <== 121;
 
     combined[0] <== term[0] + int_div[0].out;
 
     lt = LessThan(b);
     lt.in[0] <== 50000000;
-    lt.in[1] <== value_normalized;
+    lt.in[1] <== response_time_normalized;
 
     temp_sub[0] = Subtract();
-    temp_sub[0].a <== value_normalized;
+    temp_sub[0].a <== response_time_normalized;
     temp_sub[0].b <== 50000000;
     temp_shift[0] <== temp_sub[0].c * lt.out;
 
     temp_sub[1] = Subtract();
     temp_sub[1].a <== 50000000;
-    temp_sub[1].b <== value_normalized;
+    temp_sub[1].b <== response_time_normalized;
     temp_shift[1] <== temp_sub[1].c*(1 - lt.out);
     shift <== temp_shift[0] + temp_shift[1];
 
@@ -64,9 +62,9 @@ template ScoringFunction(b) {
 
 }
 
-template IncentiveMetric(b){
-    signal input WEIGHT;
-    signal input normalized_value;
+template ResponseTimeMetric(b){
+    signal input RESPONSE_TIME_WEIGHT;
+    signal input response_time_normalized;
     signal input scaling;
     signal output out;
 
@@ -78,14 +76,13 @@ template IncentiveMetric(b){
 
 
     scoring_function = ScoringFunction(b);
-    scoring_function.value_normalized <== normalized_value;
-    scoring_function.scaling <== scaling;
+    scoring_function.response_time_normalized <== response_time_normalized;
 
     subtract = Subtract();
     subtract.a <== scaling;
     subtract.b <== scoring_function.out;
 
-    temp_mul <== subtract.c * WEIGHT;
+    temp_mul <== subtract.c * RESPONSE_TIME_WEIGHT;
 
 
     int_div = IntDiv(b);
