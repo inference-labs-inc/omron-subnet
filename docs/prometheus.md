@@ -2,10 +2,12 @@
 
 ## Important Port Configuration
 
-> ⚠️ **Port Conflict Warning**: By default, both Prometheus and the validator use port 9090. If installing on the same machine, you must either:
+> [!WARNING]
+> **Port Conflicts**
+> By default, both prometheus server and the validator prometheus exporter use port 9090. If installing on the same machine, you must either:
 >
-> - Change validator metrics port: `--prometheus-port <port>`
-> - Change Prometheus port: `--web.listen-address=:<port>`
+> - Change the validator exporter port: `--prometheus-port <port>`
+> - Change the prometheus server port: `--web.listen-address=:<port>`
 
 ## Installation Options
 
