@@ -42,6 +42,12 @@ Instructions for configuring a PM2 ecosystem file which allows for streamlined s
 
 [View PM2 Configuration →]
 
+## [Prometheus and Grafana Configuration]
+
+Instructions for configuring Prometheus and Grafana to monitor your validator.
+
+[View Prometheus and Grafana Configuration →]
+
 ## [Versioning]
 
 Information about Omron's versioning system and how to stay up-to-date with the latest releases.
@@ -60,7 +66,8 @@ Information about Omron's versioning system and how to stay up-to-date with the 
 [View mainnet instructions →]: ./running_on_mainnet.md
 [View testnet instructions →]: ./running_on_testnet.md
 [View local instructions →]: ./running_on_staging.md
-[Analysing metrics with Prometheus and Grafana →]: ./prometheus.md
+[Prometheus and Grafana Configuration]: ./prometheus.md
+[View Prometheus and Grafana Configuration →]: ./prometheus.md
 [Versioning]: ./versioning.md
 [View versioning →]: ./versioning.md
 [← Back to home]: ../
