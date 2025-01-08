@@ -2,7 +2,8 @@
 
 ## Important Port Configuration
 
-> [!WARNING] > **Port Conflicts**
+> [!WARNING] 
+> **Port Conflicts**
 > By default, both prometheus server and the validator prometheus exporter use port 9090. If installing on the same machine, you must either:
 >
 > - Change the validator exporter port: `--prometheus-port <port>`
