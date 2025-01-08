@@ -2,8 +2,7 @@
 
 ## Important Port Configuration
 
-> [!WARNING]
-> **Port Conflicts**
+> [!WARNING] > **Port Conflicts**
 > By default, both prometheus server and the validator prometheus exporter use port 9090. If installing on the same machine, you must either:
 >
 > - Change the validator exporter port: `--prometheus-port <port>`
@@ -154,7 +153,9 @@ For more information on using Docker Compose with Prometheus and Grafana, refer 
 
 ## Security Considerations
 
-> ⚠️ **Production Deployment Warning**: The setup described above is suitable for local development. For production deployments:
+> [!WARNING]
+> **Production Deployment Warning**
+> The setup described above is suitable for local development. For production deployments:
 >
 > - Use strong passwords for Grafana
 > - Configure TLS/SSL for both Prometheus and Grafana
