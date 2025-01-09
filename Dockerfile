@@ -3,8 +3,7 @@ FROM --platform=linux/amd64 ubuntu:noble
 # Install dependencies
 RUN apt update && \
     apt install -y \
-    python3-dev \
-    python3-venv \
+    pipx \
     build-essential \
     jq \
     git \
@@ -40,22 +39,16 @@ RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | b
     ln -s $(which node) /usr/bin/node && \
     ln -s $(which npm) /usr/bin/npm
 
-# Use a venv because of https://peps.python.org/pep-0668/
-RUN python3 -m venv /opt/venv && \
-    /opt/venv/bin/python3 -m pip install --upgrade pip && \
-    rm -rf /root/.cache/pip && \
-    echo "source /opt/venv/bin/activate" >> ~/.bashrc
-ENV PATH="/opt/venv/bin:${PATH}"
-
-# Install Python dependencies
-COPY requirements.txt /opt/omron/requirements.txt
-RUN TORCH_VERSION=$(grep "^torch" /opt/omron/requirements.txt) && \
-    pip3 install $TORCH_VERSION --index-url https://download.pytorch.org/whl/cpu && \
-    pip3 install -r /opt/omron/requirements.txt && \
-    rm -rf /root/.cache/pip
-
-# Copy omron
+# Copy omron and install Python dependencies
 COPY neurons /opt/omron/neurons
+COPY pyproject.toml /opt/omron/pyproject.toml
+COPY uv.lock /opt/omron/uv.lock
+RUN pipx install uv && \
+    cd /opt/omron && \
+    /root/.local/bin/uv sync --locked && \
+    /root/.local/bin/uv cache clean && \
+    echo "source /opt/omron/.venv/bin/activate" >> ~/.bashrc
+ENV PATH="/opt/omron/.venv/bin:${PATH}"
 
 # Set workdir for running miner.py or validator.py and compile circuits
 WORKDIR /opt/omron/neurons
@@ -66,10 +59,10 @@ RUN OMRON_DOCKER_BUILD=1 python3 miner.py && \
     rm -rf /opt/omron/neurons/deployment_layer/*/target/release/examples && \
     rm -rf /opt/omron/neurons/deployment_layer/*/target/release/incremental && \
     rm -rf /root/.bittensor
-ENTRYPOINT ["/opt/venv/bin/python3"]
+ENTRYPOINT ["/opt/omron/.venv/bin/python3"]
 CMD ["-c", "import subprocess; \
-    subprocess.run(['/opt/venv/bin/python3', '/opt/omron/neurons/miner.py', '--help']); \
-    subprocess.run(['/opt/venv/bin/python3', '/opt/omron/neurons/validator.py', '--help']);" \
+    subprocess.run(['/opt/omron/.venv/bin/python3', '/opt/omron/neurons/miner.py', '--help']); \
+    subprocess.run(['/opt/omron/.venv/bin/python3', '/opt/omron/neurons/validator.py', '--help']);" \
     ]
 EXPOSE 4091/tcp
 EXPOSE 8000/tcp

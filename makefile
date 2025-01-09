@@ -5,6 +5,8 @@ WALLET_PATH ?= $(HOME)/.bittensor
 MINER_PORT ?= 8091
 VALIDATOR_PORT ?= 8000
 
+.PHONY: build stop clean miner-logs validator-logs miner validator test-miner test-validator
+
 build:
 	docker build -t omron -f Dockerfile .
 

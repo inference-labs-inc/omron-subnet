@@ -4,34 +4,40 @@ This document provides a guide for developers who contributes to the project.
 
 ## Adding Dependencies
 
-We use `pip-tools` to manage dependencies. To add new dependencies, follow the steps below:
+We use `uv` to manage dependencies. To add new dependencies, follow the steps below:
 
-1. Add the package to `requirements.in` file.
-2. Compile dependencies:
+1. Add the package to `pyproject.toml`:
 
 ```sh
-pip-compile --generate-hashes requirements.in
+uv add <package-name>
+```
+
+2. Lock dependencies and generate `requirements.txt`:
+
+```sh
+uv lock
+uv export -o requirements.txt
 ```
 
 3. Sync dependencies:
 
 ```sh
-pip-sync
+uv sync --locked
 ```
 
 ## Updating Dependencies
 
-To force pip-compile to update all packages in an existing `requirements.txt`, run `pip-compile --upgrade`.
+To force uv to update all packages in an existing `pyproject.toml`, run `uv sync --upgrade`.
 
 ```sh
 # only update the bittensor package
-$ pip-compile --upgrade-package bittensor
+$ uv sync --upgrade-package bittensor
 
 # update both the bittensor and requests packages
-$ pip-compile --upgrade-package bittensor --upgrade-package requests
+$ uv sync --upgrade-package bittensor --upgrade-package requests
 
 # update the bittensor package to the latest, and requests to v2.0.0
-$ pip-compile --upgrade-package bittensor --upgrade-package requests==2.0.0
+$ uv sync --upgrade-package bittensor --upgrade-package requests==2.0.0
 ```
 
 ## Running Locally for Development
