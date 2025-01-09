@@ -1,0 +1,17 @@
+[package]
+name = "guest"
+version = "0.0.4"
+edition = "2021"
+
+[[bin]]
+name = "guest"
+path = "./src/lib.rs"
+
+[features]
+guest = []
+
+[dependencies]
+jolt = { package = "jolt-sdk", git = "https://github.com/a16z/jolt", rev = "9f0b9e6d95814dfe15d74ea736b9f89d505e8d07" }
+serde = { version = "1.0.209", default-features = false }
+serde-big-array = "0.5.1"
+libm = "0.2.8"

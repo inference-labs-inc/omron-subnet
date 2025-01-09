@@ -178,3 +178,14 @@ ecosystem.config.js
 neurons/_validator/proof_of_weights/
 **.zkey
 **/target/
+*.ptau
+docs/notebooks/input.json
+docs/notebooks/calibration.json
+docs/notebooks/network.onnx
+docs/notebooks/witness.json
+docs/notebooks/proof.json
+docs/notebooks/model.compiled
+docs/notebooks/settings.json
+docs/notebooks/*.key
+**/witness.json
+**/input.json

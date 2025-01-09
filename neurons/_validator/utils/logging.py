@@ -1,10 +1,12 @@
 from __future__ import annotations
+
+import torch
 from rich.console import Console, JustifyMethod
 from rich.table import Table
+
+from neurons.deployment_layer import circuit_store
 import utils.wandb_logger as wandb_logger
-import torch
 from _validator.models.miner_response import MinerResponse
-from deployment_layer.circuit_store import circuit_store
 
 
 def create_and_print_table(
@@ -119,7 +121,11 @@ def log_responses(responses: list[MinerResponse]):
                 str(response.verification_result),
                 str(response.response_time),
                 str(response.proof_size),
-                (circuit.metadata.name if circuit is not None else str(response.model_id)),
+                (
+                    circuit.metadata.name
+                    if circuit is not None
+                    else str(response.model_id)
+                ),
                 (circuit.metadata.proof_system if circuit is not None else "Unknown"),
             ]
         )
@@ -127,14 +133,9 @@ def log_responses(responses: list[MinerResponse]):
 
     wandb_log = {"responses": {}}
     for response in sorted_responses:
-        model_id = response.model_id
-        circuit = circuit_store.get_circuit(model_id)
-        circuit_name = model_id
-        if circuit:
-            circuit_name = circuit.metadata.name
         if response.uid not in wandb_log["responses"]:
             wandb_log["responses"][response.uid] = {}
-        wandb_log["responses"][response.uid][circuit_name] = {
+        wandb_log["responses"][response.uid][str(circuit)] = {
             "verification_result": int(response.verification_result),
             "response_time": response.response_time,
             "proof_size": response.proof_size,
@@ -142,49 +143,7 @@ def log_responses(responses: list[MinerResponse]):
     wandb_logger.safe_log(wandb_log)
 
 
-def log_pow(proof_and_public_signals: dict):
-    """
-    Log proof of weights to a table and Weights & Biases.
-
-    Args:
-        proof_and_public_signals (dict): JSON representation of the proof of weights and public signals.
-    """
-    try:
-        public_signals = proof_and_public_signals["public_signals"]
-        proof = proof_and_public_signals["proof"]
-
-        # Extract block numbers from public signals
-        block_numbers = public_signals[1025:2049]
-        unique_block_numbers = list(set(block_numbers))
-        unique_block_numbers.sort()
-        block_number = "_".join(str(num) for num in unique_block_numbers)
-
-        table = Table(title="Proof of Weights")
-        table.add_column("Public Signals", style="cyan")
-        table.add_column("Proof", style="magenta")
-        table.add_row(str(public_signals), str(proof))
-
-        if bt.logging.get_level() == 10:
-            Console().print(table)
-
-        wandb_logger.safe_log(
-            {
-                "proof_of_weights": {
-                    "block_number": block_number,
-                    "public_signals": public_signals,
-                    "proof": proof,
-                }
-            }
-        )
-    except Exception as e:
-        bt.logging.error(f"Error logging proof of weights: {e}")
-
-
-def log_system_metrics(response_times: list[float], verified_count: int, model_id: str):
-    circuit = circuit_store.get_circuit(model_id)
-    circuit_name = model_id
-    if circuit:
-        circuit_name = circuit.metadata.name
+def log_system_metrics(response_times: list[float], verified_count: int, circuit: str):
     if response_times:
         max_response_time = max(response_times)
         min_response_time = min(response_times)
@@ -192,7 +151,7 @@ def log_system_metrics(response_times: list[float], verified_count: int, model_i
         median_response_time = sorted(response_times)[len(response_times) // 2]
         wandb_logger.safe_log(
             {
-                f"{circuit_name}": {
+                f"{circuit}": {
                     "max_response_time": max_response_time,
                     "min_response_time": min_response_time,
                     "mean_response_time": mean_response_time,

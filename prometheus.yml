@@ -1,0 +1,4 @@
+scrape_configs:
+  - job_name: "omron-validator-metrics"
+    static_configs:
+      - targets: ["localhost:8000"] # Replace with validator IP if needed

@@ -12,7 +12,8 @@ from __init__ import __version__  # type: ignore
 from .system import restart_app
 from .wandb_logger import safe_log
 
-TARGET_BRANCH = "main"
+
+TARGET_BRANCHES = ["main", "testnet"]
 
 
 class AutoUpdate:
@@ -44,7 +45,8 @@ class AutoUpdate:
                     file.read().encode("utf-8")
                 ).hexdigest()
             requirements_blob = (
-                self.repo.remote().refs[TARGET_BRANCH].commit.tree / "requirements.txt"
+                self.repo.remote().refs[self.repo.active_branch.name].commit.tree
+                / "requirements.txt"
             )
             remote_requirements_content = requirements_blob.data_stream.read().decode(
                 "utf-8"
@@ -58,7 +60,7 @@ class AutoUpdate:
 
             # Get version number from remote
             blob = (
-                self.repo.remote().refs[TARGET_BRANCH].commit.tree
+                self.repo.remote().refs[self.repo.active_branch.name].commit.tree
                 / "neurons"
                 / "__init__.py"
             )
@@ -192,8 +194,19 @@ class AutoUpdate:
         """
         Automatic update entrypoint method
         """
-        if self.repo.head.is_detached or self.repo.active_branch.name != "main":
-            logging.debug("Not on the main branch, skipping auto-update")
+        if (
+            self.repo.head.is_detached
+            or self.repo.active_branch.name not in TARGET_BRANCHES
+        ):
+            ref_name = (
+                self.repo.active_branch.name
+                if not self.repo.head.is_detached
+                else str(self.repo.head.commit)
+            )
+            logging.debug(
+                f"Skipping auto-update on branch {ref_name} as it is "
+                f"{'in a detached head state' if self.repo.head.is_detached else f'not a member of {TARGET_BRANCHES}'}"
+            )
             return
 
         if not self.check_version_updated():

@@ -4,21 +4,30 @@ import subprocess
 import time
 import json
 import requests
+import ezkl
+import asyncio
 
 # trunk-ignore(pylint/E0611)
 from bittensor import logging
 
 from constants import IGNORED_MODEL_HASHES
+from execution_layer.circuit import ProofSystem
 
 
 LOCAL_SNARKJS_INSTALL_DIR = os.path.join(os.path.expanduser("~"), ".snarkjs")
 LOCAL_SNARKJS_PATH = os.path.join(
     LOCAL_SNARKJS_INSTALL_DIR, "node_modules", ".bin", "snarkjs"
 )
-TOOLCHAIN = "nightly-2024-08-01"
+LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")
+TOOLCHAIN = "nightly-2024-09-30"
+JOLT_VERSION = "dd9e5c4bcf36ffeb75a576351807f8d86c33ec66"
 
 
-def run_shared_preflight_checks():
+async def download_srs(logrows):
+    await ezkl.get_srs(logrows=logrows, commitment=ezkl.PyCommitments.KZG)
+
+
+def run_shared_preflight_checks(external_model_dir: str):
     """
     This function executes a series of checks to ensure the environment is properly
     set up for both validator and miner operations.
@@ -33,17 +42,22 @@ def run_shared_preflight_checks():
     Raises:
         Exception: If any of the pre-flight checks fail.
     """
+    global EXTERNAL_MODEL_DIR
+    EXTERNAL_MODEL_DIR = external_model_dir
+
     preflight_checks = [
         ("Syncing model files", sync_model_files),
         ("Ensuring Node.js version", ensure_nodejs_version),
         ("Checking SnarkJS installation", ensure_snarkjs_installed),
-        ("Checking Rust and Cargo installation", ensure_rust_cargo_installed),
-        ("Checking Rust nightly toolchain", ensure_rust_nightly_installed),
-        ("Checking Jolt installation", ensure_jolt_installed),
-        ("Compiling Jolt circuits", compile_jolt_circuits),
+        ("Checking EZKL installation", ensure_ezkl_installed),
     ]
 
     logging.info(" PreFlight | Running pre-flight checks")
+
+    # Skip sync_model_files during docker build
+    if os.getenv("OMRON_DOCKER_BUILD", False):
+        logging.info(" PreFlight | Skipping model file sync")
+        preflight_checks.remove(("Syncing model files", sync_model_files))
 
     for check_name, check_function in preflight_checks:
         logging.info(f" PreFlight | {check_name}")
@@ -57,6 +71,44 @@ def run_shared_preflight_checks():
             raise e
 
     logging.info(" PreFlight | Pre-flight checks completed.")
+
+
+def ensure_ezkl_installed():
+    """
+    Ensure EZKL is installed by first checking if it exists, and if not,
+    running the official installation script. Also verifies the version matches.
+    """
+    python_ezkl_version = ezkl.__version__
+    try:
+        if os.path.exists(LOCAL_EZKL_PATH):
+            # Check version matches
+            result = subprocess.run(
+                [LOCAL_EZKL_PATH, "--version"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            if python_ezkl_version in result.stdout:
+                logging.info(
+                    f"EZKL is already installed with correct version: {python_ezkl_version}"
+                )
+                return
+            else:
+                logging.warning("EZKL version mismatch, reinstalling...")
+
+        # trunk-ignore(bandit/B605)
+        subprocess.run(
+            f"curl -s https://raw.githubusercontent.com/zkonduit/ezkl/main/install_ezkl_cli.sh | bash -s -- v{python_ezkl_version}",  # noqa
+            shell=True,
+            check=True,
+        )
+        logging.info("EZKL installed successfully")
+
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Failed to install/verify EZKL: {e}")
+        raise RuntimeError(
+            "EZKL installation failed. Please install it manually."
+        ) from e
 
 
 def ensure_snarkjs_installed():
@@ -117,13 +169,12 @@ def sync_model_files():
         if not model_hash.startswith("model_"):
             continue
 
-        for ignored_hash in IGNORED_MODEL_HASHES:
-            if model_hash.endswith(ignored_hash):
-                logging.info(
-                    SYNC_LOG_PREFIX
-                    + f"Ignoring model {model_hash} as it is in the ignored list."
-                )
-                continue
+        if model_hash.split("_")[1] in IGNORED_MODEL_HASHES:
+            logging.info(
+                SYNC_LOG_PREFIX
+                + f"Ignoring model {model_hash} as it is in the ignored list."
+            )
+            continue
 
         metadata_file = os.path.join(MODEL_DIR, model_hash, "metadata.json")
         if not os.path.isfile(metadata_file):
@@ -141,10 +192,34 @@ def sync_model_files():
                 SYNC_LOG_PREFIX + f"Failed to parse JSON from {metadata_file}"
             )
             continue
+        # If it's an EZKL model, we'll try to download the SRS files
+        if metadata.get("proof_system") == ProofSystem.EZKL:
+            ezkl_settings_file = os.path.join(MODEL_DIR, model_hash, "settings.json")
+            if not os.path.isfile(ezkl_settings_file):
+                logging.error(
+                    f"{SYNC_LOG_PREFIX}Settings file not found at {ezkl_settings_file} for {model_hash}. Skipping sync."
+                )
+                continue
+
+            try:
+                with open(ezkl_settings_file, "r", encoding="utf-8") as f:
+                    logrows = json.load(f).get("run_args", {}).get("logrows")
+                    if logrows:
+                        loop = asyncio.get_event_loop()
+                        loop.run_until_complete(download_srs(logrows))
+                        logging.info(
+                            f"{SYNC_LOG_PREFIX}Successfully downloaded SRS for logrows={logrows}"
+                        )
+            except (json.JSONDecodeError, subprocess.CalledProcessError) as e:
+                logging.error(
+                    f"{SYNC_LOG_PREFIX}Failed to process settings or download SRS: {e}"
+                )
+                continue
 
         external_files = metadata.get("external_files", {})
         for key, url in external_files.items():
-            file_path = os.path.join(MODEL_DIR, model_hash, key)
+            file_path = os.path.join(EXTERNAL_MODEL_DIR, model_hash, key)
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
             if os.path.isfile(file_path):
                 logging.info(
                     SYNC_LOG_PREFIX
@@ -360,6 +435,8 @@ def ensure_jolt_installed():
                     "install",
                     "--git",
                     "https://github.com/a16z/jolt",
+                    "--rev",
+                    JOLT_VERSION,
                     "--force",
                     "--bins",
                     "jolt",
@@ -399,6 +476,13 @@ def compile_jolt_circuits():
 
     for model_hash in os.listdir(MODEL_DIR):
         if not model_hash.startswith("model_"):
+            continue
+
+        if model_hash.split("_")[1] in IGNORED_MODEL_HASHES:
+            logging.info(
+                JOLT_LOG_PREFIX
+                + f"Ignoring model {model_hash} as it is in the ignored list."
+            )
             continue
 
         metadata_file = os.path.join(MODEL_DIR, model_hash, "metadata.json")
