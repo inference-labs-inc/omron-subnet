@@ -257,5 +257,5 @@ class RequestPipeline:
                 axon=self.config.metagraph.axons[uid],
                 synapse=synapse,
                 circuit=circuit,
-                inputs=GenericInput(RequestType.BENCHMARK, input_data),
+                inputs=circuit.input_handler(RequestType.BENCHMARK, input_data),
             )
