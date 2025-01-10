@@ -30,7 +30,7 @@ from constants import (
     MAX_CONCURRENT_REQUESTS,
 )
 from execution_layer.circuit import CircuitType
-from neurons.utils.system import with_rate_limit
+from utils.system import with_rate_limit
 from utils import AutoUpdate, clean_temp_files
 
 

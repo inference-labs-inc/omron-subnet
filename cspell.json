@@ -20,6 +20,7 @@
     "localnet",
     "Mbps",
     "metagraph",
+    "ndarray",
     "netuid",
     "Omron",
     "onnxruntime",
