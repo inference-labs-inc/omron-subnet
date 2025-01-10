@@ -6,7 +6,8 @@
 	// "image": "mcr.microsoft.com/devcontainers/base:jammy",
 	"build": {
         // Path is relative to the devcontainer.json file.
-        "dockerfile": "../devcontainer.Dockerfile"
+        "context": "..",
+        "dockerfile": "Dockerfile"
     },
 	"remoteUser": "root",
 	"customizations": {

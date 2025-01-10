@@ -3,16 +3,16 @@ import threading
 from typing import Optional
 from wsgiref.simple_server import WSGIServer
 
-from prometheus_client import Summary, start_http_server
+from prometheus_client import Summary, Histogram, start_http_server
 
 
 _server: Optional[WSGIServer] = None
 _thread: Optional[threading.Thread] = None
 
-_validation_times: Optional[Summary] = None
-_response_times: Optional[Summary] = None
-_proof_sizes: Optional[Summary] = None
-_verification_ratio: Optional[Summary] = None
+_validation_times: Optional[Histogram] = None
+_response_times: Optional[Histogram] = None
+_proof_sizes: Optional[Histogram] = None
+_verification_ratio: Optional[Histogram] = None
 
 
 def start_prometheus_logging(port: int) -> None:
@@ -20,16 +20,18 @@ def start_prometheus_logging(port: int) -> None:
     _server, _thread = start_http_server(port)
 
     global _validation_times, _response_times, _proof_sizes, _verification_ratio
-    _validation_times = Summary("validating_seconds", "Time spent validating responses")
-    _response_times = Summary(
+    _validation_times = Histogram(
+        "validating_seconds", "Time spent validating responses"
+    )
+    _response_times = Histogram(
         "requests_seconds",
         "Time spent processing requests",
         ["aggregation_type", "model"],
     )
-    _proof_sizes = Summary(
+    _proof_sizes = Histogram(
         "proof_sizes", "Size of proofs", ["aggregation_type", "model"]
     )
-    _verification_ratio = Summary(
+    _verification_ratio = Histogram(
         "verified_proofs_ratio", "Verified proofs ratio", ["model"]
     )
 
