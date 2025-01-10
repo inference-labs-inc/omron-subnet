@@ -89,36 +89,30 @@ def init_config(role: Optional[str]):
         config.verbose = config.verbose if config.verbose is None else True
         config.max_workers = config.max_workers or 1
 
-    config.full_path = os.path.expanduser(
-        "{}/{}/{}/netuid{}".format(
-            config.logging.logging_dir,  # type: ignore
-            config.wallet.name,  # type: ignore
-            config.wallet.hotkey,  # type: ignore
-            config.netuid,
-        )
-    )
+    config.full_path = os.path.expanduser("~/.bittensor/omron")  # type: ignore
+    config.full_path_ezkl = os.path.join(config.full_path, "ezkl")
+    config.full_path_score = os.path.join(config.full_path, "scores")
 
-    os.makedirs(config.full_path, exist_ok=True)
-    if role:
-        config.full_path_role = os.path.join(config.full_path, role)
-        os.makedirs(config.full_path_role, exist_ok=True)
-    else:
-        # no role specified, so we assume it's a docker image build call
-        config.full_path_role = config.full_path
-
-    bt.logging(config=config, logging_dir=config.full_path_role)
-    bt.logging.enable_info()
-
-    if config.external_model_dir is None:
+    if config.external_model_dir:
         # user might have specified a custom location for storing models data
         # if not, we use the default location
-        config.external_model_dir = os.path.join(config.full_path, "deployment_layer")
+        config.full_path_models = config.external_model_dir
+    else:
+        config.full_path_models = os.path.join(config.full_path, "models")
+
+    os.makedirs(config.full_path, exist_ok=True)
+    os.makedirs(config.full_path_ezkl, exist_ok=True)
+    os.makedirs(config.full_path_score, exist_ok=True)
+    os.makedirs(config.full_path_models, exist_ok=True)
+
+    bt.logging(config=config, logging_dir=config.logging.logging_dir)
+    bt.logging.enable_info()
 
     if config.wandb_key:
         wandb_logger.safe_login(api_key=config.wandb_key)
         bt.logging.success("Logged into WandB")
 
-    os.environ["OMRON_EXTERNAL_MODEL_DIR"] = config.external_model_dir
+    os.environ["OMRON_EXTERNAL_MODEL_DIR"] = config.full_path_models
 
 
 def _miner_config():

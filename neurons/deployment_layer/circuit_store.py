@@ -46,7 +46,7 @@ class CircuitStore:
         in the circuits dictionary.
         """
         deployment_layer_path = (
-            deployment_layer_path or cli_parser.config.external_model_dir
+            deployment_layer_path or cli_parser.config.full_path_models
         )
         bt.logging.info(f"Loading circuits from {deployment_layer_path}")
 

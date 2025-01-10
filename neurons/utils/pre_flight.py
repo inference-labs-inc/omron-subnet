@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import shutil
 import subprocess
 import time
 import traceback
@@ -47,6 +48,7 @@ def run_shared_preflight_checks(role: Optional[str] = None):
 
     preflight_checks = [
         ("Init configs", partial(cli_parser.init_config, role=role)),
+        ("Resolve legacy folders", partial(resolve_legacy_folders, role=role)),
         ("Syncing model files", sync_model_files),
         ("Ensuring Node.js version", ensure_nodejs_version),
         ("Checking SnarkJS installation", ensure_snarkjs_installed),
@@ -80,7 +82,7 @@ def ensure_ezkl_installed():
     running the official installation script. Also verifies the version matches.
     """
     python_ezkl_version = ezkl.__version__
-    os.environ["EZKL_REPO_PATH"] = os.path.join(cli_parser.config.full_path, "ezkl")
+    os.environ["EZKL_REPO_PATH"] = os.path.join(cli_parser.config.full_path_ezkl)
     try:
         if os.path.exists(LOCAL_EZKL_PATH):
             # Check version matches
@@ -221,7 +223,7 @@ def sync_model_files():
         external_files = metadata.get("external_files", {})
         for key, url in external_files.items():
             file_path = os.path.join(
-                cli_parser.config.external_model_dir, model_hash, key
+                cli_parser.config.full_path_models, model_hash, key
             )
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             if os.path.isfile(file_path):
@@ -549,3 +551,61 @@ def safe_extract(tar, path):
         if not is_safe_path(path, member_path):
             continue
         tar.extract(member, path)
+
+
+def resolve_legacy_folders(role: str):
+    """
+    Move files from legacy folders to the new locations.
+    This step gonna be removed in the future.
+    """
+
+    if not role:
+        # dry run - no actions needed
+        return
+
+    if cli_parser.config.external_model_dir:
+        # user have specified a custom location for storing models data
+        # that means we don't need to move files from the legacy folders
+        return
+
+    legacy_full_path = os.path.expanduser(
+        "{}/{}/{}/netuid{}".format(
+            cli_parser.config.logging.logging_dir,  # type: ignore
+            cli_parser.config.wallet.name,  # type: ignore
+            cli_parser.config.wallet.hotkey,  # type: ignore
+            cli_parser.config.netuid,
+        )
+    )
+
+    _move_files(
+        os.path.join(legacy_full_path, "ezkl"),
+        cli_parser.config.full_path_ezkl,
+    )
+    _move_files(
+        os.path.join(legacy_full_path, role),
+        cli_parser.config.full_path_score,
+    )
+    _move_files(
+        os.path.join(legacy_full_path, "deployment_layer"),
+        cli_parser.config.full_path_models,
+    )
+
+
+def _move_files(src: str, dst: str):
+    """
+    Move files recurcively from source to destination.
+    """
+    if not os.path.exists(src) or not any(os.scandir(src)) or any(os.scandir(dst)):
+        # if source does not exist or is empty, or destination is not empty -> skip
+        return
+
+    try:
+        for item in os.listdir(src):
+            s = os.path.join(src, item)
+            d = os.path.join(dst, item)
+            shutil.move(s, d)
+
+        os.rmdir(src)
+        bt.logging.info(f"Moved files from {src} to {dst}")
+    except Exception as e:
+        bt.logging.error(f"Oops. Failed to move files from {src} to {dst}: {e}")

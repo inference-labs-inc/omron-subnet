@@ -53,7 +53,7 @@ class ValidatorLoop:
         self.config.check_register()
         self.auto_update = AutoUpdate()
         self.score_manager = ScoreManager(
-            self.config.metagraph, self.config.user_uid, self.config.full_path_role
+            self.config.metagraph, self.config.user_uid, self.config.full_path_score
         )
         self.response_processor = ResponseProcessor(
             self.config.metagraph,
