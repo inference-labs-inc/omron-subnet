@@ -20,7 +20,7 @@ from _validator.core.request import Request
 from utils.wandb_logger import safe_log
 from _validator.models.request_type import RequestType
 import copy
-from utils.system import hash_inputs
+from _validator.utils.api import hash_inputs
 
 
 class RequestPipeline:
