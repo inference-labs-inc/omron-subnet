@@ -276,3 +276,22 @@ class ScoreManager:
                 self.score_dict[model_id] = torch.cat(
                     (self.score_dict[model_id], new_scores)
                 )
+
+    def update_single_score(self, response: MinerResponse) -> None:
+        """
+        Update the score for a single miner based on their response.
+
+        Args:
+            response (MinerResponse): The processed response from a miner.
+        """
+        if response.model_id not in self.score_dict:
+            return
+
+        scores = self.score_dict[response.model_id]
+        if response.uid >= len(scores):
+            return
+
+        if response.verification_result:
+            scores[response.uid] = min(scores[response.uid] + 0.1, 1.0)
+        else:
+            scores[response.uid] = max(scores[response.uid] - 0.1, 0.0)

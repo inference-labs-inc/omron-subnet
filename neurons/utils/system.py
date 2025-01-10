@@ -1,9 +1,12 @@
 import os
 import sys
 import shutil
+import time
 import functools
 import multiprocessing
 from bittensor import logging
+from functools import wraps
+from typing import Callable, TypeVar, ParamSpec
 
 
 def restart_app():
@@ -90,6 +93,36 @@ def timeout_with_multiprocess_retry(seconds, retries=3):
                     manager.shutdown()
 
             return None
+
+        return wrapper
+
+    return decorator
+
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+
+def with_rate_limit(period: float):
+    """
+    Rate limits a function to one call per time period.
+
+    Args:
+        period: Time period in seconds
+    """
+    last_call = 0.0
+
+    def decorator(func: Callable[P, T]) -> Callable[P, T]:
+        @wraps(func)
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+            nonlocal last_call
+            now = time.time()
+
+            if now - last_call < period:
+                return None
+
+            last_call = now
+            return func(*args, **kwargs)
 
         return wrapper
 
