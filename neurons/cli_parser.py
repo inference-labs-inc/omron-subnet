@@ -92,6 +92,8 @@ def init_config(role: Optional[str]):
     config.full_path = os.path.expanduser("~/.bittensor/omron")  # type: ignore
     config.full_path_ezkl = os.path.join(config.full_path, "ezkl")
     config.full_path_score = os.path.join(config.full_path, "scores")
+    if not config.certificate_path:
+        config.certificate_path = os.path.join(config.full_path, "cert")
 
     if config.external_model_dir:
         # user might have specified a custom location for storing models data
@@ -104,6 +106,7 @@ def init_config(role: Optional[str]):
     os.makedirs(config.full_path_ezkl, exist_ok=True)
     os.makedirs(config.full_path_score, exist_ok=True)
     os.makedirs(config.full_path_models, exist_ok=True)
+    os.makedirs(config.certificate_path, exist_ok=True)
 
     bt.logging(config=config, logging_dir=config.logging.logging_dir)
     bt.logging.enable_info()
@@ -221,6 +224,16 @@ def _validator_config():
             "By default we verify is the wallet legitimate. "
             "You can disable this check with the flag."
         ),
+    )
+
+    parser.add_argument(
+        "--certificate-path",
+        type=str,
+        default=None,
+        help="A custom path to a directory containing a public and private SSL certificate. "
+        "(cert.pem and key.pem) "
+        "Please note that this should not be used unless you have issued your own certificate. "
+        "Omron will issue a certificate for you by default.",
     )
 
     parser.add_argument(
