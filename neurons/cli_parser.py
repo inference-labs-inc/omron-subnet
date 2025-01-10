@@ -90,7 +90,6 @@ def init_config(role: Optional[str]):
         config.max_workers = config.max_workers or 1
 
     config.full_path = os.path.expanduser("~/.bittensor/omron")  # type: ignore
-    config.full_path_ezkl = os.path.join(config.full_path, "ezkl")
     config.full_path_score = os.path.join(config.full_path, "scores")
     if not config.certificate_path:
         config.certificate_path = os.path.join(config.full_path, "cert")
@@ -103,7 +102,6 @@ def init_config(role: Optional[str]):
         config.full_path_models = os.path.join(config.full_path, "models")
 
     os.makedirs(config.full_path, exist_ok=True)
-    os.makedirs(config.full_path_ezkl, exist_ok=True)
     os.makedirs(config.full_path_score, exist_ok=True)
     os.makedirs(config.full_path_models, exist_ok=True)
     os.makedirs(config.certificate_path, exist_ok=True)

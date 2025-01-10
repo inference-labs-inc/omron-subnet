@@ -82,7 +82,6 @@ def ensure_ezkl_installed():
     running the official installation script. Also verifies the version matches.
     """
     python_ezkl_version = ezkl.__version__
-    os.environ["EZKL_REPO_PATH"] = os.path.join(cli_parser.config.full_path_ezkl)
     try:
         if os.path.exists(LOCAL_EZKL_PATH):
             # Check version matches
@@ -577,10 +576,6 @@ def resolve_legacy_folders(role: str):
         )
     )
 
-    _move_files(
-        os.path.join(legacy_full_path, "ezkl"),
-        cli_parser.config.full_path_ezkl,
-    )
     _move_files(
         os.path.join(legacy_full_path, role),
         cli_parser.config.full_path_score,
