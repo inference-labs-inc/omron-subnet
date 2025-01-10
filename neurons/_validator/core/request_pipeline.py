@@ -20,6 +20,7 @@ from _validator.core.request import Request
 from utils.wandb_logger import safe_log
 from _validator.models.request_type import RequestType
 import copy
+from utils.system import hash_inputs
 
 
 class RequestPipeline:
@@ -227,6 +228,7 @@ class RequestPipeline:
                 synapse=synapse,
                 circuit=external_request.circuit,
                 inputs=GenericInput(RequestType.RWR, input_data),
+                request_type=RequestType.RWR,
                 request_hash=external_request.hash,
             )
         else:
@@ -258,4 +260,6 @@ class RequestPipeline:
                 synapse=synapse,
                 circuit=circuit,
                 inputs=circuit.input_handler(RequestType.BENCHMARK, input_data),
+                request_type=RequestType.BENCHMARK,
+                request_hash=hash_inputs(input_data),
             )
