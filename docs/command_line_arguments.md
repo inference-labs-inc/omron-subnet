@@ -21,7 +21,7 @@ The below arguments are specific to miner software and have no effect on validat
 
 | Argument              | Required | Default | Accepted Values | Description                                                  |
 | --------------------- | :------: | ------- | --------------- | ------------------------------------------------------------ |
-| `--disable-blacklist` |    No    | `False` | `True`, `False` | Disables request filtering and allows all incoming requests. |
+| `--disable-blacklist` |    No    | `False` | `True`, `False` | Disables request filtering and allows all incoming requests.  |
 
 ### Validator specific arguments
 
@@ -39,7 +39,7 @@ The below arguments are specific to validator software and have no effect on min
 | `--do-not-verify-external-signatures` |    No    | `False`   | `True`, `False` | External PoW requests are signed by validator's (sender's) wallet. By default, these are checked to ensure legitimacy. This should only be disabled in controlled development environments. |
 | `--prometheus-monitoring`             |    No    | `False`   | `True`, `False` | Whether to enable sering of metrics for Prometheus monitoring.                                                                                                                              |
 | `--prometheus-port`                   |    No    | `9090`    | Integer         | The port for the Prometheus data source.                                                                                                                                                    |
-| `--rapidsnark-binary-path`            |    No    | `None`    | String          | The path to the rapidsnark binary.                                                                                                                                                          |
+| `--use-rapidsnark`                    |    No    | `False`   | Boolean         | Use rapidsnark for verifying Bolt and Circom proofs                                                                                                                                         |
 
 ## Built-in Arguments
 
@@ -66,8 +66,8 @@ Bittensor subtensor configuration options.
 
 | Argument                     | Required | Default            | Accepted Values                      | Description                                                                                                                |
 | ---------------------------- | :------: | ------------------ | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| `--subtensor.network`        |    No    | `finney`           | `finney`, `test`, `archive`, `local` | The subtensor network to connect to. Overrides `--subtensor.chain_endpoint` with a default node from the selected network. |
-| `--subtensor.chain_endpoint` |    No    | Depends on network | String                               | The specific blockchain endpoint to connect to. Overrides the network default endpoint if set.                             |
+| `--subtensor.network`        |    No    | `finney`            | `finney`, `test`, `archive`, `local`  | The subtensor network to connect to. Overrides `--subtensor.chain_endpoint` with a default node from the selected network. |
+| `--subtensor.chain_endpoint` |    No    | Depends on network | String                               | The specific blockchain endpoint to connect to. Overrides the network default endpoint if set.                              |
 | `--subtensor._mock`          |    No    | `False`            | `True`, `False`                      | If true, uses a mocked connection to the chain for testing purposes.                                                       |
 
 ### Axon
@@ -94,5 +94,5 @@ Bittensor logging configuration options.
 | ----------------------- | :------: | -------------------- | --------------- | ------------------------------------------ |
 | `--logging.debug`       |    No    | `False`              | `True`, `False` | Turn on bittensor debugging information.   |
 | `--logging.trace`       |    No    | `False`              | `True`, `False` | Turn on bittensor trace level information. |
-| `--logging.record_log`  |    No    | `False`              | `True`, `False` | Turns on logging to file.                  |
+| `--logging.record_log`  |    No    | `False`              | `True`, `False` | Turns on logging to file.                   |
 | `--logging.logging_dir` |    No    | `~/.bittensor/logs/` | String          | Logging default root directory.            |
