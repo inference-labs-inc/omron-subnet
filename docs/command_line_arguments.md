@@ -39,7 +39,7 @@ The below arguments are specific to validator software and have no effect on min
 | `--do-not-verify-external-signatures` |    No    | `False`   | `True`, `False` | External PoW requests are signed by validator's (sender's) wallet. By default, these are checked to ensure legitimacy. This should only be disabled in controlled development environments. |
 | `--prometheus-monitoring`             |    No    | `False`   | `True`, `False` | Whether to enable sering of metrics for Prometheus monitoring.                                                                                                                              |
 | `--prometheus-port`                   |    No    | `9090`    | Integer         | The port for the Prometheus data source.                                                                                                                                                    |
-| `--use-rapidsnark`                    |    No    | `False`   | Boolean         | Use rapidsnark for verifying Bolt and Circom proofs                                                                                                                                         |
+| `--use-rapidsnark`                    |    No    | `False`   | Boolean         | Use rapidsnark for verifying Circom proofs.                                                                                                                                                 |
 
 ## Built-in Arguments
 

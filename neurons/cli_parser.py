@@ -254,7 +254,7 @@ def _validator_config():
         "--use-rapidsnark",
         action="store_true",
         default=False,
-        help="Use Rapidsnark for Jolt and Circom proofs verification.",
+        help="Use Rapidsnark for Circom proofs verification.",
     )
 
     bt.subtensor.add_args(parser)
