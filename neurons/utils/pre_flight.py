@@ -1,10 +1,12 @@
 import asyncio
 import json
 import os
+import platform
 import shutil
 import subprocess
 import time
 import traceback
+import zipfile
 from functools import partial
 from typing import Optional
 
@@ -14,7 +16,7 @@ import ezkl
 import requests
 
 import cli_parser
-from constants import IGNORED_MODEL_HASHES
+from constants import IGNORED_MODEL_HASHES, Roles
 from execution_layer.circuit import ProofSystem
 
 LOCAL_SNARKJS_INSTALL_DIR = os.path.join(os.path.expanduser("~"), ".snarkjs")
@@ -53,6 +55,10 @@ def run_shared_preflight_checks(role: Optional[str] = None):
         ("Ensuring Node.js version", ensure_nodejs_version),
         ("Checking SnarkJS installation", ensure_snarkjs_installed),
         ("Checking EZKL installation", ensure_ezkl_installed),
+        (
+            "Checking RapidSnark installation",
+            partial(ensure_rapidsnark_installed, role=role),
+        ),
     ]
 
     bt.logging.info(" PreFlight | Running pre-flight checks")
@@ -538,6 +544,131 @@ def compile_jolt_circuits():
             )
 
     bt.logging.info(f"{JOLT_LOG_PREFIX}Jolt circuit compilation process completed.")
+
+
+def ensure_rapidsnark_installed(role: Optional[str] = None):
+    """
+    Ensure that Rapidsnark is installed.
+    """
+    if role != Roles.VALIDATOR or not cli_parser.config.use_rapidsnark:
+        bt.logging.info("RapidSnark is not enabled. Skipping...")
+
+    try:
+        if rapidsnark_test_run():
+            return
+
+        if os.listdir(cli_parser.config.full_path_rapidsnark):
+            shutil.rmtree(cli_parser.config.full_path_rapidsnark)
+            os.makedirs(cli_parser.config.full_path_rapidsnark, exist_ok=True)
+
+        bt.logging.info("Downloading RapidSnark binaries...")
+        rs_version = (
+            "v0.0.7"  # hardcoded, because believe we need to test any new version first
+        )
+        rs_base_url = "https://github.com/iden3/rapidsnark/releases/download"
+        system = platform.system()
+        arch = platform.machine()
+
+        if system == "Linux":
+            if arch == "x86_64":
+                filename = "rapidsnark-linux-x86_64-v0.0.7.zip"
+            elif arch == "arm64":
+                filename = "rapidsnark-linux-arm64-v0.0.7.zip"
+            else:
+                raise RuntimeError(f"Unsupported architecture: {arch}")
+        elif system == "Darwin":
+            if arch == "x86_64":
+                filename = "rapidsnark-macOS-x86_64-v0.0.7.zip"
+            elif arch == "arm64":
+                filename = "rapidsnark-macOS-arm64-v0.0.7.zip"
+            else:
+                raise RuntimeError(f"Unsupported architecture: {arch}")
+        else:
+            raise RuntimeError(f"Unsupported OS: {system}")
+
+        # Download the archive
+        url = f"{rs_base_url}/{rs_version}/{filename}"
+        filepath = os.path.join(cli_parser.config.full_path_rapidsnark, filename)
+        try:
+            bt.logging.info(f"Downloading {url} to {filepath}...")
+            with requests.get(url, timeout=600, stream=True) as response:
+                response.raise_for_status()
+                with open(filepath, "wb") as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+        except requests.RequestException as e:
+            bt.logging.error(f"Failed to download {url} to {filepath}: {e}")
+            raise e
+
+        # Extract files
+        bt.logging.info(
+            f"Extracting {filename} to {cli_parser.config.full_path_rapidsnark}..."
+        )
+
+        with zipfile.ZipFile(filepath, "r") as zip_ref:
+            zip_ref.extractall(cli_parser.config.full_path_rapidsnark)
+
+        # Clean up
+        os.remove(filepath)
+
+        # move all files to the parent directory
+        subdir = os.path.join(
+            cli_parser.config.full_path_rapidsnark,
+            os.listdir(cli_parser.config.full_path_rapidsnark)[0],
+        )
+        for item in os.listdir(subdir):
+            shutil.move(
+                os.path.join(subdir, item),
+                os.path.join(cli_parser.config.full_path_rapidsnark, item),
+            )
+        os.rmdir(subdir)
+
+        # mark binary files as executable
+        bin_dir = os.path.join(cli_parser.config.full_path_rapidsnark, "bin")
+        for item in os.listdir(bin_dir):
+            if os.path.isfile(os.path.join(bin_dir, item)):
+                os.chmod(os.path.join(bin_dir, item), 0o755)
+
+        if rapidsnark_test_run():
+            bt.logging.info("RapidSnark has been successfully installed.")
+        else:
+            bt.logging.error("Failed to run RapidSnark verifier binary.")
+
+    except Exception as e:
+        bt.logging.error(f"Failed to install/verify RapidSnark: {e}")
+        bt.logging.warning(
+            "RapidSnark installation failed. It won't be used for proof verification."
+        )
+
+
+def rapidsnark_test_run() -> bool:
+    if os.path.exists(os.path.join(cli_parser.config.full_path_rapidsnark, "verifier")):
+        binary_path = os.path.join(cli_parser.config.full_path_rapidsnark, "verifier")
+    elif os.path.exists(
+        os.path.join(cli_parser.config.full_path_rapidsnark, "bin", "verifier")
+    ):
+        binary_path = os.path.join(
+            cli_parser.config.full_path_rapidsnark, "bin", "verifier"
+        )
+    else:
+        bt.logging.debug("RapidSnark verifier binary not found.")
+        return False
+    try:
+        # trunk-ignore(bandit/B603)
+        subprocess.run(
+            [binary_path],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        bt.logging.info("RapidSnark is already installed and available.")
+        return True
+    except subprocess.CalledProcessError as e:
+        if e.stderr.startswith("Invalid number of parameters:"):
+            bt.logging.info("RapidSnark is already installed and available.")
+            return True
+        bt.logging.error("RapidSnark verifier binary found but failed to run.")
+        return False
 
 
 def is_safe_path(base_path, path):

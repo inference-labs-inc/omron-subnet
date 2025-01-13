@@ -1,9 +1,11 @@
+import os
 import sys
-import bittensor as bt
-from constants import DEFAULT_NETUID
 
-from utils import wandb_logger
+import bittensor as bt
+
 from _validator.config.api import ApiConfig
+from constants import DEFAULT_NETUID
+from utils import wandb_logger
 
 
 class ValidatorConfig:
@@ -46,7 +48,21 @@ class ValidatorConfig:
         )
         self.localnet = self.bt_config.localnet
         self.api = ApiConfig(self.bt_config)
-        self.rapidsnark_binary_path = self.bt_config.rapidsnark_binary_path
+
+        self.rapidsnark_binary_path = None
+        if self.bt_config.use_rapidsnark:
+            if os.path.exists(
+                os.path.join(self.bt_config.full_path_rapidsnark, "verifier")
+            ):
+                self.rapidsnark_binary_path = os.path.join(
+                    self.bt_config.full_path_rapidsnark, "verifier"
+                )
+            elif os.path.exists(
+                os.path.join(self.bt_config.full_path_rapidsnark, "bin", "verifier")
+            ):
+                self.rapidsnark_binary_path = os.path.join(
+                    self.bt_config.full_path_rapidsnark, "bin", "verifier"
+                )
 
         # Initialize wandb logger
         wandb_logger.safe_init(

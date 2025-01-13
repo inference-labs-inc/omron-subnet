@@ -91,6 +91,7 @@ def init_config(role: Optional[str]):
 
     config.full_path = os.path.expanduser("~/.bittensor/omron")  # type: ignore
     config.full_path_score = os.path.join(config.full_path, "scores")
+    config.full_path_rapidsnark = os.path.join(config.full_path, "rapidsnark")
     if not config.certificate_path:
         config.certificate_path = os.path.join(config.full_path, "cert")
 
@@ -105,6 +106,7 @@ def init_config(role: Optional[str]):
     os.makedirs(config.full_path_score, exist_ok=True)
     os.makedirs(config.full_path_models, exist_ok=True)
     os.makedirs(config.certificate_path, exist_ok=True)
+    os.makedirs(config.full_path_rapidsnark, exist_ok=True)
 
     bt.logging(config=config, logging_dir=config.logging.logging_dir)
     bt.logging.enable_info()
@@ -249,10 +251,10 @@ def _validator_config():
     )
 
     parser.add_argument(
-        "--rapidsnark-binary-path",
-        type=str,
-        default=None,
-        help="Path to the rapid snark binary.",
+        "--use-rapidsnark",
+        action="store_true",
+        default=False,
+        help="Use Rapidsnark for Jolt and Circom proofs verification.",
     )
 
     bt.subtensor.add_args(parser)
