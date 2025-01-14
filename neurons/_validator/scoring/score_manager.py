@@ -284,10 +284,10 @@ class ScoreManager:
         Args:
             response (MinerResponse): The processed response from a miner.
         """
-        if response.model_id not in self.score_dict:
+        if response.circuit.id not in self.score_dict:
             return
 
-        scores = self.score_dict[response.model_id]
+        scores = self.score_dict[response.circuit.id]
         if response.uid >= len(scores):
             return
 
