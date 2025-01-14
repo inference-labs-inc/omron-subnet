@@ -2,6 +2,7 @@ import asyncio
 import random
 import traceback
 import bittensor as bt
+from aiohttp.client_exceptions import InvalidUrlClientError
 
 from constants import (
     MAX_CONCURRENT_REQUESTS,
@@ -41,6 +42,12 @@ async def query_single_axon(dendrite: bt.dendrite, request: Request) -> Request 
         )
         request.deserialized = result.deserialize()
         return request
+
+    except InvalidUrlClientError:
+        bt.logging.warning(
+            f"Ignoring UID as axon is not a valid URL: {request.uid}. {request.axon.ip}:{request.axon.port}"
+        )
+        return None
 
     except Exception as e:
         bt.logging.warning(f"Failed to query axon for UID: {request.uid}. Error: {e}")
