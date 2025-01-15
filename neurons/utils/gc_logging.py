@@ -5,7 +5,7 @@ import os
 import bittensor as bt
 import requests
 import torch
-
+import substrateinterface
 from _validator.models.miner_response import MinerResponse
 
 LOGGING_URL = os.getenv(
@@ -16,7 +16,7 @@ LOGGING_URL = os.getenv(
 
 def log_responses(
     metagraph: bt.metagraph,  # type: ignore
-    hotkey: bt.Keypair,
+    hotkey: substrateinterface.Keypair,
     uid: int,
     responses: list[MinerResponse],
     overhead_time: float,

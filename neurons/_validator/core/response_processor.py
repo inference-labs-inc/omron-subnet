@@ -17,13 +17,21 @@ from constants import BATCHED_PROOF_OF_WEIGHTS_MODEL_ID
 from execution_layer.generic_input import GenericInput
 from execution_layer.verified_model_session import VerifiedModelSession
 from utils import wandb_logger
+import substrateinterface
 
 
 class ResponseProcessor:
-    def __init__(self, metagraph, score_manager: ScoreManager, user_uid):
+    def __init__(
+        self,
+        metagraph,
+        score_manager: ScoreManager,
+        user_uid,
+        hotkey: substrateinterface.Keypair,
+    ):
         self.metagraph = metagraph
         self.score_manager = score_manager
         self.user_uid = user_uid
+        self.hotkey = hotkey
         self.proof_batches_queue = []
         self.completed_proof_of_weights_queue: list[CompletedProofOfWeightsItem] = []
 
@@ -77,6 +85,7 @@ class ResponseProcessor:
                     "request_hash": "-",
                     "miner_uid": selected_response.uid,
                 },
+                hotkey=self.hotkey,
             )  # type: ignore
             self.completed_proof_of_weights_queue.append(
                 CompletedProofOfWeightsItem(

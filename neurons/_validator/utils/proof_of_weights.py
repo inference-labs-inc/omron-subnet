@@ -9,7 +9,7 @@ from typing import Optional
 import requests
 
 
-from substrateinterface import ExtrinsicReceipt
+from substrateinterface import ExtrinsicReceipt, Keypair
 from _validator.models.miner_response import (
     MinerResponse,
 )
@@ -224,6 +224,7 @@ def save_proof_of_weights(
     public_signals: list,
     proof: str,
     metadata: dict,
+    hotkey: Keypair,
     proof_filename: Optional[str] = None,
 ):
     """
@@ -250,10 +251,19 @@ def save_proof_of_weights(
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(proof_json, f)
 
+        body_sig = hotkey.sign(json.dumps(proof_json))
+
         try:
             pps_host = os.getenv("OMRON_PPS_HOST", PROOF_PUBLISHING_SERVICE_HOST)
             url = f"https://{pps_host}/proof"
-            response = requests.post(url, json=proof_json)
+            response = requests.post(
+                url,
+                json=proof_json,
+                headers={
+                    "Authorization": f"Signature {body_sig}",
+                    "Content-Type": "application/json",
+                },
+            )
             if response.status_code == 200:
                 bt.logging.success(f"Proof of weights uploaded to {url}")
             else:
