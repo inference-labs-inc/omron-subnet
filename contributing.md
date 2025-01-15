@@ -49,7 +49,7 @@ Running miner locally for development:
 ```sh
 python miner.py \
     --netuid 1 \
-    --subtensor.chain_endpoint ws://127.0.0.1:9946 \
+    --subtensor.chain_endpoint ws://127.0.0.1:9944 \
     --wallet.name miner \
     --wallet.hotkey default \
     --subtensor.network local \
@@ -67,7 +67,7 @@ Running validator locally for development:
 ```sh
 python validator.py \
     --netuid 1 \
-    --subtensor.chain_endpoint ws://127.0.0.1:9946 \
+    --subtensor.chain_endpoint ws://127.0.0.1:9944 \
     --wallet.name validator \
     --wallet.hotkey default \
     --subtensor.network local \

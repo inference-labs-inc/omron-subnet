@@ -78,7 +78,7 @@ def init_config(role: Optional[str]):
             == "wss://entrypoint-finney.opentensor.ai:443"
         ):
             # in case of default value, change to localnet
-            config.subtensor.chain_endpoint = "ws://127.0.0.1:9946"
+            config.subtensor.chain_endpoint = "ws://127.0.0.1:9944"
         if config.subtensor.network == "finney":
             config.subtensor.network = "local"
         config.eth_wallet = (
@@ -112,9 +112,6 @@ def init_config(role: Optional[str]):
     if config.wandb_key:
         wandb_logger.safe_login(api_key=config.wandb_key)
         bt.logging.success("Logged into WandB")
-
-    os.environ["OMRON_EXTERNAL_MODEL_DIR"] = config.full_path_models
-
 
 def _miner_config():
     """
