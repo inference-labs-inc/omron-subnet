@@ -6,8 +6,7 @@ import bittensor as bt
 import torch
 import time
 from typing import Optional
-import requests
-
+from _validator.utils.pps import ProofPublishingService
 
 from substrateinterface import ExtrinsicReceipt, Keypair
 from _validator.models.miner_response import (
@@ -17,7 +16,7 @@ from constants import (
     DEFAULT_MAX_SCORE,
     DEFAULT_PROOF_SIZE,
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-    PROOF_PUBLISHING_SERVICE_HOST,
+    PPS_URL,
 )
 
 # Constants
@@ -233,8 +232,9 @@ def save_proof_of_weights(
     Args:
         public_signals (list): The public signals data as a JSON array.
         proof (str): The proof.
-
-    This function saves the proof of weights as a JSON file.
+        metadata (dict): Additional metadata for the proof.
+        hotkey (Keypair): The hotkey used to sign the proof.
+        proof_filename (Optional[str]): Custom filename for the proof file.
     """
     try:
         if proof_filename is None:
@@ -251,27 +251,9 @@ def save_proof_of_weights(
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(proof_json, f)
 
-        body_sig = hotkey.sign(json.dumps(proof_json))
+        pps = ProofPublishingService(PPS_URL)
+        pps.publish_proof(proof_json, hotkey)
 
-        try:
-            pps_host = os.getenv("OMRON_PPS_HOST", PROOF_PUBLISHING_SERVICE_HOST)
-            url = f"https://{pps_host}/proof"
-            response = requests.post(
-                url,
-                json=proof_json,
-                headers={
-                    "Authorization": f"Signature {body_sig}",
-                    "Content-Type": "application/json",
-                },
-            )
-            if response.status_code == 200:
-                bt.logging.success(f"Proof of weights uploaded to {url}")
-            else:
-                bt.logging.warning(
-                    f"Failed to upload proof of weights to {url}. Status code: {response.status_code}"
-                )
-        except Exception as e:
-            bt.logging.warning(f"Error uploading proof of weights: {e}")
         bt.logging.success(f"Proof of weights saved to {file_path}")
     except Exception as e:
         bt.logging.error(f"Error saving proof of weights to file: {e}")

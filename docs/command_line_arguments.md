@@ -14,10 +14,10 @@ These are options configurable via command line arguments or environment variabl
 
 These variables are specific to validator software and have no effect on miner software.
 
-| Variable Name       | Required | Default                                | Accepted Values | Description                                        |
-| ------------------- | :------: | -------------------------------------- | --------------- | -------------------------------------------------- |
-| `OMRON_LOGGING_URL` |    No    | `https://api.omron.ai/statistics/log/` | String          | The URL for metrics logging.                       |
-| `OMRON_PPS_HOST`    |    No    | `pps.omron.ai`                         | String          | The (HTTPS) host for the proof publishing service. |
+| Variable Name       | Required | Default                                | Accepted Values | Description                               |
+| ------------------- | :------: | -------------------------------------- | --------------- | ----------------------------------------- |
+| `OMRON_LOGGING_URL` |    No    | `https://api.omron.ai/statistics/log/` | String          | The URL for metrics logging.              |
+| `OMRON_PPS_URL`     |    No    | `https://pps.omron.ai`                 | String          | The URL for the proof publishing service. |
 
 ## General Arguments
 

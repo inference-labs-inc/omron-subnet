@@ -1,3 +1,5 @@
+import os
+
 # The model ID for a batched proof of weights model
 BATCHED_PROOF_OF_WEIGHTS_MODEL_ID = (
     "e84b2e5f223621fa20078eb9f920d8d4d3a4ff95fa6e2357646fdbb43a2557c9"
@@ -126,4 +128,4 @@ MAINNET_TESTNET_UIDS = [
     (59, 249),  # agent-arena
 ]
 # Proof publishing service URL
-PROOF_PUBLISHING_SERVICE_HOST = "pps.omron.ai"
+PPS_URL = os.getenv("OMRON_PPS_URL", "https://pps.omron.ai")
