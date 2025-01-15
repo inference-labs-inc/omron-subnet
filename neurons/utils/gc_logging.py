@@ -7,10 +7,9 @@ import requests
 import torch
 
 from _validator.models.miner_response import MinerResponse
-from deployment_layer.circuit_store import circuit_store
 
 LOGGING_URL = os.getenv(
-    "LOGGING_URL",
+    "OMRON_LOGGING_URL",
     "https://api.omron.ai/statistics/log/",
 )
 

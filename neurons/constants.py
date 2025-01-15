@@ -125,3 +125,5 @@ MAINNET_TESTNET_UIDS = [
     (57, 237),  # gaia
     (59, 249),  # agent-arena
 ]
+# Proof publishing service URL
+PROOF_PUBLISHING_SERVICE_HOST = "pps.omron.ai"

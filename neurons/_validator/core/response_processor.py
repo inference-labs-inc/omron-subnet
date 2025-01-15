@@ -69,7 +69,15 @@ class ResponseProcessor:
                 f"Selected Proof of Weights from UID: {selected_response.uid} to use "
                 "as batched proof of weights for this interval."
             )
-            save_proof_of_weights(selected_response.public_json, selected_response.proof_content)  # type: ignore
+            save_proof_of_weights(
+                selected_response.public_json,
+                selected_response.proof_content,
+                {
+                    "circuit": str(circuit),
+                    "request_hash": "-",
+                    "miner_uid": selected_response.uid,
+                },
+            )  # type: ignore
             self.completed_proof_of_weights_queue.append(
                 CompletedProofOfWeightsItem(
                     selected_response.public_json,

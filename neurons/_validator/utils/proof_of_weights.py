@@ -6,6 +6,8 @@ import bittensor as bt
 import torch
 import time
 from typing import Optional
+import requests
+
 
 from substrateinterface import ExtrinsicReceipt
 from _validator.models.miner_response import (
@@ -15,6 +17,7 @@ from constants import (
     DEFAULT_MAX_SCORE,
     DEFAULT_PROOF_SIZE,
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+    PROOF_PUBLISHING_SERVICE_HOST,
 )
 
 # Constants
@@ -218,7 +221,10 @@ class ProofOfWeightsItem:
 
 
 def save_proof_of_weights(
-    public_signals: list, proof: str, proof_filename: Optional[str] = None
+    public_signals: list,
+    proof: str,
+    metadata: dict,
+    proof_filename: Optional[str] = None,
 ):
     """
     Save the proof of weights to a JSON file.
@@ -235,10 +241,27 @@ def save_proof_of_weights(
 
         file_path = os.path.join(POW_DIRECTORY, f"{proof_filename}.json")
 
-        proof_json = {"public_signals": public_signals, "proof": proof}
+        proof_json = {
+            "public_signals": public_signals,
+            "proof": proof,
+            "metadata": metadata,
+        }
 
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(proof_json, f)
+
+        try:
+            pps_host = os.getenv("OMRON_PPS_HOST", PROOF_PUBLISHING_SERVICE_HOST)
+            url = f"https://{pps_host}/proof"
+            response = requests.post(url, json=proof_json)
+            if response.status_code == 200:
+                bt.logging.success(f"Proof of weights uploaded to {url}")
+            else:
+                bt.logging.warning(
+                    f"Failed to upload proof of weights to {url}. Status code: {response.status_code}"
+                )
+        except Exception as e:
+            bt.logging.warning(f"Error uploading proof of weights: {e}")
         bt.logging.success(f"Proof of weights saved to {file_path}")
     except Exception as e:
         bt.logging.error(f"Error saving proof of weights to file: {e}")
