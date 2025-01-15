@@ -16,6 +16,7 @@
     "ezkl",
     "fastapi",
     "Gbps",
+    "hexsha",
     "incentivizes",
     "Keypair",
     "libudev",
