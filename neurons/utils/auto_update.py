@@ -88,6 +88,14 @@ class AutoUpdate:
                 [
                     python_executable,
                     "-m",
+                    "ensurepip",
+                ],
+                timeout=60,
+            )
+            subprocess.check_call(
+                [
+                    python_executable,
+                    "-m",
                     "pip",
                     "install",
                     "-r",
