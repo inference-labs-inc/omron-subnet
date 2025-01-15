@@ -179,6 +179,24 @@ if ! command -v jq >/dev/null 2>&1; then
 	esac
 fi
 
+# Check if aria2 is installed, if not then install it
+if ! [ -x "$(command -v aria2c)" ]; then
+	echo "aria2 not found. Installing aria2..."
+	case ${OS} in
+	'Linux')
+		sudo apt update
+		sudo apt install -y aria2
+		;;
+	'Darwin')
+		brew install aria2
+		;;
+	*)
+		echo "Unsupported OS for aria2 installation"
+		exit 1
+		;;
+	esac
+fi
+
 # Check if PM2 is installed, if not then install it
 if ! command -v pm2 >/dev/null 2>&1; then
 	echo "pm2 not found. Installing pm2..."
@@ -244,10 +262,6 @@ fi
 
 # Set working directory to install dir
 cd "${INSTALL_PATH}" || exit
-
-# Sync remote files for all models
-echo "Syncing model files..."
-bash "./sync_model_files.sh"
 
 # Display next steps
 echo -e "\033[32mOmron has been installed to ${INSTALL_PATH}. Please run \`cd ${INSTALL_PATH}\` to navigate to the directory.\033[0m"

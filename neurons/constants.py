@@ -17,6 +17,8 @@ IGNORED_MODEL_HASHES = [
     "55de10a6bcf638af4bc79901d63204a9e5b1c6534670aa03010bae6045e3d0e8",
     "9998a12b8194d3e57d332b484ede57c3d871d42a176456c4e10da2995791d181",
     "ed8ba401d709ee31f6b9272163c71451da171c7d71800313fe5db58d0f6c483a",
+    "1d60d545b7c5123fd60524dcbaf57081ca7dc4a9ec36c892927a3153328d17c0",
+    "37320fc74fec80805eedc8e92baf3c58842a2cb2a4ae127ad6e930f0c8441c7a",
 ]
 
 # The maximum timespan allowed for miners to respond to a query
@@ -32,7 +34,7 @@ MAXIMUM_SCORE_MEDIAN_SAMPLE = 0.05
 # Shift in seconds to apply to the minimum response time for vertical asymptote adjustment
 MINIMUM_SCORE_SHIFT = 0.0
 # Weights version hyperparameter
-WEIGHTS_VERSION = 1514
+WEIGHTS_VERSION = 1644
 # Rate limit for weight updates
 WEIGHT_RATE_LIMIT: int = 100
 # Delay between requests
@@ -67,3 +69,59 @@ CIRCUIT_WEIGHTS = {
     "e84b2e5f223621fa20078eb9f920d8d4d3a4ff95fa6e2357646fdbb43a2557c9": 0.20,
     "8dcff627a782525ea86196941a694ffbead179905f0cd4550ddc3df9e2b90924": 0.20,
 }
+# Maximum signature lifespan for WebSocket requests
+MAX_SIGNATURE_LIFESPAN = 300
+# Whitelisted public keys (ss58 addresses) we accept external requests from by default
+# (even if an address is not in the metagraph)
+WHITELISTED_PUBLIC_KEYS = []
+# Mainnet <> Testnet UID mapping
+MAINNET_TESTNET_UIDS = [
+    (1, 61),  # apex
+    (2, 118),  # omron
+    (3, 223),  # templar
+    (4, 40),  # targon
+    (5, 88),  # kaito
+    (6, 155),  # infinite
+    (7, 92),  # subvortex
+    (8, 3),  # ptn
+    (8, 116),  # ptn (PTN)
+    (10, 104),  # sturdy
+    (11, 135),  # dippy
+    (12, 174),  # horde
+    (13, 254),  # dataverse
+    (14, 203),  # palaidn
+    (15, 202),  # deval
+    (16, 120),  # bitads
+    (17, 89),  # 3gen
+    (18, 24),  # cortex
+    (19, 176),  # inference
+    (20, 76),  # bitagent
+    (21, 157),  # any-any
+    (23, 119),  # social
+    (24, 96),  # omega
+    (25, 141),  # protein
+    (26, 25),  # alchemy
+    (27, 15),  # compute
+    (28, 93),  # oracle
+    (31, 123),  # naschain
+    (32, 87),  # itsai
+    (33, 138),  # ready
+    (34, 168),  # mind
+    (35, 78),  # logic
+    (39, 159),  # edge
+    (40, 166),  # chunk
+    (41, 172),  # sportstensor
+    (42, 165),  # masa
+    (43, 65),  # graphite
+    (44, 180),  # score
+    (45, 171),  # gen42
+    (46, 182),  # neural
+    (48, 208),  # nextplace
+    (49, 100),  # automl
+    (50, 31),  # audio
+    (52, 98),  # dojo
+    (53, 232),  # efficient-frontier
+    (54, 236),  # docs-insights
+    (57, 237),  # gaia
+    (59, 249),  # agent-arena
+]

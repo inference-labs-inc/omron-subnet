@@ -26,8 +26,8 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Install Jolt
-ENV JOLT_VERSION=dd9e5c4bcf36ffeb75a576351807f8d86c33ec66
-RUN cargo +${RUST_TOOLCHAIN} install --git https://github.com/a16z/jolt --rev ${JOLT_VERSION} --force --bins jolt
+#ENV JOLT_VERSION=dd9e5c4bcf36ffeb75a576351807f8d86c33ec66
+#RUN cargo +${RUST_TOOLCHAIN} install --git https://github.com/a16z/jolt --rev ${JOLT_VERSION} --force --bins jolt
 
 # Install node et al.
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash && \
@@ -64,5 +64,9 @@ CMD ["-c", "import subprocess; \
     subprocess.run(['/opt/omron/.venv/bin/python3', '/opt/omron/neurons/miner.py', '--help']); \
     subprocess.run(['/opt/omron/.venv/bin/python3', '/opt/omron/neurons/validator.py', '--help']);" \
     ]
-EXPOSE 4091/tcp
-EXPOSE 8000/tcp
+# Axon server
+EXPOSE 8091/tcp
+# API server
+EXPOSE 8443/tcp
+# Prometheus server
+EXPOSE 9090/tcp

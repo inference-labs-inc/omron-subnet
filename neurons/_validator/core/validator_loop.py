@@ -10,7 +10,13 @@ from typing import NoReturn
 import bittensor as bt
 
 from _validator.config import ValidatorConfig
-from _validator.core.api import ValidatorAPI
+from _validator.api import ValidatorAPI
+from _validator.core.prometheus import (
+    log_validation_time,
+    start_prometheus_logging,
+    stop_prometheus_logging,
+)
+from _validator.core.request import Request
 from _validator.core.request_pipeline import RequestPipeline
 from _validator.core.response_processor import ResponseProcessor
 from _validator.models.miner_response import MinerResponse
@@ -18,13 +24,13 @@ from _validator.scoring.score_manager import ScoreManager
 from _validator.scoring.weights import WeightsManager
 from _validator.utils.api import hash_inputs
 from _validator.utils.axon import query_axons
+from _validator.models.request_type import RequestType
 from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
-from _validator.core.request import Request
-from execution_layer.circuit import Circuit, CircuitType
 from constants import (
     REQUEST_DELAY_SECONDS,
 )
+from execution_layer.circuit import Circuit, CircuitType
 from utils import AutoUpdate, clean_temp_files, wandb_logger
 from utils.gc_logging import log_responses as log_responses_gc
 
@@ -65,6 +71,9 @@ class ValidatorLoop:
         self.request_pipeline = RequestPipeline(
             self.config, self.score_manager, self.api
         )
+
+        if self.config.bt_config.prometheus_monitoring:
+            start_prometheus_logging(self.config.bt_config.prometheus_port)
 
     def run(self) -> NoReturn:
         """
@@ -163,11 +172,24 @@ class ValidatorLoop:
             ]
             if verified_responses:
                 random_verified_response = random.choice(verified_responses)
+                request_hash = requests[0].request_hash or hash_inputs(
+                    requests[0].inputs
+                )
                 save_proof_of_weights(
                     public_signals=[random_verified_response.public_json],
                     proof=[random_verified_response.proof_content],
-                    proof_filename=hash_inputs(requests[0].inputs),
+                    proof_filename=request_hash,
                 )
+
+                if requests[0].request_type == RequestType.RWR:
+                    self.api.set_request_result(
+                        request_hash,
+                        {
+                            "hash": request_hash,
+                            "public_signals": random_verified_response.public_json,
+                            "proof": random_verified_response.proof_content,
+                        },
+                    )
 
         self.score_manager.update_scores(processed_responses)
         self.weights_manager.update_weights(self.score_manager.scores)
@@ -190,11 +212,14 @@ class ValidatorLoop:
                 "overhead_time": overhead_time,
             }
         )
+        log_validation_time(overhead_time)
         return overhead_time
 
     def _handle_keyboard_interrupt(self):
         """Handle keyboard interrupt by cleaning up and exiting."""
         bt.logging.success("Keyboard interrupt detected. Exiting validator.")
-        self.api.stop()
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.api.stop())
+        stop_prometheus_logging()
         clean_temp_files()
         sys.exit(0)
