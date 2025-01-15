@@ -9,6 +9,7 @@ from typing import Optional
 from bittensor import logging
 
 from .system import restart_app
+import cli_parser
 
 TARGET_BRANCH = "main"
 
@@ -20,8 +21,9 @@ class AutoUpdate:
 
     def __init__(self):
         try:
-            self.repo = git.Repo(search_parent_directories=True)
-            self.current_requirements_hash = self.get_requirements_hash()
+            if not cli_parser.config.no_auto_update:
+                self.repo = git.Repo(search_parent_directories=True)
+                self.current_requirements_hash = self.get_requirements_hash()
         except Exception as e:
             logging.exception("Failed to initialize the repository", e)
 

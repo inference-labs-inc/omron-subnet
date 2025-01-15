@@ -13,16 +13,18 @@ dependencies = [
 	"bittensor==8.5.1",
 	"ezkl==16.2.0",
 	"fastapi==0.110.1",
+	"jsonrpcserver>=5.0.9",
 	"numpy==2.0.1",
 	"packaging==24.1",
 	"prometheus_client==0.21.1",
 	"psutil==6.0.0",
 	"pydantic==2.10.3",
+	"pyopenssl>=25.0.0",
 	"requests==2.32.3",
 	"rich==13.8.1",
 	"torch==2.4.1",
 	"uvicorn==0.22.0",
-	"wandb==0.18.1"
+	"wandb==0.18.1",
 ]
 
 [tool.setuptools]

@@ -1,10 +1,15 @@
 from __future__ import annotations
+
 import os
 import traceback
+from typing import Optional
+
 import bittensor as bt
-from execution_layer.circuit import Circuit
-from constants import IGNORED_MODEL_HASHES
 from packaging import version
+
+import cli_parser
+from constants import IGNORED_MODEL_HASHES
+from execution_layer.circuit import Circuit
 
 
 class CircuitStore:
@@ -31,12 +36,8 @@ class CircuitStore:
         Creates an empty dictionary to store Circuit objects and loads circuits.
         """
         self.circuits: dict[str, Circuit] = {}
-        # load circuits from the deployment layer path
-        # these circuits come precompiled with the docker image
-        deployment_layer_path = os.path.dirname(__file__)
-        self.load_circuits(deployment_layer_path)
 
-    def load_circuits(self, deployment_layer_path):
+    def load_circuits(self, deployment_layer_path: Optional[str] = None):
         """
         Load circuits from the file system.
 
@@ -44,6 +45,9 @@ class CircuitStore:
         attempts to create Circuit objects from these directories, and stores them
         in the circuits dictionary.
         """
+        deployment_layer_path = (
+            deployment_layer_path or cli_parser.config.full_path_models
+        )
         bt.logging.info(f"Loading circuits from {deployment_layer_path}")
 
         for folder_name in os.listdir(deployment_layer_path):
