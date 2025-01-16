@@ -110,9 +110,10 @@ def with_rate_limit(period: float):
     Args:
         period: Time period in seconds
     """
-    last_call = 0.0
 
     def decorator(func: Callable[P, T]) -> Callable[P, T]:
+        last_call = 0.0
+
         @wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             nonlocal last_call
