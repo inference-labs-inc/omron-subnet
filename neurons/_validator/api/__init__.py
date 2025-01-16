@@ -19,7 +19,12 @@ import bittensor as bt
 from _validator.models.poc_rpc_request import ProofOfComputationRPCRequest
 from _validator.models.pow_rpc_request import ProofOfWeightsRPCRequest
 import hashlib
-from constants import MAX_SIGNATURE_LIFESPAN, MAINNET_TESTNET_UIDS
+from constants import (
+    MAX_SIGNATURE_LIFESPAN,
+    MAINNET_TESTNET_UIDS,
+    VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+    EXTERNAL_REQUEST_QUEUE_TIME_SECONDS,
+)
 from _validator.config import ValidatorConfig
 import base64
 import substrateinterface
@@ -131,7 +136,8 @@ class ValidatorAPI:
                 try:
                     await asyncio.wait_for(
                         self.pending_requests[external_request.hash].wait(),
-                        timeout=60,
+                        timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS
+                        + EXTERNAL_REQUEST_QUEUE_TIME_SECONDS,
                     )
                     result = self.request_results.pop(external_request.hash, None)
 
