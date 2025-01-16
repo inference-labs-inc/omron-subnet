@@ -12,6 +12,7 @@ from constants import (
 from deployment_layer.circuit_store import circuit_store
 from _validator.core.request import Request
 from execution_layer.circuit import ProofSystem, Circuit
+from _validator.models.request_type import RequestType
 
 
 @dataclass
@@ -32,11 +33,13 @@ class MinerResponse:
 
     uid: int
     verification_result: bool
+    input_hash: str
     response_time: float
     proof_size: int
     circuit: Circuit
     proof_content: dict | str | None = None
     public_json: list[str] | None = None
+    request_type: RequestType | None = None
     raw: dict | None = None
     error: str | None = None
 
@@ -109,6 +112,8 @@ class MinerResponse:
                 proof_size=proof_size,
                 circuit=response.circuit,
                 proof_content=proof_content,
+                request_type=response.request_type,
+                input_hash=response.request_hash,
                 public_json=public_json,
                 raw=deserialized_response,
             )
@@ -137,6 +142,8 @@ class MinerResponse:
             circuit=circuit,
             proof_content=None,
             public_json=None,
+            request_type=None,
+            input_hash=None,
             raw=None,
             error="Empty response",
         )
@@ -161,6 +168,8 @@ class MinerResponse:
             "proof_size": self.proof_size,
             "response_duration": self.response_time,
             "is_verified": self.verification_result,
+            "input_hash": self.input_hash,
+            "request_type": self.request_type,
         }
 
     def set_verification_result(self, result: bool):

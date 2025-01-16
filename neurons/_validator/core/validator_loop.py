@@ -20,7 +20,6 @@ from _validator.core.response_processor import ResponseProcessor
 from _validator.models.miner_response import MinerResponse
 from _validator.scoring.score_manager import ScoreManager
 from _validator.scoring.weights import WeightsManager
-from _validator.utils.api import hash_inputs
 from _validator.utils.axon import query_single_axon
 from _validator.models.request_type import RequestType
 from _validator.utils.proof_of_weights import save_proof_of_weights
@@ -200,7 +199,7 @@ class ValidatorLoop:
         """
         if response.verification_result and response.proof_content:
             if response.circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS:
-                request_hash = response.request_hash or hash_inputs(response.inputs)
+                request_hash = response.input_hash
                 save_proof_of_weights(
                     public_signals=[response.public_json],
                     proof=[response.proof_content],
