@@ -149,7 +149,6 @@ class ValidatorLoop:
                         return_when=asyncio.FIRST_COMPLETED,
                         timeout=0.1,
                     )
-
                     for task in done:
                         uid, response = await task
                         self.processed_uids.add(uid)
@@ -219,7 +218,6 @@ class ValidatorLoop:
                     )
 
         self.score_manager.update_single_score(response)
-        self.weights_manager.update_weights(self.score_manager.score_dict)
 
     def _handle_auto_update(self):
         """Handle automatic updates if enabled."""
