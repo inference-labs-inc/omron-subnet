@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import os
 import json
+import cli_parser
 from execution_layer.input_registry import InputRegistry
 
 # trunk-ignore(pylint/E0611)
@@ -73,7 +74,7 @@ class CircuitPaths:
             f"model_{self.model_id}",
         )
         self.external_base_path = os.path.join(
-            os.getenv("OMRON_EXTERNAL_MODEL_DIR", os.path.dirname(self.base_path)),
+            cli_parser.config.full_path_models,
             f"model_{self.model_id}",
         )
         self.input = os.path.join(self.base_path, "input.json")
