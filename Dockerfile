@@ -7,6 +7,7 @@ RUN apt update && \
     build-essential \
     jq \
     git \
+    aria2 \
     curl \
     make \
     clang \
