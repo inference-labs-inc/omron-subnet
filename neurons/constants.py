@@ -1,4 +1,12 @@
 import os
+from dataclasses import dataclass
+
+
+@dataclass
+class Roles:
+    VALIDATOR = "validator"
+    MINER = "miner"
+
 
 # The model ID for a batched proof of weights model
 BATCHED_PROOF_OF_WEIGHTS_MODEL_ID = (
