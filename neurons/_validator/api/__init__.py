@@ -131,7 +131,7 @@ class ValidatorAPI:
                 try:
                     await asyncio.wait_for(
                         self.pending_requests[external_request.hash].wait(),
-                        timeout=900,
+                        timeout=60,
                     )
                     result = self.request_results.pop(external_request.hash, None)
 
