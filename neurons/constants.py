@@ -134,3 +134,5 @@ MAINNET_TESTNET_UIDS = [
     (57, 237),  # gaia
     (59, 249),  # agent-arena
 ]
+# GitHub repository URL
+REPO_URL = "https://github.com/inference-labs-inc/omron-subnet"
