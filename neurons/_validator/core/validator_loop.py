@@ -13,6 +13,7 @@ from _validator.api import ValidatorAPI
 from _validator.core.prometheus import (
     start_prometheus_logging,
     stop_prometheus_logging,
+    log_request_metrics,
 )
 from _validator.core.request import Request
 from _validator.core.request_pipeline import RequestPipeline
@@ -138,6 +139,12 @@ class ValidatorLoop:
 
                 if response:
                     await self._handle_response(response)
+
+        log_request_metrics(
+            queue_size=len(self.request_queue._queue),
+            active_requests=len(self.active_requests),
+            processed_uids=len(self.processed_uids),
+        )
 
     async def run(self) -> NoReturn:
         """
