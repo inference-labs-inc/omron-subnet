@@ -104,7 +104,9 @@ class ValidatorLoop:
 
     @with_rate_limit(period=60)
     def log_health(self):
-        bt.logging.info(f"In-flight requests: {len(self.active_requests)}")
+        bt.logging.info(
+            f"In-flight requests: {len(self.active_requests)} / {MAX_CONCURRENT_REQUESTS}"
+        )
         bt.logging.debug(f"Processed UIDs: {len(self.processed_uids)}")
         bt.logging.debug(f"Queryable UIDs: {len(self.queryable_uids)}")
         bt.logging.success("Validator loop is healthy")
