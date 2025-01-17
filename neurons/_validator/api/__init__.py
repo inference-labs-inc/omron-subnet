@@ -186,6 +186,16 @@ class ValidatorAPI:
             axon = bt.axon(
                 wallet=self.config.wallet, external_port=self.config.api.port
             )
+            existing_axon = self.config.metagraph.axons[self.config.user_uid]
+            if (
+                existing_axon
+                and existing_axon.port == axon.external_port
+                and existing_axon.ip == axon.external_ip
+            ):
+                bt.logging.info(
+                    f"Axon already serving on port and ip {axon.external_port}:{axon.external_ip}"
+                )
+                return
             axon.serve(self.config.bt_config.netuid, self.config.subtensor)
             bt.logging.success("Axon served")
         except Exception as e:
