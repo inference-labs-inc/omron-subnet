@@ -4,7 +4,7 @@ import asyncio
 import random
 import sys
 import traceback
-from typing import NoReturn, Dict, Set
+from typing import NoReturn
 
 import bittensor as bt
 
@@ -71,8 +71,9 @@ class ValidatorLoop:
 
         # Request queue management
         self.request_queue = asyncio.Queue()
-        self.active_requests: Dict[int, asyncio.Task] = {}
-        self.processed_uids: Set[int] = set()
+        self.active_requests: dict[int, asyncio.Task] = {}
+        self.processed_uids: set[int] = set()
+        self.queryable_uids: list[int] = []
 
         if self.config.bt_config.prometheus_monitoring:
             start_prometheus_logging(self.config.bt_config.prometheus_port)
@@ -100,6 +101,44 @@ class ValidatorLoop:
     def update_queryable_uids(self):
         self.queryable_uids = list(get_queryable_uids(self.config.metagraph))
 
+    def update_processed_uids(self):
+        if len(self.processed_uids) >= len(self.queryable_uids):
+            self.processed_uids.clear()
+
+    async def update_active_requests(self):
+        random.shuffle(self.queryable_uids)
+        needed_requests = MAX_CONCURRENT_REQUESTS - len(self.active_requests)
+        if needed_requests > 0:
+            available_uids = [
+                uid
+                for uid in self.queryable_uids
+                if uid not in self.processed_uids and uid not in self.active_requests
+            ]
+
+            if not available_uids:
+                self.processed_uids.clear()
+                return
+
+            uid = available_uids[0]
+            request = self.request_pipeline.prepare_single_request(uid)
+            if request:
+                task = asyncio.create_task(self._process_single_request(request))
+                self.active_requests[uid] = task
+
+        if self.active_requests:
+            done, _ = await asyncio.wait(
+                self.active_requests.values(),
+                return_when=asyncio.FIRST_COMPLETED,
+                timeout=0.1,
+            )
+            for task in done:
+                uid, response = await task
+                self.processed_uids.add(uid)
+                del self.active_requests[uid]
+
+                if response:
+                    await self._handle_response(response)
+
     async def run(self) -> NoReturn:
         """
         Run the main validator loop indefinitely.
@@ -115,47 +154,8 @@ class ValidatorLoop:
                 self.sync_metagraph()
                 self.sync_scores_uids()
                 self.update_queryable_uids()
-
-                random.shuffle(self.queryable_uids)
-
-                if len(self.processed_uids) >= len(self.queryable_uids):
-                    self.processed_uids.clear()
-
-                needed_requests = MAX_CONCURRENT_REQUESTS - len(self.active_requests)
-                if needed_requests > 0:
-                    available_uids = [
-                        uid
-                        for uid in self.queryable_uids
-                        if uid not in self.processed_uids
-                        and uid not in self.active_requests
-                    ]
-
-                    if not available_uids:
-                        self.processed_uids.clear()
-                        continue
-
-                    uid = available_uids[0]
-                    request = self.request_pipeline.prepare_single_request(uid)
-                    if request:
-                        task = asyncio.create_task(
-                            self._process_single_request(request)
-                        )
-                        self.active_requests[uid] = task
-
-                if self.active_requests:
-                    done, _ = await asyncio.wait(
-                        self.active_requests.values(),
-                        return_when=asyncio.FIRST_COMPLETED,
-                        timeout=0.1,
-                    )
-                    for task in done:
-                        uid, response = await task
-                        self.processed_uids.add(uid)
-                        del self.active_requests[uid]
-
-                        if response:
-                            await self._handle_response(response)
-
+                self.update_processed_uids()
+                await self.update_active_requests()
                 await asyncio.sleep(0.1)
 
             except KeyboardInterrupt:
