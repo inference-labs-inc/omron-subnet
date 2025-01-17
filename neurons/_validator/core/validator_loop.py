@@ -102,6 +102,13 @@ class ValidatorLoop:
     def update_queryable_uids(self):
         self.queryable_uids = list(get_queryable_uids(self.config.metagraph))
 
+    @with_rate_limit(period=60)
+    def log_health(self):
+        bt.logging.info(f"In-flight requests: {len(self.active_requests)}")
+        bt.logging.debug(f"Processed UIDs: {len(self.processed_uids)}")
+        bt.logging.debug(f"Queryable UIDs: {len(self.queryable_uids)}")
+        bt.logging.success("Validator loop is healthy")
+
     def update_processed_uids(self):
         if len(self.processed_uids) >= len(self.queryable_uids):
             self.processed_uids.clear()
@@ -162,6 +169,7 @@ class ValidatorLoop:
                 self.sync_scores_uids()
                 self.update_queryable_uids()
                 self.update_processed_uids()
+                self.log_health()
                 await self.update_active_requests()
                 await asyncio.sleep(0.1)
 
