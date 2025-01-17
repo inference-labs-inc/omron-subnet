@@ -109,7 +109,6 @@ class ValidatorLoop:
         )
         bt.logging.debug(f"Processed UIDs: {len(self.processed_uids)}")
         bt.logging.debug(f"Queryable UIDs: {len(self.queryable_uids)}")
-        bt.logging.success("Validator loop is healthy")
 
     def update_processed_uids(self):
         if len(self.processed_uids) >= len(self.queryable_uids):

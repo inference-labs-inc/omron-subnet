@@ -17,7 +17,7 @@ if __name__ == "__main__":
 
         bt.logging.info("Creating miner session...")
         miner_session = MinerSession()
-        bt.logging.info("Running main loop...")
+        bt.logging.debug("Running main loop...")
         miner_session.run()
     except Exception:
         bt.logging.error(

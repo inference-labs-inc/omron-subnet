@@ -192,7 +192,7 @@ class ValidatorAPI:
                 and existing_axon.port == axon.external_port
                 and existing_axon.ip == axon.external_ip
             ):
-                bt.logging.info(
+                bt.logging.debug(
                     f"Axon already serving on ip {axon.external_ip} and port {axon.external_port}"
                 )
                 return
