@@ -5,6 +5,7 @@ import hashlib
 import sys
 import requests
 from typing import Optional
+from constants import REPO_URL
 
 from bittensor import logging
 
@@ -46,9 +47,7 @@ class AutoUpdate:
         Get the latest release tag from the GitHub repository
         """
         try:
-            response = requests.get(
-                f"https://api.github.com/repos/inference-labs-inc/omron-subnet/releases/latest"
-            )
+            response = requests.get(f"{REPO_URL}/releases/latest")
             response.raise_for_status()
             latest_release = response.json()
             return latest_release["tag_name"]
@@ -117,7 +116,7 @@ class AutoUpdate:
         try:
 
             if self.repo.is_dirty(untracked_files=False):
-                logging.error(
+                logging.warning(
                     "Current changeset is dirty. Please commit changes, discard changes or update manually."
                 )
                 return False
