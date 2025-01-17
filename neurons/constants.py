@@ -136,3 +136,10 @@ MAINNET_TESTNET_UIDS = [
 ]
 # GitHub repository URL
 REPO_URL = "https://github.com/inference-labs-inc/omron-subnet"
+# Various time constants in seconds
+ONE_SECOND = 1
+ONE_MINUTE = 60
+FIVE_MINUTES = ONE_MINUTE * 5
+ONE_HOUR = ONE_MINUTE * 60
+ONE_DAY = ONE_HOUR * 24
+ONE_YEAR = ONE_DAY * 365

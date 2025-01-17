@@ -28,6 +28,9 @@ from _validator.utils.uid import get_queryable_uids
 from constants import (
     REQUEST_DELAY_SECONDS,
     MAX_CONCURRENT_REQUESTS,
+    ONE_MINUTE,
+    FIVE_MINUTES,
+    ONE_HOUR,
 )
 from execution_layer.circuit import CircuitType
 from utils import AutoUpdate, clean_temp_files, with_rate_limit
@@ -82,27 +85,27 @@ class ValidatorLoop:
     # Note that this rate limit is less than the weights rate limit
     # This is to reduce extra subtensor calls but ensure that we check
     # regularly with the updater
-    @with_rate_limit(period=300)
+    @with_rate_limit(period=FIVE_MINUTES)
     def update_weights(self):
         self.weights_manager.update_weights(self.score_manager.score_dict)
 
-    @with_rate_limit(period=3600)
+    @with_rate_limit(period=ONE_HOUR)
     def sync_scores_uids(self):
         self.score_manager.sync_scores_uids(self.config.metagraph.uids.tolist())
 
-    @with_rate_limit(period=3600)
+    @with_rate_limit(period=ONE_HOUR)
     def sync_metagraph(self):
         self.config.metagraph.sync(subtensor=self.config.subtensor)
 
-    @with_rate_limit(period=300)
+    @with_rate_limit(period=FIVE_MINUTES)
     def check_auto_update(self):
         self._handle_auto_update()
 
-    @with_rate_limit(period=300)
+    @with_rate_limit(period=FIVE_MINUTES)
     def update_queryable_uids(self):
         self.queryable_uids = list(get_queryable_uids(self.config.metagraph))
 
-    @with_rate_limit(period=60)
+    @with_rate_limit(period=ONE_MINUTE)
     def log_health(self):
         bt.logging.info(
             f"In-flight requests: {len(self.active_requests)} / {MAX_CONCURRENT_REQUESTS}"
