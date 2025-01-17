@@ -68,7 +68,7 @@ class ValidatorAPI:
 
         self.setup_rpc_methods()
         self.start_server()
-        bt.logging.success("WebSocket API server started")
+        bt.logging.success("Ready to serve external requests")
 
     def setup_rpc_methods(self) -> None:
         @self.app.websocket("/rpc")
@@ -273,7 +273,7 @@ class ValidatorAPI:
                     bt.logging.error(f"Error committing certificate hash: {str(e)}")
                     traceback.print_exc()
             else:
-                bt.logging.info("Certificate hash already committed to chain.")
+                bt.logging.debug("Certificate hash already committed to chain.")
 
     def set_request_result(self, request_hash: str, result: dict[str, any]):
         """Set the result for a pending request and signal its completion."""
