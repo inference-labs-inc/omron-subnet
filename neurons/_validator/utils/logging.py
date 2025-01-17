@@ -114,7 +114,7 @@ def log_responses(responses: list[MinerResponse]):
 
     rows = []
     for response in sorted_responses:
-        circuit = circuit_store.get_circuit(response.model_id)
+        circuit = circuit_store.get_circuit(response.circuit.id)
         rows.append(
             [
                 str(response.uid),
@@ -124,7 +124,7 @@ def log_responses(responses: list[MinerResponse]):
                 (
                     circuit.metadata.name
                     if circuit is not None
-                    else str(response.model_id)
+                    else str(response.circuit.id)
                 ),
                 (circuit.metadata.proof_system if circuit is not None else "Unknown"),
             ]

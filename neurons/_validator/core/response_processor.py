@@ -17,7 +17,7 @@ from constants import BATCHED_PROOF_OF_WEIGHTS_MODEL_ID
 from execution_layer.generic_input import GenericInput
 from deployment_layer.circuit_store import circuit_store
 from execution_layer.verified_model_session import VerifiedModelSession
-from utils import wandb_logger
+import utils.wandb_logger as wandb_logger
 
 
 class ResponseProcessor:
@@ -38,12 +38,12 @@ class ResponseProcessor:
         response_times = collections.defaultdict(list)
         for r in processed_responses:
             if r.response_time is not None and r.verification_result:
-                response_times[r.model_id].append(r.response_time)
+                response_times[r.circuit.id].append(r.response_time)
 
-        for model_id in response_times:
-            verified_count = len(response_times[model_id])
-            circuit = circuit_store.get_circuit(model_id)
-            log_system_metrics(response_times[model_id], verified_count, model_id)
+        for circuit_id in response_times:
+            verified_count = len(response_times[circuit_id])
+            circuit = circuit_store.get_circuit(circuit_id)
+            log_system_metrics(response_times[circuit_id], verified_count, circuit_id)
 
             # Log response times, proof sizes and verification ratio to Prometheus
             prometheus.log_verification_ratio(
@@ -57,7 +57,7 @@ class ResponseProcessor:
 
         # return early if no proof of weights models are present
         if all(
-            pr.model_id not in circuit_store.list_circuits()
+            pr.circuit.id not in circuit_store.list_circuits()
             for pr in processed_responses
         ):
             return processed_responses
