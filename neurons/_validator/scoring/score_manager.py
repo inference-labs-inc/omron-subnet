@@ -39,13 +39,13 @@ class ScoreManager:
         """Initialize or load existing scores."""
         bt.logging.info("Initializing validation weights")
         try:
-            scores = torch.load(f"scores_{model_id}.pt")
+            scores = torch.load(f"scores_{model_id}.pt", weights_only=True)
             if os.path.isfile("scores.pt") and not os.path.isfile(
                 os.path.join(self.score_path, "scores.pt")
             ):
                 # Migrate the scores file from the old location
                 os.rename("scores.pt", os.path.join(self.score_path, "scores.pt"))
-            scores = torch.load(os.path.join(self.score_path, "scores.pt"))
+            scores = torch.load(os.path.join(self.score_path, "scores.pt"), weights_only=True)
         except FileNotFoundError:
             scores = self._create_initial_scores()
         except Exception as e:
@@ -85,7 +85,7 @@ class ScoreManager:
             return
 
         for model_id in circuit_store.list_circuits():
-            responses_for_model = [r for r in responses if r.model_id == model_id]
+            responses_for_model = [r for r in responses if r.circuit.id == model_id]
             if responses_for_model:
                 self._update_scores_single_model(responses_for_model, model_id)
 
