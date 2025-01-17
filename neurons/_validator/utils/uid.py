@@ -8,8 +8,8 @@ from constants import VALIDATOR_STAKE_THRESHOLD
 
 def is_valid_ip(ip: str) -> bool:
     try:
-        ipaddress.ip_address(ip)
-        return True
+        address = ipaddress.IPv4Address(ip)
+        return address.is_global and not address.is_multicast
     except ValueError:
         return False
 
