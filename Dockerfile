@@ -53,7 +53,7 @@ COPY pyproject.toml /home/ubuntu/omron/pyproject.toml
 COPY uv.lock /home/ubuntu/omron/uv.lock
 RUN pipx install uv && \
     cd ~/omron && \
-    ~/.local/bin/uv sync --locked && \
+    ~/.local/bin/uv sync --locked --compile-bytecode && \
     ~/.local/bin/uv cache clean && \
     echo "source ~/omron/.venv/bin/activate" >> ~/.bashrc
 ENV PATH="/home/ubuntu/omron/.venv/bin:${PATH}"
