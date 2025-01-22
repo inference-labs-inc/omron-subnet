@@ -62,7 +62,7 @@ services:
     ports:
       - 8091:8091
     volumes:  # Update this path to your .bittensor directory
-      - {path_to_your_.bittensor_directory}:/root/.bittensor
+      - {path_to_your_.bittensor_directory}:/home/ubuntu/.bittensor
     labels:
       - com.centurylinklabs.watchtower.enable=true  # Enables Watchtower for this container
     command: miner.py --wallet.name {your_miner_key_name} --wallet.hotkey {your_miner_hotkey_name} --netuid 2
@@ -82,7 +82,7 @@ services:
 docker run -d \
   --name omron-miner \
   -p 8091:8091 \
-  -v {path_to_your_.bittensor_directory}:/root/.bittensor \
+  -v {path_to_your_.bittensor_directory}:/home/ubuntu/.bittensor \
   --restart unless-stopped \
   ghcr.io/inference-labs-inc/omron:latest \
   miner.py \
@@ -133,7 +133,7 @@ services:
       - 8443:8443
       - 9090:9090  # In case you use prometheus monitoring
     volumes:  # Update this path to your .bittensor directory
-      - {path_to_your_.bittensor_directory}:/root/.bittensor
+      - {path_to_your_.bittensor_directory}:/home/ubuntu/.bittensor
     labels:
       - com.centurylinklabs.watchtower.enable=true  # Enables Watchtower for this container
     command: validator.py --wallet.name {validator_key_name} --wallet.hotkey {validator_hot_key_name} --netuid 2
@@ -154,7 +154,7 @@ docker run -d \
   --name omron-validator \
   -p 8443:8443 \
   -p 9090:9090 \
-  -v {path_to_your_.bittensor_directory}:/root/.bittensor \
+  -v {path_to_your_.bittensor_directory}:/home/ubuntu/.bittensor \
   --restart unless-stopped \
   ghcr.io/inference-labs-inc/omron:latest \
   validator.py \
