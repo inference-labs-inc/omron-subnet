@@ -21,14 +21,12 @@ def clean_temp_files():
     Clean temporary files
     """
     logging.info("Deleting temp folder...")
-    folder_path = os.path.join(
-        os.path.dirname(__file__),
-        "execution_layer",
-        "temp",
-    )
+    folder_path = "/tmp/omron"
     if os.path.exists(folder_path):
         logging.debug("Removing temp folder...")
         shutil.rmtree(folder_path)
+    else:
+        logging.info("Temp folder does not exist")
 
 
 def timeout_with_multiprocess_retry(seconds, retries=3):

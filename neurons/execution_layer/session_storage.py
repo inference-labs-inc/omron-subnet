@@ -10,7 +10,7 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 class SessionStorage:
     model_id: str = field()
     session_uuid: str = field()
-    base_path: str = field(default=os.path.join(dir_path, "temp"))
+    base_path: str = field(default="/tmp/omron")
     input_path: str = field(init=False)
     witness_path: str = field(init=False)
     proof_path: str = field(init=False)
@@ -18,6 +18,8 @@ class SessionStorage:
     public_path: str = field(init=False)
 
     def __attrs_post_init__(self):
+        if not os.path.exists(self.base_path):
+            os.makedirs(self.base_path)
         self.input_path = os.path.join(
             self.base_path, f"input_{self.model_id}_{self.session_uuid}.json"
         )
