@@ -4,7 +4,12 @@ from typing import Optional
 
 import bittensor as bt
 
-from constants import ONCHAIN_PROOF_OF_WEIGHTS_ENABLED, PROOF_OF_WEIGHTS_INTERVAL, Roles
+from constants import (
+    ONCHAIN_PROOF_OF_WEIGHTS_ENABLED,
+    PROOF_OF_WEIGHTS_INTERVAL,
+    Roles,
+    TEMP_FOLDER,
+)
 
 parser: Optional[argparse.ArgumentParser]
 config: Optional[bt.config]
@@ -21,6 +26,9 @@ def init_config(role: Optional[str]):
 
     global parser
     global config
+
+    if not os.path.exists(TEMP_FOLDER):
+        os.makedirs(TEMP_FOLDER)
 
     parser = argparse.ArgumentParser()
 

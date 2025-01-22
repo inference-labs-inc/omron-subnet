@@ -1,5 +1,6 @@
 import os
 import bittensor as bt
+from constants import TEMP_FOLDER
 
 from attr import define, field
 
@@ -10,7 +11,7 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 class SessionStorage:
     model_id: str = field()
     session_uuid: str = field()
-    base_path: str = field(default="/tmp/omron")
+    base_path: str = field(default=TEMP_FOLDER)
     input_path: str = field(init=False)
     witness_path: str = field(init=False)
     proof_path: str = field(init=False)

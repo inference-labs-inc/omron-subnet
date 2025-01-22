@@ -4,6 +4,7 @@ import shutil
 import functools
 import multiprocessing
 from bittensor import logging
+from constants import TEMP_FOLDER
 
 
 def restart_app():
@@ -21,7 +22,7 @@ def clean_temp_files():
     Clean temporary files
     """
     logging.info("Deleting temp folder...")
-    folder_path = "/tmp/omron"
+    folder_path = TEMP_FOLDER
     if os.path.exists(folder_path):
         logging.debug("Removing temp folder...")
         shutil.rmtree(folder_path)
