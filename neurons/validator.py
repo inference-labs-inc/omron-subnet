@@ -17,7 +17,7 @@ if __name__ == "__main__":
 
         bt.logging.info("Creating validator session...")
         validator_session = ValidatorSession()
-        bt.logging.info("Running main loop...")
+        bt.logging.debug("Running main loop...")
         validator_session.run()
     except Exception as e:
         bt.logging.error("Critical error while attempting to run validator: ", e)

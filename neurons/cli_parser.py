@@ -206,7 +206,7 @@ def _validator_config():
     parser.add_argument(
         "--external-api-port",
         type=int,
-        default=8000,
+        default=8443,
         help="The port for the external API.",
     )
 
@@ -263,5 +263,5 @@ def _validator_config():
         if config.wallet.name == "default":
             config.wallet.name = "validator"
         config.external_api_workers = config.external_api_workers or 1
-        config.external_api_port = config.external_api_port or 8000
+        config.external_api_port = config.external_api_port or 8443
         config.do_not_verify_external_signatures = True

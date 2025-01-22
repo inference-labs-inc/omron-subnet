@@ -45,7 +45,9 @@ class ScoreManager:
             ):
                 # Migrate the scores file from the old location
                 os.rename("scores.pt", os.path.join(self.score_path, "scores.pt"))
-            scores = torch.load(os.path.join(self.score_path, "scores.pt"), weights_only=True)
+            scores = torch.load(
+                os.path.join(self.score_path, "scores.pt"), weights_only=True
+            )
         except FileNotFoundError:
             scores = self._create_initial_scores()
         except Exception as e:
@@ -276,3 +278,22 @@ class ScoreManager:
                 self.score_dict[model_id] = torch.cat(
                     (self.score_dict[model_id], new_scores)
                 )
+
+    def update_single_score(self, response: MinerResponse) -> None:
+        """
+        Update the score for a single miner based on their response.
+
+        Args:
+            response (MinerResponse): The processed response from a miner.
+        """
+        if response.circuit.id not in self.score_dict:
+            return
+
+        scores = self.score_dict[response.circuit.id]
+        if response.uid >= len(scores):
+            return
+
+        if response.verification_result:
+            scores[response.uid] = min(scores[response.uid] + 0.1, 1.0)
+        else:
+            scores[response.uid] = max(scores[response.uid] - 0.1, 0.0)

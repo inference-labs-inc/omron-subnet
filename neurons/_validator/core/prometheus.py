@@ -3,7 +3,7 @@ import threading
 from typing import Optional
 from wsgiref.simple_server import WSGIServer
 
-from prometheus_client import Summary, Histogram, start_http_server
+from prometheus_client import Histogram, Gauge, start_http_server
 
 
 _server: Optional[WSGIServer] = None
@@ -13,6 +13,9 @@ _validation_times: Optional[Histogram] = None
 _response_times: Optional[Histogram] = None
 _proof_sizes: Optional[Histogram] = None
 _verification_ratio: Optional[Histogram] = None
+_request_queue_size: Optional[Gauge] = None
+_active_requests: Optional[Gauge] = None
+_processed_uids: Optional[Gauge] = None
 
 
 def start_prometheus_logging(port: int) -> None:
@@ -20,6 +23,7 @@ def start_prometheus_logging(port: int) -> None:
     _server, _thread = start_http_server(port)
 
     global _validation_times, _response_times, _proof_sizes, _verification_ratio
+    global _request_queue_size, _active_requests, _processed_uids
     _validation_times = Histogram(
         "validating_seconds", "Time spent validating responses"
     )
@@ -34,11 +38,15 @@ def start_prometheus_logging(port: int) -> None:
     _verification_ratio = Histogram(
         "verified_proofs_ratio", "Verified proofs ratio", ["model"]
     )
+    _request_queue_size = Gauge("request_queue_size", "Number of requests in queue")
+    _active_requests = Gauge("active_requests", "Number of currently active requests")
+    _processed_uids = Gauge("processed_uids", "Number of processed UIDs")
 
 
 def stop_prometheus_logging() -> None:
     global _server, _thread
     global _validation_times, _response_times, _proof_sizes, _verification_ratio
+    global _request_queue_size, _active_requests, _processed_uids
     if _server:
         _server.shutdown()
         _server = None
@@ -47,6 +55,9 @@ def stop_prometheus_logging() -> None:
         _response_times = None
         _proof_sizes = None
         _verification_ratio = None
+        _request_queue_size = None
+        _active_requests = None
+        _processed_uids = None
 
 
 def log_validation_time(time: float) -> None:
@@ -83,3 +94,15 @@ def log_verification_ratio(value: float, model_name: str) -> None:
     global _verification_ratio
     if _verification_ratio:
         _verification_ratio.labels(model_name).observe(value)
+
+
+def log_request_metrics(
+    queue_size: int, active_requests: int, processed_uids: int
+) -> None:
+    global _request_queue_size, _active_requests, _processed_uids
+    if _request_queue_size:
+        _request_queue_size.set(queue_size)
+    if _active_requests:
+        _active_requests.set(active_requests)
+    if _processed_uids:
+        _processed_uids.set(processed_uids)

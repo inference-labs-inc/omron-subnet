@@ -7,6 +7,7 @@ import time
 import traceback
 from functools import partial
 from typing import Optional
+from constants import FIVE_MINUTES
 
 # trunk-ignore(pylint/E0611)
 import bittensor as bt
@@ -234,7 +235,9 @@ def sync_model_files():
 
             bt.logging.info(SYNC_LOG_PREFIX + f"Downloading {url} to {file_path}...")
             try:
-                with requests.get(url, timeout=600, stream=True) as response:
+                with requests.get(
+                    url, timeout=FIVE_MINUTES * 2, stream=True
+                ) as response:
                     response.raise_for_status()
                     with open(file_path, "wb") as f:
                         for chunk in response.iter_content(chunk_size=8192):

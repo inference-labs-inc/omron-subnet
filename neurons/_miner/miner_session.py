@@ -58,9 +58,20 @@ class MinerSession:
 
         # Serve passes the axon information to the network + netuid we are hosting on.
         # This will auto-update if the axon port of external ip has changed.
+        existing_axon = self.metagraph.axons[self.subnet_uid]
+        if (
+            existing_axon
+            and existing_axon.port == axon.external_port
+            and existing_axon.ip == axon.external_ip
+        ):
+            bt.logging.debug(
+                f"Axon already serving on ip {axon.external_ip} and port {axon.external_port}"
+            )
+            return
         bt.logging.info(
             f"Serving axon on network: {self.subtensor.chain_endpoint} with netuid: {cli_parser.config.netuid}"
         )
+
         axon.serve(netuid=cli_parser.config.netuid, subtensor=self.subtensor)
         bt.logging.info(
             f"Served axon on network: {self.subtensor.chain_endpoint} with netuid: {cli_parser.config.netuid}"

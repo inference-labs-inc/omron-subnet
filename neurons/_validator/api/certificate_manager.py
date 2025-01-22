@@ -2,6 +2,7 @@ import os
 import time
 from OpenSSL import crypto
 import bittensor as bt
+from constants import ONE_YEAR
 
 
 class CertificateManager:
@@ -26,7 +27,7 @@ class CertificateManager:
         cert.get_subject().CN = cn
         cert.set_serial_number(int(time.time()))
         cert.gmtime_adj_notBefore(0)
-        cert.gmtime_adj_notAfter(2 * 365 * 24 * 60 * 60)
+        cert.gmtime_adj_notAfter(2 * ONE_YEAR)
         cert.set_issuer(cert.get_subject())
         cert.set_pubkey(key)
         cert.sign(key, "sha256")

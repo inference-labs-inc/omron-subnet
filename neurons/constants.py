@@ -32,10 +32,10 @@ IGNORED_MODEL_HASHES = [
 
 # The maximum timespan allowed for miners to respond to a query
 VALIDATOR_REQUEST_TIMEOUT_SECONDS = 120
-# The timeout for aggregation requests
-VALIDATOR_AGG_REQUEST_TIMEOUT_SECONDS = 600
+# An additional queueing time for external requests
+EXTERNAL_REQUEST_QUEUE_TIME_SECONDS = 10
 # Maximum number of concurrent requests that the validator will handle
-MAX_CONCURRENT_REQUESTS = 16
+MAX_CONCURRENT_REQUESTS = 32
 # Default proof size when we're unable to determine the actual size
 DEFAULT_PROOF_SIZE = 5000
 # Size in percent of the sample to be used for the maximum score median
@@ -136,3 +136,10 @@ MAINNET_TESTNET_UIDS = [
 ]
 # GitHub repository URL
 REPO_URL = "https://github.com/inference-labs-inc/omron-subnet"
+# Various time constants in seconds
+ONE_SECOND = 1
+ONE_MINUTE = 60
+FIVE_MINUTES = ONE_MINUTE * 5
+ONE_HOUR = ONE_MINUTE * 60
+ONE_DAY = ONE_HOUR * 24
+ONE_YEAR = ONE_DAY * 365
