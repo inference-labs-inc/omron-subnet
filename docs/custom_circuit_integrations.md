@@ -65,7 +65,7 @@ There are three primary functions which must be implemented.
 | `validate` | Validates the external inputs for the circuit.                                                     |
 | `process`  | Processes external input for the circuit.                                                          |
 
-> [!CAUTION]
+> [!IMPORTANT]
 >
 > `input.py` **must** implement a unique key field named `nonce`. This field is required for security reasons and is used internally by the subnet.
 
@@ -80,12 +80,14 @@ This file is responsible for describing the circuit's properties, and contains b
 | `author`          | `string`        | The author of the circuit.                                                           | ✅       |
 | `version`         | `string`        | The version of the circuit.                                                          | ✅       |
 | `proof_system`    | [`ProofSystem`] | The proof system used by the circuit.                                                | ✅       |
-| `type`            | [`CircuitType`] | The type of circuit.                                                                 | ✅       |
+| `type`            | [`CircuitType`] | The type of circuit. New circuits should use `PROOF_OF_COMPUTATION` by default       | ✅       |
 | `external_files`  | `dict`          | A dictionary of external files required by the circuit.                              | ✅       |
 | `netuid`          | `int`           | For Proof of Weights, the netuid of the target subnet.                               | ❌       |
 | `weights_version` | `int`           | For Proof of Weights, the version of subnet weights that the circuit corresponds to. | ❌       |
 
 [See it's class definition here for more information](https://github.com/inference-labs-inc/omron-subnet/blob/main/neurons/execution_layer/circuit.py#L100)
+
+[See an example `metadata.json` file here](https://github.com/inference-labs-inc/omron-subnet/blob/main/neurons/deployment_layer/model_33b92394b18412622adad75733a6fc659b4e202b01ee8a5465958a6bad8ded62/metadata.json)
 
 #### `settings.json`
 
@@ -94,6 +96,8 @@ This file is generated automatically by the EZKL proof system (if using EZKL). A
 Locate the `model_input_scales` field in the `settings.json` file. This field is a list of floats, where each float corresponds to the scale of the input for a specific input field.
 
 Add a new field below this list called `model_input_types`. This should look the exact same as the `model_input_scales`, but instead: This field is a list of strings, where each string corresponds to the type of the input for a specific input field. A list of valid types can be found [here](https://github.com/zkonduit/ezkl/blob/f35688917d09806196fdedc7fc69804357363183/src/circuit/ops/mod.rs#L86). If you are unsure about this step, please reach out to the Omron team for assistance.
+
+[See an example `settings.json` file here](https://github.com/inference-labs-inc/omron-subnet/blob/main/neurons/deployment_layer/model_33b92394b18412622adad75733a6fc659b4e202b01ee8a5465958a6bad8ded62/settings.json#L82)
 
 ### Create the circuit directory
 
