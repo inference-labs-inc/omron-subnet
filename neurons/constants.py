@@ -136,3 +136,5 @@ MAINNET_TESTNET_UIDS = [
 ]
 # GitHub repository URL
 REPO_URL = "https://github.com/inference-labs-inc/omron-subnet"
+# Temporary folder for storing proof files
+TEMP_FOLDER = "/tmp/omron"
