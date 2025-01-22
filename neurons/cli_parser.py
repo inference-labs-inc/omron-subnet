@@ -114,6 +114,12 @@ def init_config(role: Optional[str]):
     bt.logging(config=config, logging_dir=config.logging.logging_dir)
     bt.logging.enable_info()
 
+    # Make sure we have access to the models directory
+    if not os.access(config.full_path, os.W_OK):
+        bt.logging.error(
+            f"Cannot write to {config.full_path}. Please make sure you have the correct permissions."
+        )
+
     if config.wandb_key:
         wandb_logger.safe_login(api_key=config.wandb_key)
         bt.logging.success("Logged into WandB")

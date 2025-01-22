@@ -141,3 +141,5 @@ MAINNET_TESTNET_UIDS = [
 ]
 # EZKL path
 LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")
+# GitHub repository URL
+REPO_URL = "https://github.com/inference-labs-inc/omron-subnet"
