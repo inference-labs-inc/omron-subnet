@@ -1,52 +1,39 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
 // README at: https://github.com/devcontainers/templates/tree/main/src/ubuntu
 {
-	"name": "Omron Dev",
-	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	// Built from https://github.com/inference-labs-inc/tensor-tools/blob/main/bittensor-devcontainer/Dockerfile
-	"image": "ghcr.io/inference-labs-inc/bittensor-devcontainer:latest",
-	// "build": {
-	// 	// Path is relative to the devcontainer.json file.
-	// 	"context": "..",
-	// 	"dockerfile": "Dockerfile"
-	// },
-	// "runArgs": ["--platform=linux/amd64"],
-
-	// Features to add to the dev container. More info: https://containers.dev/features.
-	// "features": {
-	// 	"ghcr.io/devcontainers/features/python:1": {
-	// 		"installTools": true,
-	// 		"version": "os-provided"
-	// 	}
-	// },
-
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
-
-	// Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": [
-	// 	"uv sync --locked",
-	// 	"source .venv/bin/activate.fish"
-	// ],
-
-	// Configure tool-specific properties.
-	"customizations": {
-		"vscode": {
-			"settings": {
-				"terminal.integrated.defaultProfile.linux": "fish"
-				// "python.defaultInterpreterPath": "/home/vscode/.venv/bin/python"
-			},
-			"extensions": [
-				"ms-python.black-formatter",
-				"ms-python.python"
-			]
-		}
-	},
-
-	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-	// "remoteUser": "root",
-
-	"mounts": [
-		{ "source": "${localEnv:HOME}/.bittensor/omron", "target": "/home/vscode/.bittensor/omron", "type": "bind" }
-	]
+  "name": "Omron Dev",
+  // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+  // Built from https://github.com/inference-labs-inc/tensor-tools/blob/main/bittensor-devcontainer/Dockerfile
+  "image": "ghcr.io/inference-labs-inc/bittensor-devcontainer:latest",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "fish",
+        "[python]": {
+          "editor.tabSize": 4,
+          "files.trimTrailingWhitespace": true,
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "ms-python.black-formatter"
+        },
+        "isort.args": [
+          "--settings-file",
+          "./.isort.cfg"
+        ]
+      },
+      "extensions": [
+        "ms-python.black-formatter",
+        "ms-python.python",
+        "ms-python.isort"
+      ]
+    }
+  },
+  // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+  // "remoteUser": "root",
+  "mounts": [
+    {
+      "source": "${localEnv:HOME}/.bittensor/omron",
+      "target": "/home/vscode/.bittensor/omron",
+      "type": "bind"
+    }
+  ]
 }
