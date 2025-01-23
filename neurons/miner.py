@@ -1,12 +1,18 @@
 import traceback
 
+# isort: off
+import cli_parser  # <- this need to stay before bittensor import
+
 import bittensor as bt
+
+# isort: on
 
 from _miner.miner_session import MinerSession
 from constants import Roles
 from utils import run_shared_preflight_checks
 
 if __name__ == "__main__":
+    cli_parser.init_config(Roles.MINER)
     run_shared_preflight_checks(Roles.MINER)
 
     try:

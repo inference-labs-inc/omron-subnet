@@ -47,7 +47,6 @@ def run_shared_preflight_checks(role: Optional[str] = None):
     """
 
     preflight_checks = [
-        ("Init configs", partial(cli_parser.init_config, role=role)),
         ("Resolve legacy folders", partial(resolve_legacy_folders, role=role)),
         ("Syncing model files", sync_model_files),
         ("Ensuring Node.js version", ensure_nodejs_version),
