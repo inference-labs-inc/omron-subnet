@@ -16,6 +16,7 @@ RUN apt update && \
     llvm \
     libudev-dev \
     protobuf-compiler \
+    gosu \
     && apt clean && rm -rf /var/lib/apt/lists/*
 
 # Use ubuntu user
@@ -69,7 +70,25 @@ RUN OMRON_DOCKER_BUILD=1 python3 miner.py && \
     rm -rf ~/omron/neurons/deployment_layer/*/target/release/examples && \
     rm -rf ~/omron/neurons/deployment_layer/*/target/release/incremental && \
     rm -rf ~/.bittensor
-ENTRYPOINT ["/home/ubuntu/omron/.venv/bin/python3"]
+USER root
+RUN cat <<'EOF' > /entrypoint.sh
+#!/usr/bin/env bash
+set -e
+if [ -n "$PUID" ]; then
+    if [ "$PUID" = "0" ]; then
+        echo "Running as root user"
+        /home/ubuntu/omron/.venv/bin/python3 "$@"
+    else
+        echo "Changing ubuntu user id to $PUID"
+        usermod -u "$PUID" ubuntu
+        gosu ubuntu /home/ubuntu/omron/.venv/bin/python3 "$@"
+    fi
+else
+    gosu ubuntu /home/ubuntu/omron/.venv/bin/python3 "$@"
+fi
+EOF
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["-c", "import subprocess; \
     subprocess.run(['/home/ubuntu/omron/.venv/bin/python3', '/home/ubuntu/omron/neurons/miner.py', '--help']); \
     subprocess.run(['/home/ubuntu/omron/.venv/bin/python3', '/home/ubuntu/omron/neurons/validator.py', '--help']);" \
