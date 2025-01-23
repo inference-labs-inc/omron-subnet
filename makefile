@@ -36,7 +36,7 @@ miner:
 		--detach \
 		--name omron-miner \
 		-p $(MINER_PORT):8091 \
-		-v $(WALLET_PATH):/root/.bittensor \
+		-v $(WALLET_PATH):/home/ubuntu/.bittensor \
 		omron miner.py \
 		--wallet.name $(WALLET_NAME) \
 		--wallet.hotkey $(WALLET_HOTKEY) \
@@ -50,7 +50,7 @@ validator:
 		--detach \
 		--name omron-validator \
 		-p $(VALIDATOR_PORT):8443 \
-		-v $(WALLET_PATH):/root/.bittensor \
+		-v $(WALLET_PATH):/home/ubuntu/.bittensor \
 		omron validator.py \
 		--wallet.name $(WALLET_NAME) \
 		--wallet.hotkey $(WALLET_HOTKEY) \
@@ -64,7 +64,7 @@ test-miner:
 		--detach \
 		--name omron-miner \
 		-p $(MINER_PORT):8091 \
-		-v $(WALLET_PATH):/root/.bittensor \
+		-v $(WALLET_PATH):/home/ubuntu/.bittensor \
 		omron miner.py \
 		--wallet.name $(WALLET_NAME) \
 		--wallet.hotkey $(WALLET_HOTKEY) \
@@ -80,7 +80,7 @@ test-validator:
 		--detach \
 		--name omron-validator \
 		-p $(VALIDATOR_PORT):8443 \
-		-v $(WALLET_PATH):/root/.bittensor \
+		-v $(WALLET_PATH):/home/ubuntu/.bittensor \
 		omron validator.py \
 		--wallet.name $(WALLET_NAME) \
 		--wallet.hotkey $(WALLET_HOTKEY) \

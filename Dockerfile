@@ -47,10 +47,12 @@ RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | b
 ENV PATH="/home/ubuntu/.local/bin:${PATH}"
 
 # Copy omron and install Python dependencies (make sure owner is ubuntu)
-RUN mkdir -p /home/ubuntu/omron/neurons
 COPY neurons /home/ubuntu/omron/neurons
 COPY pyproject.toml /home/ubuntu/omron/pyproject.toml
 COPY uv.lock /home/ubuntu/omron/uv.lock
+USER root
+RUN chown -R ubuntu:ubuntu /home/ubuntu/omron
+USER ubuntu
 RUN pipx install uv && \
     cd ~/omron && \
     ~/.local/bin/uv sync --locked --compile-bytecode && \
