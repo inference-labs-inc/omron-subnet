@@ -69,7 +69,8 @@ RUN OMRON_DOCKER_BUILD=1 /home/ubuntu/omron/.venv/bin/python3 miner.py && \
     rm -rf ~/omron/neurons/deployment_layer/*/target/release/deps && \
     rm -rf ~/omron/neurons/deployment_layer/*/target/release/examples && \
     rm -rf ~/omron/neurons/deployment_layer/*/target/release/incremental && \
-    rm -rf ~/.bittensor
+    rm -rf ~/.bittensor && \
+    rm -rf /tmp/omron
 USER root
 RUN cat <<'EOF' > /entrypoint.sh
 #!/usr/bin/env bash
