@@ -11,7 +11,6 @@ requires-python = "==3.12.*"
 dependencies = [
 	"attrs==24.2.0",
 	"bittensor==8.5.1",
-	"black>=24.10.0",
 	"ezkl==16.2.0",
 	"fastapi==0.110.1",
 	"jsonrpcserver>=5.0.9",
@@ -42,3 +41,8 @@ torch = { index = "pytorch" }
 name = "pytorch"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
+
+[dependency-groups]
+dev = [
+    "black>=24.10.0",
+]

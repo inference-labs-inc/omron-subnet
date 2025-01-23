@@ -866,7 +866,6 @@ source = { editable = "." }
 dependencies = [
     { name = "attrs" },
     { name = "bittensor" },
-    { name = "black" },
     { name = "ezkl" },
     { name = "fastapi" },
     { name = "jsonrpcserver" },
@@ -884,11 +883,15 @@ dependencies = [
     { name = "wandb" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "black" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "attrs", specifier = "==24.2.0" },
     { name = "bittensor", specifier = "==8.5.1" },
-    { name = "black", specifier = ">=24.10.0" },
     { name = "ezkl", specifier = "==16.2.0" },
     { name = "fastapi", specifier = "==0.110.1" },
     { name = "jsonrpcserver", specifier = ">=5.0.9" },
@@ -904,6 +907,9 @@ requires-dist = [
     { name = "uvicorn", specifier = "==0.22.0" },
     { name = "wandb", specifier = "==0.18.1" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "black", specifier = ">=24.10.0" }]
 
 [[package]]
 name = "oslash"
