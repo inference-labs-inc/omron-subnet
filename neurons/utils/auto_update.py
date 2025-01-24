@@ -138,15 +138,12 @@ class AutoUpdate:
                 }
             )
 
-            logging.info(f"Current version: {current_tag.name}")
-            logging.info(f"Latest release version: {latest_release_tag_name}")
-
             if current_tag.name == latest_release_tag_name:
                 if self.repo.head.commit.hexsha == current_tag.commit.hexsha:
-                    logging.info("Already having latest release locally.")
+                    logging.info("Your version is up to date.")
                     return True
                 logging.info(
-                    "Latest release is already checked out. But current commit is different."
+                    "Latest release is checked out, however your commit is different."
                 )
             else:
                 logging.trace(
