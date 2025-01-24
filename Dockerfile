@@ -56,7 +56,7 @@ RUN chown -R ubuntu:ubuntu /home/ubuntu/omron
 USER ubuntu
 RUN pipx install uv && \
     cd ~/omron && \
-    ~/.local/bin/uv sync --locked --compile-bytecode && \
+    ~/.local/bin/uv sync --locked --no-dev --compile-bytecode && \
     ~/.local/bin/uv cache clean && \
     echo "source ~/omron/.venv/bin/activate" >> ~/.bashrc
 ENV PATH="/home/ubuntu/omron/.venv/bin:${PATH}"
@@ -64,12 +64,13 @@ ENV PATH="/home/ubuntu/omron/.venv/bin:${PATH}"
 # Set workdir for running miner.py or validator.py and compile circuits
 WORKDIR /home/ubuntu/omron/neurons
 ENV OMRON_NO_AUTO_UPDATE=1
-RUN OMRON_DOCKER_BUILD=1 python3 miner.py && \
+RUN OMRON_DOCKER_BUILD=1 /home/ubuntu/omron/.venv/bin/python3 miner.py && \
     rm -rf ~/omron/neurons/deployment_layer/*/target/release/build && \
     rm -rf ~/omron/neurons/deployment_layer/*/target/release/deps && \
     rm -rf ~/omron/neurons/deployment_layer/*/target/release/examples && \
     rm -rf ~/omron/neurons/deployment_layer/*/target/release/incremental && \
-    rm -rf ~/.bittensor
+    rm -rf ~/.bittensor && \
+    rm -rf /tmp/omron
 USER root
 RUN cat <<'EOF' > /entrypoint.sh
 #!/usr/bin/env bash

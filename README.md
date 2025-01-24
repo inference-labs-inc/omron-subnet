@@ -61,8 +61,13 @@ services:
     restart: unless-stopped
     ports:
       - 8091:8091
-    volumes:  # Update this path to your .bittensor directory
+    volumes:
+      # Update this path to your .bittensor directory
+      # Note: use /root/.bittensor instead of /home/ubuntu/.bittensor if you set PUID to 0
       - {path_to_your_.bittensor_directory}:/home/ubuntu/.bittensor
+    environment:
+      # This UID needs to be able to read/write to your .bittensor directory, either update the UID or the directory permissions
+      - PUID=1000
     labels:
       - com.centurylinklabs.watchtower.enable=true  # Enables Watchtower for this container
     command: miner.py --wallet.name {your_miner_key_name} --wallet.hotkey {your_miner_hotkey_name} --netuid 2
@@ -83,6 +88,7 @@ docker run -d \
   --name omron-miner \
   -p 8091:8091 \
   -v {path_to_your_.bittensor_directory}:/home/ubuntu/.bittensor \
+  -e PUID=1000 \
   --restart unless-stopped \
   ghcr.io/inference-labs-inc/omron:latest \
   miner.py \
@@ -132,8 +138,13 @@ services:
     ports:
       - 8443:8443
       - 9090:9090  # In case you use prometheus monitoring
-    volumes:  # Update this path to your .bittensor directory
+    volumes:
+      # Update this path to your .bittensor directory
+      # Note: use /root/.bittensor instead of /home/ubuntu/.bittensor if you set PUID to 0
       - {path_to_your_.bittensor_directory}:/home/ubuntu/.bittensor
+    environment:
+      # This UID needs to be able to read/write to your .bittensor directory, either update the UID or the directory permissions
+      - PUID=1000
     labels:
       - com.centurylinklabs.watchtower.enable=true  # Enables Watchtower for this container
     command: validator.py --wallet.name {validator_key_name} --wallet.hotkey {validator_hot_key_name} --netuid 2
@@ -155,6 +166,7 @@ docker run -d \
   -p 8443:8443 \
   -p 9090:9090 \
   -v {path_to_your_.bittensor_directory}:/home/ubuntu/.bittensor \
+  -e PUID=1000 \
   --restart unless-stopped \
   ghcr.io/inference-labs-inc/omron:latest \
   validator.py \
