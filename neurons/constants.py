@@ -143,3 +143,5 @@ FIVE_MINUTES = ONE_MINUTE * 5
 ONE_HOUR = ONE_MINUTE * 60
 ONE_DAY = ONE_HOUR * 24
 ONE_YEAR = ONE_DAY * 365
+# Temporary folder for storing proof files
+TEMP_FOLDER = "/tmp/omron"

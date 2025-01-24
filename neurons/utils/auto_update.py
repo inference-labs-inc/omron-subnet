@@ -47,7 +47,9 @@ class AutoUpdate:
         Get the latest release tag from the GitHub repository
         """
         try:
-            response = requests.get(f"{REPO_URL}/releases/latest")
+            headers = {"Accept": "application/vnd.github.v3+json"}
+            api_url = f"{REPO_URL.replace('github.com', 'api.github.com/repos')}/releases/latest"
+            response = requests.get(api_url, headers=headers)
             response.raise_for_status()
             latest_release = response.json()
             return latest_release["tag_name"]
