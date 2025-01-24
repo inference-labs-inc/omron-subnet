@@ -143,7 +143,7 @@ class AutoUpdate:
             if current_tag.name == latest_release_tag_name:
                 if self.repo.head.commit.hexsha == current_tag.commit.hexsha:
                     logging.info("Your version is up to date.")
-                    return True
+                    return False
                 logging.info(
                     "Latest release is checked out, however your commit is different."
                 )
