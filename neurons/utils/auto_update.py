@@ -6,6 +6,7 @@ import sys
 import requests
 from typing import Optional
 from constants import REPO_URL
+from .wandb_logger import safe_log
 
 from bittensor import logging
 
@@ -129,6 +130,17 @@ class AutoUpdate:
                 return False
 
             current_tag = self.get_local_latest_tag()
+
+            safe_log(
+                {
+                    "local_version": current_tag.name,
+                    "remote_version": latest_release_tag_name,
+                }
+            )
+
+            logging.info(f"Current version: {current_tag.name}")
+            logging.info(f"Latest release version: {latest_release_tag_name}")
+
             if current_tag.name == latest_release_tag_name:
                 if self.repo.head.commit.hexsha == current_tag.commit.hexsha:
                     logging.info("Already having latest release locally.")
