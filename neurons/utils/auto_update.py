@@ -3,6 +3,7 @@ import subprocess
 import git
 import hashlib
 import sys
+import time
 import requests
 from typing import Optional
 from constants import REPO_URL
@@ -22,6 +23,7 @@ class AutoUpdate:
     """
 
     def __init__(self):
+        self.last_check_time = 0
         try:
             if not cli_parser.config.no_auto_update:
                 self.repo = git.Repo(search_parent_directories=True)
@@ -174,6 +176,11 @@ class AutoUpdate:
         """
         Automatic update entrypoint method
         """
+
+        if time.time() - self.last_check_time < 300:
+            return
+
+        self.last_check_time = time.time()
 
         if not self.update_to_latest_release():
             return
