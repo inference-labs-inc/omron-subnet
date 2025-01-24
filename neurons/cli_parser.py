@@ -1,21 +1,43 @@
 import argparse
 import os
+import sys
 from typing import Optional
-
-import bittensor as bt
 
 from constants import (
     ONCHAIN_PROOF_OF_WEIGHTS_ENABLED,
     PROOF_OF_WEIGHTS_INTERVAL,
-    Roles,
     TEMP_FOLDER,
+    Roles,
 )
+
+SHOW_HELP = False
+
+### A dirty hack to show help message when running the script with --help or -h ###
+# Bittensor is the culprit of this ugly piece of code.
+# It intercepts the --help and -h flags, shows its own help message and exits the script.
+# So this should be executed before the Bittensor is first time imported.
+if "--help" in sys.argv:
+    SHOW_HELP = True
+    sys.argv.remove("--help")
+elif "-h" in sys.argv:
+    SHOW_HELP = True
+    sys.argv.remove("-h")
+
+import bittensor as bt
+
+###################################################################################
 
 parser: Optional[argparse.ArgumentParser]
 config: Optional[bt.config]
 
 
-def init_config(role: Optional[str]):
+DESCRIPTION = {
+    Roles.MINER: "Omron Miner. Starts a Bittensor node that mines on the Omron subnet.",
+    Roles.VALIDATOR: "Omron Validator. Starts a Bittensor node that validates on the Omron subnet.",
+}
+
+
+def init_config(role: Optional[str] = None):
     """
     Initialize the configuration for the node.
     Config is based on CLI arguments, some of which are common to both miner and validator,
@@ -30,7 +52,11 @@ def init_config(role: Optional[str]):
     if not os.path.exists(TEMP_FOLDER):
         os.makedirs(TEMP_FOLDER)
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description=DESCRIPTION.get(role, ""),
+        epilog="For more information, visit https://omron.ai/",
+        allow_abbrev=False,
+    )
 
     # init common CLI arguments for both miner and validator:
     parser.add_argument("--netuid", type=int, default=1, help="The UID of the subnet.")
@@ -77,7 +103,12 @@ def init_config(role: Optional[str]):
         bt.subtensor.add_args(parser)
         bt.logging.add_args(parser)
         bt.wallet.add_args(parser)
-        config = bt.config(parser)
+        config = bt.config(parser, strict=True)
+
+    if SHOW_HELP:
+        # --help or -h flag was passed, show the help message and exit
+        parser.print_help()
+        sys.exit(0)
 
     if config.localnet:
         # quick localnet configuration set up for testing (common params for both miner and validator)
@@ -147,7 +178,7 @@ def _miner_config():
     bt.wallet.add_args(parser)
     bt.axon.add_args(parser)
 
-    config = bt.config(parser)
+    config = bt.config(parser, strict=True)
 
     if config.localnet:
         # quick localnet configuration set up for testing (specific params for miner)
@@ -264,7 +295,7 @@ def _validator_config():
     bt.logging.add_args(parser)
     bt.wallet.add_args(parser)
 
-    config = bt.config(parser)
+    config = bt.config(parser, strict=True)
 
     if config.localnet:
         # quick localnet configuration set up for testing (specific params for validator)
