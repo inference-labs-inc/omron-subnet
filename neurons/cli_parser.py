@@ -90,7 +90,7 @@ def init_config(role: Optional[str]):
         config.max_workers = config.max_workers or 1
 
     config.full_path = os.path.expanduser("~/.bittensor/omron")  # type: ignore
-    config.full_path_score = os.path.join(config.full_path, "scores")
+    config.full_path_score = os.path.join(config.full_path, "scores.pt")
     if not config.certificate_path:
         config.certificate_path = os.path.join(config.full_path, "cert")
 

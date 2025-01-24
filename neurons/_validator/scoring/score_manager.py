@@ -1,4 +1,3 @@
-import os
 import torch
 import bittensor as bt
 from _validator.models.miner_response import MinerResponse
@@ -28,10 +27,7 @@ class ScoreManager:
         self.metagraph = metagraph
         self.user_uid = user_uid
         self.score_path = score_path
-        self.score_dict: dict[torch.Tensor] = {
-            model_id: self.init_scores(model_id)
-            for model_id in circuit_store.list_circuits()
-        }
+        self.scores = torch.Tensor([])
 
         self.proof_of_weights_queue = []
 
@@ -39,15 +35,7 @@ class ScoreManager:
         """Initialize or load existing scores."""
         bt.logging.info("Initializing validation weights")
         try:
-            scores = torch.load(f"scores_{model_id}.pt", weights_only=True)
-            if os.path.isfile("scores.pt") and not os.path.isfile(
-                os.path.join(self.score_path, "scores.pt")
-            ):
-                # Migrate the scores file from the old location
-                os.rename("scores.pt", os.path.join(self.score_path, "scores.pt"))
-            scores = torch.load(
-                os.path.join(self.score_path, "scores.pt"), weights_only=True
-            )
+            scores = torch.load(self.score_path, weights_only=True)
         except FileNotFoundError:
             scores = self._create_initial_scores()
         except Exception as e:
@@ -249,35 +237,16 @@ class ScoreManager:
             self.proof_of_weights_queue, new_items
         )
 
-    def _try_store_scores(self, model_id: str):
+    def _try_store_scores(self):
         """Attempt to store scores to disk."""
         try:
-            torch.save(self.score_dict[model_id], f"scores_{model_id}.pt")
+            torch.save(self.scores, self.score_path)
         except Exception as e:
-            bt.logging.info(f"Error storing scores: {e}")
-
-    def get_proof_of_weights_queue(self):
-        """Return the current proof of weights queue."""
-        return self.proof_of_weights_queue
+            bt.logging.error(f"Error storing scores: {e}")
 
     def clear_proof_of_weights_queue(self):
         """Clear the proof of weights queue."""
         self.proof_of_weights_queue = []
-
-    def sync_scores_uids(self, uids: list[int]):
-        """
-        If there are more uids than scores, add more weights.
-        """
-        for model_id in circuit_store.list_circuits():
-            if len(uids) > len(self.score_dict[model_id]):
-                bt.logging.trace(
-                    f"Scores length: {len(self.score_dict[model_id])}, UIDs length: {len(uids)}. Adding more weights"
-                )
-                size_difference = len(uids) - len(self.score_dict[model_id])
-                new_scores = torch.zeros(size_difference, dtype=torch.float32)
-                self.score_dict[model_id] = torch.cat(
-                    (self.score_dict[model_id], new_scores)
-                )
 
     def update_single_score(self, response: MinerResponse) -> None:
         """
@@ -286,7 +255,7 @@ class ScoreManager:
         Args:
             response (MinerResponse): The processed response from a miner.
         """
-        if response.circuit.id not in self.score_dict:
+        if response.circuit.id not in self.scores:
             return
 
         scores = self.score_dict[response.circuit.id]

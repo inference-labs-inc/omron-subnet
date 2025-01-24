@@ -87,7 +87,7 @@ class ValidatorLoop:
     # regularly with the updater
     @with_rate_limit(period=FIVE_MINUTES)
     def update_weights(self):
-        self.weights_manager.update_weights(self.score_manager.score_dict)
+        self.weights_manager.update_weights(self.score_manager.scores)
 
     @with_rate_limit(period=ONE_HOUR)
     def sync_scores_uids(self):

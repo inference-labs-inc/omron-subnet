@@ -86,6 +86,9 @@ class CircuitPaths:
         self.witness_executable = os.path.join(self.base_path, "witness.js")
         self.pk = os.path.join(self.external_base_path, "circuit.zkey")
         self.vk = os.path.join(self.base_path, "verification_key.json")
+        self.evaluation_data = os.path.join(
+            self.external_base_path, "evaluation_data.json"
+        )
 
     def set_proof_system_paths(self, proof_system: ProofSystem):
         """
@@ -139,6 +142,53 @@ class CircuitMetadata:
         return cls(**metadata)
 
 
+class CircuitEvaluationItem:
+    """
+    Data collected from the evaluation of the circuit.
+    """
+
+    def __init__(self, model_id: str):
+        self.model_id = model_id
+        self.uid = 0
+        self.minimum_response_time = 0
+        self.maximum_response_time = 0
+        self.proof_size = 0
+        self.response_time = 0
+        self.score = 0
+        self.verification_result = False
+
+
+class CircuitEvaluationData:
+    """
+    Data collected from the evaluation of the circuit.
+    """
+
+    def __init__(self, model_id: str, evaluation_store_path: str):
+        self.model_id = model_id
+        self.store_path = evaluation_store_path
+        self.data: list[CircuitEvaluationItem] = []
+        if os.path.exists(evaluation_store_path):
+            with open(evaluation_store_path, "r", encoding="utf-8") as f:
+                self.data = json.load(f)
+        else:
+            os.makedirs(os.path.dirname(evaluation_store_path), exist_ok=True)
+            with open(evaluation_store_path, "w", encoding="utf-8") as f:
+                json.dump([], f)
+
+    def update(self, item: CircuitEvaluationItem):
+        self.data.append(item)
+        with open(self.store_path, "w", encoding="utf-8") as f:
+            json.dump(self.data, f)
+
+    @property
+    def minimum_response_time(self):
+        return min(item.response_time for item in self.data)
+
+    @property
+    def maximum_response_time(self):
+        return max(item.response_time for item in self.data)
+
+
 class Circuit:
     """
     A class representing a circuit.
@@ -157,6 +207,9 @@ class Circuit:
         self.proof_system = ProofSystem[self.metadata.proof_system]
         self.paths.set_proof_system_paths(self.proof_system)
         self.settings = {}
+        self.evaluation_data = CircuitEvaluationData(
+            model_id, self.paths.evaluation_data
+        )
         try:
             with open(self.paths.settings, "r", encoding="utf-8") as f:
                 self.settings = json.load(f)
