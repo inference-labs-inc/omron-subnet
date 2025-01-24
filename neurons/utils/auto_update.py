@@ -151,7 +151,7 @@ class AutoUpdate:
                 logging.trace(
                     f"Attempting to check out the latest release: {latest_release_tag_name}..."
                 )
-                self.repo.remote().fetch(quiet=True, tags=True)
+                self.repo.remote().fetch(quiet=True, tags=True, force=True)
                 if latest_release_tag_name not in [tag.name for tag in self.repo.tags]:
                     logging.error(
                         f"Latest release tag {latest_release_tag_name} not found in the repository."
