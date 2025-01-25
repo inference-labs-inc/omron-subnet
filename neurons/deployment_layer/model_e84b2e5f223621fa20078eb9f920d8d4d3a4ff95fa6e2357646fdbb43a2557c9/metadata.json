@@ -9,5 +9,6 @@
     "type": "proof_of_weights",
     "external_files": {
         "circuit.zkey": "https://storage.omron.ai/e84b2e5f223621fa20078eb9f920d8d4d3a4ff95fa6e2357646fdbb43a2557c9/circuit.zkey"
-    }
+    },
+    "benchmark_choice_weight": 0.2
 }
