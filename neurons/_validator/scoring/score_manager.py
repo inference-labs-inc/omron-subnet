@@ -67,16 +67,13 @@ class ScoreManager:
         """
         If there are more uids than scores, add more weights.
         """
-        for model_id in circuit_store.list_circuits():
-            if len(uids) > len(self.score_dict[model_id]):
-                bt.logging.trace(
-                    f"Scores length: {len(self.score_dict[model_id])}, UIDs length: {len(uids)}. Adding more weights"
-                )
-                size_difference = len(uids) - len(self.score_dict[model_id])
-                new_scores = torch.zeros(size_difference, dtype=torch.float32)
-                self.score_dict[model_id] = torch.cat(
-                    (self.score_dict[model_id], new_scores)
-                )
+        if len(uids) > len(self.scores):
+            bt.logging.trace(
+                f"Scores length: {len(self.scores)}, UIDs length: {len(uids)}. Adding more weights"
+            )
+            size_difference = len(uids) - len(self.scores)
+            new_scores = torch.zeros(size_difference, dtype=torch.float32)
+            self.scores = torch.cat((self.scores, new_scores))
 
     def update_scores(self, responses: list[MinerResponse]) -> None:
         """
