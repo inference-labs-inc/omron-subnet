@@ -9,5 +9,6 @@
     "type": "proof_of_weights",
     "external_files": {
         "pk.key": "https://storage.omron.ai/33b92394b18412622adad75733a6fc659b4e202b01ee8a5465958a6bad8ded62/pk.key"
-    }
+    },
+    "benchmark_choice_weight": 0.2
 }

@@ -1,22 +1,25 @@
 from __future__ import annotations
-from _validator.pow.proof_of_weights_handler import ProofOfWeightsHandler
-import bittensor as bt
-import random
-from protocol import ProofOfWeightsSynapse, QueryZkProof
 
-from _validator.scoring.score_manager import ScoreManager
+import copy
+import random
+
+import bittensor as bt
+
 from _validator.api import ValidatorAPI
 from _validator.config import ValidatorConfig
+from _validator.core.request import Request
+from _validator.models.request_type import RequestType
+from _validator.pow.proof_of_weights_handler import ProofOfWeightsHandler
+from _validator.scoring.score_manager import ScoreManager
+from _validator.utils.hash_guard import HashGuard
 from constants import (
     BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
-    CIRCUIT_WEIGHTS,
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
 )
 from deployment_layer.circuit_store import circuit_store
 from execution_layer.circuit import Circuit, CircuitType
 from execution_layer.generic_input import GenericInput
-from _validator.utils.hash_guard import HashGuard
-from _validator.core.request import Request
+from protocol import ProofOfWeightsSynapse, QueryZkProof
 from utils.wandb_logger import safe_log
 from _validator.models.request_type import RequestType
 import copy
@@ -125,12 +128,15 @@ class RequestPipeline:
         """
         Select a circuit for benchmarking using weighted random selection.
         """
+        circuits = list(circuit_store.circuits.values())
 
-        circuit_id = random.choices(
-            list(CIRCUIT_WEIGHTS.keys()), weights=list(CIRCUIT_WEIGHTS.values()), k=1
+        return random.choices(
+            circuits,
+            weights=[
+                (circuit.metadata.benchmark_choice_weight or 0) for circuit in circuits
+            ],
+            k=1,
         )[0]
-
-        return circuit_store.get_circuit(circuit_id)
 
     def format_for_query(
         self, inputs: dict[str, object], circuit: Circuit

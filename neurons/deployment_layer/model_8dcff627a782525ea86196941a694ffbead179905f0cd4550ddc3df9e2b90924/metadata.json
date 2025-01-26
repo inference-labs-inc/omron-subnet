@@ -7,5 +7,6 @@
     "type": "proof_of_computation",
     "external_files": {
         "pk.key": "https://storage.omron.ai/8dcff627a782525ea86196941a694ffbead179905f0cd4550ddc3df9e2b90924/pk.key"
-    }
+    },
+    "benchmark_choice_weight": 0.2
 }
