@@ -267,8 +267,6 @@ class ScoreManager:
         Args:
             response (MinerResponse): The processed response from a miner.
         """
-        if response.circuit.id not in self.scores:
-            return
 
         if response.uid >= len(self.scores):
             return
