@@ -97,7 +97,7 @@ class ScoreManager:
         """
         Update scores for a single model.
         """
-        max_score = 1 / len(self.score_dict[model_id])
+        max_score = 1 / len(self.scores)
         responses = self._add_missing_responses(responses, model_id)
 
         sorted_filtered_times = self._get_sorted_filtered_times(responses)
@@ -112,14 +112,14 @@ class ScoreManager:
         self._update_scores_from_witness(proof_of_weights_items, model_id)
         self._update_pow_queue(proof_of_weights_items)
 
-        log_scores(self.score_dict[model_id])
+        log_scores(self.scores)
         self._try_store_scores(model_id)
 
     def _add_missing_responses(
         self, responses: list[MinerResponse], model_id: str
     ) -> list[MinerResponse]:
         """Add missing responses for all UIDs not present in the original responses."""
-        all_uids = set(range(len(self.score_dict[model_id]) - 1))
+        all_uids = set(range(len(self.scores) - 1))
         response_uids = set(r.uid for r in responses)
         missing_uids = all_uids - response_uids
         responses.extend(MinerResponse.empty(uid) for uid in missing_uids)
@@ -173,7 +173,7 @@ class ScoreManager:
             ProofOfWeightsItem.from_miner_response(
                 response,
                 max_score,
-                self.score_dict[model_id][response.uid],
+                self.scores[response.uid],
                 median_max_response_time,
                 min_response_time,
                 self.metagraph.block.item(),
@@ -234,13 +234,13 @@ class ScoreManager:
 
         bt.logging.debug(
             f"Proof of weights scores: {scores} for miner UIDs: {miner_uids} for "
-            f"model ID: {model_id}, existing scores: {self.score_dict[model_id]}"
+            f"model ID: {model_id}, existing scores: {self.scores}"
         )
 
         for uid, score in zip(miner_uids, scores):
-            if uid >= len(self.score_dict[model_id]):
+            if uid >= len(self.scores):
                 continue
-            self.score_dict[model_id][uid] = float(score)
+            self.scores[uid] = float(score)
             bt.logging.debug(f"Updated score for UID {uid}: {score}")
 
     def _update_pow_queue(self, new_items: list[ProofOfWeightsItem]):
@@ -270,11 +270,10 @@ class ScoreManager:
         if response.circuit.id not in self.scores:
             return
 
-        scores = self.score_dict[response.circuit.id]
-        if response.uid >= len(scores):
+        if response.uid >= len(self.scores):
             return
 
         if response.verification_result:
-            scores[response.uid] = min(scores[response.uid] + 0.1, 1.0)
+            self.scores[response.uid] = min(self.scores[response.uid] + 0.1, 1.0)
         else:
-            scores[response.uid] = max(scores[response.uid] - 0.1, 0.0)
+            self.scores[response.uid] = max(self.scores[response.uid] - 0.1, 0.0)
