@@ -1,0 +1,40 @@
+import json
+import bittensor as bt
+import requests
+from substrateinterface import Keypair
+
+
+class ProofPublishingService:
+    def __init__(self, url: str):
+        self.url = url
+
+    def publish_proof(self, proof_json: dict, hotkey: Keypair):
+        """
+        Publishes a proof to the proof publishing service.
+
+        Args:
+            proof_json (dict): The proof data as a JSON object
+            hotkey (Keypair): The hotkey used to sign the proof
+        """
+        try:
+            body_sig = hotkey.sign(json.dumps(proof_json))
+
+            response = requests.post(
+                f"{self.url}/proof",
+                json=proof_json,
+                headers={
+                    "Authorization": f"Signature {body_sig}",
+                    "Content-Type": "application/json",
+                },
+            )
+
+            if response.status_code == 200:
+                bt.logging.success(f"Proof of weights uploaded to {self.url}")
+                bt.logging.info(f"Response: {response.json()}")
+            else:
+                bt.logging.warning(
+                    f"Failed to upload proof of weights to {self.url}. Status code: {response.status_code}"
+                )
+
+        except Exception as e:
+            bt.logging.warning(f"Error uploading proof of weights: {e}")

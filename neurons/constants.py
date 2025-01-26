@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 
 
@@ -124,6 +125,8 @@ MAINNET_TESTNET_UIDS = [
     (57, 237),  # gaia
     (59, 249),  # agent-arena
 ]
+# Proof publishing service URL
+PPS_URL = os.getenv("OMRON_PPS_URL", "https://pps.omron.ai")
 # GitHub repository URL
 REPO_URL = "https://github.com/inference-labs-inc/omron-subnet"
 # Temporary folder for storing proof files

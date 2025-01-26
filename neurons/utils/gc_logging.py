@@ -5,19 +5,18 @@ import os
 import bittensor as bt
 import requests
 import torch
-
+import substrateinterface
 from _validator.models.miner_response import MinerResponse
-from deployment_layer.circuit_store import circuit_store
 
 LOGGING_URL = os.getenv(
-    "LOGGING_URL",
+    "OMRON_LOGGING_URL",
     "https://api.omron.ai/statistics/log/",
 )
 
 
 def log_responses(
     metagraph: bt.metagraph,  # type: ignore
-    hotkey: bt.Keypair,
+    hotkey: substrateinterface.Keypair,
     uid: int,
     responses: list[MinerResponse],
     overhead_time: float,

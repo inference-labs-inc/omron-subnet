@@ -59,6 +59,7 @@ class ValidatorLoop:
             self.config.metagraph,
             self.score_manager,
             self.config.user_uid,
+            self.config.wallet.hotkey,
         )
         self.weights_manager = WeightsManager(
             self.config.subtensor,
@@ -178,6 +179,12 @@ class ValidatorLoop:
                 save_proof_of_weights(
                     public_signals=[random_verified_response.public_json],
                     proof=[random_verified_response.proof_content],
+                    metadata={
+                        "circuit": str(circuit),
+                        "request_hash": request_hash,
+                        "miner_uid": random_verified_response.uid,
+                    },
+                    hotkey=self.config.wallet.hotkey,
                     proof_filename=request_hash,
                 )
 
