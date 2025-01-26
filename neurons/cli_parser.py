@@ -1,16 +1,43 @@
 import argparse
 import os
+import sys
 from typing import Optional
+
+from constants import (
+    ONCHAIN_PROOF_OF_WEIGHTS_ENABLED,
+    PROOF_OF_WEIGHTS_INTERVAL,
+    TEMP_FOLDER,
+    Roles,
+)
+
+SHOW_HELP = False
+
+### A dirty hack to show help message when running the script with --help or -h ###
+# Bittensor is the culprit of this ugly piece of code.
+# It intercepts the --help and -h flags, shows its own help message and exits the script.
+# So this should be executed before the Bittensor is first time imported.
+if "--help" in sys.argv:
+    SHOW_HELP = True
+    sys.argv.remove("--help")
+elif "-h" in sys.argv:
+    SHOW_HELP = True
+    sys.argv.remove("-h")
 
 import bittensor as bt
 
-from constants import ONCHAIN_PROOF_OF_WEIGHTS_ENABLED, PROOF_OF_WEIGHTS_INTERVAL, Roles
+###################################################################################
 
 parser: Optional[argparse.ArgumentParser]
 config: Optional[bt.config]
 
 
-def init_config(role: Optional[str]):
+DESCRIPTION = {
+    Roles.MINER: "Omron Miner. Starts a Bittensor node that mines on the Omron subnet.",
+    Roles.VALIDATOR: "Omron Validator. Starts a Bittensor node that validates on the Omron subnet.",
+}
+
+
+def init_config(role: Optional[str] = None):
     """
     Initialize the configuration for the node.
     Config is based on CLI arguments, some of which are common to both miner and validator,
@@ -22,7 +49,14 @@ def init_config(role: Optional[str]):
     global parser
     global config
 
-    parser = argparse.ArgumentParser()
+    if not os.path.exists(TEMP_FOLDER):
+        os.makedirs(TEMP_FOLDER)
+
+    parser = argparse.ArgumentParser(
+        description=DESCRIPTION.get(role, ""),
+        epilog="For more information, visit https://omron.ai/",
+        allow_abbrev=False,
+    )
 
     # init common CLI arguments for both miner and validator:
     parser.add_argument("--netuid", type=int, default=1, help="The UID of the subnet.")
@@ -54,6 +88,12 @@ def init_config(role: Optional[str]):
         help="Whether to run the miner in localnet mode.",
     )
     parser.add_argument(
+        "--timeout",
+        default=120,
+        type=int,
+        help="Timeout for requests in seconds (default: 120)",
+    )
+    parser.add_argument(
         "--external-model-dir",
         default=None,
         help="Custom location for storing models data (optional)",
@@ -69,7 +109,12 @@ def init_config(role: Optional[str]):
         bt.subtensor.add_args(parser)
         bt.logging.add_args(parser)
         bt.wallet.add_args(parser)
-        config = bt.config(parser)
+        config = bt.config(parser, strict=True)
+
+    if SHOW_HELP:
+        # --help or -h flag was passed, show the help message and exit
+        parser.print_help()
+        sys.exit(0)
 
     if config.localnet:
         # quick localnet configuration set up for testing (common params for both miner and validator)
@@ -84,7 +129,6 @@ def init_config(role: Optional[str]):
         config.eth_wallet = (
             config.eth_wallet if config.eth_wallet is not None else "0x002"
         )
-        config.timeout = config.timeout if config.timeout is None else 120
         config.disable_wandb = True
         config.verbose = config.verbose if config.verbose is None else True
         config.max_workers = config.max_workers or 1
@@ -101,6 +145,9 @@ def init_config(role: Optional[str]):
     else:
         config.full_path_models = os.path.join(config.full_path, "models")
 
+    if config.whitelisted_public_keys:
+        config.whitelisted_public_keys = config.whitelisted_public_keys.split(",")
+
     os.makedirs(config.full_path, exist_ok=True)
     os.makedirs(config.full_path_score, exist_ok=True)
     os.makedirs(config.full_path_models, exist_ok=True)
@@ -109,9 +156,16 @@ def init_config(role: Optional[str]):
     bt.logging(config=config, logging_dir=config.logging.logging_dir)
     bt.logging.enable_info()
 
+    # Make sure we have access to the models directory
+    if not os.access(config.full_path, os.W_OK):
+        bt.logging.error(
+            f"Cannot write to {config.full_path}. Please make sure you have the correct permissions."
+        )
+
     if config.wandb_key:
         wandb_logger.safe_login(api_key=config.wandb_key)
         bt.logging.success("Logged into WandB")
+
 
 def _miner_config():
     """
@@ -132,7 +186,7 @@ def _miner_config():
     bt.wallet.add_args(parser)
     bt.axon.add_args(parser)
 
-    config = bt.config(parser)
+    config = bt.config(parser, strict=True)
 
     if config.localnet:
         # quick localnet configuration set up for testing (specific params for miner)
@@ -222,6 +276,13 @@ def _validator_config():
     )
 
     parser.add_argument(
+        "--whitelisted-public-keys",
+        type=str,
+        default=None,
+        help="A comma-separated list of public keys to whitelist for external requests.",
+    )
+
+    parser.add_argument(
         "--certificate-path",
         type=str,
         default=None,
@@ -249,7 +310,7 @@ def _validator_config():
     bt.logging.add_args(parser)
     bt.wallet.add_args(parser)
 
-    config = bt.config(parser)
+    config = bt.config(parser, strict=True)
 
     if config.localnet:
         # quick localnet configuration set up for testing (specific params for validator)

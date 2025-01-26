@@ -44,7 +44,7 @@ MAXIMUM_SCORE_MEDIAN_SAMPLE = 0.05
 # Shift in seconds to apply to the minimum response time for vertical asymptote adjustment
 MINIMUM_SCORE_SHIFT = 0.0
 # Weights version hyperparameter
-WEIGHTS_VERSION = 1644
+WEIGHTS_VERSION = 1652
 # Rate limit for weight updates
 WEIGHT_RATE_LIMIT: int = 100
 # Delay between requests
@@ -69,16 +69,6 @@ PROOF_OF_WEIGHTS_INTERVAL = 1000
 MAX_PROOFS_TO_LOG = 0
 # Era period for proof of weights (mortality of the pow log)
 PROOF_OF_WEIGHTS_LIFESPAN = 2
-# Weights that determine the probability of selecting a circuit for benchmarking
-CIRCUIT_WEIGHTS = {
-    "1d60d545b7c5123fd60524dcbaf57081ca7dc4a9ec36c892927a3153328d17c0": 0,
-    "33b92394b18412622adad75733a6fc659b4e202b01ee8a5465958a6bad8ded62": 0.20,
-    "37320fc74fec80805eedc8e92baf3c58842a2cb2a4ae127ad6e930f0c8441c7a": 0,
-    "a4bcecaf699fd9212600a1f2fcaa40c444e1aeaab409ea240a38c33ed356f4e2": 0.20,
-    "a849500803abdbb86a9460e18684a6411dc7ae0b75f1f6330e3028081a497dea": 0.20,
-    "e84b2e5f223621fa20078eb9f920d8d4d3a4ff95fa6e2357646fdbb43a2557c9": 0.20,
-    "8dcff627a782525ea86196941a694ffbead179905f0cd4550ddc3df9e2b90924": 0.20,
-}
 # Maximum signature lifespan for WebSocket requests
 MAX_SIGNATURE_LIFESPAN = 300
 # Whitelisted public keys (ss58 addresses) we accept external requests from by default
@@ -137,3 +127,7 @@ MAINNET_TESTNET_UIDS = [
 ]
 # Proof publishing service URL
 PPS_URL = os.getenv("OMRON_PPS_URL", "https://pps.omron.ai")
+# GitHub repository URL
+REPO_URL = "https://github.com/inference-labs-inc/omron-subnet"
+# Temporary folder for storing proof files
+TEMP_FOLDER = "/tmp/omron"
