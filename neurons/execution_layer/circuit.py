@@ -122,6 +122,7 @@ class CircuitMetadata:
     external_files: dict[str, str]
     netuid: int | None = None
     weights_version: int | None = None
+    benchmark_choice_weight: float | None = None
 
     @classmethod
     def from_file(cls, metadata_path: str) -> CircuitMetadata:

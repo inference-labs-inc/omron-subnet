@@ -88,6 +88,12 @@ def init_config(role: Optional[str] = None):
         help="Whether to run the miner in localnet mode.",
     )
     parser.add_argument(
+        "--timeout",
+        default=120,
+        type=int,
+        help="Timeout for requests in seconds (default: 120)",
+    )
+    parser.add_argument(
         "--external-model-dir",
         default=None,
         help="Custom location for storing models data (optional)",
@@ -123,7 +129,6 @@ def init_config(role: Optional[str] = None):
         config.eth_wallet = (
             config.eth_wallet if config.eth_wallet is not None else "0x002"
         )
-        config.timeout = config.timeout if config.timeout is None else 120
         config.disable_wandb = True
         config.verbose = config.verbose if config.verbose is None else True
         config.max_workers = config.max_workers or 1
@@ -139,6 +144,9 @@ def init_config(role: Optional[str] = None):
         config.full_path_models = config.external_model_dir
     else:
         config.full_path_models = os.path.join(config.full_path, "models")
+
+    if config.whitelisted_public_keys:
+        config.whitelisted_public_keys = config.whitelisted_public_keys.split(",")
 
     os.makedirs(config.full_path, exist_ok=True)
     os.makedirs(config.full_path_score, exist_ok=True)
@@ -265,6 +273,13 @@ def _validator_config():
             "By default we verify is the wallet legitimate. "
             "You can disable this check with the flag."
         ),
+    )
+
+    parser.add_argument(
+        "--whitelisted-public-keys",
+        type=str,
+        default=None,
+        help="A comma-separated list of public keys to whitelist for external requests.",
     )
 
     parser.add_argument(
