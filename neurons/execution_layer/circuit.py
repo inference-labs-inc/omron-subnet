@@ -159,6 +159,19 @@ class CircuitEvaluationItem:
     score: float = field(default=0)
     verification_result: bool = field(default=False)
 
+    def to_dict(self) -> dict:
+        """Convert the evaluation item to a dictionary for JSON serialization."""
+        return {
+            "circuit_id": self.circuit_id,
+            "uid": self.uid,
+            "minimum_response_time": self.minimum_response_time,
+            "maximum_response_time": self.maximum_response_time,
+            "proof_size": self.proof_size,
+            "response_time": self.response_time,
+            "score": self.score,
+            "verification_result": self.verification_result,
+        }
+
 
 class CircuitEvaluationData:
     """
@@ -171,7 +184,8 @@ class CircuitEvaluationData:
         self.data: list[CircuitEvaluationItem] = []
         if os.path.exists(evaluation_store_path):
             with open(evaluation_store_path, "r", encoding="utf-8") as f:
-                self.data = json.load(f)
+                data = json.load(f)
+                self.data = [CircuitEvaluationItem(**item) for item in data]
         else:
             os.makedirs(os.path.dirname(evaluation_store_path), exist_ok=True)
             with open(evaluation_store_path, "w", encoding="utf-8") as f:
@@ -186,7 +200,7 @@ class CircuitEvaluationData:
             self.data = self.data[-MAX_EVALUATION_ITEMS:]
 
         with open(self.store_path, "w", encoding="utf-8") as f:
-            json.dump(self.data, f)
+            json.dump([item.to_dict() for item in self.data], f)
 
     @property
     def verification_ratio(self) -> float:
