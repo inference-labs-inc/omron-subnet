@@ -6,9 +6,7 @@ from _validator.models.miner_response import MinerResponse
 from _validator.utils.logging import log_scores
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
 from _validator.utils.uid import get_queryable_uids
-from constants import (
-    MAX_POW_QUEUE_SIZE,
-)
+from constants import MAX_POW_QUEUE_SIZE, SINGLE_PROOF_OF_WEIGHTS_MODEL_ID
 from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
 from _validator.models.request_type import RequestType
@@ -362,7 +360,7 @@ class ScoreManager:
         self._update_pow_queue([pow_item])
 
         if len(self.proof_of_weights_queue) >= 256:
-            self.process_pow_queue(circuit.id)
+            self.process_pow_queue(SINGLE_PROOF_OF_WEIGHTS_MODEL_ID)
 
     def get_pow_queue(self) -> list[ProofOfWeightsItem]:
         """Get the current proof of weights queue."""
