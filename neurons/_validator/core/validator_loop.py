@@ -270,17 +270,16 @@ class ValidatorLoop:
 
     async def _process_single_request(
         self, request: Request
-    ) -> tuple[int, MinerResponse | None]:
+    ) -> tuple[int, MinerResponse]:
         start_time = time.time()
         try:
             bt.logging.debug(f"Starting request to UID {request.uid}")
             response = await query_single_axon(self.config.dendrite, request)
             elapsed = time.time() - start_time
             bt.logging.info(f"Request to UID {request.uid} completed in {elapsed:.2f}s")
-            if response:
-                return request.uid, self.response_processor.process_single_response(
-                    response
-                )
+            return request.uid, self.response_processor.process_single_response(
+                response
+            )
         except Exception as e:
             elapsed = time.time() - start_time
             bt.logging.error(
@@ -289,7 +288,7 @@ class ValidatorLoop:
             bt.logging.debug(traceback.format_exc())
             log_network_error("unknown_error")
 
-        return request.uid, None
+        return request.uid, MinerResponse.empty(request.uid, request.circuit)
 
     async def _handle_response(self, response: MinerResponse) -> None:
         """Handle a processed response, updating scores and weights."""
