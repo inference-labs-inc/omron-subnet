@@ -145,16 +145,18 @@ class ScoreManager:
     def _update_scores_from_witness(
         self, proof_of_weights_items: list[ProofOfWeightsItem], model_id: str
     ):
-        """Update scores based on the witness generated from proof of weights items."""
+        bt.logging.info(
+            f"Generating witness for {len(proof_of_weights_items)} PoW items for model {model_id}"
+        )
         pow_circuit = circuit_store.get_circuit(model_id)
         if not pow_circuit:
             raise ValueError(
                 f"Proof of weights circuit not found for model ID: {model_id}"
             )
 
-        # Always use 256 batch size for witness generation
         batch_size = 256
         padded_items = ProofOfWeightsItem.pad_items(proof_of_weights_items, batch_size)
+        bt.logging.debug(f"Padded PoW items to batch size {batch_size}")
 
         # Use circuit evaluation data for response times
         for item in padded_items:
@@ -196,6 +198,7 @@ class ScoreManager:
 
         session = VerifiedModelSession(inputs, pow_circuit)
         witness = session.generate_witness(return_content=True)
+        bt.logging.info(f"Generated witness for model {model_id}")
         witness_list = witness if isinstance(witness, list) else list(witness.values())
 
         # Process witness results based on batch size
@@ -215,9 +218,12 @@ class ScoreManager:
     def _process_witness_results(
         self, scores: list, miner_uids: list, scaling: int, model_id: str
     ):
-        """Process the results from the witness."""
         scores = torch.div(torch.tensor([float(w) for w in scores]), scaling).tolist()
         miner_uids = [int(float(w)) for w in miner_uids]
+
+        bt.logging.info(f"Processing witness results for model {model_id}")
+        bt.logging.debug(f"Raw witness scores: {scores}")
+        bt.logging.debug(f"Miner UIDs: {miner_uids}")
 
         bt.logging.debug(
             f"Proof of weights scores: {scores} for miner UIDs: {miner_uids} for "
@@ -231,9 +237,12 @@ class ScoreManager:
             bt.logging.debug(f"Updated score for UID {uid}: {score}")
 
     def _update_pow_queue(self, new_items: list[ProofOfWeightsItem]):
-        """Update the proof of weights queue with items, maintaining size limit."""
+        bt.logging.debug(
+            f"Adding {len(new_items)} new PoW items to queue. Current queue size: {len(self.proof_of_weights_queue)}"
+        )
         merged = ProofOfWeightsItem.merge_items(self.proof_of_weights_queue, new_items)
         self.proof_of_weights_queue = merged[-MAX_POW_QUEUE_SIZE:]
+        bt.logging.debug(f"Updated PoW queue size: {len(self.proof_of_weights_queue)}")
 
     def _try_store_scores(self):
         """Attempt to store scores to disk."""
