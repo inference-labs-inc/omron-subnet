@@ -79,48 +79,6 @@ class ScoreManager:
             )
             self.scores = torch.cat((self.scores, new_scores))
 
-    def _update_scores_single_model(
-        self, responses: list[MinerResponse], model_id: str
-    ):
-        """
-        Update scores for a single model.
-        """
-        bt.logging.info(
-            f"Starting score update for model {model_id} with {len(responses)} responses"
-        )
-        max_score = 1 / len(self.scores)
-        circuit = circuit_store.get_circuit(model_id)
-
-        for response in responses:
-            if response.verification_result and response.response_time > 0:
-                circuit.evaluation_data.update(
-                    CircuitEvaluationItem(
-                        circuit_id=model_id,
-                        uid=response.uid,
-                        minimum_response_time=circuit.evaluation_data.minimum_response_time,
-                        maximum_response_time=circuit.evaluation_data.maximum_response_time,
-                        proof_size=response.proof_size,
-                        response_time=response.response_time,
-                        score=self.scores[response.uid],
-                        verification_result=response.verification_result,
-                    )
-                )
-
-        median_max_response_time = circuit.evaluation_data.maximum_response_time
-        min_response_time = circuit.evaluation_data.minimum_response_time
-
-        proof_of_weights_items = self._create_pow_items(
-            responses, max_score, median_max_response_time, min_response_time, model_id
-        )
-        bt.logging.info(
-            f"Created {len(proof_of_weights_items)} PoW items for model {model_id}"
-        )
-
-        self._update_pow_queue(proof_of_weights_items)
-
-        log_scores(self.scores)
-        self._try_store_scores()
-
     def _create_pow_items(
         self,
         responses: list[MinerResponse],
@@ -278,45 +236,6 @@ class ScoreManager:
     def clear_proof_of_weights_queue(self):
         """Clear the proof of weights queue."""
         self.proof_of_weights_queue = []
-
-    def update_scores(
-        self, responses: list[MinerResponse], queryable_uids: set[int] | None = None
-    ) -> None:
-        """
-        Update scores based on miner responses.
-
-        Args:
-            responses: List of MinerResponse objects.
-            queryable_uids: Optional pre-computed set of queryable UIDs.
-        """
-        if not responses:
-            bt.logging.error("No responses. Skipping update.")
-            return
-
-        if queryable_uids is None:
-            queryable_uids = set(get_queryable_uids(self.metagraph))
-
-        valid_responses = [
-            r for r in responses if r.uid in queryable_uids and r.uid < len(self.scores)
-        ]
-
-        if not valid_responses:
-            bt.logging.warning(
-                "No valid responses after UID filtering. Skipping update."
-            )
-            return
-
-        for model_id in circuit_store.list_circuits():
-            circuit = circuit_store.get_circuit(model_id)
-            if not circuit:
-                bt.logging.error(f"Circuit not found for model ID: {model_id}")
-                continue
-
-            responses_for_model = [
-                r for r in valid_responses if r.circuit.id == model_id
-            ]
-            if responses_for_model:
-                self._update_scores_single_model(responses_for_model, model_id)
 
     def update_single_score(
         self, response: MinerResponse, queryable_uids: set[int] | None = None
