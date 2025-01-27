@@ -62,7 +62,7 @@ class ProofOfWeightsHandler:
             )
             if item.minimum_response_time >= item.maximum_response_time:
                 logging.warning(
-                    f"Minimum response time is gte than maximum response time for item {item.uid}"
+                    "Minimum response time is gte than maximum response time for item. Setting to default timeout."
                 )
                 item.minimum_response_time = 0
                 item.maximum_response_time = VALIDATOR_REQUEST_TIMEOUT_SECONDS
