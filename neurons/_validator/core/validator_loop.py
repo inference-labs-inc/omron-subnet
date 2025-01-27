@@ -164,7 +164,7 @@ class ValidatorLoop:
             finally:
                 self.processed_tasks.remove(task)
 
-        if not done_tasks:
+        if len(self.processed_tasks) >= MAX_CONCURRENT_REQUESTS:
             return
 
         while len(self.processed_tasks) < MAX_CONCURRENT_REQUESTS:
