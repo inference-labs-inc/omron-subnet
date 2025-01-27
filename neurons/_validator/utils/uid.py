@@ -20,7 +20,12 @@ def get_queryable_uids(metagraph: bt.metagraph) -> Generator[int, None, None]:
     """
     uids = metagraph.uids.tolist()
     stake_threshold = VALIDATOR_STAKE_THRESHOLD
-    if metagraph.netuid == MAINNET_TESTNET_UIDS[DEFAULT_NETUID]:
+    if (
+        metagraph.netuid
+        == MAINNET_TESTNET_UIDS[
+            next(i[1] for i in MAINNET_TESTNET_UIDS if i[0] == DEFAULT_NETUID)
+        ]
+    ):
         stake_threshold = 1e19
     total_stake = (
         metagraph.total_stake[uids]
