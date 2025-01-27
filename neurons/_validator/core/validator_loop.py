@@ -100,6 +100,7 @@ class ValidatorLoop:
         self.total_responses = 0
         self.total_processed = 0
         self.start_time = time.time()
+        self.total_requests = 0
 
         if self.config.bt_config.prometheus_monitoring:
             start_prometheus_logging(self.config.bt_config.prometheus_port)
@@ -127,20 +128,21 @@ class ValidatorLoop:
     async def log_health(self):
         """Logs validator health metrics"""
         current_time = time.time()
-        elapsed = current_time - self.last_completed_check
-        requests_per_min = int((self.completed_requests / elapsed) * 60)
+        total_runtime_minutes = (current_time - self.start_time) / 60
+        avg_requests_per_min = (
+            int(self.total_requests / total_runtime_minutes)
+            if total_runtime_minutes > 0
+            else 0
+        )
         uptime_hours = (current_time - self.start_time) / 3600
 
         bt.logging.info(
             f"In-flight: {len(self.processed_tasks)}/{MAX_CONCURRENT_REQUESTS} | "
-            f"Req/min: {requests_per_min} | "
+            f"Avg Req/min: {avg_requests_per_min} | "
             f"Processed UIDs: {len(self.processed_uids)} | "
             f"Lifetime - Total: {self.total_processed} Success: {self.total_responses} ({uptime_hours:.1f}h)"
         )
         bt.logging.debug(f"Queryable UIDs: {len(self.queryable_uids)}")
-
-        self.completed_requests = 0
-        self.last_completed_check = current_time
 
     def update_processed_uids(self):
         if len(self.processed_uids) >= len(self.queryable_uids):
@@ -148,14 +150,14 @@ class ValidatorLoop:
 
     async def update_active_requests(self):
         """Update active requests to maintain MAX_CONCURRENT_REQUESTS."""
-
         done_tasks = {task for task in self.processed_tasks if task.done()}
         for task in done_tasks:
             try:
                 uid, response = await task
                 self.processed_uids.add(uid)
                 self.total_processed += 1
-                if response:
+                self.total_requests += 1
+                if response and response.verification_result:
                     await self.event_queue.put(ResponseEvent(response))
                     self.total_responses += 1
                 self.completed_requests += 1
