@@ -61,7 +61,7 @@ class ProofOfWeightsHandler:
                 circuit.evaluation_data.maximum_response_time, dtype=torch.float32
             )
             if item.minimum_response_time >= item.maximum_response_time:
-                logging.warning(
+                logging.debug(
                     "Minimum response time is gte than maximum response time for item. Setting to default timeout."
                 )
                 item.minimum_response_time = torch.tensor(
