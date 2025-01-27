@@ -3,6 +3,8 @@ import json
 import time
 import traceback
 from typing import Tuple, Union
+from rich.console import Console
+from rich.table import Table
 
 import bittensor as bt
 import websocket
@@ -125,16 +127,24 @@ class MinerSession:
                         self.metagraph = self.subtensor.metagraph(
                             cli_parser.config.netuid
                         )
-                        bt.logging.info(
-                            f"Step:{step} | "
-                            f"Block:{self.metagraph.block.item()} | "
-                            f"Stake:{self.metagraph.S[self.subnet_uid]} | "
-                            f"Rank:{self.metagraph.R[self.subnet_uid]} | "
-                            f"Trust:{self.metagraph.T[self.subnet_uid]} | "
-                            f"Consensus:{self.metagraph.C[self.subnet_uid]} | "
-                            f"Incentive:{self.metagraph.I[self.subnet_uid]} | "
-                            f"Emission:{self.metagraph.E[self.subnet_uid]}"
+                        table = Table(title=f"Miner Status (UID: {self.subnet_uid})")
+                        table.add_column("Metric", justify="right", style="cyan")
+                        table.add_column("Value", justify="left", style="green")
+                        table.add_row("Block", str(self.metagraph.block.item()))
+                        table.add_row("Stake", str(self.metagraph.S[self.subnet_uid]))
+                        table.add_row("Rank", str(self.metagraph.R[self.subnet_uid]))
+                        table.add_row("Trust", str(self.metagraph.T[self.subnet_uid]))
+                        table.add_row(
+                            "Consensus", str(self.metagraph.C[self.subnet_uid])
                         )
+                        table.add_row(
+                            "Incentive", str(self.metagraph.I[self.subnet_uid])
+                        )
+                        table.add_row(
+                            "Emission", str(self.metagraph.E[self.subnet_uid])
+                        )
+                        console = Console()
+                        console.print(table)
                     except Exception:
                         bt.logging.warning(
                             f"Failed to sync metagraph: {traceback.format_exc()}"
