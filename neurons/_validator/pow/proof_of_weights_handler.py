@@ -3,6 +3,7 @@ from _validator.utils.proof_of_weights import ProofOfWeightsItem
 from execution_layer.circuit import Circuit, CircuitType
 from constants import (
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
+    VALIDATOR_REQUEST_TIMEOUT_SECONDS,
 )
 from protocol import ProofOfWeightsSynapse, QueryZkProof
 from _validator.models.request_type import RequestType
@@ -59,6 +60,12 @@ class ProofOfWeightsHandler:
             item.maximum_response_time = torch.tensor(
                 circuit.evaluation_data.maximum_response_time, dtype=torch.float32
             )
+            if item.minimum_response_time >= item.maximum_response_time:
+                logging.warning(
+                    f"Minimum response time is gte than maximum response time for item {item.uid}"
+                )
+                item.minimum_response_time = 0
+                item.maximum_response_time = VALIDATOR_REQUEST_TIMEOUT_SECONDS
 
         inputs = circuit.input_handler(
             RequestType.RWR, ProofOfWeightsItem.to_dict_list(pow_items)
