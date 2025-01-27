@@ -1,7 +1,6 @@
 from __future__ import annotations
 import torch
 import bittensor as bt
-import sys
 
 from _validator.models.miner_response import MinerResponse
 from _validator.utils.logging import log_scores
@@ -156,13 +155,24 @@ class ScoreManager:
         self, proof_of_weights_items: list[ProofOfWeightsItem], model_id: str
     ):
         bt.logging.info(
-            f"Generating witness for {len(proof_of_weights_items)} PoW items for model {model_id}"
+            f"Processing PoW witness generation for {len(proof_of_weights_items)} items on model {model_id}"
         )
         pow_circuit = circuit_store.get_circuit(model_id)
         if not pow_circuit:
             raise ValueError(
                 f"Proof of weights circuit not found for model ID: {model_id}"
             )
+
+        if len(proof_of_weights_items) < 256:
+            bt.logging.info(
+                f"Not enough items for witness generation ({len(proof_of_weights_items)}/256). Queueing items."
+            )
+            self._update_pow_queue(proof_of_weights_items)
+            return
+
+        bt.logging.info(
+            f"Queue full! Generating witness for {len(proof_of_weights_items)} items"
+        )
 
         batch_size = 256
         padded_items = ProofOfWeightsItem.pad_items(proof_of_weights_items, batch_size)
@@ -248,12 +258,18 @@ class ScoreManager:
 
     def _update_pow_queue(self, new_items: list[ProofOfWeightsItem]):
         bt.logging.info(
-            f"PoW Queue Update - Adding {len(new_items)} items. Current size: {len(self.proof_of_weights_queue)}. "
-            f"Queue memory usage: {sys.getsizeof(self.proof_of_weights_queue)} bytes"
+            f"PoW Queue Update - Adding {len(new_items)} items."
+            "Current size: {len(self.proof_of_weights_queue)} / {MAX_POW_QUEUE_SIZE}"
         )
         merged = ProofOfWeightsItem.merge_items(self.proof_of_weights_queue, new_items)
         self.proof_of_weights_queue = merged[-MAX_POW_QUEUE_SIZE:]
-        bt.logging.debug(f"Updated PoW queue size: {len(self.proof_of_weights_queue)}")
+
+        # Log queue status after update
+        queue_size = len(self.proof_of_weights_queue)
+        bt.logging.info(
+            f"Queue Status: {queue_size} / {MAX_POW_QUEUE_SIZE} items "
+            f"({(queue_size / MAX_POW_QUEUE_SIZE) * 100:.1f}% full)"
+        )
 
     def _try_store_scores(self):
         """Attempt to store scores to disk."""
