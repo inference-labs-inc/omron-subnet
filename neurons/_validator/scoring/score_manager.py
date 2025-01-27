@@ -259,7 +259,7 @@ class ScoreManager:
     def _update_pow_queue(self, new_items: list[ProofOfWeightsItem]):
         bt.logging.info(
             f"PoW Queue Update - Adding {len(new_items)} items."
-            "Current size: {len(self.proof_of_weights_queue)} / {MAX_POW_QUEUE_SIZE}"
+            f"Current size: {len(self.proof_of_weights_queue)} / {MAX_POW_QUEUE_SIZE}"
         )
         merged = ProofOfWeightsItem.merge_items(self.proof_of_weights_queue, new_items)
         self.proof_of_weights_queue = merged[-MAX_POW_QUEUE_SIZE:]
