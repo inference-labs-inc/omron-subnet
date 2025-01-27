@@ -5,6 +5,7 @@ import sys
 import traceback
 from typing import NoReturn
 import time
+from dataclasses import dataclass
 
 import bittensor as bt
 import psutil
@@ -34,7 +35,6 @@ from _validator.models.request_type import RequestType
 from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
 from constants import (
-    REQUEST_DELAY_SECONDS,
     MAX_CONCURRENT_REQUESTS,
     ONE_MINUTE,
     FIVE_MINUTES,
@@ -43,6 +43,13 @@ from constants import (
 )
 from execution_layer.circuit import CircuitType
 from utils import AutoUpdate, clean_temp_files, with_rate_limit
+
+
+@dataclass
+class ResponseEvent:
+    """Event wrapper for miner responses"""
+
+    response: MinerResponse
 
 
 class ValidatorLoop:
@@ -82,7 +89,8 @@ class ValidatorLoop:
             self.config, self.score_manager, self.api
         )
 
-        self.active_requests = asyncio.Queue(maxsize=MAX_CONCURRENT_REQUESTS)
+        self.event_queue = asyncio.Queue()
+        self.running = True
         self.processed_tasks: set[asyncio.Task] = set()
         self.processed_uids: set[int] = set()
         self.queryable_uids: list[int] = []
@@ -124,7 +132,7 @@ class ValidatorLoop:
         uptime_hours = (current_time - self.start_time) / 3600
 
         bt.logging.info(
-            f"In-flight: {self.active_requests.qsize()}/{MAX_CONCURRENT_REQUESTS} | "
+            f"In-flight: {len(self.processed_tasks)}/{MAX_CONCURRENT_REQUESTS} | "
             f"Req/min: {requests_per_min} | "
             f"Processed UIDs: {len(self.processed_uids)} | "
             f"Lifetime - Total: {self.total_processed} Success: {self.total_responses} ({uptime_hours:.1f}h)"
@@ -140,7 +148,7 @@ class ValidatorLoop:
 
     async def update_active_requests(self):
         """Update active requests to maintain MAX_CONCURRENT_REQUESTS."""
-        # Clean up completed tasks
+
         done_tasks = {task for task in self.processed_tasks if task.done()}
         for task in done_tasks:
             try:
@@ -148,7 +156,7 @@ class ValidatorLoop:
                 self.processed_uids.add(uid)
                 self.total_processed += 1
                 if response:
-                    await self._handle_response(response)
+                    await self.event_queue.put(ResponseEvent(response))
                     self.total_responses += 1
                 self.completed_requests += 1
             except Exception as e:
@@ -156,16 +164,18 @@ class ValidatorLoop:
             finally:
                 self.processed_tasks.remove(task)
 
-        # Fill queue with new requests
         while len(self.processed_tasks) < MAX_CONCURRENT_REQUESTS:
             available_uids = [
                 uid
                 for uid in self.queryable_uids
                 if uid not in self.processed_uids
-                and not any(uid == t.get_name() for t in self.processed_tasks)
+                and not any(uid == int(t.get_name()) for t in self.processed_tasks)
             ]
 
             if not available_uids:
+                if len(self.processed_uids) >= len(self.queryable_uids):
+                    self.processed_uids.clear()
+                    continue
                 break
 
             uid = available_uids[0]
@@ -179,36 +189,70 @@ class ValidatorLoop:
 
         process = psutil.Process()
         log_request_metrics(
-            active_requests=self.active_requests.qsize(),
+            active_requests=len(self.processed_tasks),
             processed_uids=len(self.processed_uids),
             memory_bytes=process.memory_info().rss,
         )
 
     async def run(self) -> NoReturn:
-        """Run the main validator loop indefinitely."""
+        """Run the main validator loop using event-driven architecture."""
         bt.logging.success(
             f"Validator started on subnet {self.config.subnet_uid} using UID {self.config.user_uid}"
         )
-        bt.logging.debug("Initializing request loop")
 
-        while True:
+        tasks = [
+            self._schedule_periodic(self.sync_metagraph, ONE_HOUR),
+            self._schedule_periodic(self.sync_scores_uids, ONE_HOUR),
+            self._schedule_periodic(self.update_weights, FIVE_MINUTES),
+            self._schedule_periodic(self.update_queryable_uids, FIVE_MINUTES),
+            self._schedule_periodic(self.check_auto_update, FIVE_MINUTES),
+            self._schedule_periodic(self.log_health, ONE_MINUTE),
+            self._process_requests(),
+            self._process_events(),
+        ]
+
+        try:
+            await asyncio.gather(*tasks)
+        except KeyboardInterrupt:
+            self._handle_keyboard_interrupt()
+        except Exception as e:
+            bt.logging.error(
+                f"Error in validator loop \n {e} \n {traceback.format_exc()}"
+            )
+            raise
+
+    async def _schedule_periodic(self, coro, interval: float):
+        """Schedule a coroutine to run periodically."""
+        while self.running:
             try:
-                self.check_auto_update()
-                self.sync_metagraph()
-                self.sync_scores_uids()
-                self.update_queryable_uids()
-                self.update_processed_uids()
-                self.log_health()
-                await self.update_active_requests()
-                await asyncio.sleep(0.1)
-
-            except KeyboardInterrupt:
-                self._handle_keyboard_interrupt()
+                await coro()
             except Exception as e:
-                bt.logging.error(
-                    f"Error in validator loop \n {e} \n {traceback.format_exc()}"
-                )
-                await asyncio.sleep(REQUEST_DELAY_SECONDS)
+                bt.logging.error(f"Error in periodic task {coro.__name__}: {e}")
+            await asyncio.sleep(interval)
+
+    async def _process_requests(self):
+        """Continuously process requests."""
+        while self.running:
+            try:
+                await self.update_active_requests()
+                await asyncio.sleep(0.01)
+            except Exception as e:
+                bt.logging.error(f"Error processing requests: {e}")
+
+    async def _process_events(self):
+        """Process events from the event queue."""
+        while self.running:
+            try:
+                event = await self.event_queue.get()
+                await self._handle_event(event)
+                self.event_queue.task_done()
+            except Exception as e:
+                bt.logging.error(f"Error processing event: {e}")
+
+    async def _handle_event(self, event):
+        """Handle different types of events."""
+        if isinstance(event, ResponseEvent):
+            await self._handle_response(event.response)
 
     async def _process_single_request(
         self, request: Request
@@ -282,11 +326,17 @@ class ValidatorLoop:
         else:
             bt.logging.debug("Automatic updates are disabled, skipping version check")
 
+    def stop(self):
+        """Gracefully stop the validator loop."""
+        self.running = False
+        if self.config.bt_config.prometheus_monitoring:
+            stop_prometheus_logging()
+        clean_temp_files()
+
     def _handle_keyboard_interrupt(self):
         """Handle keyboard interrupt by cleaning up and exiting."""
         bt.logging.success("Keyboard interrupt detected. Exiting validator.")
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.api.stop())
-        stop_prometheus_logging()
-        clean_temp_files()
+        self.stop()
         sys.exit(0)
