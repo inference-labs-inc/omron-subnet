@@ -9,7 +9,6 @@ from dataclasses import dataclass
 
 import bittensor as bt
 import psutil
-import aiohttp
 
 from _validator.config import ValidatorConfig
 from _validator.api import ValidatorAPI
@@ -17,7 +16,6 @@ from _validator.core.prometheus import (
     start_prometheus_logging,
     stop_prometheus_logging,
     log_request_metrics,
-    log_timeout,
     log_network_error,
     log_verification_ratio,
     log_proof_sizes,
@@ -39,7 +37,6 @@ from constants import (
     MAX_CONCURRENT_REQUESTS,
     FIVE_MINUTES,
     ONE_HOUR,
-    VALIDATOR_REQUEST_TIMEOUT_SECONDS,
 )
 from execution_layer.circuit import CircuitType
 from utils import AutoUpdate, clean_temp_files
@@ -271,18 +268,11 @@ class ValidatorLoop:
         self, request: Request
     ) -> tuple[int, MinerResponse | None]:
         try:
-            async with aiohttp.ClientTimeout(total=VALIDATOR_REQUEST_TIMEOUT_SECONDS):
-                response = await query_single_axon(self.config.dendrite, request)
-                if response:
-                    return request.uid, self.response_processor.process_single_response(
-                        response
-                    )
-        except asyncio.TimeoutError:
-            bt.logging.warning(f"Request to UID {request.uid} timed out")
-            log_timeout(request.circuit.metadata.name if request.circuit else "unknown")
-        except aiohttp.ClientError as e:
-            bt.logging.warning(f"Network error for UID {request.uid}: {str(e)}")
-            log_network_error("connection_error")
+            response = await query_single_axon(self.config.dendrite, request)
+            if response:
+                return request.uid, self.response_processor.process_single_response(
+                    response
+                )
         except Exception as e:
             bt.logging.error(f"Unexpected error processing UID {request.uid}: {str(e)}")
             bt.logging.debug(traceback.format_exc())
