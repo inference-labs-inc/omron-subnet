@@ -234,7 +234,7 @@ class ValidatorLoop:
                         },
                     )
 
-        self.score_manager.update_single_score(response)
+        self.score_manager.update_single_score(response, self.queryable_uids)
 
     def _handle_auto_update(self):
         """Handle automatic updates if enabled."""
