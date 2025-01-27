@@ -129,8 +129,8 @@ class ValidatorLoop:
         """Logs validator health metrics"""
         current_time = time.time()
         total_runtime_minutes = (current_time - self.start_time) / 60
-        avg_requests_per_min = (
-            int(self.total_requests / total_runtime_minutes)
+        avg_responses_per_min = (
+            int(self.total_processed / total_runtime_minutes)
             if total_runtime_minutes > 0
             else 0
         )
@@ -138,7 +138,7 @@ class ValidatorLoop:
 
         bt.logging.info(
             f"In-flight: {len(self.processed_tasks)}/{MAX_CONCURRENT_REQUESTS} | "
-            f"Avg Req/min: {avg_requests_per_min} | "
+            f"RPM: {avg_responses_per_min} | "
             f"Processed UIDs: {len(self.processed_uids)} | "
             f"Lifetime - Total: {self.total_processed} Success: {self.total_responses} ({uptime_hours:.1f}h)"
         )
