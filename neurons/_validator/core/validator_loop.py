@@ -152,7 +152,6 @@ class ValidatorLoop:
                     await self._handle_response(response)
 
         log_request_metrics(
-            queue_size=len(self.request_queue._queue),
             active_requests=len(self.active_requests),
             processed_uids=len(self.processed_uids),
         )
