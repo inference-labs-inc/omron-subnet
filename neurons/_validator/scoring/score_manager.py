@@ -1,6 +1,7 @@
 from __future__ import annotations
 import torch
 import bittensor as bt
+import sys
 
 from _validator.models.miner_response import MinerResponse
 from _validator.utils.logging import log_scores
@@ -87,6 +88,9 @@ class ScoreManager:
         """
         Update scores for a single model.
         """
+        bt.logging.info(
+            f"Starting score update for model {model_id} with {len(responses)} responses"
+        )
         max_score = 1 / len(self.scores)
         circuit = circuit_store.get_circuit(model_id)
 
@@ -113,8 +117,14 @@ class ScoreManager:
         proof_of_weights_items = self._create_pow_items(
             responses, max_score, median_max_response_time, min_response_time, model_id
         )
+        bt.logging.info(
+            f"Created {len(proof_of_weights_items)} PoW items for model {model_id}"
+        )
 
         self._update_scores_from_witness(proof_of_weights_items, model_id)
+        bt.logging.info(
+            f"About to update PoW queue with {len(proof_of_weights_items)} items"
+        )
         self._update_pow_queue(proof_of_weights_items)
 
         log_scores(self.scores)
@@ -237,8 +247,9 @@ class ScoreManager:
             bt.logging.debug(f"Updated score for UID {uid}: {score}")
 
     def _update_pow_queue(self, new_items: list[ProofOfWeightsItem]):
-        bt.logging.debug(
-            f"Adding {len(new_items)} new PoW items to queue. Current queue size: {len(self.proof_of_weights_queue)}"
+        bt.logging.info(
+            f"PoW Queue Update - Adding {len(new_items)} items. Current size: {len(self.proof_of_weights_queue)}. "
+            f"Queue memory usage: {sys.getsizeof(self.proof_of_weights_queue)} bytes"
         )
         merged = ProofOfWeightsItem.merge_items(self.proof_of_weights_queue, new_items)
         self.proof_of_weights_queue = merged[-MAX_POW_QUEUE_SIZE:]
