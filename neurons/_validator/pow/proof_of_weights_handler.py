@@ -20,8 +20,8 @@ class ProofOfWeightsHandler:
     @staticmethod
     def prepare_pow_request(circuit: Circuit, score_manager):
         queue = score_manager.get_pow_queue()
-        if not queue:
-            logging.debug("No proof of weights queue found. Defaulting to benchmark.")
+        if len(queue) == 0:
+            logging.debug("Queue is empty. Defaulting to benchmark.")
             return ProofOfWeightsHandler._create_benchmark_request(circuit)
 
         batch_size = 256 if circuit.id == SINGLE_PROOF_OF_WEIGHTS_MODEL_ID else 1024
@@ -68,8 +68,9 @@ class ProofOfWeightsHandler:
 
     @staticmethod
     def _create_benchmark_request(circuit: Circuit):
-        if circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS:
-            return ProofOfWeightsSynapse(
+        """Create a benchmark request when queue is empty."""
+        return (
+            ProofOfWeightsSynapse(
                 subnet_uid=circuit.metadata.netuid,
                 verification_key_hash=circuit.id,
                 proof_system=circuit.proof_system,
@@ -77,10 +78,14 @@ class ProofOfWeightsHandler:
                 proof="",
                 public_signals="",
             )
-        return QueryZkProof(
-            query_input={
-                "public_inputs": circuit.input_handler(RequestType.BENCHMARK).to_json(),
-                "model_id": circuit.id,
-            },
-            query_output="",
+            if circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS
+            else QueryZkProof(
+                query_input={
+                    "public_inputs": circuit.input_handler(
+                        RequestType.BENCHMARK
+                    ).to_json(),
+                    "model_id": circuit.id,
+                },
+                query_output="",
+            )
         )
