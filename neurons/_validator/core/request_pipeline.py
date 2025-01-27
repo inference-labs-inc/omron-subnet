@@ -21,9 +21,6 @@ from execution_layer.circuit import Circuit, CircuitType
 from execution_layer.generic_input import GenericInput
 from protocol import ProofOfWeightsSynapse, QueryZkProof
 from utils.wandb_logger import safe_log
-from _validator.models.request_type import RequestType
-import copy
-from _validator.utils.api import hash_inputs
 
 
 class RequestPipeline:
@@ -209,63 +206,8 @@ class RequestPipeline:
             Request | None: The prepared request, or None if preparation failed.
         """
         if self.api.external_requests_queue:
-            external_request = self.api.external_requests_queue[
-                0
-            ]  # Peek but don't remove
-            synapse = self.get_synapse_request(
-                RequestType.RWR, external_request.circuit, external_request
-            )
-
-            if isinstance(synapse, ProofOfWeightsSynapse):
-                input_data = synapse.inputs
-            else:
-                input_data = synapse.query_input["public_inputs"]
-
-            try:
-                self.hash_guard.check_hash(input_data)
-            except Exception as e:
-                bt.logging.error(f"Hash already exists: {e}")
-                safe_log({"hash_guard_error": 1})
-                return None
-
-            return Request(
-                uid=uid,
-                axon=self.config.metagraph.axons[uid],
-                synapse=synapse,
-                circuit=external_request.circuit,
-                inputs=GenericInput(RequestType.RWR, input_data),
-                request_type=RequestType.RWR,
-                request_hash=external_request.hash,
-            )
+            requests = self._prepare_real_world_requests([uid])
         else:
-            circuit = self.select_circuit_for_benchmark()
-            if circuit is None:
-                bt.logging.error("No circuit selected")
-                return None
+            requests = self._prepare_benchmark_requests([uid])
 
-            if circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
-                self.score_manager.clear_proof_of_weights_queue()
-
-            synapse = self.get_synapse_request(RequestType.BENCHMARK, circuit)
-
-            if isinstance(synapse, ProofOfWeightsSynapse):
-                input_data = synapse.inputs
-            else:
-                input_data = synapse.query_input["public_inputs"]
-
-            try:
-                self.hash_guard.check_hash(input_data)
-            except Exception as e:
-                bt.logging.error(f"Hash already exists: {e}")
-                safe_log({"hash_guard_error": 1})
-                return None
-
-            return Request(
-                uid=uid,
-                axon=self.config.metagraph.axons[uid],
-                synapse=synapse,
-                circuit=circuit,
-                inputs=circuit.input_handler(RequestType.BENCHMARK, input_data),
-                request_type=RequestType.BENCHMARK,
-                request_hash=hash_inputs(input_data),
-            )
+        return requests[0] if requests else None
