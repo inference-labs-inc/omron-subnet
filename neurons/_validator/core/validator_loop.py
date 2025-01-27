@@ -128,13 +128,14 @@ class ValidatorLoop:
             self.processed_uids.clear()
 
     async def update_active_requests(self):
-        # Process completed requests first
+        """Update active requests to maintain MAX_CONCURRENT_REQUESTS."""
         if self.active_requests:
-            done, _ = await asyncio.wait(
+            done, pending = await asyncio.wait(
                 self.active_requests.values(),
                 return_when=asyncio.FIRST_COMPLETED,
-                timeout=0.1,
+                timeout=0.01,  # Shorter timeout to be more responsive
             )
+
             for task in done:
                 uid, response = await task
                 self.processed_uids.add(uid)
@@ -142,22 +143,28 @@ class ValidatorLoop:
                 if response:
                     await self._handle_response(response)
 
-        needed_requests = MAX_CONCURRENT_REQUESTS - len(self.active_requests)
-        if needed_requests <= 0:
-            return
+        while len(self.active_requests) < MAX_CONCURRENT_REQUESTS:
+            # Get available UIDs we can query
+            available_uids = [
+                uid
+                for uid in self.queryable_uids
+                if uid not in self.processed_uids and uid not in self.active_requests
+            ]
 
-        available_uids = [
-            uid
-            for uid in self.queryable_uids
-            if uid not in self.processed_uids and uid not in self.active_requests
-        ][:needed_requests]
+            if not available_uids:
+                self.processed_uids.clear()
+                continue
 
-        for uid in available_uids:
-            if request := self.request_pipeline.prepare_single_request(uid):
-                task = asyncio.create_task(self._process_single_request(request))
-                self.active_requests[uid] = task
+            needed = MAX_CONCURRENT_REQUESTS - len(self.active_requests)
+            uids_to_process = available_uids[:needed]
 
-        # Log request metrics with memory usage
+            for uid in uids_to_process:
+                if request := self.request_pipeline.prepare_single_request(uid):
+                    task = asyncio.create_task(self._process_single_request(request))
+                    self.active_requests[uid] = task
+            if not uids_to_process:
+                break
+
         process = psutil.Process()
         log_request_metrics(
             active_requests=len(self.active_requests),
