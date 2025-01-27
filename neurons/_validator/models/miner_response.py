@@ -36,9 +36,9 @@ class MinerResponse:
     verification_result: bool
     input_hash: str
     response_time: float
-    verification_time: float | None = None
     proof_size: int
     circuit: Circuit
+    verification_time: float | None = None
     proof_content: dict | str | None = None
     public_json: list[str] | None = None
     request_type: RequestType | None = None
