@@ -175,7 +175,6 @@ class MinerSession:
         else:
             # Each miner gets a unique identity (UID) in the network for differentiation.
             subnet_uid = self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
-            bt.logging.info(f"Running miner on uid: {subnet_uid}")
             self.subnet_uid = subnet_uid
 
     def configure(self):
