@@ -36,7 +36,6 @@ from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
 from constants import (
     MAX_CONCURRENT_REQUESTS,
-    ONE_MINUTE,
     FIVE_MINUTES,
     ONE_HOUR,
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
@@ -157,12 +156,16 @@ class ValidatorLoop:
                 self.processed_uids.add(uid)
                 self.total_processed += 1
                 self.total_requests += 1
+                bt.logging.debug(f"Got response from UID {uid}")
                 if response:
                     await self.event_queue.put(ResponseEvent(response))
             except Exception as e:
                 bt.logging.error(f"Task failed with error: {str(e)}")
             finally:
                 self.processed_tasks.remove(task)
+
+        if not done_tasks:
+            return
 
         while len(self.processed_tasks) < MAX_CONCURRENT_REQUESTS:
             available_uids = [
@@ -187,6 +190,7 @@ class ValidatorLoop:
                     self._process_single_request(request), name=str(uid)
                 )
                 self.processed_tasks.add(task)
+                bt.logging.debug(f"Added request for UID {uid}")
             else:
                 continue
 
@@ -214,7 +218,7 @@ class ValidatorLoop:
             self._schedule_periodic(self.update_weights, FIVE_MINUTES),
             self._schedule_periodic(self.update_queryable_uids, FIVE_MINUTES),
             self._schedule_periodic(self.check_auto_update, FIVE_MINUTES),
-            self._schedule_periodic(self.log_health, ONE_MINUTE),
+            self._schedule_periodic(self.log_health, 1.0),
             self._process_requests(),
             self._process_events(),
         ]
