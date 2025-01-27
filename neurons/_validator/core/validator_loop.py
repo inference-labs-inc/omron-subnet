@@ -157,9 +157,8 @@ class ValidatorLoop:
                 self.processed_uids.add(uid)
                 self.total_processed += 1
                 self.total_requests += 1
-                if response and response.verification_result:
+                if response:
                     await self.event_queue.put(ResponseEvent(response))
-                    self.total_responses += 1
             except Exception as e:
                 bt.logging.error(f"Task failed with error: {str(e)}")
             finally:
@@ -328,6 +327,9 @@ class ValidatorLoop:
         self.score_manager.update_single_score(
             response, queryable_uids=set(self.queryable_uids)
         )
+
+        if response.verification_result:
+            self.total_responses += 1
 
     def _handle_auto_update(self):
         if not self.config.bt_config.no_auto_update:
