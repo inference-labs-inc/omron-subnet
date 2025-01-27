@@ -6,6 +6,7 @@ from constants import (
 )
 from protocol import ProofOfWeightsSynapse, QueryZkProof
 from _validator.models.request_type import RequestType
+import torch
 
 
 class ProofOfWeightsHandler:
@@ -40,12 +41,25 @@ class ProofOfWeightsHandler:
                 )
             )
 
+        batch_size = 256 if circuit.id == SINGLE_PROOF_OF_WEIGHTS_MODEL_ID else 1024
         pow_items: list[ProofOfWeightsItem] = ProofOfWeightsItem.pad_items(
             proof_of_weights_queue,
-            target_item_count=(
-                256 if circuit.id == SINGLE_PROOF_OF_WEIGHTS_MODEL_ID else 1024
-            ),
+            target_item_count=batch_size,
         )
+
+        # Update response times from circuit evaluation data
+        for item in pow_items:
+            if item.response_time < circuit.evaluation_data.minimum_response_time:
+                item.response_time = torch.tensor(
+                    circuit.evaluation_data.minimum_response_time, dtype=torch.float32
+                )
+            item.minimum_response_time = torch.tensor(
+                circuit.evaluation_data.minimum_response_time, dtype=torch.float32
+            )
+            item.maximum_response_time = torch.tensor(
+                circuit.evaluation_data.maximum_response_time, dtype=torch.float32
+            )
+
         inputs = circuit.input_handler(
             RequestType.RWR, ProofOfWeightsItem.to_dict_list(pow_items)
         ).to_json()

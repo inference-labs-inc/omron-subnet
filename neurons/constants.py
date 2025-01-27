@@ -135,3 +135,7 @@ ONE_DAY = ONE_HOUR * 24
 ONE_YEAR = ONE_DAY * 365
 # Temporary folder for storing proof files
 TEMP_FOLDER = "/tmp/omron"
+
+# Queue size limits
+MAX_POW_QUEUE_SIZE = 1024
+MAX_EVALUATION_ITEMS = 1024

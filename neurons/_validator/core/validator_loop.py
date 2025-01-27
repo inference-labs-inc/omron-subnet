@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import random
 import sys
 import traceback
 from typing import NoReturn
 
 import bittensor as bt
+import psutil
 
 from _validator.config import ValidatorConfig
 from _validator.api import ValidatorAPI
@@ -14,6 +14,13 @@ from _validator.core.prometheus import (
     start_prometheus_logging,
     stop_prometheus_logging,
     log_request_metrics,
+    log_timeout,
+    log_network_error,
+    log_verification_ratio,
+    log_proof_sizes,
+    log_verification_failure,
+    log_response_times,
+    log_validation_time,
 )
 from _validator.core.request import Request
 from _validator.core.request_pipeline import RequestPipeline
@@ -31,6 +38,7 @@ from constants import (
     ONE_MINUTE,
     FIVE_MINUTES,
     ONE_HOUR,
+    VALIDATOR_REQUEST_TIMEOUT_SECONDS,
 )
 from execution_layer.circuit import CircuitType
 from utils import AutoUpdate, clean_temp_files, with_rate_limit
@@ -38,9 +46,15 @@ from utils import AutoUpdate, clean_temp_files, with_rate_limit
 
 class ValidatorLoop:
     """
-    Main loop for the validator node.
+    Core validator node orchestrator responsible for:
+    - Managing concurrent miner requests
+    - Updating network weights and scores
+    - Processing responses and proofs
+    - Handling auto-updates and prometheus metrics
 
-    The main loop for the validator. Handles everything from score updates to weight updates.
+    The loop maintains a pool of active requests up to MAX_CONCURRENT_REQUESTS,
+    processes responses asynchronously, and updates network state based on
+    configurable intervals.
     """
 
     def __init__(self, config: ValidatorConfig):
@@ -48,7 +62,7 @@ class ValidatorLoop:
         Initialize the ValidatorLoop based on provided configuration.
 
         Args:
-            config (bt.config): Bittensor configuration object.
+            config (ValidatorConfig): Validator configuration object.
         """
         self.config = config
         self.config.check_register()
@@ -73,8 +87,7 @@ class ValidatorLoop:
             self.config, self.score_manager, self.api
         )
 
-        # Request queue management
-        self.request_queue = asyncio.Queue()
+        # Request management
         self.active_requests: dict[int, asyncio.Task] = {}
         self.processed_uids: set[int] = set()
         self.queryable_uids: list[int] = []
@@ -82,9 +95,6 @@ class ValidatorLoop:
         if self.config.bt_config.prometheus_monitoring:
             start_prometheus_logging(self.config.bt_config.prometheus_port)
 
-    # Note that this rate limit is less than the weights rate limit
-    # This is to reduce extra subtensor calls but ensure that we check
-    # regularly with the updater
     @with_rate_limit(period=FIVE_MINUTES)
     def update_weights(self):
         self.weights_manager.update_weights(self.score_manager.scores)
@@ -118,25 +128,7 @@ class ValidatorLoop:
             self.processed_uids.clear()
 
     async def update_active_requests(self):
-        random.shuffle(self.queryable_uids)
-        needed_requests = MAX_CONCURRENT_REQUESTS - len(self.active_requests)
-        if needed_requests > 0:
-            available_uids = [
-                uid
-                for uid in self.queryable_uids
-                if uid not in self.processed_uids and uid not in self.active_requests
-            ]
-
-            if not available_uids:
-                self.processed_uids.clear()
-                return
-
-            uid = available_uids[0]
-            request = self.request_pipeline.prepare_single_request(uid)
-            if request:
-                task = asyncio.create_task(self._process_single_request(request))
-                self.active_requests[uid] = task
-
+        # Process completed requests first
         if self.active_requests:
             done, _ = await asyncio.wait(
                 self.active_requests.values(),
@@ -147,14 +139,30 @@ class ValidatorLoop:
                 uid, response = await task
                 self.processed_uids.add(uid)
                 del self.active_requests[uid]
-
                 if response:
                     await self._handle_response(response)
 
+        needed_requests = MAX_CONCURRENT_REQUESTS - len(self.active_requests)
+        if needed_requests <= 0:
+            return
+
+        available_uids = [
+            uid
+            for uid in self.queryable_uids
+            if uid not in self.processed_uids and uid not in self.active_requests
+        ][:needed_requests]
+
+        for uid in available_uids:
+            if request := self.request_pipeline.prepare_single_request(uid):
+                task = asyncio.create_task(self._process_single_request(request))
+                self.active_requests[uid] = task
+
+        # Log request metrics with memory usage
+        process = psutil.Process()
         log_request_metrics(
-            queue_size=len(self.request_queue._queue),
             active_requests=len(self.active_requests),
             processed_uids=len(self.processed_uids),
+            memory_bytes=process.memory_info().rss,
         )
 
     async def run(self) -> NoReturn:
@@ -198,14 +206,26 @@ class ValidatorLoop:
             tuple[int, MinerResponse | None]: The UID and processed response (if successful).
         """
         try:
-            response = await query_single_axon(self.config.dendrite, request)
+            response = await asyncio.wait_for(
+                query_single_axon(self.config.dendrite, request),
+                timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+            )
             if response:
                 processed_response = self.response_processor.process_single_response(
                     response
                 )
                 return request.uid, processed_response
+
+        except asyncio.TimeoutError:
+            bt.logging.warning(f"Request to UID {request.uid} timed out")
+            log_timeout(request.circuit.metadata.name if request.circuit else "unknown")
+        except ConnectionError as e:
+            bt.logging.warning(f"Network error for UID {request.uid}: {str(e)}")
+            log_network_error("connection_error")
         except Exception as e:
-            bt.logging.error(f"Error processing request for UID {request.uid}: {e}")
+            bt.logging.error(f"Unexpected error processing UID {request.uid}: {str(e)}")
+            bt.logging.debug(traceback.format_exc())
+            log_network_error("unknown_error")
 
         return request.uid, None
 
@@ -216,6 +236,8 @@ class ValidatorLoop:
         Args:
             response (MinerResponse): The processed response to handle.
         """
+        model_name = response.circuit.metadata.name if response.circuit else "unknown"
+
         if response.verification_result and response.proof_content:
             if response.circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS:
                 request_hash = response.input_hash
@@ -235,7 +257,25 @@ class ValidatorLoop:
                         },
                     )
 
-        self.score_manager.update_single_score(response)
+            if response.proof_content:
+                log_proof_sizes([len(response.proof_content)], model_name)
+        else:
+            if response.error:
+                log_verification_failure(model_name, response.error)
+
+        if response.response_time:
+            log_response_times([response.response_time], model_name)
+        if response.verification_time:
+            log_validation_time(response.verification_time)
+
+        if response.circuit:
+            log_verification_ratio(
+                response.circuit.evaluation_data.verification_ratio, model_name
+            )
+
+        self.score_manager.update_single_score(
+            response, queryable_uids=set(self.queryable_uids)
+        )
 
     def _handle_auto_update(self):
         """Handle automatic updates if enabled."""
