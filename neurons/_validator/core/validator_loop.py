@@ -104,27 +104,27 @@ class ValidatorLoop:
         if self.config.bt_config.prometheus_monitoring:
             start_prometheus_logging(self.config.bt_config.prometheus_port)
 
-    def update_weights(self):
+    async def update_weights(self):
         """Updates network weights based on current scores"""
         self.weights_manager.update_weights(self.score_manager.scores)
 
-    def sync_scores_uids(self):
+    async def sync_scores_uids(self):
         """Syncs scores with current network UIDs"""
         self.score_manager.sync_scores_uids(self.config.metagraph.uids.tolist())
 
-    def sync_metagraph(self):
+    async def sync_metagraph(self):
         """Syncs local metagraph with network state"""
         self.config.metagraph.sync(subtensor=self.config.subtensor)
 
-    def check_auto_update(self):
+    async def check_auto_update(self):
         """Checks and performs auto-updates if enabled"""
         self._handle_auto_update()
 
-    def update_queryable_uids(self):
+    async def update_queryable_uids(self):
         """Updates list of UIDs that can be queried"""
         self.queryable_uids = list(get_queryable_uids(self.config.metagraph))
 
-    def log_health(self):
+    async def log_health(self):
         """Logs validator health metrics"""
         current_time = time.time()
         elapsed = current_time - self.last_completed_check
