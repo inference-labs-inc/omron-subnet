@@ -128,20 +128,21 @@ class MinerSession:
                             cli_parser.config.netuid
                         )
                         table = Table(title=f"Miner Status (UID: {self.subnet_uid})")
-                        table.add_column("Metric", justify="right", style="cyan")
-                        table.add_column("Value", justify="left", style="green")
-                        table.add_row("Block", str(self.metagraph.block.item()))
-                        table.add_row("Stake", str(self.metagraph.S[self.subnet_uid]))
-                        table.add_row("Rank", str(self.metagraph.R[self.subnet_uid]))
-                        table.add_row("Trust", str(self.metagraph.T[self.subnet_uid]))
+                        table.add_column("Block", justify="center", style="cyan")
+                        table.add_column("Stake", justify="center", style="cyan")
+                        table.add_column("Rank", justify="center", style="cyan")
+                        table.add_column("Trust", justify="center", style="cyan")
+                        table.add_column("Consensus", justify="center", style="cyan")
+                        table.add_column("Incentive", justify="center", style="cyan")
+                        table.add_column("Emission", justify="center", style="cyan")
                         table.add_row(
-                            "Consensus", str(self.metagraph.C[self.subnet_uid])
-                        )
-                        table.add_row(
-                            "Incentive", str(self.metagraph.I[self.subnet_uid])
-                        )
-                        table.add_row(
-                            "Emission", str(self.metagraph.E[self.subnet_uid])
+                            str(self.metagraph.block.item()),
+                            str(self.metagraph.S[self.subnet_uid]),
+                            str(self.metagraph.R[self.subnet_uid]),
+                            str(self.metagraph.T[self.subnet_uid]),
+                            str(self.metagraph.C[self.subnet_uid]),
+                            str(self.metagraph.I[self.subnet_uid]),
+                            str(self.metagraph.E[self.subnet_uid]),
                         )
                         console = Console()
                         console.print(table)
