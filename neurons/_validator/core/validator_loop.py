@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 import bittensor as bt
 import psutil
+import aiohttp
 
 from _validator.config import ValidatorConfig
 from _validator.api import ValidatorAPI
@@ -270,16 +271,16 @@ class ValidatorLoop:
         self, request: Request
     ) -> tuple[int, MinerResponse | None]:
         try:
-            async with asyncio.timeout(VALIDATOR_REQUEST_TIMEOUT_SECONDS):
+            async with aiohttp.ClientTimeout(total=VALIDATOR_REQUEST_TIMEOUT_SECONDS):
                 response = await query_single_axon(self.config.dendrite, request)
                 if response:
                     return request.uid, self.response_processor.process_single_response(
                         response
                     )
-        except TimeoutError:
+        except asyncio.TimeoutError:
             bt.logging.warning(f"Request to UID {request.uid} timed out")
             log_timeout(request.circuit.metadata.name if request.circuit else "unknown")
-        except ConnectionError as e:
+        except aiohttp.ClientError as e:
             bt.logging.warning(f"Network error for UID {request.uid}: {str(e)}")
             log_network_error("connection_error")
         except Exception as e:
