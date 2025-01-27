@@ -1,6 +1,7 @@
 from __future__ import annotations
 import torch
 import bittensor as bt
+import traceback
 
 from _validator.models.miner_response import MinerResponse
 from _validator.utils.logging import log_scores
@@ -257,17 +258,22 @@ class ScoreManager:
             bt.logging.debug(f"Updated score for UID {uid}: {score}")
 
     def _update_pow_queue(self, new_items: list[ProofOfWeightsItem]):
+        current_size = len(self.proof_of_weights_queue)
         bt.logging.info(
-            f"PoW Queue Update - Adding {len(new_items)} items."
-            f"Current size: {len(self.proof_of_weights_queue)} / {MAX_POW_QUEUE_SIZE}"
+            f"PoW Queue Update - Adding {len(new_items)} items. Current size: {current_size} / {MAX_POW_QUEUE_SIZE}"
         )
+
+        if current_size > 0 and len(self.proof_of_weights_queue) == 0:
+            bt.logging.warning(
+                f"Queue was unexpectedly cleared! Stack trace: {''.join(traceback.format_stack())}"
+            )
+
         merged = ProofOfWeightsItem.merge_items(self.proof_of_weights_queue, new_items)
         self.proof_of_weights_queue = merged[-MAX_POW_QUEUE_SIZE:]
 
-        # Log queue status after update
         queue_size = len(self.proof_of_weights_queue)
         bt.logging.info(
-            f"Queue Status: {queue_size} / {MAX_POW_QUEUE_SIZE} items "
+            f"Queue Status: {queue_size}/{MAX_POW_QUEUE_SIZE} items "
             f"({(queue_size / MAX_POW_QUEUE_SIZE) * 100:.1f}% full)"
         )
 
@@ -368,3 +374,7 @@ class ScoreManager:
             self.user_uid,
         )
         self._update_pow_queue([pow_item])
+
+    def get_pow_queue(self) -> list[ProofOfWeightsItem]:
+        """Get the current proof of weights queue."""
+        return self.proof_of_weights_queue
