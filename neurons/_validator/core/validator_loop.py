@@ -4,6 +4,7 @@ import asyncio
 import sys
 import traceback
 from typing import NoReturn
+import time
 
 import bittensor as bt
 import psutil
@@ -58,12 +59,6 @@ class ValidatorLoop:
     """
 
     def __init__(self, config: ValidatorConfig):
-        """
-        Initialize the ValidatorLoop based on provided configuration.
-
-        Args:
-            config (ValidatorConfig): Validator configuration object.
-        """
         self.config = config
         self.config.check_register()
         self.auto_update = AutoUpdate()
@@ -87,10 +82,16 @@ class ValidatorLoop:
             self.config, self.score_manager, self.api
         )
 
-        # Request management
-        self.active_requests: dict[int, asyncio.Task] = {}
+        self.active_requests = asyncio.Queue(maxsize=MAX_CONCURRENT_REQUESTS)
+        self.processed_tasks: set[asyncio.Task] = set()
         self.processed_uids: set[int] = set()
         self.queryable_uids: list[int] = []
+
+        self.completed_requests = 0
+        self.last_completed_check = time.time()
+        self.total_responses = 0
+        self.total_processed = 0
+        self.start_time = time.time()
 
         if self.config.bt_config.prometheus_monitoring:
             start_prometheus_logging(self.config.bt_config.prometheus_port)
@@ -117,11 +118,21 @@ class ValidatorLoop:
 
     @with_rate_limit(period=ONE_MINUTE)
     def log_health(self):
+        current_time = time.time()
+        elapsed = current_time - self.last_completed_check
+        requests_per_min = int((self.completed_requests / elapsed) * 60)
+        uptime_hours = (current_time - self.start_time) / 3600
+
         bt.logging.info(
-            f"In-flight requests: {len(self.active_requests)} / {MAX_CONCURRENT_REQUESTS}"
+            f"In-flight: {self.active_requests.qsize()}/{MAX_CONCURRENT_REQUESTS} | "
+            f"Req/min: {requests_per_min} | "
+            f"Processed UIDs: {len(self.processed_uids)} | "
+            f"Lifetime - Total: {self.total_processed} Success: {self.total_responses} ({uptime_hours:.1f}h)"
         )
-        bt.logging.debug(f"Processed UIDs: {len(self.processed_uids)}")
         bt.logging.debug(f"Queryable UIDs: {len(self.queryable_uids)}")
+
+        self.completed_requests = 0
+        self.last_completed_check = current_time
 
     def update_processed_uids(self):
         if len(self.processed_uids) >= len(self.queryable_uids):
@@ -129,53 +140,52 @@ class ValidatorLoop:
 
     async def update_active_requests(self):
         """Update active requests to maintain MAX_CONCURRENT_REQUESTS."""
-        if self.active_requests:
-            done, pending = await asyncio.wait(
-                self.active_requests.values(),
-                return_when=asyncio.FIRST_COMPLETED,
-                timeout=0.01,  # Shorter timeout to be more responsive
-            )
-
-            for task in done:
+        # Clean up completed tasks
+        done_tasks = {task for task in self.processed_tasks if task.done()}
+        for task in done_tasks:
+            try:
                 uid, response = await task
                 self.processed_uids.add(uid)
-                del self.active_requests[uid]
+                self.total_processed += 1
                 if response:
                     await self._handle_response(response)
+                    self.total_responses += 1
+                self.completed_requests += 1
+            except Exception as e:
+                bt.logging.error(f"Task failed with error: {str(e)}")
+            finally:
+                self.processed_tasks.remove(task)
 
-        while len(self.active_requests) < MAX_CONCURRENT_REQUESTS:
-            # Get available UIDs we can query
+        # Fill queue with new requests
+        while len(self.processed_tasks) < MAX_CONCURRENT_REQUESTS:
             available_uids = [
                 uid
                 for uid in self.queryable_uids
-                if uid not in self.processed_uids and uid not in self.active_requests
+                if uid not in self.processed_uids
+                and not any(uid == t.get_name() for t in self.processed_tasks)
             ]
 
             if not available_uids:
-                self.processed_uids.clear()
-                continue
+                break
 
-            needed = MAX_CONCURRENT_REQUESTS - len(self.active_requests)
-            uids_to_process = available_uids[:needed]
-
-            for uid in uids_to_process:
-                if request := self.request_pipeline.prepare_single_request(uid):
-                    task = asyncio.create_task(self._process_single_request(request))
-                    self.active_requests[uid] = task
-            if not uids_to_process:
+            uid = available_uids[0]
+            if request := self.request_pipeline.prepare_single_request(uid):
+                task = asyncio.create_task(
+                    self._process_single_request(request), name=str(uid)
+                )
+                self.processed_tasks.add(task)
+            else:
                 break
 
         process = psutil.Process()
         log_request_metrics(
-            active_requests=len(self.active_requests),
+            active_requests=self.active_requests.qsize(),
             processed_uids=len(self.processed_uids),
             memory_bytes=process.memory_info().rss,
         )
 
     async def run(self) -> NoReturn:
-        """
-        Run the main validator loop indefinitely.
-        """
+        """Run the main validator loop indefinitely."""
         bt.logging.success(
             f"Validator started on subnet {self.config.subnet_uid} using UID {self.config.user_uid}"
         )
@@ -203,27 +213,14 @@ class ValidatorLoop:
     async def _process_single_request(
         self, request: Request
     ) -> tuple[int, MinerResponse | None]:
-        """
-        Process a single request and return the response.
-
-        Args:
-            request (Request): The request to process.
-
-        Returns:
-            tuple[int, MinerResponse | None]: The UID and processed response (if successful).
-        """
         try:
-            response = await asyncio.wait_for(
-                query_single_axon(self.config.dendrite, request),
-                timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-            )
-            if response:
-                processed_response = self.response_processor.process_single_response(
-                    response
-                )
-                return request.uid, processed_response
-
-        except asyncio.TimeoutError:
+            async with asyncio.timeout(VALIDATOR_REQUEST_TIMEOUT_SECONDS):
+                response = await query_single_axon(self.config.dendrite, request)
+                if response:
+                    return request.uid, self.response_processor.process_single_response(
+                        response
+                    )
+        except TimeoutError:
             bt.logging.warning(f"Request to UID {request.uid} timed out")
             log_timeout(request.circuit.metadata.name if request.circuit else "unknown")
         except ConnectionError as e:
@@ -237,12 +234,7 @@ class ValidatorLoop:
         return request.uid, None
 
     async def _handle_response(self, response: MinerResponse) -> None:
-        """
-        Handle a processed response, updating scores and weights as needed.
-
-        Args:
-            response (MinerResponse): The processed response to handle.
-        """
+        """Handle a processed response, updating scores and weights."""
         model_name = response.circuit.metadata.name if response.circuit else "unknown"
 
         if response.verification_result and response.proof_content:
@@ -285,7 +277,6 @@ class ValidatorLoop:
         )
 
     def _handle_auto_update(self):
-        """Handle automatic updates if enabled."""
         if not self.config.bt_config.no_auto_update:
             self.auto_update.try_update()
         else:
