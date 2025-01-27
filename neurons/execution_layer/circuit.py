@@ -182,12 +182,21 @@ class CircuitEvaluationData:
         self.model_id = model_id
         self.store_path = evaluation_store_path
         self.data: list[CircuitEvaluationItem] = []
-        if os.path.exists(evaluation_store_path):
-            with open(evaluation_store_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                self.data = [CircuitEvaluationItem(**item) for item in data]
-        else:
-            os.makedirs(os.path.dirname(evaluation_store_path), exist_ok=True)
+
+        os.makedirs(os.path.dirname(evaluation_store_path), exist_ok=True)
+
+        try:
+            if os.path.exists(evaluation_store_path):
+                with open(evaluation_store_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    self.data = [CircuitEvaluationItem(**item) for item in data]
+        except Exception as e:
+            logging.error(
+                f"Failed to load evaluation data for model {model_id}, starting fresh: {e}"
+            )
+            self.data = []
+
+        if not self.data:
             with open(evaluation_store_path, "w", encoding="utf-8") as f:
                 json.dump([], f)
 
@@ -199,8 +208,11 @@ class CircuitEvaluationData:
         if len(self.data) > MAX_EVALUATION_ITEMS:
             self.data = self.data[-MAX_EVALUATION_ITEMS:]
 
-        with open(self.store_path, "w", encoding="utf-8") as f:
-            json.dump([item.to_dict() for item in self.data], f)
+        try:
+            with open(self.store_path, "w", encoding="utf-8") as f:
+                json.dump([item.to_dict() for item in self.data], f)
+        except Exception as e:
+            logging.error(f"Failed to save evaluation data: {e}")
 
     @property
     def verification_ratio(self) -> float:
