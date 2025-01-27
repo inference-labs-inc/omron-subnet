@@ -24,6 +24,7 @@ class MinerResponse:
         uid (int): Unique identifier of the miner.
         verification_result (bool): Whether the miner's response was verified.
         response_time (float): Time taken by the miner to respond.
+        verification_time (float): Time taken to verify the proof.
         proof_size (int): Size of the proof provided by the miner.
         circuit (Circuit): Circuit used.
         proof_content (Any): Content of the proof - either a string or a dict.
@@ -35,6 +36,7 @@ class MinerResponse:
     verification_result: bool
     input_hash: str
     response_time: float
+    verification_time: float | None = None
     proof_size: int
     circuit: Circuit
     proof_content: dict | str | None = None
@@ -138,6 +140,7 @@ class MinerResponse:
             uid=uid,
             verification_result=False,
             response_time=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+            verification_time=None,
             proof_size=DEFAULT_PROOF_SIZE,
             circuit=circuit,
             proof_content=None,

@@ -2,6 +2,7 @@ from __future__ import annotations
 import collections
 import random
 import traceback
+import time
 
 from bittensor import logging
 
@@ -103,9 +104,11 @@ class ResponseProcessor:
         elif miner_response.proof_content:
             logging.debug(f"Attempting to verify proof for UID: {miner_response.uid}")
             try:
+                start_time = time.time()
                 verification_result = self.verify_proof_string(
                     miner_response, response.inputs
                 )
+                miner_response.verification_time = time.time() - start_time
                 miner_response.set_verification_result(verification_result)
                 if not verification_result:
                     logging.warning(
