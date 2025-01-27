@@ -90,9 +90,6 @@ class RequestPipeline:
             bt.logging.error("No circuit selected")
             return []
 
-        if circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
-            self.score_manager.clear_proof_of_weights_queue()
-
         requests = []
         for uid in filtered_uids:
             synapse = self.get_synapse_request(RequestType.BENCHMARK, circuit)
