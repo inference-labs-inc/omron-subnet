@@ -56,9 +56,15 @@ class MinerSession:
         )
         bt.logging.info("Attached forward functions to axon")
 
+        # Start the miner's axon, making it active on the network.
+        bt.logging.info(f"Starting axon server: {axon.info()}")
+        axon.start()
+        bt.logging.info(f"Started axon server: {axon.info()}")
+
         # Serve passes the axon information to the network + netuid we are hosting on.
         # This will auto-update if the axon port of external ip has changed.
         existing_axon = self.metagraph.axons[self.subnet_uid]
+
         if (
             existing_axon
             and existing_axon.port == axon.external_port
@@ -76,11 +82,6 @@ class MinerSession:
         bt.logging.info(
             f"Served axon on network: {self.subtensor.chain_endpoint} with netuid: {cli_parser.config.netuid}"
         )
-
-        # Start the miner's axon, making it active on the network.
-        bt.logging.info(f"Starting axon server: {axon.info()}")
-        axon.start()
-        bt.logging.info(f"Started axon server: {axon.info()}")
 
         self.axon = axon
 
