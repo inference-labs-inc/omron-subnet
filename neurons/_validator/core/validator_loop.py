@@ -160,7 +160,6 @@ class ValidatorLoop:
                 if response and response.verification_result:
                     await self.event_queue.put(ResponseEvent(response))
                     self.total_responses += 1
-                self.completed_requests += 1
             except Exception as e:
                 bt.logging.error(f"Task failed with error: {str(e)}")
             finally:
@@ -175,7 +174,10 @@ class ValidatorLoop:
             ]
 
             if not available_uids:
-                if len(self.processed_uids) >= len(self.queryable_uids):
+                if len(self.processed_uids) > 0:
+                    bt.logging.debug(
+                        "Resetting processed UIDs to maintain request volume"
+                    )
                     self.processed_uids.clear()
                     continue
                 break
@@ -187,7 +189,12 @@ class ValidatorLoop:
                 )
                 self.processed_tasks.add(task)
             else:
-                break
+                continue
+
+        if len(self.processed_tasks) < MAX_CONCURRENT_REQUESTS:
+            bt.logging.warning(
+                f"Running below capacity: {len(self.processed_tasks)}/{MAX_CONCURRENT_REQUESTS} requests"
+            )
 
         process = psutil.Process()
         log_request_metrics(
