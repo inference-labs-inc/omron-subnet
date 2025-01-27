@@ -1,7 +1,6 @@
 from __future__ import annotations
 import torch
 import bittensor as bt
-import traceback
 
 from _validator.models.miner_response import MinerResponse
 from _validator.utils.logging import log_scores
@@ -51,7 +50,7 @@ class ScoreManager:
 
     def _create_initial_scores(self) -> torch.Tensor:
         """Create initial scores based on metagraph data."""
-        # Depending on how bittensor was installed, metagraph may be tensor or ndarray
+
         total_stake = (
             self.metagraph.S
             if isinstance(self.metagraph.S, torch.Tensor)
@@ -94,7 +93,6 @@ class ScoreManager:
         max_score = 1 / len(self.scores)
         circuit = circuit_store.get_circuit(model_id)
 
-        # Update evaluation data with new responses
         for response in responses:
             if response.verification_result and response.response_time > 0:
                 circuit.evaluation_data.update(
@@ -110,7 +108,6 @@ class ScoreManager:
                     )
                 )
 
-        # Get metrics from updated evaluation data
         median_max_response_time = circuit.evaluation_data.maximum_response_time
         min_response_time = circuit.evaluation_data.minimum_response_time
 
@@ -121,10 +118,6 @@ class ScoreManager:
             f"Created {len(proof_of_weights_items)} PoW items for model {model_id}"
         )
 
-        self._update_scores_from_witness(proof_of_weights_items, model_id)
-        bt.logging.info(
-            f"About to update PoW queue with {len(proof_of_weights_items)} items"
-        )
         self._update_pow_queue(proof_of_weights_items)
 
         log_scores(self.scores)
@@ -164,29 +157,12 @@ class ScoreManager:
                 f"Proof of weights circuit not found for model ID: {model_id}"
             )
 
-        if len(proof_of_weights_items) < 256:
-            bt.logging.info(
-                f"Not enough items for witness generation ({len(proof_of_weights_items)}/256). Queueing items."
-            )
-            self._update_pow_queue(proof_of_weights_items)
-            return
-
-        bt.logging.info(
-            f"Queue full! Generating witness for {len(proof_of_weights_items)} items"
-        )
-
         batch_size = 256
         padded_items = ProofOfWeightsItem.pad_items(proof_of_weights_items, batch_size)
         bt.logging.debug(f"Padded PoW items to batch size {batch_size}")
 
-        # Use circuit evaluation data for response times
         for item in padded_items:
             if item.response_time < pow_circuit.evaluation_data.minimum_response_time:
-                bt.logging.warning(
-                    f"Response time {item.response_time.item()} is less than minimum"
-                    f" {pow_circuit.evaluation_data.minimum_response_time} for UID {item.miner_uid.item()}"
-                )
-
                 item.response_time = torch.max(
                     item.response_time,
                     torch.tensor(
@@ -195,14 +171,10 @@ class ScoreManager:
                     ),
                 )
 
-            # Ensure there is > 0 spread between min and max response times
             if (
                 pow_circuit.evaluation_data.maximum_response_time
                 <= pow_circuit.evaluation_data.minimum_response_time
             ):
-                bt.logging.warning(
-                    f"No spread between min and max response times for UID {item.miner_uid.item()}"
-                )
                 item.maximum_response_time = torch.tensor(
                     pow_circuit.evaluation_data.minimum_response_time + 1,
                     dtype=torch.float32,
@@ -216,13 +188,12 @@ class ScoreManager:
         inputs = pow_circuit.input_handler(
             RequestType.RWR, ProofOfWeightsItem.to_dict_list(padded_items)
         )
-
         session = VerifiedModelSession(inputs, pow_circuit)
         witness = session.generate_witness(return_content=True)
         bt.logging.info(f"Generated witness for model {model_id}")
+
         witness_list = witness if isinstance(witness, list) else list(witness.values())
 
-        # Process witness results based on batch size
         scores_end = batch_size + 1
         uids_start = batch_size * 2 + 1
         uids_end = uids_start + batch_size
@@ -258,24 +229,44 @@ class ScoreManager:
             bt.logging.debug(f"Updated score for UID {uid}: {score}")
 
     def _update_pow_queue(self, new_items: list[ProofOfWeightsItem]):
+        if not new_items:
+            return
+
         current_size = len(self.proof_of_weights_queue)
         bt.logging.info(
             f"PoW Queue Update - Adding {len(new_items)} items. Current size: {current_size} / {MAX_POW_QUEUE_SIZE}"
         )
 
-        if current_size > 0 and len(self.proof_of_weights_queue) == 0:
-            bt.logging.warning(
-                f"Queue was unexpectedly cleared! Stack trace: {''.join(traceback.format_stack())}"
-            )
+        self.proof_of_weights_queue.extend(new_items)
 
-        merged = ProofOfWeightsItem.merge_items(self.proof_of_weights_queue, new_items)
-        self.proof_of_weights_queue = merged[-MAX_POW_QUEUE_SIZE:]
+        if len(self.proof_of_weights_queue) > MAX_POW_QUEUE_SIZE:
+            self.proof_of_weights_queue = self.proof_of_weights_queue[
+                -MAX_POW_QUEUE_SIZE:
+            ]
 
         queue_size = len(self.proof_of_weights_queue)
         bt.logging.info(
             f"Queue Status: {queue_size}/{MAX_POW_QUEUE_SIZE} items "
             f"({(queue_size / MAX_POW_QUEUE_SIZE) * 100:.1f}% full)"
         )
+
+    def process_pow_queue(self, model_id: str) -> bool:
+        """Process items in the proof of weights queue for a specific model."""
+        if len(self.proof_of_weights_queue) < 256:
+            return False
+
+        pow_circuit = circuit_store.get_circuit(model_id)
+        if not pow_circuit:
+            bt.logging.error(f"Circuit not found for model ID: {model_id}")
+            return False
+
+        items_to_process = self.proof_of_weights_queue[:256]
+
+        self._update_scores_from_witness(items_to_process, model_id)
+
+        self.proof_of_weights_queue = self.proof_of_weights_queue[256:]
+
+        return True
 
     def _try_store_scores(self):
         """Attempt to store scores to disk."""
@@ -302,11 +293,9 @@ class ScoreManager:
             bt.logging.error("No responses. Skipping update.")
             return
 
-        # Use provided queryable_uids or compute if not provided
         if queryable_uids is None:
             queryable_uids = set(get_queryable_uids(self.metagraph))
 
-        # Pre-filter responses for valid UIDs
         valid_responses = [
             r for r in responses if r.uid in queryable_uids and r.uid < len(self.scores)
         ]
@@ -339,17 +328,14 @@ class ScoreManager:
             response (MinerResponse): The processed response from a miner.
             queryable_uids: Optional pre-computed set of queryable UIDs.
         """
-        # Use provided queryable_uids or compute if not provided
         if queryable_uids is None:
             queryable_uids = set(get_queryable_uids(self.metagraph))
 
-        # Skip if UID isn't queryable
         if response.uid not in queryable_uids or response.uid >= len(self.scores):
             return
 
         circuit = response.circuit
 
-        # First update circuit evaluation data
         evaluation_data = CircuitEvaluationItem(
             circuit_id=circuit.id,
             uid=response.uid,
@@ -362,7 +348,6 @@ class ScoreManager:
         )
         circuit.evaluation_data.update(evaluation_data)
 
-        # Then create and add PoW item
         max_score = 1 / len(self.scores)
         pow_item = ProofOfWeightsItem.from_miner_response(
             response,
@@ -373,7 +358,11 @@ class ScoreManager:
             self.metagraph.block.item(),
             self.user_uid,
         )
+
         self._update_pow_queue([pow_item])
+
+        if len(self.proof_of_weights_queue) >= 256:
+            self.process_pow_queue(circuit.id)
 
     def get_pow_queue(self) -> list[ProofOfWeightsItem]:
         """Get the current proof of weights queue."""
