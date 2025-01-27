@@ -226,6 +226,8 @@ class ScoreManager:
             self.scores[uid] = float(score)
             bt.logging.debug(f"Updated score for UID {uid}: {score}")
 
+        log_scores(self.scores)
+
     def _update_pow_queue(self, new_items: list[ProofOfWeightsItem]):
         if not new_items:
             return
