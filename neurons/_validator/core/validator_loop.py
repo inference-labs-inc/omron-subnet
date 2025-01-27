@@ -150,15 +150,19 @@ class ValidatorLoop:
         done_tasks = {task for task in self.processed_tasks if task.done()}
         for task in done_tasks:
             try:
+                bt.logging.debug(f"Processing completed task {task.get_name()}")
                 uid, response = await task
                 self.processed_uids.add(uid)
                 self.total_processed += 1
                 self.total_requests += 1
-                bt.logging.debug(f"Got response from UID {uid}")
+                bt.logging.info(
+                    f"Got response from UID {uid} - Response: {'Success' if response else 'Failed'}"
+                )
                 if response:
                     await self.event_queue.put(ResponseEvent(response))
             except Exception as e:
                 bt.logging.error(f"Task failed with error: {str(e)}")
+                bt.logging.debug(traceback.format_exc())
             finally:
                 self.processed_tasks.remove(task)
 
@@ -188,7 +192,7 @@ class ValidatorLoop:
                     self._process_single_request(request), name=str(uid)
                 )
                 self.processed_tasks.add(task)
-                bt.logging.debug(f"Added request for UID {uid}")
+                bt.logging.info(f"Started request for UID {uid}")
             else:
                 continue
 
@@ -267,14 +271,21 @@ class ValidatorLoop:
     async def _process_single_request(
         self, request: Request
     ) -> tuple[int, MinerResponse | None]:
+        start_time = time.time()
         try:
+            bt.logging.debug(f"Starting request to UID {request.uid}")
             response = await query_single_axon(self.config.dendrite, request)
+            elapsed = time.time() - start_time
+            bt.logging.info(f"Request to UID {request.uid} completed in {elapsed:.2f}s")
             if response:
                 return request.uid, self.response_processor.process_single_response(
                     response
                 )
         except Exception as e:
-            bt.logging.error(f"Unexpected error processing UID {request.uid}: {str(e)}")
+            elapsed = time.time() - start_time
+            bt.logging.error(
+                f"Request to UID {request.uid} failed after {elapsed:.2f}s: {str(e)}"
+            )
             bt.logging.debug(traceback.format_exc())
             log_network_error("unknown_error")
 
