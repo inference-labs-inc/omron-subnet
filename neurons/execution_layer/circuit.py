@@ -152,24 +152,24 @@ class CircuitEvaluationItem:
 
     circuit_id: str = field(default="")
     uid: int = field(default=0)
-    minimum_response_time: float = field(default=0)
-    maximum_response_time: float = field(default=0)
+    minimum_response_time: float = field(default=0.0)
+    maximum_response_time: float = field(default=0.0)
     proof_size: int = field(default=0)
-    response_time: float = field(default=0)
-    score: float = field(default=0)
+    response_time: float = field(default=0.0)
+    score: float = field(default=0.0)
     verification_result: bool = field(default=False)
 
     def to_dict(self) -> dict:
         """Convert the evaluation item to a dictionary for JSON serialization."""
         return {
-            "circuit_id": self.circuit_id,
-            "uid": self.uid,
-            "minimum_response_time": self.minimum_response_time,
-            "maximum_response_time": self.maximum_response_time,
-            "proof_size": self.proof_size,
-            "response_time": self.response_time,
-            "score": self.score,
-            "verification_result": self.verification_result,
+            "circuit_id": str(self.circuit_id),
+            "uid": int(self.uid),
+            "minimum_response_time": float(self.minimum_response_time),
+            "maximum_response_time": float(self.maximum_response_time),
+            "proof_size": int(self.proof_size),
+            "response_time": float(self.response_time),
+            "score": float(self.score),
+            "verification_result": bool(self.verification_result),
         }
 
 
