@@ -176,7 +176,7 @@ class RequestPipeline:
             BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
         ]:
             return ProofOfWeightsHandler.prepare_pow_request(
-                circuit, self.score_manager.proof_of_weights_queue
+                circuit, self.score_manager
             )
 
         if circuit.metadata.type == CircuitType.PROOF_OF_COMPUTATION:
