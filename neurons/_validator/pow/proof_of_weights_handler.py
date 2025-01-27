@@ -64,9 +64,7 @@ class ProofOfWeightsHandler:
                 logging.debug(
                     "Minimum response time is gte than maximum response time for item. Setting to default timeout."
                 )
-                item.minimum_response_time = torch.tensor(
-                    VALIDATOR_REQUEST_TIMEOUT_SECONDS, dtype=torch.float32
-                )
+                item.minimum_response_time = torch.tensor(0, dtype=torch.float32)
                 item.maximum_response_time = torch.tensor(
                     VALIDATOR_REQUEST_TIMEOUT_SECONDS, dtype=torch.float32
                 )
