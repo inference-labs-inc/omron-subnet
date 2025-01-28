@@ -29,6 +29,7 @@ class ScoreManager:
         self.user_uid = user_uid
         self.score_path = score_path
         self.scores = torch.Tensor([])
+        self.last_processed_queue_step = -1
 
         self.proof_of_weights_queue = []
 
@@ -113,6 +114,10 @@ class ScoreManager:
     def _update_scores_from_witness(
         self, proof_of_weights_items: list[ProofOfWeightsItem], model_id: str
     ):
+        current_step = len(self.proof_of_weights_queue) >> 8
+        if current_step == self.last_processed_queue_step:
+            return
+
         bt.logging.info(
             f"Processing PoW witness generation for {len(proof_of_weights_items)} items on model {model_id}"
         )
@@ -156,6 +161,8 @@ class ScoreManager:
         witness_list = witness if isinstance(witness, list) else list(witness.values())
 
         self._process_witness_results(witness_list, pow_circuit.settings["scaling"])
+
+        self.last_processed_queue_step = current_step
 
         session.end()
 
