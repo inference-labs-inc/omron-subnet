@@ -25,7 +25,7 @@ def get_queryable_uids(metagraph: bt.metagraph) -> Generator[int, None, None]:
     ]:
         stake_threshold = 1e19
     total_stake = (
-        torch.tensor(metagraph.total_stake)
+        torch.tensor(metagraph.total_stake, dtype=torch.float32)
         if not isinstance(metagraph.total_stake, torch.Tensor)
         else metagraph.total_stake
     )
