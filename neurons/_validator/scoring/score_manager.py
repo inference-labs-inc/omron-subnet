@@ -113,11 +113,7 @@ class ScoreManager:
                 f"Proof of weights circuit not found for model ID: {model_id}"
             )
 
-        batch_size = 256
-        padded_items = ProofOfWeightsItem.pad_items(proof_of_weights_items, batch_size)
-        bt.logging.debug(f"Padded PoW items to batch size {batch_size}")
-
-        for item in padded_items:
+        for item in proof_of_weights_items:
             if item.response_time < pow_circuit.evaluation_data.minimum_response_time:
                 item.response_time = torch.max(
                     item.response_time,
@@ -142,7 +138,7 @@ class ScoreManager:
                 )
 
         inputs = pow_circuit.input_handler(
-            RequestType.RWR, ProofOfWeightsItem.to_dict_list(padded_items)
+            RequestType.RWR, ProofOfWeightsItem.to_dict_list(proof_of_weights_items)
         )
         session = VerifiedModelSession(inputs, pow_circuit)
         witness = session.generate_witness(return_content=True)
@@ -150,36 +146,23 @@ class ScoreManager:
 
         witness_list = witness if isinstance(witness, list) else list(witness.values())
 
-        scores_end = batch_size + 1
-        uids_start = batch_size * 2 + 1
-        uids_end = uids_start + batch_size
-
-        self._process_witness_results(
-            witness_list[1:scores_end],
-            witness_list[uids_start:uids_end],
-            pow_circuit.settings["scaling"],
-            model_id,
-        )
+        self._process_witness_results(witness_list, pow_circuit.settings["scaling"])
 
         session.end()
 
-    def _process_witness_results(
-        self, scores: list, miner_uids: list, scaling: int, model_id: str
-    ):
-        scores = torch.div(torch.tensor([float(w) for w in scores]), scaling).tolist()
-        miner_uids = [int(float(w)) for w in miner_uids]
-
-        bt.logging.info(f"Processing witness results for model {model_id}")
-        bt.logging.debug(f"Raw witness scores: {scores}")
-        bt.logging.debug(f"Miner UIDs: {miner_uids}")
+    def _process_witness_results(self, witness: list, scaling: int):
+        """Process the results from the witness."""
+        scores = torch.div(
+            torch.tensor([float(w) for w in witness[1:257]]), scaling
+        ).tolist()
+        miner_uids = [int(float(w)) for w in witness[513:769]]
 
         bt.logging.debug(
-            f"Proof of weights scores: {scores} for miner UIDs: {miner_uids} for "
-            f"model ID: {model_id}, existing scores: {self.scores}"
+            f"Proof of weights scores: {scores} for miner UIDs: {miner_uids}, existing scores: {self.scores}"
         )
 
         for uid, score in zip(miner_uids, scores):
-            if uid >= len(self.scores):
+            if uid < 0 or uid >= len(self.scores):
                 continue
             self.scores[uid] = float(score)
             bt.logging.debug(f"Updated score for UID {uid}: {score}")
@@ -190,27 +173,26 @@ class ScoreManager:
         if not new_items:
             return
 
-        current_size = len(self.proof_of_weights_queue)
-        bt.logging.info(
-            f"PoW Queue Update - Adding {len(new_items)} items. Current size: {current_size} / {MAX_POW_QUEUE_SIZE}"
-        )
-
         self.proof_of_weights_queue.extend(new_items)
 
-        if len(self.proof_of_weights_queue) > MAX_POW_QUEUE_SIZE:
+        current_size = len(self.proof_of_weights_queue)
+
+        if current_size > MAX_POW_QUEUE_SIZE:
             self.proof_of_weights_queue = self.proof_of_weights_queue[
                 -MAX_POW_QUEUE_SIZE:
             ]
 
-        queue_size = len(self.proof_of_weights_queue)
         bt.logging.info(
-            f"Queue Status: {queue_size}/{MAX_POW_QUEUE_SIZE} items "
-            f"({(queue_size / MAX_POW_QUEUE_SIZE) * 100:.1f}% full)"
+            f"PoW Queue Status: {current_size}/{MAX_POW_QUEUE_SIZE} items "
+            f"({(current_size / MAX_POW_QUEUE_SIZE) * 100:.1f}% full)"
         )
 
     def process_pow_queue(self, model_id: str) -> bool:
         """Process items in the proof of weights queue for a specific model."""
-        if len(self.proof_of_weights_queue) < 256:
+        if (
+            len(self.proof_of_weights_queue) < 256
+            or len(self.proof_of_weights_queue) % 256 != 0
+        ):
             return False
 
         pow_circuit = circuit_store.get_circuit(model_id)
@@ -218,11 +200,9 @@ class ScoreManager:
             bt.logging.error(f"Circuit not found for model ID: {model_id}")
             return False
 
-        items_to_process = self.proof_of_weights_queue[:256]
+        items_to_process = self.proof_of_weights_queue[-256:]
 
         self._update_scores_from_witness(items_to_process, model_id)
-
-        self.proof_of_weights_queue = self.proof_of_weights_queue[256:]
 
         return True
 

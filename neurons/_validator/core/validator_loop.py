@@ -73,7 +73,6 @@ class ValidatorLoop:
             self.config, self.score_manager, self.api
         )
 
-        # Request queue management
         self.request_queue = asyncio.Queue()
         self.active_requests: dict[int, asyncio.Task] = {}
         self.processed_uids: set[int] = set()
@@ -224,15 +223,15 @@ class ValidatorLoop:
                     proof_filename=request_hash,
                 )
 
-                if response.request_type == RequestType.RWR:
-                    self.api.set_request_result(
-                        request_hash,
-                        {
-                            "hash": request_hash,
-                            "public_signals": response.public_json,
-                            "proof": response.proof_content,
-                        },
-                    )
+            if response.request_type == RequestType.RWR:
+                self.api.set_request_result(
+                    request_hash,
+                    {
+                        "hash": request_hash,
+                        "public_signals": response.public_json,
+                        "proof": response.proof_content,
+                    },
+                )
 
         self.score_manager.update_single_score(response, self.queryable_uids)
 

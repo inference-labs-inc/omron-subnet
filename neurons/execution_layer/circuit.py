@@ -240,7 +240,7 @@ class CircuitEvaluationData:
                 VALIDATOR_REQUEST_TIMEOUT_SECONDS,
             ).item()
             - MINIMUM_SCORE_SHIFT,
-            0,  # Base minimum
+            0,
         )
 
     @property
@@ -264,7 +264,7 @@ class CircuitEvaluationData:
                 0,
                 VALIDATOR_REQUEST_TIMEOUT_SECONDS,
             ).item(),
-            VALIDATOR_REQUEST_TIMEOUT_SECONDS,  # Hard cap
+            VALIDATOR_REQUEST_TIMEOUT_SECONDS,
         )
 
 
