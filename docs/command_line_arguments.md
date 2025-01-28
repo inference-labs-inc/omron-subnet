@@ -21,7 +21,7 @@ The below arguments are specific to miner software and have no effect on validat
 
 | Argument              | Required | Default | Accepted Values | Description                                                  |
 | --------------------- | :------: | ------- | --------------- | ------------------------------------------------------------ |
-| `--disable-blacklist` |    No    | `False` | `True`, `False` | Disables request filtering and allows all incoming requests. |
+| `--disable-blacklist` |    No    | `False` | `True`, `False` | Disables request filtering and allows all incoming requests.  |
 
 ### Validator specific arguments
 
@@ -65,8 +65,8 @@ Bittensor subtensor configuration options.
 
 | Argument                     | Required | Default            | Accepted Values                      | Description                                                                                                                |
 | ---------------------------- | :------: | ------------------ | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| `--subtensor.network`        |    No    | `finney`           | `finney`, `test`, `archive`, `local` | The subtensor network to connect to. Overrides `--subtensor.chain_endpoint` with a default node from the selected network. |
-| `--subtensor.chain_endpoint` |    No    | Depends on network | String                               | The specific blockchain endpoint to connect to. Overrides the network default endpoint if set.                             |
+| `--subtensor.network`        |    No    | `finney`           | `finney`, `test`, `archive`, `local`   | The subtensor network to connect to. Overrides `--subtensor.chain_endpoint` with a default node from the selected network. |
+| `--subtensor.chain_endpoint` |    No    | Depends on network | String                               | The specific blockchain endpoint to connect to. Overrides the network default endpoint if set.                              |
 | `--subtensor._mock`          |    No    | `False`            | `True`, `False`                      | If true, uses a mocked connection to the chain for testing purposes.                                                       |
 
 ### Axon
@@ -81,7 +81,6 @@ Bittensor Axon configuration options.
 | `--axon.ip`            |    No    | `[::]`  | String          | The local IP this axon binds to.                                                          |
 | `--axon.external_port` |    No    | None    | Integer         | The public port this axon broadcasts to the network.                                      |
 | `--axon.external_ip`   |    No    | None    | String          | The external IP this axon broadcasts to the network.                                      |
-| `--axon.max_workers`   |    No    | 10      | Integer         | The maximum number of connection handler threads working simultaneously on this endpoint. |
 
 ### Logging
 
@@ -93,5 +92,5 @@ Bittensor logging configuration options.
 | ----------------------- | :------: | -------------------- | --------------- | ------------------------------------------ |
 | `--logging.debug`       |    No    | `False`              | `True`, `False` | Turn on bittensor debugging information.   |
 | `--logging.trace`       |    No    | `False`              | `True`, `False` | Turn on bittensor trace level information. |
-| `--logging.record_log`  |    No    | `False`              | `True`, `False` | Turns on logging to file.                  |
+| `--logging.record_log`  |    No    | `False`              | `True`, `False` | Turns on logging to file.                   |
 | `--logging.logging_dir` |    No    | `~/.bittensor/logs/` | String          | Logging default root directory.            |
