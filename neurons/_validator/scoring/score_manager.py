@@ -6,7 +6,7 @@ from _validator.models.miner_response import MinerResponse
 from _validator.utils.logging import log_scores
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
 from _validator.utils.uid import get_queryable_uids
-from constants import MAX_POW_QUEUE_SIZE, SINGLE_PROOF_OF_WEIGHTS_MODEL_ID, ONE_MINUTE
+from constants import SINGLE_PROOF_OF_WEIGHTS_MODEL_ID, ONE_MINUTE
 from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
 from _validator.models.request_type import RequestType
@@ -105,11 +105,7 @@ class ScoreManager:
 
     @with_rate_limit(period=ONE_MINUTE)
     def log_pow_queue_status(self):
-        """Log the status of the proof of weights queue."""
-        bt.logging.info(
-            f"PoW Queue Status: {len(self.proof_of_weights_queue)}/{MAX_POW_QUEUE_SIZE} items "
-            f"({(len(self.proof_of_weights_queue) / MAX_POW_QUEUE_SIZE) * 100:.1f}% full)"
-        )
+        bt.logging.info(f"PoW Queue Status: {len(self.proof_of_weights_queue)} items")
 
     def _update_scores_from_witness(
         self, proof_of_weights_items: list[ProofOfWeightsItem], model_id: str
@@ -190,14 +186,6 @@ class ScoreManager:
             return
 
         self.proof_of_weights_queue.extend(new_items)
-
-        current_size = len(self.proof_of_weights_queue)
-
-        if current_size > MAX_POW_QUEUE_SIZE:
-            self.proof_of_weights_queue = self.proof_of_weights_queue[
-                -MAX_POW_QUEUE_SIZE:
-            ]
-
         self.log_pow_queue_status()
 
     def process_pow_queue(self, model_id: str) -> bool:
@@ -282,3 +270,8 @@ class ScoreManager:
     def get_pow_queue(self) -> list[ProofOfWeightsItem]:
         """Get the current proof of weights queue."""
         return self.proof_of_weights_queue
+
+    def remove_processed_items(self, count: int):
+        if count <= 0:
+            return
+        self.proof_of_weights_queue = self.proof_of_weights_queue[count:]
