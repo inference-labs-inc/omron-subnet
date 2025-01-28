@@ -30,10 +30,10 @@ class ProofOfWeightsHandler:
 
         batch_size = 256 if circuit.id == SINGLE_PROOF_OF_WEIGHTS_MODEL_ID else 1024
         pow_items = ProofOfWeightsItem.pad_items(
-            queue[:batch_size], target_item_count=batch_size
+            queue[-batch_size:], target_item_count=batch_size
         )
 
-        logging.info(f"Preparing PoW request with {len(queue)} items in queue")
+        logging.info(f"Preparing PoW request for {circuit}")
         if circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
             score_manager.clear_proof_of_weights_queue()
         return ProofOfWeightsHandler._create_request_from_items(circuit, pow_items)
