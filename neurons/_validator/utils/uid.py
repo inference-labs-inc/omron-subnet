@@ -25,10 +25,11 @@ def get_queryable_uids(metagraph: bt.metagraph) -> Generator[int, None, None]:
     ]:
         stake_threshold = 1e19
     total_stake = (
-        metagraph.total_stake[uids]
-        if isinstance(metagraph.total_stake[uids], torch.Tensor)
-        else torch.tensor(metagraph.total_stake[uids])
+        torch.tensor(metagraph.total_stake)
+        if not isinstance(metagraph.total_stake, torch.Tensor)
+        else metagraph.total_stake
     )
+    total_stake = total_stake[uids]
     queryable_flags: Iterable[bool] = (
         (total_stake < stake_threshold)
         & torch.tensor([is_valid_ip(metagraph.axons[i].ip) for i in uids])
