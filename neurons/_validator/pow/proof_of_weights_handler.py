@@ -3,6 +3,7 @@ from _validator.utils.proof_of_weights import ProofOfWeightsItem
 from execution_layer.circuit import Circuit, CircuitType
 from constants import (
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
+    BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
 )
 from protocol import ProofOfWeightsSynapse, QueryZkProof
@@ -21,8 +22,10 @@ class ProofOfWeightsHandler:
     def prepare_pow_request(circuit: Circuit, score_manager):
         queue = score_manager.get_pow_queue()
 
-        if len(queue) == 0:
-            logging.debug("Queue is empty. Defaulting to benchmark.")
+        if len(queue) == 0 or len(queue) % 256 != 0:
+            logging.debug(
+                "Queue is empty or not a multiple of 256. Defaulting to benchmark."
+            )
             return ProofOfWeightsHandler._create_benchmark_request(circuit)
 
         # Try to process queue first
@@ -37,6 +40,8 @@ class ProofOfWeightsHandler:
         )
 
         logging.info(f"Preparing PoW request with {len(queue)} items in queue")
+        if circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
+            score_manager.clear_pow_queue()
         return ProofOfWeightsHandler._create_request_from_items(circuit, pow_items)
 
     @staticmethod
