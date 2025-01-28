@@ -266,7 +266,10 @@ class ScoreManager:
 
         self._update_pow_queue([pow_item])
 
-        if len(self.proof_of_weights_queue) >= 256:
+        if (
+            len(self.proof_of_weights_queue) >= 256
+            and len(self.proof_of_weights_queue) % 256 == 0
+        ):
             self.process_pow_queue(SINGLE_PROOF_OF_WEIGHTS_MODEL_ID)
 
     def get_pow_queue(self) -> list[ProofOfWeightsItem]:

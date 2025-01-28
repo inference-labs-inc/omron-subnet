@@ -28,12 +28,6 @@ class ProofOfWeightsHandler:
             )
             return ProofOfWeightsHandler._create_benchmark_request(circuit)
 
-        # Try to process queue first
-        if score_manager.process_pow_queue(circuit.id):
-            logging.info("Queue processed successfully")
-            # Get fresh queue after processing
-            queue = score_manager.get_pow_queue()
-
         batch_size = 256 if circuit.id == SINGLE_PROOF_OF_WEIGHTS_MODEL_ID else 1024
         pow_items = ProofOfWeightsItem.pad_items(
             queue[:batch_size], target_item_count=batch_size
