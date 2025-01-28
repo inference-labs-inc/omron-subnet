@@ -34,7 +34,7 @@ class ProofOfWeightsHandler:
         )
 
         logging.info(f"Preparing PoW request for {circuit}")
-        if circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
+        if circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID and len(queue) >= batch_size:
             score_manager.remove_processed_items(batch_size)
         return ProofOfWeightsHandler._create_request_from_items(circuit, pow_items)
 
