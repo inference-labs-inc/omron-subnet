@@ -2,7 +2,6 @@ from bittensor import logging
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
 from execution_layer.circuit import Circuit, CircuitType
 from constants import (
-    SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
     BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
 )
@@ -21,21 +20,24 @@ class ProofOfWeightsHandler:
     @staticmethod
     def prepare_pow_request(circuit: Circuit, score_manager):
         queue = score_manager.get_pow_queue()
+        batch_size = 1024
 
-        if len(queue) == 0 or len(queue) % 256 != 0:
+        if circuit.id != BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
+            logging.debug("Not a batched PoW model. Defaulting to benchmark.")
+            return ProofOfWeightsHandler._create_benchmark_request(circuit)
+
+        if len(queue) < batch_size:
             logging.debug(
-                "Queue is empty or not a multiple of 256. Defaulting to benchmark."
+                f"Queue is less than {batch_size} items. Defaulting to benchmark."
             )
             return ProofOfWeightsHandler._create_benchmark_request(circuit)
 
-        batch_size = 256 if circuit.id == SINGLE_PROOF_OF_WEIGHTS_MODEL_ID else 1024
         pow_items = ProofOfWeightsItem.pad_items(
-            queue[-batch_size:], target_item_count=batch_size
+            queue[:batch_size], target_item_count=batch_size
         )
 
         logging.info(f"Preparing PoW request for {str(circuit)}")
-        if circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID and len(queue) >= batch_size:
-            score_manager.remove_processed_items(batch_size)
+        score_manager.remove_processed_items(batch_size)
         return ProofOfWeightsHandler._create_request_from_items(circuit, pow_items)
 
     @staticmethod

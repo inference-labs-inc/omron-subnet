@@ -30,7 +30,6 @@ class ScoreManager:
         self.score_path = score_path
         self.scores = torch.Tensor([])
         self.last_processed_queue_step = -1
-
         self.proof_of_weights_queue = []
 
     def init_scores(self, model_id: str) -> torch.Tensor:
@@ -110,10 +109,6 @@ class ScoreManager:
     def _update_scores_from_witness(
         self, proof_of_weights_items: list[ProofOfWeightsItem], model_id: str
     ):
-        current_step = len(self.proof_of_weights_queue) >> 8
-        if current_step == self.last_processed_queue_step:
-            return
-
         bt.logging.info(
             f"Processing PoW witness generation for {len(proof_of_weights_items)} items on model {model_id}"
         )
@@ -155,11 +150,7 @@ class ScoreManager:
         bt.logging.info(f"Generated witness for model {model_id}")
 
         witness_list = witness if isinstance(witness, list) else list(witness.values())
-
         self._process_witness_results(witness_list, pow_circuit.settings["scaling"])
-
-        self.last_processed_queue_step = current_step
-
         session.end()
 
     def _process_witness_results(self, witness: list, scaling: int):
@@ -196,14 +187,18 @@ class ScoreManager:
         ):
             return False
 
+        current_step = len(self.proof_of_weights_queue) >> 8
+        if current_step == self.last_processed_queue_step:
+            return False
+
         pow_circuit = circuit_store.get_circuit(model_id)
         if not pow_circuit:
             bt.logging.error(f"Circuit not found for model ID: {model_id}")
             return False
 
         items_to_process = self.proof_of_weights_queue[-256:]
-
         self._update_scores_from_witness(items_to_process, model_id)
+        self.last_processed_queue_step = current_step
 
         return True
 
