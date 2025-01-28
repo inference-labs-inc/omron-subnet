@@ -6,11 +6,12 @@ from _validator.models.miner_response import MinerResponse
 from _validator.utils.logging import log_scores
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
 from _validator.utils.uid import get_queryable_uids
-from constants import MAX_POW_QUEUE_SIZE, SINGLE_PROOF_OF_WEIGHTS_MODEL_ID
+from constants import MAX_POW_QUEUE_SIZE, SINGLE_PROOF_OF_WEIGHTS_MODEL_ID, ONE_MINUTE
 from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
 from _validator.models.request_type import RequestType
 from execution_layer.circuit import CircuitEvaluationItem
+from utils import with_rate_limit
 
 
 class ScoreManager:
@@ -101,6 +102,14 @@ class ScoreManager:
             for response in responses
         ]
 
+    @with_rate_limit(period=ONE_MINUTE)
+    def log_pow_queue_status(self):
+        """Log the status of the proof of weights queue."""
+        bt.logging.info(
+            f"PoW Queue Status: {len(self.proof_of_weights_queue)}/{MAX_POW_QUEUE_SIZE} items "
+            f"({(len(self.proof_of_weights_queue) / MAX_POW_QUEUE_SIZE) * 100:.1f}% full)"
+        )
+
     def _update_scores_from_witness(
         self, proof_of_weights_items: list[ProofOfWeightsItem], model_id: str
     ):
@@ -182,10 +191,7 @@ class ScoreManager:
                 -MAX_POW_QUEUE_SIZE:
             ]
 
-        bt.logging.info(
-            f"PoW Queue Status: {current_size}/{MAX_POW_QUEUE_SIZE} items "
-            f"({(current_size / MAX_POW_QUEUE_SIZE) * 100:.1f}% full)"
-        )
+        self.log_pow_queue_status()
 
     def process_pow_queue(self, model_id: str) -> bool:
         """Process items in the proof of weights queue for a specific model."""
