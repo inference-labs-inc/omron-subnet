@@ -35,7 +35,7 @@ class ProofOfWeightsHandler:
 
         logging.info(f"Preparing PoW request with {len(queue)} items in queue")
         if circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
-            score_manager.clear_pow_queue()
+            score_manager.clear_proof_of_weights_queue()
         return ProofOfWeightsHandler._create_request_from_items(circuit, pow_items)
 
     @staticmethod
