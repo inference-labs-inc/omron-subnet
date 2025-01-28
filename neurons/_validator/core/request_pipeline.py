@@ -51,6 +51,37 @@ class RequestPipeline:
             return self._prepare_real_world_requests(filtered_uids)
         return self._prepare_benchmark_requests(filtered_uids)
 
+    def _check_and_create_request(
+        self,
+        uid: int,
+        synapse: ProofOfWeightsSynapse | QueryZkProof,
+        circuit: Circuit,
+        request_type: RequestType,
+        request_hash: str | None = None,
+    ) -> Request | None:
+        """Check hash and create request if valid."""
+        if isinstance(synapse, ProofOfWeightsSynapse):
+            input_data = synapse.inputs
+        else:
+            input_data = synapse.query_input["public_inputs"]
+
+        try:
+            self.hash_guard.check_hash(input_data)
+        except Exception as e:
+            bt.logging.error(f"Hash already exists: {e}")
+            safe_log({"hash_guard_error": 1})
+            return None
+
+        return Request(
+            uid=uid,
+            axon=self.config.metagraph.axons[uid],
+            synapse=synapse,
+            circuit=circuit,
+            request_type=request_type,
+            inputs=GenericInput(RequestType.RWR, input_data),
+            request_hash=request_hash,
+        )
+
     def _prepare_real_world_requests(self, filtered_uids: list[int]) -> list[Request]:
         external_request = self.api.external_requests_queue.pop()
         requests = []
@@ -59,29 +90,15 @@ class RequestPipeline:
             synapse = self.get_synapse_request(
                 RequestType.RWR, external_request.circuit, external_request
             )
-
-            if isinstance(synapse, ProofOfWeightsSynapse):
-                input_data = synapse.inputs
-            else:
-                input_data = synapse.query_input["public_inputs"]
-
-            try:
-                self.hash_guard.check_hash(input_data)
-            except Exception as e:
-                bt.logging.error(f"Hash already exists: {e}")
-                safe_log({"hash_guard_error": 1})
-                continue
-
-            request = Request(
+            request = self._check_and_create_request(
                 uid=uid,
-                axon=self.config.metagraph.axons[uid],
                 synapse=synapse,
                 circuit=external_request.circuit,
                 request_type=RequestType.RWR,
-                inputs=GenericInput(RequestType.RWR, input_data),
                 request_hash=external_request.hash,
             )
-            requests.append(request)
+            if request:
+                requests.append(request)
         return requests
 
     def _prepare_benchmark_requests(self, filtered_uids: list[int]) -> list[Request]:
@@ -93,29 +110,14 @@ class RequestPipeline:
         requests = []
         for uid in filtered_uids:
             synapse = self.get_synapse_request(RequestType.BENCHMARK, circuit)
-
-            if isinstance(synapse, ProofOfWeightsSynapse):
-                input_data = synapse.inputs
-            else:
-                input_data = synapse.query_input["public_inputs"]
-
-            try:
-                self.hash_guard.check_hash(input_data)
-            except Exception as e:
-                bt.logging.error(f"Hash already exists: {e}")
-                safe_log({"hash_guard_error": 1})
-                continue
-
-            request = Request(
+            request = self._check_and_create_request(
                 uid=uid,
-                axon=self.config.metagraph.axons[uid],
                 synapse=synapse,
                 circuit=circuit,
                 request_type=RequestType.BENCHMARK,
-                inputs=GenericInput(RequestType.RWR, input_data),
             )
-            requests.append(request)
-
+            if request:
+                requests.append(request)
         return requests
 
     def select_circuit_for_benchmark(self) -> Circuit:
