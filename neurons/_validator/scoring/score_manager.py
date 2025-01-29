@@ -28,11 +28,11 @@ class ScoreManager:
         self.metagraph = metagraph
         self.user_uid = user_uid
         self.score_path = score_path
-        self.scores = torch.Tensor([])
+        self.scores = self.init_scores()
         self.last_processed_queue_step = -1
         self.proof_of_weights_queue = []
 
-    def init_scores(self, model_id: str) -> torch.Tensor:
+    def init_scores(self) -> torch.Tensor:
         """Initialize or load existing scores."""
         bt.logging.info("Initializing validation weights")
         try:
@@ -43,7 +43,7 @@ class ScoreManager:
             bt.logging.error(f"Error loading scores: {e}")
             scores = self._create_initial_scores()
 
-        bt.logging.success(f"Successfully set up scores for model ID: {model_id}")
+        bt.logging.success("Successfully initialized scores")
         log_scores(scores)
         return scores
 
