@@ -215,26 +215,35 @@ class ValidatorLoop:
         Args:
             response (MinerResponse): The processed response to handle.
         """
-        if response.verification_result and response.proof_content:
-            if (
-                response.circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS
-                and response.request_type == RequestType.RWR
-            ) or response.circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
-                request_hash = response.input_hash
-                save_proof_of_weights(
-                    public_signals=[response.public_json],
-                    proof=[response.proof_content],
-                    proof_filename=request_hash,
-                )
-
-            if response.request_type == RequestType.RWR:
+        request_hash = response.input_hash
+        if response.request_type == RequestType.RWR:
+            if response.verification_result:
                 self.api.set_request_result(
                     request_hash,
                     {
                         "hash": request_hash,
                         "public_signals": response.public_json,
                         "proof": response.proof_content,
+                        "success": True,
                     },
+                )
+            else:
+                self.api.set_request_result(
+                    request_hash,
+                    {
+                        "success": False,
+                    },
+                )
+
+        if response.verification_result:
+            if (
+                response.circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS
+                and response.request_type == RequestType.RWR
+            ) or response.circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
+                save_proof_of_weights(
+                    public_signals=[response.public_json],
+                    proof=[response.proof_content],
+                    proof_filename=request_hash,
                 )
 
         self.score_manager.update_single_score(response, self.queryable_uids)

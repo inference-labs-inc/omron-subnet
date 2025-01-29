@@ -141,7 +141,7 @@ class ValidatorAPI:
                     )
                     result = self.request_results.pop(external_request.hash, None)
 
-                    if result:
+                    if result["success"]:
                         bt.logging.success(
                             f"External request with hash {external_request.hash} processed successfully"
                         )

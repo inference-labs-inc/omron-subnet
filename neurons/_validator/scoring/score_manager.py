@@ -109,10 +109,10 @@ class ScoreManager:
     def _update_scores_from_witness(
         self, proof_of_weights_items: list[ProofOfWeightsItem], model_id: str
     ):
-        bt.logging.info(
-            f"Processing PoW witness generation for {len(proof_of_weights_items)} items on model {model_id}"
-        )
         pow_circuit = circuit_store.get_circuit(model_id)
+        bt.logging.info(
+            f"Processing PoW witness generation for {len(proof_of_weights_items)} items using {str(pow_circuit)}"
+        )
         if not pow_circuit:
             raise ValueError(
                 f"Proof of weights circuit not found for model ID: {model_id}"
@@ -124,7 +124,9 @@ class ScoreManager:
         session = VerifiedModelSession(inputs, pow_circuit)
         try:
             witness = session.generate_witness(return_content=True)
-            bt.logging.info(f"Generated witness for model {model_id}")
+            bt.logging.success(
+                f"Witness for {str(pow_circuit)} generated successfully."
+            )
         except Exception as e:
             bt.logging.error(f"Error generating witness: {e}")
             return
