@@ -49,17 +49,7 @@ class ScoreManager:
 
     def _create_initial_scores(self) -> torch.Tensor:
         """Create initial scores based on metagraph data."""
-
-        total_stake = (
-            self.metagraph.S
-            if isinstance(self.metagraph.S, torch.Tensor)
-            else torch.tensor(self.metagraph.S)
-        )
-        scores = torch.zeros_like(total_stake, dtype=torch.float32)
-        queryable_uids = set(get_queryable_uids(self.metagraph))
-        return scores * torch.Tensor(
-            [uid in queryable_uids for uid in self.metagraph.uids]
-        )
+        return torch.zeros(len(self.metagraph.uids), dtype=torch.float32)
 
     def sync_scores_uids(self, uids: list[int]):
         """
