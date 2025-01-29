@@ -23,12 +23,14 @@ class ResponseProcessor:
         miner_response = MinerResponse.from_raw_response(response)
         if miner_response.proof_content is None:
             bt.logging.debug(
-                f"Miner at UID: {miner_response.uid} failed to provide a valid proof. "
+                f"Miner at UID: {miner_response.uid} failed to provide a valid proof for "
+                f"{str(miner_response.circuit)}."
                 f"Response from miner: {miner_response.raw}"
             )
         elif miner_response.proof_content:
             bt.logging.debug(
-                f"Attempting to verify proof for UID: {miner_response.uid}"
+                f"Attempting to verify proof for UID: {miner_response.uid} "
+                f"using {str(miner_response.circuit)}."
             )
             try:
                 start_time = time.time()
@@ -39,7 +41,9 @@ class ResponseProcessor:
                 miner_response.set_verification_result(verification_result)
                 if not verification_result:
                     bt.logging.warning(
-                        f"Miner at UID: {miner_response.uid} provided a proof, but verification failed."
+                        f"Miner at UID: {miner_response.uid} provided a proof"
+                        f"for {str(miner_response.circuit)} "
+                        ", but verification failed."
                     )
             except Exception as e:
                 bt.logging.warning(
@@ -50,6 +54,7 @@ class ResponseProcessor:
             if miner_response.verification_result:
                 bt.logging.success(
                     f"Miner at UID: {miner_response.uid} provided a valid proof "
+                    f"for {str(miner_response.circuit)} "
                     f"in {miner_response.response_time} seconds."
                 )
         return miner_response
