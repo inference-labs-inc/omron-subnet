@@ -101,6 +101,11 @@ def load_evaluation_data(models_path: Path, scores_path: Path) -> Dict:
 
 def create_scatter_plot(ax: plt.Axes, data: Dict, title: str) -> None:
 
+    times = np.array(data["times"])
+    sort_idx = np.argsort(times)[::-1]
+    sorted_times = times[sort_idx]
+    sorted_scores = np.array(data["scores"])[sort_idx]
+
     colors = [
         (0.8, 0.1, 0.1),
         (0.95, 0.9, 0.25),
@@ -109,19 +114,19 @@ def create_scatter_plot(ax: plt.Axes, data: Dict, title: str) -> None:
     n_bins = 100
     cmap = LinearSegmentedColormap.from_list("custom", colors, N=n_bins)
 
-    scores = np.array(data["scores"])
-    if len(scores) > 0:
-        score_range = scores.max() - scores.min()
+    if len(sorted_scores) > 0:
+        score_range = sorted_scores.max() - sorted_scores.min()
         if score_range > 0:
-            normalized_scores = (scores - scores.min()) / score_range
+            normalized_scores = (sorted_scores - sorted_scores.min()) / score_range
         else:
-            normalized_scores = np.zeros_like(scores)
+            normalized_scores = np.zeros_like(sorted_scores)
     else:
         normalized_scores = np.array([])
 
+    x_range = np.arange(len(sorted_times))
     scatter = ax.scatter(
-        data["uids"],
-        data["times"],
+        x_range,
+        sorted_times,
         c=normalized_scores,
         cmap=cmap,
         alpha=0.9,
@@ -138,6 +143,8 @@ def create_scatter_plot(ax: plt.Axes, data: Dict, title: str) -> None:
     ax.grid(True, alpha=0.2, linestyle="--", color="#cccccc")
     ax.tick_params(axis="both", labelsize=10)
     ax.set_facecolor("#f8f9fa")
+
+    ax.set_xlabel("UIDs (sorted by response time)", fontsize=12, weight="bold")
 
     for spine in ax.spines.values():
         spine.set_edgecolor("#dddddd")
