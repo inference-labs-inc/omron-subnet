@@ -1,24 +1,14 @@
 from __future__ import annotations
-import collections
-import random
 import traceback
 import time
-
-from bittensor import logging
-
-from _validator.core import prometheus
+import bittensor as bt
 from _validator.core.request import Request
 from _validator.models.completed_proof_of_weights import CompletedProofOfWeightsItem
 from _validator.models.miner_response import MinerResponse
 from _validator.models.request_type import RequestType
 from _validator.scoring.score_manager import ScoreManager
-from _validator.utils.logging import log_responses, log_system_metrics
-from _validator.utils.proof_of_weights import save_proof_of_weights
-from constants import BATCHED_PROOF_OF_WEIGHTS_MODEL_ID
 from execution_layer.generic_input import GenericInput
-from deployment_layer.circuit_store import circuit_store
 from execution_layer.verified_model_session import VerifiedModelSession
-import utils.wandb_logger as wandb_logger
 
 
 class ResponseProcessor:
@@ -29,80 +19,17 @@ class ResponseProcessor:
         self.proof_batches_queue = []
         self.completed_proof_of_weights_queue: list[CompletedProofOfWeightsItem] = []
 
-    def process_responses(self, responses: list[Request]) -> list[MinerResponse]:
-        if len(responses) == 0:
-            logging.error("No responses received")
-            return []
-
-        processed_responses = [self.process_single_response(r) for r in responses]
-        log_responses(processed_responses)
-        response_times = collections.defaultdict(list)
-        for r in processed_responses:
-            if r.response_time is not None and r.verification_result:
-                response_times[r.circuit.id].append(r.response_time)
-
-        for circuit_id in response_times:
-            verified_count = len(response_times[circuit_id])
-            circuit = circuit_store.get_circuit(circuit_id)
-            log_system_metrics(response_times[circuit_id], verified_count, circuit_id)
-
-            # Log response times, proof sizes and verification ratio to Prometheus
-            prometheus.log_verification_ratio(
-                verified_count / len(response_times) if response_times else 0, circuit
-            )
-            prometheus.log_proof_sizes(
-                [r.proof_size for r in processed_responses if r.proof_size is not None],
-                circuit,
-            )
-            prometheus.log_response_times(response_times, circuit)
-
-        # return early if no proof of weights models are present
-        if all(
-            pr.circuit.id not in circuit_store.list_circuits()
-            for pr in processed_responses
-        ):
-            return processed_responses
-
-        verified_batched_responses = [
-            r
-            for r in processed_responses
-            if r.verification_result and r.proof_content is not None
-        ]
-        if verified_batched_responses:
-            # trunk-ignore(bandit/B311)
-            selected_response = random.choice(verified_batched_responses)
-            logging.debug(
-                f"Selected Proof of Weights from UID: {selected_response.uid} to use "
-                "as batched proof of weights for this interval."
-            )
-            save_proof_of_weights(selected_response.public_json, selected_response.proof_content)  # type: ignore
-            self.completed_proof_of_weights_queue.append(
-                CompletedProofOfWeightsItem(
-                    selected_response.public_json,
-                    selected_response.proof_content,
-                    BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
-                    selected_response.circuit.metadata.netuid,
-                )
-            )
-        else:
-            logging.error("No valid batched proof of weights found.")
-            wandb_logger.safe_log(
-                {
-                    "valid_batched_proof_of_weights": False,
-                }
-            )
-
-        return processed_responses
-
     def process_single_response(self, response: Request) -> MinerResponse:
         miner_response = MinerResponse.from_raw_response(response)
         if miner_response.proof_content is None:
-            logging.debug(
+            bt.logging.debug(
                 f"Miner at UID: {miner_response.uid} failed to provide a valid proof. "
                 f"Response from miner: {miner_response.raw}"
             )
         elif miner_response.proof_content:
-            logging.debug(f"Attempting to verify proof for UID: {miner_response.uid}")
+            bt.logging.debug(
+                f"Attempting to verify proof for UID: {miner_response.uid}"
+            )
             try:
                 start_time = time.time()
                 verification_result = self.verify_proof_string(
@@ -111,17 +38,17 @@ class ResponseProcessor:
                 miner_response.verification_time = time.time() - start_time
                 miner_response.set_verification_result(verification_result)
                 if not verification_result:
-                    logging.warning(
+                    bt.logging.warning(
                         f"Miner at UID: {miner_response.uid} provided a proof, but verification failed."
                     )
             except Exception as e:
-                logging.warning(
+                bt.logging.warning(
                     f"Unable to verify proof for UID: {miner_response.uid}. Error: {e}"
                 )
                 traceback.print_exc()
 
             if miner_response.verification_result:
-                logging.success(
+                bt.logging.success(
                     f"Miner at UID: {miner_response.uid} provided a valid proof "
                     f"in {miner_response.response_time} seconds."
                 )
@@ -131,7 +58,7 @@ class ResponseProcessor:
         self, response: MinerResponse, validator_inputs: GenericInput
     ) -> bool:
         if not response.proof_content or not response.public_json:
-            logging.error(f"Proof or public json not found for UID: {response.uid}")
+            bt.logging.error(f"Proof or public json not found for UID: {response.uid}")
             return False
         try:
             inference_session = VerifiedModelSession(

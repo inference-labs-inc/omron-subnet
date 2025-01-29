@@ -31,6 +31,7 @@ from constants import (
     ONE_MINUTE,
     FIVE_MINUTES,
     ONE_HOUR,
+    BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
 )
 from execution_layer.circuit import CircuitType
 from utils import AutoUpdate, clean_temp_files, with_rate_limit
@@ -215,7 +216,10 @@ class ValidatorLoop:
             response (MinerResponse): The processed response to handle.
         """
         if response.verification_result and response.proof_content:
-            if response.circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS:
+            if (
+                response.circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS
+                and response.request_type == RequestType.RWR
+            ) or response.circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
                 request_hash = response.input_hash
                 save_proof_of_weights(
                     public_signals=[response.public_json],
