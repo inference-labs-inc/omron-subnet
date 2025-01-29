@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
+import torch
 import os
 import json
 import cli_parser
@@ -8,7 +9,12 @@ from execution_layer.input_registry import InputRegistry
 
 # trunk-ignore(pylint/E0611)
 from bittensor import logging
-from constants import MAX_EVALUATION_ITEMS
+from constants import (
+    MAX_EVALUATION_ITEMS,
+    MINIMUM_SCORE_SHIFT,
+    VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+    MAXIMUM_SCORE_MEDIAN_SAMPLE,
+)
 
 
 class CircuitType(str, Enum):
@@ -202,7 +208,13 @@ class CircuitEvaluationData:
 
     def update(self, item: CircuitEvaluationItem):
         """Update evaluation data, maintaining size limit."""
-        self.data.append(item)
+        # Replace existing item with same UID if found
+        for i, existing_item in enumerate(self.data):
+            if existing_item.uid == item.uid:
+                self.data[i] = item
+                break
+        else:
+            self.data.append(item)
 
         # Keep only most recent items
         if len(self.data) > MAX_EVALUATION_ITEMS:
@@ -224,15 +236,23 @@ class CircuitEvaluationData:
         return successful / len(self.data)
 
     @property
+    def successful_response_time_items(self) -> list[CircuitEvaluationItem]:
+        return sorted(
+            r.response_time
+            for r in self.data
+            if r.verification_result and r.response_time > 0
+        )
+
+    @property
     def minimum_response_time(self):
         """Get minimum response time from evaluation data."""
-        import torch
-        from constants import VALIDATOR_REQUEST_TIMEOUT_SECONDS, MINIMUM_SCORE_SHIFT
 
-        if not self.data:
+        if not self.successful_response_time_items:
             return 0
 
-        response_times = [item.response_time for item in self.data]
+        response_times = [
+            item.response_time for item in self.successful_response_time_items
+        ]
         return max(
             torch.clamp(
                 torch.min(torch.tensor(response_times)),
@@ -246,26 +266,19 @@ class CircuitEvaluationData:
     @property
     def maximum_response_time(self):
         """Get maximum response time from evaluation data."""
-        import torch
-        from constants import (
-            VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-            MAXIMUM_SCORE_MEDIAN_SAMPLE,
+        if not self.successful_response_time_items:
+            return VALIDATOR_REQUEST_TIMEOUT_SECONDS
+
+        response_times = sorted(
+            item.response_time for item in self.successful_response_time_items
         )
-
-        if not self.data:
-            return 0
-
-        response_times = sorted(item.response_time for item in self.data)
         sample_size = max(int(len(response_times) * MAXIMUM_SCORE_MEDIAN_SAMPLE), 1)
 
-        return min(
-            torch.clamp(
-                torch.median(torch.tensor(response_times[-sample_size:])),
-                0,
-                VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-            ).item(),
+        return torch.clamp(
+            torch.median(torch.tensor(response_times[-sample_size:])),
+            0,
             VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-        )
+        ).item()
 
 
 class Circuit:
