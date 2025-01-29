@@ -146,8 +146,12 @@ class ScoreManager:
             RequestType.RWR, ProofOfWeightsItem.to_dict_list(proof_of_weights_items)
         )
         session = VerifiedModelSession(inputs, pow_circuit)
-        witness = session.generate_witness(return_content=True)
-        bt.logging.info(f"Generated witness for model {model_id}")
+        try:
+            witness = session.generate_witness(return_content=True)
+            bt.logging.info(f"Generated witness for model {model_id}")
+        except Exception as e:
+            bt.logging.error(f"Error generating witness: {e}")
+            return
 
         witness_list = witness if isinstance(witness, list) else list(witness.values())
         self._process_witness_results(witness_list, pow_circuit.settings["scaling"])
