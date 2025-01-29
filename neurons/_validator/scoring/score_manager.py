@@ -118,30 +118,6 @@ class ScoreManager:
                 f"Proof of weights circuit not found for model ID: {model_id}"
             )
 
-        for item in proof_of_weights_items:
-            if item.response_time < pow_circuit.evaluation_data.minimum_response_time:
-                item.response_time = torch.max(
-                    item.response_time,
-                    torch.tensor(
-                        pow_circuit.evaluation_data.minimum_response_time,
-                        dtype=torch.float32,
-                    ),
-                )
-
-            if (
-                pow_circuit.evaluation_data.maximum_response_time
-                <= pow_circuit.evaluation_data.minimum_response_time
-            ):
-                item.maximum_response_time = torch.tensor(
-                    pow_circuit.evaluation_data.minimum_response_time + 1,
-                    dtype=torch.float32,
-                )
-            else:
-                item.maximum_response_time = torch.tensor(
-                    pow_circuit.evaluation_data.maximum_response_time,
-                    dtype=torch.float32,
-                )
-
         inputs = pow_circuit.input_handler(
             RequestType.RWR, ProofOfWeightsItem.to_dict_list(proof_of_weights_items)
         )
