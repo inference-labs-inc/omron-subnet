@@ -11,7 +11,7 @@ from execution_layer.input_registry import InputRegistry
 from bittensor import logging
 from constants import (
     MAX_EVALUATION_ITEMS,
-    MINIMUM_SCORE_SHIFT,
+    DEFAULT_PROOF_SIZE,
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
     MAXIMUM_SCORE_MEDIAN_SAMPLE,
 )
@@ -159,8 +159,8 @@ class CircuitEvaluationItem:
     circuit_id: str = field(default="")
     uid: int = field(default=0)
     minimum_response_time: float = field(default=0.0)
-    maximum_response_time: float = field(default=0.0)
-    proof_size: int = field(default=0)
+    maximum_response_time: float = field(default=VALIDATOR_REQUEST_TIMEOUT_SECONDS)
+    proof_size: int = field(default=DEFAULT_PROOF_SIZE)
     response_time: float = field(default=0.0)
     score: float = field(default=0.0)
     verification_result: bool = field(default=False)
@@ -253,15 +253,11 @@ class CircuitEvaluationData:
         if not response_times:
             return 0
 
-        return max(
-            torch.clamp(
-                torch.min(torch.tensor(response_times)),
-                0,
-                VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-            ).item()
-            - MINIMUM_SCORE_SHIFT,
+        return torch.clamp(
+            torch.min(torch.tensor(response_times)),
             0,
-        )
+            VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+        ).item()
 
     @property
     def maximum_response_time(self) -> float:
