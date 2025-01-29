@@ -146,7 +146,6 @@ def init_config(role: Optional[str] = None):
         config.whitelisted_public_keys = config.whitelisted_public_keys.split(",")
 
     os.makedirs(config.full_path, exist_ok=True)
-    os.makedirs(config.full_path_score, exist_ok=True)
     os.makedirs(config.full_path_models, exist_ok=True)
     os.makedirs(config.certificate_path, exist_ok=True)
 
