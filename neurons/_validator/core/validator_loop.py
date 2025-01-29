@@ -148,8 +148,7 @@ class ValidatorLoop:
                 self.processed_uids.add(uid)
                 del self.active_requests[uid]
 
-                if response:
-                    await self._handle_response(response)
+                await self._handle_response(response)
 
         log_request_metrics(
             active_requests=len(self.active_requests),

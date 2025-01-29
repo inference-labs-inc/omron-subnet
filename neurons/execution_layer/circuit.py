@@ -250,8 +250,8 @@ class CircuitEvaluationData:
         """Get minimum response time from evaluation data."""
         response_times = self.get_successful_response_times()
 
-        if not response_times:
-            return 0
+        if len(self.data) in [0, 1]:
+            return 0.0
 
         return torch.clamp(
             torch.min(torch.tensor(response_times)),
@@ -264,7 +264,7 @@ class CircuitEvaluationData:
         """Get maximum response time from evaluation data."""
 
         response_times = self.get_successful_response_times()
-        if not response_times:
+        if len(response_times) in [0, 1]:
             return VALIDATOR_REQUEST_TIMEOUT_SECONDS
 
         sample_size = max(int(len(response_times) * MAXIMUM_SCORE_MEDIAN_SAMPLE), 1)
