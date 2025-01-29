@@ -580,8 +580,9 @@ def resolve_legacy_folders(role: str):
 
     _move_files(
         os.path.join(legacy_full_path, role),
-        cli_parser.config.full_path_score,
+        cli_parser.config.full_path,
     )
+
     _move_files(
         os.path.join(legacy_full_path, "deployment_layer"),
         cli_parser.config.full_path_models,
@@ -590,7 +591,7 @@ def resolve_legacy_folders(role: str):
 
 def _move_files(src: str, dst: str):
     """
-    Move files recurcively from source to destination.
+    Move files recursively from source to destination.
     """
     if not os.path.exists(src) or not any(os.scandir(src)) or any(os.scandir(dst)):
         # if source does not exist or is empty, or destination is not empty -> skip
