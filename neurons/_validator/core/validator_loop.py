@@ -169,6 +169,7 @@ class ValidatorLoop:
                 self.check_auto_update()
                 self.sync_metagraph()
                 self.sync_scores_uids()
+                self.update_weights()
                 self.update_queryable_uids()
                 self.update_processed_uids()
                 self.log_health()
