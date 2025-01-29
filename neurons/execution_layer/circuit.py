@@ -235,8 +235,10 @@ class CircuitEvaluationData:
         successful = sum(1 for item in self.data if item.verification_result)
         return successful / len(self.data)
 
-    @property
-    def successful_response_time_items(self) -> list[CircuitEvaluationItem]:
+    def get_successful_response_times(self) -> list[float]:
+        if not self.data:
+            return []
+
         return sorted(
             r.response_time
             for r in self.data
@@ -244,15 +246,13 @@ class CircuitEvaluationData:
         )
 
     @property
-    def minimum_response_time(self):
+    def minimum_response_time(self) -> float:
         """Get minimum response time from evaluation data."""
+        response_times = self.get_successful_response_times()
 
-        if not self.successful_response_time_items:
+        if not response_times:
             return 0
 
-        response_times = [
-            item.response_time for item in self.successful_response_time_items
-        ]
         return max(
             torch.clamp(
                 torch.min(torch.tensor(response_times)),
@@ -264,14 +264,13 @@ class CircuitEvaluationData:
         )
 
     @property
-    def maximum_response_time(self):
+    def maximum_response_time(self) -> float:
         """Get maximum response time from evaluation data."""
-        if not self.successful_response_time_items:
+
+        response_times = self.get_successful_response_times()
+        if not response_times:
             return VALIDATOR_REQUEST_TIMEOUT_SECONDS
 
-        response_times = sorted(
-            item.response_time for item in self.successful_response_time_items
-        )
         sample_size = max(int(len(response_times) * MAXIMUM_SCORE_MEDIAN_SAMPLE), 1)
 
         return torch.clamp(
