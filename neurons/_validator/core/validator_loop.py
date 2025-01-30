@@ -4,6 +4,7 @@ import asyncio
 import random
 import sys
 import traceback
+import time
 from typing import NoReturn
 
 import bittensor as bt
@@ -13,6 +14,11 @@ from _validator.api import ValidatorAPI
 from _validator.core.prometheus import (
     start_prometheus_logging,
     stop_prometheus_logging,
+    log_system_metrics,
+    log_queue_metrics,
+    log_weight_update,
+    log_score_change,
+    log_error,
 )
 from _validator.core.request import Request
 from _validator.core.request_pipeline import RequestPipeline
@@ -85,7 +91,15 @@ class ValidatorLoop:
     # regularly with the updater
     @with_rate_limit(period=FIVE_MINUTES)
     def update_weights(self):
-        self.weights_manager.update_weights(self.score_manager.scores)
+        start_time = time.time()
+        try:
+            self.weights_manager.update_weights(self.score_manager.scores)
+            duration = time.time() - start_time
+            log_weight_update(duration, success=True)
+        except Exception as e:
+            log_weight_update(0.0, success=False, failure_reason=str(e))
+            log_error("weight_update", "weights_manager", str(e))
+            raise
 
     @with_rate_limit(period=ONE_HOUR)
     def sync_scores_uids(self):
@@ -110,6 +124,17 @@ class ValidatorLoop:
         )
         bt.logging.debug(f"Processed UIDs: {len(self.processed_uids)}")
         bt.logging.debug(f"Queryable UIDs: {len(self.queryable_uids)}")
+
+        log_system_metrics()
+        if hasattr(self, "request_queue"):
+            queue_size = self.request_queue.qsize()
+            # Estimate latency based on queue size and processing rate
+            est_latency = (
+                queue_size * (LOOP_DELAY_SECONDS / MAX_CONCURRENT_REQUESTS)
+                if queue_size > 0
+                else 0
+            )
+            log_queue_metrics(queue_size, est_latency)
 
     def update_processed_uids(self):
         if len(self.processed_uids) >= len(self.queryable_uids):
@@ -198,6 +223,7 @@ class ValidatorLoop:
                 return request.uid, processed_response
         except Exception as e:
             bt.logging.error(f"Error processing request for UID {request.uid}: {e}")
+            log_error("request_processing", "axon_query", str(e))
 
         return request.uid, None
 
@@ -208,34 +234,42 @@ class ValidatorLoop:
         Args:
             response (MinerResponse): The processed response to handle.
         """
-        request_hash = response.input_hash
-        if response.request_type == RequestType.RWR:
-            if response.verification_result:
-                self.api.set_request_result(
-                    request_hash,
-                    {
-                        "hash": request_hash,
-                        "public_signals": response.public_json,
-                        "proof": response.proof_content,
-                        "success": True,
-                    },
-                )
-            else:
-                self.api.set_request_result(
-                    request_hash,
-                    {
-                        "success": False,
-                    },
+        try:
+            request_hash = response.input_hash
+            if response.request_type == RequestType.RWR:
+                if response.verification_result:
+                    self.api.set_request_result(
+                        request_hash,
+                        {
+                            "hash": request_hash,
+                            "public_signals": response.public_json,
+                            "proof": response.proof_content,
+                            "success": True,
+                        },
+                    )
+                else:
+                    self.api.set_request_result(
+                        request_hash,
+                        {
+                            "success": False,
+                        },
+                    )
+
+            if response.verification_result and response.save:
+                save_proof_of_weights(
+                    public_signals=[response.public_json],
+                    proof=[response.proof_content],
+                    proof_filename=request_hash,
                 )
 
-        if response.verification_result and response.save:
-            save_proof_of_weights(
-                public_signals=[response.public_json],
-                proof=[response.proof_content],
-                proof_filename=request_hash,
-            )
+            old_score = self.score_manager.scores.get(response.uid, 0.0)
+            self.score_manager.update_single_score(response, self.queryable_uids)
+            new_score = self.score_manager.scores.get(response.uid, 0.0)
+            log_score_change(old_score, new_score)
 
-        self.score_manager.update_single_score(response, self.queryable_uids)
+        except Exception as e:
+            bt.logging.error(f"Error handling response: {e}")
+            log_error("response_handling", "response_processor", str(e))
 
     def _handle_auto_update(self):
         """Handle automatic updates if enabled."""
