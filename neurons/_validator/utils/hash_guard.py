@@ -12,7 +12,6 @@ class HashGuard:
     Uses a set for O(1) lookups and a deque for FIFO order.
     """
 
-    # 32K entries - each hash is 32 bytes, so ~1MB total memory
     MAX_HASHES = 32768
 
     def __init__(self):
@@ -20,11 +19,10 @@ class HashGuard:
         self.hash_queue = deque(maxlen=self.MAX_HASHES)
 
     def check_hash(self, input: BaseInput) -> None:
-        # Convert to dict if BaseInput
+
         if isinstance(input, BaseInput):
             input = input.to_json()
 
-        # Sort keys for deterministic JSON string
         def sort_dict(d):
             if isinstance(d, dict):
                 return {k: sort_dict(v) for k, v in sorted(d.items())}
@@ -40,7 +38,6 @@ class HashGuard:
             bt.logging.error(f"Hash already exists: {hash_value}. Inputs: {input}")
             raise ValueError("Hash already exists")
 
-        # If we're at max capacity, remove oldest hash from set
         if len(self.hash_queue) == self.MAX_HASHES:
             old_hash = self.hash_queue.popleft()
             self.hash_set.remove(old_hash)
