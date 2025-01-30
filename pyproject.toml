@@ -13,6 +13,7 @@ dependencies = [
 	"bittensor==8.5.2",
 	"ezkl==16.2.3",
 	"fastapi==0.110.3",
+	"httpx>=0.28.1",
 	"jsonrpcserver>=5.0.9",
 	"numpy==2.0.2",
 	"packaging==24.2",
