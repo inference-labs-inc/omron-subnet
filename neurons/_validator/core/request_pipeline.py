@@ -70,6 +70,10 @@ class RequestPipeline:
         except Exception as e:
             bt.logging.error(f"Hash already exists: {e}")
             safe_log({"hash_guard_error": 1})
+            if request_type == RequestType.RWR:
+                self.api.set_request_result(
+                    request_hash, {"success": False, "error": "Hash already exists"}
+                )
             return None
 
         return Request(
