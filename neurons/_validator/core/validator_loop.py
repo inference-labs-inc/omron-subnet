@@ -13,7 +13,6 @@ from _validator.api import ValidatorAPI
 from _validator.core.prometheus import (
     start_prometheus_logging,
     stop_prometheus_logging,
-    log_request_metrics,
 )
 from _validator.core.request import Request
 from _validator.core.request_pipeline import RequestPipeline
@@ -120,6 +119,7 @@ class ValidatorLoop:
     async def update_active_requests(self):
         random.shuffle(self.queryable_uids)
         needed_requests = MAX_CONCURRENT_REQUESTS - len(self.active_requests)
+
         if needed_requests > 0:
             available_uids = [
                 uid
@@ -135,25 +135,19 @@ class ValidatorLoop:
             request = self.request_pipeline.prepare_single_request(uid)
             if request:
                 task = asyncio.create_task(self._process_single_request(request))
+
+                def done_callback(completed_task):
+                    try:
+                        uid, response = completed_task.result()
+                        self.processed_uids.add(uid)
+                        if response is not None:
+                            asyncio.create_task(self._handle_response(response))
+                        del self.active_requests[uid]
+                    except Exception as e:
+                        bt.logging.error(f"Error in callback for UID {uid}: {e}")
+
+                task.add_done_callback(done_callback)
                 self.active_requests[uid] = task
-
-        if self.active_requests:
-            done, _ = await asyncio.wait(
-                self.active_requests.values(),
-                return_when=asyncio.FIRST_COMPLETED,
-                timeout=0.1,
-            )
-            for task in done:
-                uid, response = await task
-                self.processed_uids.add(uid)
-                del self.active_requests[uid]
-
-                await self._handle_response(response)
-
-        log_request_metrics(
-            active_requests=len(self.active_requests),
-            processed_uids=len(self.processed_uids),
-        )
 
     async def run(self) -> NoReturn:
         """
