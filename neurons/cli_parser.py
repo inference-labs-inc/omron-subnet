@@ -131,7 +131,7 @@ def init_config(role: Optional[str] = None):
         config.max_workers = config.max_workers or 1
 
     config.full_path = os.path.expanduser("~/.bittensor/omron")  # type: ignore
-    config.full_path_score = os.path.join(config.full_path, "scores.pt")
+    config.full_path_score = os.path.join(config.full_path, "scores", "scores.pt")
     if not config.certificate_path:
         config.certificate_path = os.path.join(config.full_path, "cert")
 
@@ -148,7 +148,7 @@ def init_config(role: Optional[str] = None):
     os.makedirs(config.full_path, exist_ok=True)
     os.makedirs(config.full_path_models, exist_ok=True)
     os.makedirs(config.certificate_path, exist_ok=True)
-
+    os.makedirs(os.path.dirname(config.full_path_score), exist_ok=True)
     bt.logging(config=config, logging_dir=config.logging.logging_dir)
     bt.logging.enable_info()
 
