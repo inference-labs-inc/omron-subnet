@@ -35,7 +35,7 @@ VALIDATOR_REQUEST_TIMEOUT_SECONDS = 120
 # An additional queueing time for external requests
 EXTERNAL_REQUEST_QUEUE_TIME_SECONDS = 10
 # Maximum number of concurrent requests that the validator will handle
-MAX_CONCURRENT_REQUESTS = 32
+MAX_CONCURRENT_REQUESTS = 16
 # Default proof size when we're unable to determine the actual size
 DEFAULT_PROOF_SIZE = 5000
 # Size in percent of the sample to be used for the maximum score median
