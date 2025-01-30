@@ -1,7 +1,6 @@
 import traceback
 import bittensor as bt
 from aiohttp.client_exceptions import InvalidUrlClientError
-import time
 
 from constants import (
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
@@ -9,7 +8,7 @@ from constants import (
 from _validator.core.request import Request
 
 
-async def query_single_axon(wallet: bt.Wallet, request: Request) -> Request | None:
+async def query_single_axon(dendrite: bt.dendrite, request: Request) -> Request | None:
     """
     Query a single axon with a request.
 
@@ -20,45 +19,36 @@ async def query_single_axon(wallet: bt.Wallet, request: Request) -> Request | No
     Returns:
         Request | None: The request with results populated, or None if the request failed.
     """
-    async with bt.dendrite(wallet=wallet) as dendrite:
-        try:
-            start_time = time.time()
-            result = await dendrite.forward(
-                axons=[request.axon],
-                synapse=request.synapse,
-                timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-                deserialize=False,
-            )
-            end_time = time.time()
 
-            if not result or not result[0]:
-                return None
+    try:
+        result = await dendrite.call(
+            target_axon=request.axon,
+            synapse=request.synapse,
+            timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+            deserialize=False,
+        )
 
-            result = result[0]
-            request.result = result
-            request.response_time = (
-                result.dendrite.process_time
-                if result.dendrite.process_time is not None
-                else VALIDATOR_REQUEST_TIMEOUT_SECONDS
-            )
-
-            bt.logging.info(
-                f"Response time: {request.response_time} seconds. "
-                f"Calculated time: {end_time - start_time} seconds for UID: {request.uid}"
-            )
-
-            request.deserialized = result.deserialize()
-            return request
-
-        except InvalidUrlClientError:
-            bt.logging.warning(
-                f"Ignoring UID as axon is not a valid URL: {request.uid}. {request.axon.ip}:{request.axon.port}"
-            )
+        if not result or not result[0]:
             return None
 
-        except Exception as e:
-            bt.logging.warning(
-                f"Failed to query axon for UID: {request.uid}. Error: {e}"
-            )
-            traceback.print_exc()
-            return None
+        result = result[0]
+        request.result = result
+        request.response_time = (
+            result.dendrite.process_time
+            if result.dendrite.process_time is not None
+            else VALIDATOR_REQUEST_TIMEOUT_SECONDS
+        )
+
+        request.deserialized = result.deserialize()
+        return request
+
+    except InvalidUrlClientError:
+        bt.logging.warning(
+            f"Ignoring UID as axon is not a valid URL: {request.uid}. {request.axon.ip}:{request.axon.port}"
+        )
+        return None
+
+    except Exception as e:
+        bt.logging.warning(f"Failed to query axon for UID: {request.uid}. Error: {e}")
+        traceback.print_exc()
+        return None

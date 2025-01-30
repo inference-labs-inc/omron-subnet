@@ -215,7 +215,7 @@ class ValidatorLoop:
             tuple[int, MinerResponse | None]: The UID and processed response (if successful).
         """
         try:
-            response = await query_single_axon(self.config.wallet, request)
+            response = await query_single_axon(self.config.dendrite, request)
             if response:
                 processed_response = self.response_processor.process_single_response(
                     response
