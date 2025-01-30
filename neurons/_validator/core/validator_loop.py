@@ -25,7 +25,8 @@ from _validator.models.request_type import RequestType
 from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
 from constants import (
-    REQUEST_DELAY_SECONDS,
+    LOOP_DELAY_SECONDS,
+    EXCEPTION_DELAY_SECONDS,
     MAX_CONCURRENT_REQUESTS,
     ONE_MINUTE,
     FIVE_MINUTES,
@@ -168,7 +169,7 @@ class ValidatorLoop:
                 self.update_processed_uids()
                 self.log_health()
                 await self.update_active_requests()
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(LOOP_DELAY_SECONDS)
 
             except KeyboardInterrupt:
                 self._handle_keyboard_interrupt()
@@ -176,7 +177,7 @@ class ValidatorLoop:
                 bt.logging.error(
                     f"Error in validator loop \n {e} \n {traceback.format_exc()}"
                 )
-                await asyncio.sleep(REQUEST_DELAY_SECONDS)
+                await asyncio.sleep(EXCEPTION_DELAY_SECONDS)
 
     async def _process_single_request(
         self, request: Request

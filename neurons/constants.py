@@ -46,8 +46,10 @@ MINIMUM_SCORE_SHIFT = 0.0
 WEIGHTS_VERSION = 1652
 # Rate limit for weight updates
 WEIGHT_RATE_LIMIT: int = 100
-# Delay between requests
-REQUEST_DELAY_SECONDS = 0
+# Delay between loop iterations
+LOOP_DELAY_SECONDS = 0.1
+# Exception delay for loop
+EXCEPTION_DELAY_SECONDS = 10
 # Default maximum score
 DEFAULT_MAX_SCORE = 1 / 235
 # Default subnet UID
