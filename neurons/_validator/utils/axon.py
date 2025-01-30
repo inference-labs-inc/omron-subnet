@@ -140,7 +140,7 @@ async def _call(
             # Extract the JSON response from the server
             json_response = response.json()
             # Process the server response and fill synapse
-            process_server_response(response, json_response, synapse)
+            process_server_response(dendrite, response, json_response, synapse)
 
         # Set process time and log the response
         synapse.dendrite.process_time = str(time.time() - start_time)  # type: ignore
