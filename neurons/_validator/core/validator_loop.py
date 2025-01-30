@@ -117,7 +117,7 @@ class ValidatorLoop:
     def update_queryable_uids(self):
         self.queryable_uids = list(get_queryable_uids(self.config.metagraph))
 
-    @with_rate_limit(period=ONE_MINUTE)
+    @with_rate_limit(period=ONE_MINUTE / 4)
     def log_health(self):
         bt.logging.info(
             f"In-flight requests: {len(self.active_requests)} / {MAX_CONCURRENT_REQUESTS}"
