@@ -261,6 +261,13 @@ def _validator_config():
     )
 
     parser.add_argument(
+        "--serve-axon",
+        type=bool,
+        default=False,
+        help="Whether to serve the axon displaying your API information.",
+    )
+
+    parser.add_argument(
         "--do-not-verify-external-signatures",
         default=False,
         action="store_true",

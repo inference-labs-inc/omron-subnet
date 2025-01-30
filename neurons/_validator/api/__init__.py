@@ -181,6 +181,8 @@ class ValidatorAPI:
             daemon=True,
         )
         self.server_thread.start()
+        if not self.config.api.serve_axon:
+            return
         try:
             bt.logging.info(f"Serving axon on port {self.config.api.port}")
             axon = bt.axon(
