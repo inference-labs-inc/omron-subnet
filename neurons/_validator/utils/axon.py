@@ -8,7 +8,7 @@ from constants import (
 from _validator.core.request import Request
 
 
-async def query_single_axon(dendrite: bt.dendrite, request: Request) -> Request | None:
+async def query_single_axon(wallet: bt.Wallet, request: Request) -> Request | None:
     """
     Query a single axon with a request.
 
@@ -19,6 +19,7 @@ async def query_single_axon(dendrite: bt.dendrite, request: Request) -> Request 
     Returns:
         Request | None: The request with results populated, or None if the request failed.
     """
+    dendrite = bt.dendrite(wallet=wallet)
     try:
         result = await dendrite.forward(
             axons=[request.axon],

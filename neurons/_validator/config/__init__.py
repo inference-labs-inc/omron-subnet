@@ -39,7 +39,6 @@ class ValidatorConfig:
         )
         self.wallet = bt.wallet(config=self.bt_config)
         self.subtensor = bt.subtensor(config=self.bt_config)
-        self.dendrite = bt.dendrite(wallet=self.wallet)
         self.metagraph = self.subtensor.metagraph(self.subnet_uid)
         self.user_uid = int(
             self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
