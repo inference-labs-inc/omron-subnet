@@ -1,6 +1,7 @@
 import traceback
 import bittensor as bt
 from aiohttp.client_exceptions import InvalidUrlClientError
+import time
 
 from constants import (
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
@@ -21,12 +22,14 @@ async def query_single_axon(wallet: bt.Wallet, request: Request) -> Request | No
     """
     async with bt.dendrite(wallet=wallet) as dendrite:
         try:
+            start_time = time.time()
             result = await dendrite.forward(
                 axons=[request.axon],
                 synapse=request.synapse,
                 timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
                 deserialize=False,
             )
+            end_time = time.time()
 
             if not result or not result[0]:
                 return None
@@ -38,6 +41,12 @@ async def query_single_axon(wallet: bt.Wallet, request: Request) -> Request | No
                 if result.dendrite.process_time is not None
                 else VALIDATOR_REQUEST_TIMEOUT_SECONDS
             )
+
+            bt.logging.info(
+                f"Response time: {request.response_time} seconds. "
+                f"Calculated time: {end_time - start_time} seconds for UID: {request.uid}"
+            )
+
             request.deserialized = result.deserialize()
             return request
 
