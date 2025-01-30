@@ -58,6 +58,7 @@ class RequestPipeline:
         circuit: Circuit,
         request_type: RequestType,
         request_hash: str | None = None,
+        save: bool = False,
     ) -> Request | None:
         """Check hash and create request if valid."""
         if isinstance(synapse, ProofOfWeightsSynapse):
@@ -84,6 +85,7 @@ class RequestPipeline:
             request_type=request_type,
             inputs=GenericInput(RequestType.RWR, input_data),
             request_hash=request_hash,
+            save=save,
         )
 
     def _prepare_real_world_requests(self, filtered_uids: list[int]) -> list[Request]:
@@ -91,7 +93,7 @@ class RequestPipeline:
         requests = []
 
         for uid in filtered_uids:
-            synapse = self.get_synapse_request(
+            synapse, save = self.get_synapse_request(
                 RequestType.RWR, external_request.circuit, external_request
             )
             request = self._check_and_create_request(
@@ -100,6 +102,7 @@ class RequestPipeline:
                 circuit=external_request.circuit,
                 request_type=RequestType.RWR,
                 request_hash=external_request.hash,
+                save=save,
             )
             if request:
                 requests.append(request)
@@ -113,12 +116,13 @@ class RequestPipeline:
 
         requests = []
         for uid in filtered_uids:
-            synapse = self.get_synapse_request(RequestType.BENCHMARK, circuit)
+            synapse, save = self.get_synapse_request(RequestType.BENCHMARK, circuit)
             request = self._check_and_create_request(
                 uid=uid,
                 synapse=synapse,
                 circuit=circuit,
                 request_type=RequestType.BENCHMARK,
+                save=save,
             )
             if request:
                 requests.append(request)
@@ -148,7 +152,7 @@ class RequestPipeline:
         request_type: RequestType,
         circuit: Circuit,
         request: any | None = None,
-    ) -> ProofOfWeightsSynapse | QueryZkProof:
+    ) -> tuple[ProofOfWeightsSynapse | QueryZkProof, bool]:
         inputs = (
             circuit.input_handler(request_type)
             if request_type == RequestType.BENCHMARK
@@ -160,42 +164,56 @@ class RequestPipeline:
 
         if request_type == RequestType.RWR:
             if circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS:
-                return ProofOfWeightsSynapse(
-                    subnet_uid=circuit.metadata.netuid,
-                    verification_key_hash=circuit.id,
-                    proof_system=circuit.proof_system,
-                    inputs=inputs.to_json(),
-                    proof="",
-                    public_signals="",
+                return (
+                    ProofOfWeightsSynapse(
+                        subnet_uid=circuit.metadata.netuid,
+                        verification_key_hash=circuit.id,
+                        proof_system=circuit.proof_system,
+                        inputs=inputs.to_json(),
+                        proof="",
+                        public_signals="",
+                    ),
+                    True,
                 )
-            return QueryZkProof(
-                model_id=circuit.id,
-                query_input=self.format_for_query(inputs, circuit),
-                query_output="",
+            return (
+                QueryZkProof(
+                    model_id=circuit.id,
+                    query_input=self.format_for_query(inputs, circuit),
+                    query_output="",
+                ),
+                True,
             )
 
         if circuit.id in [
             SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
             BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
         ]:
-            return ProofOfWeightsHandler.prepare_pow_request(
+            synapse_request, save = ProofOfWeightsHandler.prepare_pow_request(
                 circuit, self.score_manager
             )
+            if synapse_request:
+                return synapse_request, save
 
         if circuit.metadata.type == CircuitType.PROOF_OF_COMPUTATION:
-            return QueryZkProof(
-                model_id=circuit.id,
-                query_input=self.format_for_query(inputs.to_json(), circuit),
-                query_output="",
+            return (
+                QueryZkProof(
+                    model_id=circuit.id,
+                    query_input=self.format_for_query(inputs.to_json(), circuit),
+                    query_output="",
+                ),
+                False,
             )
 
-        return ProofOfWeightsSynapse(
-            subnet_uid=circuit.metadata.netuid,
-            verification_key_hash=circuit.id,
-            proof_system=circuit.proof_system,
-            inputs=inputs.to_json(),
-            proof="",
-            public_signals="",
+        return (
+            ProofOfWeightsSynapse(
+                subnet_uid=circuit.metadata.netuid,
+                verification_key_hash=circuit.id,
+                proof_system=circuit.proof_system,
+                inputs=inputs.to_json(),
+                proof="",
+                public_signals="",
+            ),
+            False,
         )
 
     def prepare_single_request(self, uid: int) -> Request | None:

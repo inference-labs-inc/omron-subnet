@@ -44,6 +44,7 @@ class MinerResponse:
     request_type: RequestType | None = None
     raw: dict | None = None
     error: str | None = None
+    save: bool = False
 
     @classmethod
     def from_raw_response(cls, response: Request) -> "MinerResponse":
@@ -118,6 +119,7 @@ class MinerResponse:
                 input_hash=response.request_hash,
                 public_json=public_json,
                 raw=deserialized_response,
+                save=response.save,
             )
         except json.JSONDecodeError as e:
             bt.logging.error(f"JSON decoding error: {e}")
@@ -149,6 +151,7 @@ class MinerResponse:
             input_hash=None,
             raw=None,
             error="Empty response",
+            save=False,
         )
 
     def to_log_dict(self, metagraph: bt.metagraph) -> dict:  # type: ignore
@@ -173,6 +176,8 @@ class MinerResponse:
             "is_verified": self.verification_result,
             "input_hash": self.input_hash,
             "request_type": self.request_type,
+            "error": self.error,
+            "save": self.save,
         }
 
     def set_verification_result(self, result: bool):

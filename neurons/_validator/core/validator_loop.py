@@ -31,9 +31,7 @@ from constants import (
     ONE_MINUTE,
     FIVE_MINUTES,
     ONE_HOUR,
-    BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
 )
-from execution_layer.circuit import CircuitType
 from utils import AutoUpdate, clean_temp_files, with_rate_limit
 
 
@@ -230,16 +228,12 @@ class ValidatorLoop:
                     },
                 )
 
-        if response.verification_result:
-            if (
-                response.circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS
-                and response.request_type == RequestType.RWR
-            ) or response.circuit.id == BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
-                save_proof_of_weights(
-                    public_signals=[response.public_json],
-                    proof=[response.proof_content],
-                    proof_filename=request_hash,
-                )
+        if response.verification_result and response.save:
+            save_proof_of_weights(
+                public_signals=[response.public_json],
+                proof=[response.proof_content],
+                proof_filename=request_hash,
+            )
 
         self.score_manager.update_single_score(response, self.queryable_uids)
 

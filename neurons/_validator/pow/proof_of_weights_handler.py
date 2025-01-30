@@ -16,19 +16,21 @@ class ProofOfWeightsHandler:
     """
 
     @staticmethod
-    def prepare_pow_request(circuit: Circuit, score_manager):
+    def prepare_pow_request(
+        circuit: Circuit, score_manager
+    ) -> ProofOfWeightsSynapse | QueryZkProof:
         queue = score_manager.get_pow_queue()
         batch_size = 1024
 
         if circuit.id != BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
             logging.debug("Not a batched PoW model. Defaulting to benchmark.")
-            return ProofOfWeightsHandler._create_benchmark_request(circuit)
+            return None, False
 
         if len(queue) < batch_size:
             logging.debug(
                 f"Queue is less than {batch_size} items. Defaulting to benchmark."
             )
-            return ProofOfWeightsHandler._create_benchmark_request(circuit)
+            return None, False
 
         pow_items = ProofOfWeightsItem.pad_items(
             queue[:batch_size], target_item_count=batch_size
@@ -36,36 +38,15 @@ class ProofOfWeightsHandler:
 
         logging.info(f"Preparing PoW request for {str(circuit)}")
         score_manager.remove_processed_items(batch_size)
-        return ProofOfWeightsHandler._create_request_from_items(circuit, pow_items)
-
-    @staticmethod
-    def _create_benchmark_request(circuit: Circuit):
-        """Create a benchmark request when queue is empty."""
         return (
-            ProofOfWeightsSynapse(
-                subnet_uid=circuit.metadata.netuid,
-                verification_key_hash=circuit.id,
-                proof_system=circuit.proof_system,
-                inputs=circuit.input_handler(RequestType.BENCHMARK).to_json(),
-                proof="",
-                public_signals="",
-            )
-            if circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS
-            else QueryZkProof(
-                query_input={
-                    "public_inputs": circuit.input_handler(
-                        RequestType.BENCHMARK
-                    ).to_json(),
-                    "model_id": circuit.id,
-                },
-                query_output="",
-            )
+            ProofOfWeightsHandler._create_request_from_items(circuit, pow_items),
+            True,
         )
 
     @staticmethod
     def _create_request_from_items(
         circuit: Circuit, pow_items: list[ProofOfWeightsItem]
-    ):
+    ) -> ProofOfWeightsSynapse | QueryZkProof:
         inputs = circuit.input_handler(
             RequestType.RWR, ProofOfWeightsItem.to_dict_list(pow_items)
         ).to_json()
