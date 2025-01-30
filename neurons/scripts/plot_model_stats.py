@@ -209,7 +209,7 @@ def plot_stats(models_path: Path, scores_path: Path) -> None:
 
 if __name__ == "__main__":
     models_path = Path(os.path.expanduser("~/.bittensor/omron/models/"))
-    scores_path = Path(os.path.expanduser("~/.bittensor/omron/scores.pt"))
+    scores_path = Path(os.path.expanduser("~/.bittensor/omron/scores/scores.pt"))
 
     if not models_path.exists():
         print(f"Models directory not found: {models_path}")
