@@ -47,7 +47,7 @@ WEIGHTS_VERSION = 1652
 # Rate limit for weight updates
 WEIGHT_RATE_LIMIT: int = 100
 # Delay between requests
-REQUEST_DELAY_SECONDS = 6
+REQUEST_DELAY_SECONDS = 0
 # Default maximum score
 DEFAULT_MAX_SCORE = 1 / 235
 # Default subnet UID
