@@ -28,10 +28,8 @@ async def query_single_axon(dendrite: bt.dendrite, request: Request) -> Request 
             deserialize=False,
         )
 
-        if not result or not result[0]:
+        if not result:
             return None
-
-        result = result[0]
         request.result = result
         request.response_time = (
             result.dendrite.process_time
