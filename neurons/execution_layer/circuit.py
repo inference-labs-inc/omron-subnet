@@ -208,7 +208,6 @@ class CircuitEvaluationData:
 
     def update(self, item: CircuitEvaluationItem):
         """Update evaluation data, maintaining size limit."""
-        # Replace existing item with same UID if found
         for i, existing_item in enumerate(self.data):
             if existing_item.uid == item.uid:
                 self.data[i] = item
@@ -216,7 +215,6 @@ class CircuitEvaluationData:
         else:
             self.data.append(item)
 
-        # Keep only most recent items
         if len(self.data) > MAX_EVALUATION_ITEMS:
             self.data = self.data[-MAX_EVALUATION_ITEMS:]
 

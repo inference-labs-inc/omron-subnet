@@ -30,6 +30,9 @@ from _validator.utils.axon import query_single_axon
 from _validator.models.request_type import RequestType
 from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
+from utils import AutoUpdate, clean_temp_files, with_rate_limit
+from neurons.utils.gc_logging import log_responses as gc_log_responses
+from _validator.utils.logging import log_responses as console_log_responses
 from constants import (
     LOOP_DELAY_SECONDS,
     EXCEPTION_DELAY_SECONDS,
@@ -38,8 +41,6 @@ from constants import (
     FIVE_MINUTES,
     ONE_HOUR,
 )
-from utils import AutoUpdate, clean_temp_files, with_rate_limit
-from _validator.utils.logging import log_responses
 
 
 class ValidatorLoop:
@@ -83,6 +84,7 @@ class ValidatorLoop:
         self.active_tasks: dict[int, asyncio.Task] = {}
         self.processed_uids: set[int] = set()
         self.queryable_uids: list[int] = []
+        self.last_response_time = time.time()
 
         self._should_run = True
 
@@ -148,7 +150,24 @@ class ValidatorLoop:
     @with_rate_limit(period=ONE_MINUTE)
     def log_pow_responses(self):
         if self.recent_responses:
-            log_responses(self.recent_responses)
+            # Log to console for visibility
+            console_log_responses(self.recent_responses)
+
+            # Log to GC for metrics collection
+            gc_log_responses(
+                self.config.metagraph,
+                self.config.wallet.hotkey,
+                self.config.user_uid,
+                self.recent_responses,
+                (
+                    time.time() - self.last_response_time
+                    if hasattr(self, "last_response_time")
+                    else 0
+                ),
+                self.config.metagraph.block.item(),
+                self.score_manager.scores,
+            )
+            self.last_response_time = time.time()
             self.recent_responses = []
 
     async def maintain_request_pool(self):
