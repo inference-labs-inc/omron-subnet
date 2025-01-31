@@ -1,10 +1,13 @@
 import base64
 import json
 import os
+from typing import Optional
 
 import bittensor as bt
 import requests
 import torch
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from _validator.models.miner_response import MinerResponse
 
@@ -13,16 +16,20 @@ LOGGING_URL = os.getenv(
     "https://api.omron.ai/statistics/log/",
 )
 
+session = requests.Session()
+retries = Retry(total=3, backoff_factor=0.1)
+session.mount("https://", HTTPAdapter(max_retries=retries))
 
-def log_responses(
-    metagraph: bt.metagraph,  # type: ignore
+
+async def log_responses(
+    metagraph: bt.metagraph,
     hotkey: bt.Keypair,
     uid: int,
     responses: list[MinerResponse],
     overhead_time: float,
     block: int,
     scores: torch.Tensor,
-):
+) -> Optional[requests.Response]:
     """
     Log miner responses to the centralized logging server.
     """
@@ -33,7 +40,7 @@ def log_responses(
         "overhead_duration": overhead_time,
         "block": block,
         "responses": [response.to_log_dict(metagraph) for response in responses],
-        "scores": {int(uid): float(value.item()) for uid, value in enumerate(scores)},
+        "scores": {k: float(v.item()) for k, v in enumerate(scores) if v.item() > 0},
     }
 
     input_bytes = json.dumps(data).encode("utf-8")
@@ -43,15 +50,15 @@ def log_responses(
     signature_str = base64.b64encode(signature).decode("utf-8")
 
     try:
-        resp = requests.post(
+        return session.post(
             LOGGING_URL,
             data=input_bytes,
             headers={
                 "X-Request-Signature": signature_str,
                 "Content-Type": "application/json",
             },
+            timeout=5,
         )
-        resp.raise_for_status()
     except requests.exceptions.RequestException as e:
         bt.logging.error(f"Failed to log responses: {e}")
-    return
+        return None

@@ -148,11 +148,11 @@ class ValidatorLoop:
             self.processed_uids.clear()
 
     @with_rate_limit(period=ONE_MINUTE)
-    def log_pow_responses(self):
+    async def log_pow_responses(self):
         if self.recent_responses:
             console_log_responses(self.recent_responses)
 
-            gc_log_responses(
+            await gc_log_responses(
                 self.config.metagraph,
                 self.config.wallet.hotkey,
                 self.config.user_uid,
