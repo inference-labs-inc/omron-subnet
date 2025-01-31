@@ -86,7 +86,7 @@ class ValidatorLoop:
 
         self._should_run = True
 
-        self.thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+        self.thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=16)
 
         if self.config.bt_config.prometheus_monitoring:
             start_prometheus_logging(self.config.bt_config.prometheus_port)
