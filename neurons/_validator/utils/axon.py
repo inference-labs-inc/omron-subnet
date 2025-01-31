@@ -56,7 +56,6 @@ async def query_single_axon(dendrite: bt.dendrite, request: Request) -> Request 
 
 
 def process_server_response(
-    dendrite: "bt.Dendrite",
     server_response: "httpx.Response",
     json_response: dict,
     local_synapse: "bt.Synapse",
@@ -140,7 +139,7 @@ async def _call(
             # Extract the JSON response from the server
             json_response = response.json()
             # Process the server response and fill synapse
-            process_server_response(dendrite, response, json_response, synapse)
+            process_server_response(response, json_response, synapse)
 
         # Set process time and log the response
         synapse.dendrite.process_time = str(time.time() - start_time)  # type: ignore
