@@ -86,7 +86,10 @@ class ValidatorLoop:
 
         self._should_run = True
 
-        self.thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+        self.thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=16)
+        self.response_thread_pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=16
+        )
 
         if self.config.bt_config.prometheus_monitoring:
             start_prometheus_logging(self.config.bt_config.prometheus_port)
@@ -124,6 +127,9 @@ class ValidatorLoop:
         bt.logging.info(
             f"In-flight requests: {len(self.active_tasks)} / {MAX_CONCURRENT_REQUESTS}"
         )
+        bt.logging.info(
+            f"Response queue size: {self.response_queue.qsize()} tasks pending processing"
+        )
         bt.logging.debug(f"Processed UIDs: {len(self.processed_uids)}")
         bt.logging.debug(f"Queryable UIDs: {len(self.queryable_uids)}")
 
@@ -143,7 +149,8 @@ class ValidatorLoop:
     async def maintain_request_pool(self):
         while True:
             try:
-                if len(self.active_tasks) < MAX_CONCURRENT_REQUESTS:
+                slots_available = MAX_CONCURRENT_REQUESTS - len(self.active_tasks)
+                if slots_available > 0:
                     available_uids = [
                         uid
                         for uid in self.queryable_uids
@@ -151,16 +158,13 @@ class ValidatorLoop:
                         and uid not in self.active_tasks
                     ]
 
-                    if available_uids:
-                        uid = available_uids[0]
+                    for uid in available_uids[:slots_available]:
                         request = self.request_pipeline.prepare_single_request(uid)
-
                         if request:
                             task = asyncio.create_task(
                                 self._process_single_request(request)
                             )
                             self.active_tasks[uid] = task
-
                             task.add_done_callback(
                                 lambda t, uid=uid: self._handle_completed_task(t, uid)
                             )
@@ -173,9 +177,7 @@ class ValidatorLoop:
 
     def _handle_completed_task(self, task: asyncio.Task, uid: int):
         try:
-            response = task.result()
             self.processed_uids.add(uid)
-            self.response_queue.put_nowait(response)
         except Exception as e:
             bt.logging.error(f"Error in task for UID {uid}: {e}")
             traceback.print_exc()
@@ -210,7 +212,7 @@ class ValidatorLoop:
             await asyncio.gather(
                 self.maintain_request_pool(),
                 self.run_periodic_tasks(),
-                self.process_responses_worker(),
+                # self.process_responses_worker(),
             )
         except KeyboardInterrupt:
             self._should_run = False
@@ -228,7 +230,14 @@ class ValidatorLoop:
                 self.thread_pool,
                 lambda: query_single_axon(self.config.dendrite, request),
             )
-            return response
+            response = await response
+            processed_response = await asyncio.get_event_loop().run_in_executor(
+                self.response_thread_pool,
+                self.response_processor.process_single_response,
+                response,
+            )
+            if processed_response:
+                await self._handle_response(processed_response)
         except Exception as e:
             bt.logging.error(f"Error processing request for UID {request.uid}: {e}")
             traceback.print_exc()
@@ -241,8 +250,10 @@ class ValidatorLoop:
                 response = await self.response_queue.get()
                 if asyncio.iscoroutine(response):
                     response = await response
-                processed_response = self.response_processor.process_single_response(
-                    response
+                processed_response = await asyncio.get_event_loop().run_in_executor(
+                    self.response_thread_pool,
+                    self.response_processor.process_single_response,
+                    response,
                 )
                 if processed_response:
                     await self._handle_response(processed_response)
