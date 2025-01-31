@@ -30,6 +30,9 @@ from _validator.utils.axon import query_single_axon
 from _validator.models.request_type import RequestType
 from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
+from utils import AutoUpdate, clean_temp_files, with_rate_limit
+from utils.gc_logging import log_responses as gc_log_responses
+from _validator.utils.logging import log_responses as console_log_responses
 from constants import (
     LOOP_DELAY_SECONDS,
     EXCEPTION_DELAY_SECONDS,
@@ -38,7 +41,6 @@ from constants import (
     FIVE_MINUTES,
     ONE_HOUR,
 )
-from utils import AutoUpdate, clean_temp_files, with_rate_limit
 
 
 class ValidatorLoop:
@@ -79,10 +81,10 @@ class ValidatorLoop:
         )
 
         self.request_queue = asyncio.Queue()
-        self.response_queue = asyncio.Queue()
         self.active_tasks: dict[int, asyncio.Task] = {}
         self.processed_uids: set[int] = set()
         self.queryable_uids: list[int] = []
+        self.last_response_time = time.time()
 
         self._should_run = True
 
@@ -90,6 +92,8 @@ class ValidatorLoop:
         self.response_thread_pool = concurrent.futures.ThreadPoolExecutor(
             max_workers=16
         )
+
+        self.recent_responses: list[MinerResponse] = []
 
         if self.config.bt_config.prometheus_monitoring:
             start_prometheus_logging(self.config.bt_config.prometheus_port)
@@ -127,14 +131,11 @@ class ValidatorLoop:
         bt.logging.info(
             f"In-flight requests: {len(self.active_tasks)} / {MAX_CONCURRENT_REQUESTS}"
         )
-        bt.logging.info(
-            f"Response queue size: {self.response_queue.qsize()} tasks pending processing"
-        )
         bt.logging.debug(f"Processed UIDs: {len(self.processed_uids)}")
         bt.logging.debug(f"Queryable UIDs: {len(self.queryable_uids)}")
 
         log_system_metrics()
-        queue_size = self.response_queue.qsize()
+        queue_size = self.request_queue.qsize()
         est_latency = (
             queue_size * (LOOP_DELAY_SECONDS / MAX_CONCURRENT_REQUESTS)
             if queue_size > 0
@@ -145,6 +146,39 @@ class ValidatorLoop:
     def update_processed_uids(self):
         if len(self.processed_uids) >= len(self.queryable_uids):
             self.processed_uids.clear()
+
+    @with_rate_limit(period=ONE_MINUTE)
+    async def log_responses(self):
+        if self.recent_responses:
+            console_log_responses(self.recent_responses)
+
+            try:
+                block = (
+                    self.config.metagraph.block.item()
+                    if self.config.metagraph.block is not None
+                    else 0
+                )
+                _ = await asyncio.get_event_loop().run_in_executor(
+                    self.thread_pool,
+                    lambda: gc_log_responses(
+                        self.config.metagraph,
+                        self.config.wallet.hotkey,
+                        self.config.user_uid,
+                        self.recent_responses,
+                        (
+                            time.time() - self.last_response_time
+                            if hasattr(self, "last_response_time")
+                            else 0
+                        ),
+                        block,
+                        self.score_manager.scores,
+                    ),
+                )
+            except Exception as e:
+                bt.logging.error(f"Error in GC logging: {e}")
+
+            self.last_response_time = time.time()
+            self.recent_responses = []
 
     async def maintain_request_pool(self):
         while True:
@@ -195,9 +229,11 @@ class ValidatorLoop:
                 self.update_queryable_uids()
                 self.update_processed_uids()
                 self.log_health()
+                await self.log_responses()
                 await asyncio.sleep(LOOP_DELAY_SECONDS)
             except Exception as e:
                 bt.logging.error(f"Error in periodic tasks: {e}")
+                traceback.print_exc()
                 await asyncio.sleep(EXCEPTION_DELAY_SECONDS)
 
     async def run(self) -> NoReturn:
@@ -212,7 +248,6 @@ class ValidatorLoop:
             await asyncio.gather(
                 self.maintain_request_pool(),
                 self.run_periodic_tasks(),
-                # self.process_responses_worker(),
             )
         except KeyboardInterrupt:
             self._should_run = False
@@ -244,25 +279,6 @@ class ValidatorLoop:
             log_error("request_processing", "axon_query", str(e))
         return request
 
-    async def process_responses_worker(self):
-        while self._should_run:
-            try:
-                response = await self.response_queue.get()
-                if asyncio.iscoroutine(response):
-                    response = await response
-                processed_response = await asyncio.get_event_loop().run_in_executor(
-                    self.response_thread_pool,
-                    self.response_processor.process_single_response,
-                    response,
-                )
-                if processed_response:
-                    await self._handle_response(processed_response)
-                self.response_queue.task_done()
-            except Exception as e:
-                bt.logging.error(f"Error in response worker: {e}")
-                traceback.print_exc()
-                await asyncio.sleep(EXCEPTION_DELAY_SECONDS)
-
     async def _handle_response(self, response: MinerResponse) -> None:
         """
         Handle a processed response, updating scores and weights as needed.
@@ -272,6 +288,7 @@ class ValidatorLoop:
         """
         try:
             request_hash = response.input_hash
+            self.recent_responses.append(response)
             if response.request_type == RequestType.RWR:
                 if response.verification_result:
                     self.api.set_request_result(
