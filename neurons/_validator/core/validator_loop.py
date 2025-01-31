@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import random
 import sys
 import traceback
 import time
@@ -78,8 +77,8 @@ class ValidatorLoop:
             self.config, self.score_manager, self.api
         )
 
-        self.request_queue = asyncio.Queue()
-        self.active_requests: dict[int, asyncio.Task] = {}
+        self.request_pool = asyncio.Queue()
+        self.active_tasks: dict[int, asyncio.Task] = {}
         self.processed_uids: set[int] = set()
         self.queryable_uids: list[int] = []
 
@@ -120,14 +119,14 @@ class ValidatorLoop:
     @with_rate_limit(period=ONE_MINUTE / 4)
     def log_health(self):
         bt.logging.info(
-            f"In-flight requests: {len(self.active_requests)} / {MAX_CONCURRENT_REQUESTS}"
+            f"In-flight requests: {len(self.active_tasks)} / {MAX_CONCURRENT_REQUESTS}"
         )
         bt.logging.debug(f"Processed UIDs: {len(self.processed_uids)}")
         bt.logging.debug(f"Queryable UIDs: {len(self.queryable_uids)}")
 
         log_system_metrics()
-        if hasattr(self, "request_queue"):
-            queue_size = self.request_queue.qsize()
+        if hasattr(self, "request_pool"):
+            queue_size = self.request_pool.qsize()
             # Estimate latency based on queue size and processing rate
             est_latency = (
                 queue_size * (LOOP_DELAY_SECONDS / MAX_CONCURRENT_REQUESTS)
@@ -140,48 +139,49 @@ class ValidatorLoop:
         if len(self.processed_uids) >= len(self.queryable_uids):
             self.processed_uids.clear()
 
-    async def update_active_requests(self):
-        random.shuffle(self.queryable_uids)
-        needed_requests = MAX_CONCURRENT_REQUESTS - len(self.active_requests)
+    async def maintain_request_pool(self):
+        while True:
+            try:
+                if len(self.active_tasks) < MAX_CONCURRENT_REQUESTS:
+                    available_uids = [
+                        uid
+                        for uid in self.queryable_uids
+                        if uid not in self.processed_uids
+                        and uid not in self.active_tasks
+                    ]
 
-        if needed_requests > 0:
-            available_uids = [
-                uid
-                for uid in self.queryable_uids
-                if uid not in self.processed_uids and uid not in self.active_requests
-            ]
+                    if available_uids:
+                        uid = available_uids[0]
+                        request = self.request_pipeline.prepare_single_request(uid)
 
-            if not available_uids:
-                self.processed_uids.clear()
-                return
+                        if request:
+                            task = asyncio.create_task(
+                                self._process_single_request(request)
+                            )
+                            self.active_tasks[uid] = task
 
-            uid = available_uids[0]
-            request = self.request_pipeline.prepare_single_request(uid)
-            if request:
-                task = asyncio.create_task(self._process_single_request(request))
+                            task.add_done_callback(
+                                lambda t, uid=uid: self._handle_completed_task(t, uid)
+                            )
 
-                def done_callback(completed_task):
-                    try:
-                        uid, response = completed_task.result()
-                        self.processed_uids.add(uid)
-                        if response is not None:
-                            asyncio.create_task(self._handle_response(response))
-                        del self.active_requests[uid]
-                    except Exception as e:
-                        bt.logging.error(f"Error in callback for UID {uid}: {e}")
+                await asyncio.sleep(0.1)  # Small delay to prevent CPU thrashing
+            except Exception as e:
+                bt.logging.error(f"Error maintaining request pool: {e}")
+                await asyncio.sleep(1)  # Longer delay on error
 
-                task.add_done_callback(done_callback)
-                self.active_requests[uid] = task
+    def _handle_completed_task(self, task: asyncio.Task, uid: int):
+        try:
+            uid, response = task.result()
+            self.processed_uids.add(uid)
+            if response is not None:
+                asyncio.create_task(self._handle_response(response))
+        except Exception as e:
+            bt.logging.error(f"Error in task for UID {uid}: {e}")
+        finally:
+            if uid in self.active_tasks:
+                del self.active_tasks[uid]
 
-    async def run(self) -> NoReturn:
-        """
-        Run the main validator loop indefinitely.
-        """
-        bt.logging.success(
-            f"Validator started on subnet {self.config.subnet_uid} using UID {self.config.user_uid}"
-        )
-        bt.logging.debug("Initializing request loop")
-
+    async def run_periodic_tasks(self):
         while True:
             try:
                 self.check_auto_update()
@@ -191,16 +191,28 @@ class ValidatorLoop:
                 self.update_queryable_uids()
                 self.update_processed_uids()
                 self.log_health()
-                await self.update_active_requests()
                 await asyncio.sleep(LOOP_DELAY_SECONDS)
-
-            except KeyboardInterrupt:
-                self._handle_keyboard_interrupt()
             except Exception as e:
-                bt.logging.error(
-                    f"Error in validator loop \n {e} \n {traceback.format_exc()}"
-                )
+                bt.logging.error(f"Error in periodic tasks: {e}")
                 await asyncio.sleep(EXCEPTION_DELAY_SECONDS)
+
+    async def run(self) -> NoReturn:
+        """
+        Run the main validator loop indefinitely.
+        """
+        bt.logging.success(
+            f"Validator started on subnet {self.config.subnet_uid} using UID {self.config.user_uid}"
+        )
+
+        try:
+            await asyncio.gather(
+                self.maintain_request_pool(), self.run_periodic_tasks()
+            )
+        except KeyboardInterrupt:
+            self._handle_keyboard_interrupt()
+        except Exception as e:
+            bt.logging.error(f"Fatal error in validator loop: {e}")
+            raise
 
     async def _process_single_request(
         self, request: Request
