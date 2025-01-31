@@ -163,6 +163,63 @@ class ValidatorAPI:
                 traceback.print_exc()
                 return Error(9, "Request processing failed", str(e))
 
+        @method(name="omron.proof_of_computation")
+        async def omron_proof_of_computation(
+            websocket: WebSocket, **params: dict[str, object]
+        ) -> dict[str, object]:
+            input_json = params.get("input")
+            circuit_hash = params.get("circuit")
+
+            if not input_json:
+                return InvalidParams("Missing input to the circuit")
+
+            if not circuit_hash:
+                return InvalidParams("Missing circuit hash")
+
+            try:
+                try:
+                    external_request = ProofOfComputationRPCRequest(
+                        circuit_name=circuit_hash,
+                        inputs=input_json,
+                    )
+                except ValueError as e:
+                    return InvalidParams(str(e))
+
+                self.pending_requests[external_request.hash] = asyncio.Event()
+                self.external_requests_queue.insert(0, external_request)
+                bt.logging.success(
+                    f"External request with hash {external_request.hash} added to queue"
+                )
+                try:
+                    await asyncio.wait_for(
+                        self.pending_requests[external_request.hash].wait(),
+                        timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS
+                        + EXTERNAL_REQUEST_QUEUE_TIME_SECONDS,
+                    )
+                    result = self.request_results.pop(external_request.hash, None)
+
+                    if result["success"]:
+                        bt.logging.success(
+                            f"External request with hash {external_request.hash} processed successfully"
+                        )
+                        return Success(result)
+                    bt.logging.error(
+                        f"External request with hash {external_request.hash} failed to process"
+                    )
+                    return Error(9, "Request processing failed")
+                except asyncio.TimeoutError:
+                    bt.logging.error(
+                        f"External request with hash {external_request.hash} timed out"
+                    )
+                    return Error(9, "Request processing failed", "Request timed out")
+                finally:
+                    self.pending_requests.pop(external_request.hash, None)
+
+            except Exception as e:
+                bt.logging.error(f"Error processing request: {str(e)}")
+                traceback.print_exc()
+                return Error(9, "Request processing failed", str(e))
+
     def start_server(self):
         """Start the uvicorn server in a separate thread"""
         self.server_thread = threading.Thread(
