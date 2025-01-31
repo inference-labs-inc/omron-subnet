@@ -31,7 +31,7 @@ from _validator.models.request_type import RequestType
 from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
 from utils import AutoUpdate, clean_temp_files, with_rate_limit
-from neurons.utils.gc_logging import log_responses as gc_log_responses
+from utils.gc_logging import log_responses as gc_log_responses
 from _validator.utils.logging import log_responses as console_log_responses
 from constants import (
     LOOP_DELAY_SECONDS,
