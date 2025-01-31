@@ -230,6 +230,7 @@ class ValidatorLoop:
                 self.thread_pool,
                 lambda: query_single_axon(self.config.dendrite, request),
             )
+            response = await response
             processed_response = await asyncio.get_event_loop().run_in_executor(
                 self.response_thread_pool,
                 self.response_processor.process_single_response,
