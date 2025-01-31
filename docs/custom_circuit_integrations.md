@@ -73,17 +73,18 @@ There are three primary functions which must be implemented.
 
 This file is responsible for describing the circuit's properties, and contains both optional and required fields.
 
-| Field             | Type            | Description                                                                          | Required |
-| ----------------- | --------------- | ------------------------------------------------------------------------------------ | -------- |
-| `name`            | `string`        | The name of the circuit.                                                             | ✅       |
-| `description`     | `string`        | A short description of the circuit.                                                  | ✅       |
-| `author`          | `string`        | The author of the circuit.                                                           | ✅       |
-| `version`         | `string`        | The version of the circuit.                                                          | ✅       |
-| `proof_system`    | [`ProofSystem`] | The proof system used by the circuit.                                                | ✅       |
-| `type`            | [`CircuitType`] | The type of circuit. New circuits should use `PROOF_OF_COMPUTATION` by default       | ✅       |
-| `external_files`  | `dict`          | A dictionary of external files required by the circuit.                              | ✅       |
-| `netuid`          | `int`           | For Proof of Weights, the netuid of the target subnet.                               | ❌       |
-| `weights_version` | `int`           | For Proof of Weights, the version of subnet weights that the circuit corresponds to. | ❌       |
+| Field                     | Type            | Description                                                                          | Required |
+| ------------------------- | --------------- | ------------------------------------------------------------------------------------ | -------- |
+| `name`                    | `string`        | The name of the circuit.                                                             | ✅       |
+| `description`             | `string`        | A short description of the circuit.                                                  | ✅       |
+| `author`                  | `string`        | The author of the circuit.                                                           | ✅       |
+| `version`                 | `string`        | The version of the circuit.                                                          | ✅       |
+| `proof_system`            | [`ProofSystem`] | The proof system used by the circuit.                                                | ✅       |
+| `type`                    | [`CircuitType`] | The type of circuit. New circuits should use `PROOF_OF_COMPUTATION` by default       | ✅       |
+| `external_files`           | `dict`          | A dictionary of external files required by the circuit.                               | ✅       |
+| `netuid`                  | `int`           | For Proof of Weights, the netuid of the target subnet.                               | ❌       |
+| `weights_version`         | `int`           | For Proof of Weights, the version of subnet weights that the circuit corresponds to. | ❌       |
+| `benchmark_choice_weight` | `float`          | The probability of the circuit being selected for benchmark request.                 | ❌       |
 
 [See it's class definition here for more information](https://github.com/inference-labs-inc/omron-subnet/blob/main/neurons/execution_layer/circuit.py#L100)
 
@@ -120,7 +121,7 @@ Ensure all the following files are copied into this directory or are listed in t
 
 ### Adding benchmark requests
 
-The last step after adding your circuit is to add an allocation of benchmark requests to the circuit. This is done through a modification to the `neurons/constants.py` file. In the `CIRCUIT_WEIGHTS` dictionary, add a new key-value pair where the key is the `SHA256` hash of the circuit's verification key, and the value is the percentage of requests that should be allocated to the circuit. Percentages should be between 0 and 1 and do not need to sum to 1. A reasonable starting point is 0.20 for each circuit. The omron team will adjust these weights as necessary to ensure a healthy distribution of requests across all circuits.
+The last step after adding your circuit is to add an allocation of benchmark requests to the circuit. This is done through a modification to the circuit `metadata.json` file. The `benchmark_choice_weight` value is the percentage of requests that should be allocated to the circuit. Percentages should be between 0 and 1 and sum of them for all models do not need to be equal to 1. A reasonable starting point is 0.20 for each circuit. The omron team will adjust these weights as necessary to ensure a healthy distribution of requests across all circuits.
 
 A higher percentage will result in more requests being allocated to the circuit, increasing the circuit's optimization pressure.
 
@@ -129,9 +130,8 @@ A higher percentage will result in more requests being allocated to the circuit,
 To update an existing circuit:
 
 1. Follow the same steps as adding a new circuit, which will result in a new verification key hash
-2. In the `CIRCUIT_WEIGHTS` dictionary, set the old circuit's allocation to 0.0
-3. Add the new circuit with the desired benchmark allocation
-4. Open a PR with these changes
+2. Add the new circuit with the desired benchmark allocation
+3. Open a PR with these changes
 
 ## Querying a circuit
 

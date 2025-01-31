@@ -1,21 +1,40 @@
 import argparse
 import os
+import sys
 from typing import Optional
-
-import bittensor as bt
 
 from constants import (
     ONCHAIN_PROOF_OF_WEIGHTS_ENABLED,
     PROOF_OF_WEIGHTS_INTERVAL,
+    TEMP_FOLDER,
     Roles,
-    COMPETITION_SYNC_INTERVAL,
 )
+
+SHOW_HELP = False
+
+# Intercept --help/-h flags before importing bittensor since it overrides help behavior
+# This allows showing our custom help message instead of bittensor's default one
+if "--help" in sys.argv:
+    SHOW_HELP = True
+    sys.argv.remove("--help")
+elif "-h" in sys.argv:
+    SHOW_HELP = True
+    sys.argv.remove("-h")
+
+# flake8: noqa
+import bittensor as bt
 
 parser: Optional[argparse.ArgumentParser]
 config: Optional[bt.config]
 
 
-def init_config(role: Optional[str]):
+DESCRIPTION = {
+    Roles.MINER: "Omron Miner. Starts a Bittensor node that mines on the Omron subnet.",
+    Roles.VALIDATOR: "Omron Validator. Starts a Bittensor node that validates on the Omron subnet.",
+}
+
+
+def init_config(role: Optional[str] = None):
     """
     Initialize the configuration for the node.
     Config is based on CLI arguments, some of which are common to both miner and validator,
@@ -27,7 +46,14 @@ def init_config(role: Optional[str]):
     global parser
     global config
 
-    parser = argparse.ArgumentParser()
+    if not os.path.exists(TEMP_FOLDER):
+        os.makedirs(TEMP_FOLDER)
+
+    parser = argparse.ArgumentParser(
+        description=DESCRIPTION.get(role, ""),
+        epilog="For more information, visit https://omron.ai/",
+        allow_abbrev=False,
+    )
 
     # init common CLI arguments for both miner and validator:
     parser.add_argument("--netuid", type=int, default=1, help="The UID of the subnet.")
@@ -59,6 +85,12 @@ def init_config(role: Optional[str]):
         help="Whether to run the miner in localnet mode.",
     )
     parser.add_argument(
+        "--timeout",
+        default=120,
+        type=int,
+        help="Timeout for requests in seconds (default: 120)",
+    )
+    parser.add_argument(
         "--external-model-dir",
         default=None,
         help="Custom location for storing models data (optional)",
@@ -74,7 +106,12 @@ def init_config(role: Optional[str]):
         bt.subtensor.add_args(parser)
         bt.logging.add_args(parser)
         bt.wallet.add_args(parser)
-        config = bt.config(parser)
+        config = bt.config(parser, strict=True)
+
+    if SHOW_HELP:
+        # --help or -h flag was passed, show the help message and exit
+        parser.print_help()
+        sys.exit(0)
 
     if config.localnet:
         # quick localnet configuration set up for testing (common params for both miner and validator)
@@ -89,13 +126,12 @@ def init_config(role: Optional[str]):
         config.eth_wallet = (
             config.eth_wallet if config.eth_wallet is not None else "0x002"
         )
-        config.timeout = config.timeout if config.timeout is None else 120
         config.disable_wandb = True
         config.verbose = config.verbose if config.verbose is None else True
         config.max_workers = config.max_workers or 1
 
     config.full_path = os.path.expanduser("~/.bittensor/omron")  # type: ignore
-    config.full_path_score = os.path.join(config.full_path, "scores")
+    config.full_path_score = os.path.join(config.full_path, "scores", "scores.pt")
     if not config.certificate_path:
         config.certificate_path = os.path.join(config.full_path, "cert")
 
@@ -106,11 +142,13 @@ def init_config(role: Optional[str]):
     else:
         config.full_path_models = os.path.join(config.full_path, "models")
 
+    if config.whitelisted_public_keys:
+        config.whitelisted_public_keys = config.whitelisted_public_keys.split(",")
+
     os.makedirs(config.full_path, exist_ok=True)
-    os.makedirs(config.full_path_score, exist_ok=True)
     os.makedirs(config.full_path_models, exist_ok=True)
     os.makedirs(config.certificate_path, exist_ok=True)
-
+    os.makedirs(os.path.dirname(config.full_path_score), exist_ok=True)
     bt.logging(config=config, logging_dir=config.logging.logging_dir)
     bt.logging.enable_info()
 
@@ -144,7 +182,7 @@ def _miner_config():
     bt.wallet.add_args(parser)
     bt.axon.add_args(parser)
 
-    config = bt.config(parser)
+    config = bt.config(parser, strict=True)
 
     if config.localnet:
         # quick localnet configuration set up for testing (specific params for miner)
@@ -218,7 +256,7 @@ def _validator_config():
     parser.add_argument(
         "--external-api-port",
         type=int,
-        default=8000,
+        default=8443,
         help="The port for the external API.",
     )
 
@@ -230,6 +268,13 @@ def _validator_config():
     )
 
     parser.add_argument(
+        "--serve-axon",
+        type=bool,
+        default=False,
+        help="Whether to serve the axon displaying your API information.",
+    )
+
+    parser.add_argument(
         "--do-not-verify-external-signatures",
         default=False,
         action="store_true",
@@ -238,6 +283,13 @@ def _validator_config():
             "By default we verify is the wallet legitimate. "
             "You can disable this check with the flag."
         ),
+    )
+
+    parser.add_argument(
+        "--whitelisted-public-keys",
+        type=str,
+        default=None,
+        help="A comma-separated list of public keys to whitelist for external requests.",
     )
 
     parser.add_argument(
@@ -268,12 +320,12 @@ def _validator_config():
     bt.logging.add_args(parser)
     bt.wallet.add_args(parser)
 
-    config = bt.config(parser)
+    config = bt.config(parser, strict=True)
 
     if config.localnet:
         # quick localnet configuration set up for testing (specific params for validator)
         if config.wallet.name == "default":
             config.wallet.name = "validator"
         config.external_api_workers = config.external_api_workers or 1
-        config.external_api_port = config.external_api_port or 8000
+        config.external_api_port = config.external_api_port or 8443
         config.do_not_verify_external_signatures = True

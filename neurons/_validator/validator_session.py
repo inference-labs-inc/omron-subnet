@@ -8,6 +8,7 @@ import cli_parser
 from _validator.config import ValidatorConfig
 from _validator.core.validator_loop import ValidatorLoop
 from utils import clean_temp_files
+import asyncio
 
 
 class ValidatorSession:
@@ -22,7 +23,7 @@ class ValidatorSession:
         bt.logging.debug("Validator session started")
 
         try:
-            self.validator_loop.run()
+            asyncio.run(self.validator_loop.run())
         except KeyboardInterrupt:
             bt.logging.info("KeyboardInterrupt caught. Exiting validator.")
             clean_temp_files()

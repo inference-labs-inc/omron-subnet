@@ -40,6 +40,7 @@ The below arguments are specific to validator software and have no effect on min
 | `--competition-sync-interval`         |    No    | `86400`   | Integer         | The interval for syncing the competition in seconds. Defaults to 86400 (1 day).                                                                                                             |
 | `--prometheus-monitoring`             |    No    | `False`   | `True`, `False` | Whether to enable sering of metrics for Prometheus monitoring.                                                                                                                              |
 | `--prometheus-port`                   |    No    | `9090`    | Integer         | The port for the Prometheus data source.                                                                                                                                                    |
+| `--serve-axon`                        |    No    | `False`   | `True`, `False` | Whether to serve the axon displaying your API information.                                                                                                                                  |
 
 ## Built-in Arguments
 

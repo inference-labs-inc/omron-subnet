@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
+import torch
 import os
 import json
 import cli_parser
@@ -8,6 +9,12 @@ from execution_layer.input_registry import InputRegistry
 
 # trunk-ignore(pylint/E0611)
 from bittensor import logging
+from constants import (
+    MAX_EVALUATION_ITEMS,
+    DEFAULT_PROOF_SIZE,
+    VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+    MAXIMUM_SCORE_MEDIAN_SAMPLE,
+)
 
 
 class CircuitType(str, Enum):
@@ -86,6 +93,9 @@ class CircuitPaths:
         self.witness_executable = os.path.join(self.base_path, "witness.js")
         self.pk = os.path.join(self.external_base_path, "circuit.zkey")
         self.vk = os.path.join(self.base_path, "verification_key.json")
+        self.evaluation_data = os.path.join(
+            self.external_base_path, "evaluation_data.json"
+        )
 
     def set_proof_system_paths(self, proof_system: ProofSystem):
         """
@@ -122,6 +132,7 @@ class CircuitMetadata:
     external_files: dict[str, str]
     netuid: int | None = None
     weights_version: int | None = None
+    benchmark_choice_weight: float | None = None
 
     @classmethod
     def from_file(cls, metadata_path: str) -> CircuitMetadata:
@@ -137,6 +148,129 @@ class CircuitMetadata:
         with open(metadata_path, "r", encoding="utf-8") as f:
             metadata = json.load(f)
         return cls(**metadata)
+
+
+@dataclass
+class CircuitEvaluationItem:
+    """
+    Data collected from the evaluation of the circuit.
+    """
+
+    circuit_id: str = field(default="")
+    uid: int = field(default=0)
+    minimum_response_time: float = field(default=0.0)
+    maximum_response_time: float = field(default=VALIDATOR_REQUEST_TIMEOUT_SECONDS)
+    proof_size: int = field(default=DEFAULT_PROOF_SIZE)
+    response_time: float = field(default=0.0)
+    score: float = field(default=0.0)
+    verification_result: bool = field(default=False)
+
+    def to_dict(self) -> dict:
+        """Convert the evaluation item to a dictionary for JSON serialization."""
+        return {
+            "circuit_id": str(self.circuit_id),
+            "uid": int(self.uid),
+            "minimum_response_time": float(self.minimum_response_time),
+            "maximum_response_time": float(self.maximum_response_time),
+            "proof_size": int(self.proof_size),
+            "response_time": float(self.response_time),
+            "score": float(self.score),
+            "verification_result": bool(self.verification_result),
+        }
+
+
+class CircuitEvaluationData:
+    """
+    Data collected from the evaluation of the circuit.
+    """
+
+    def __init__(self, model_id: str, evaluation_store_path: str):
+        self.model_id = model_id
+        self.store_path = evaluation_store_path
+        self.data: list[CircuitEvaluationItem] = []
+
+        os.makedirs(os.path.dirname(evaluation_store_path), exist_ok=True)
+
+        try:
+            if os.path.exists(evaluation_store_path):
+                with open(evaluation_store_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    self.data = [CircuitEvaluationItem(**item) for item in data]
+        except Exception as e:
+            logging.error(
+                f"Failed to load evaluation data for model {model_id}, starting fresh: {e}"
+            )
+            self.data = []
+
+        if not self.data:
+            with open(evaluation_store_path, "w", encoding="utf-8") as f:
+                json.dump([], f)
+
+    def update(self, item: CircuitEvaluationItem):
+        """Update evaluation data, maintaining size limit."""
+        for i, existing_item in enumerate(self.data):
+            if existing_item.uid == item.uid:
+                self.data[i] = item
+                break
+        else:
+            self.data.append(item)
+
+        if len(self.data) > MAX_EVALUATION_ITEMS:
+            self.data = self.data[-MAX_EVALUATION_ITEMS:]
+
+        try:
+            with open(self.store_path, "w", encoding="utf-8") as f:
+                json.dump([item.to_dict() for item in self.data], f)
+        except Exception as e:
+            logging.error(f"Failed to save evaluation data: {e}")
+
+    @property
+    def verification_ratio(self) -> float:
+        """Get the ratio of successful verifications from recent evaluation data."""
+        if not self.data:
+            return 0.0
+
+        successful = sum(1 for item in self.data if item.verification_result)
+        return successful / len(self.data)
+
+    def get_successful_response_times(self) -> list[float]:
+        if not self.data:
+            return []
+
+        return sorted(
+            r.response_time
+            for r in self.data
+            if r.verification_result and r.response_time > 0
+        )
+
+    @property
+    def minimum_response_time(self) -> float:
+        response_times = self.get_successful_response_times()
+
+        if not response_times or len(response_times) in [0, 1]:
+            return 0.0
+
+        return torch.clamp(
+            torch.min(torch.tensor(response_times)),
+            0,
+            VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+        ).item()
+
+    @property
+    def maximum_response_time(self) -> float:
+        """Get maximum response time from evaluation data."""
+
+        response_times = self.get_successful_response_times()
+        if not response_times or len(response_times) in [0, 1]:
+            return VALIDATOR_REQUEST_TIMEOUT_SECONDS
+
+        sample_size = max(int(len(response_times) * MAXIMUM_SCORE_MEDIAN_SAMPLE), 1)
+
+        return torch.clamp(
+            torch.median(torch.tensor(response_times[-sample_size:])),
+            0,
+            VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+        ).item()
 
 
 class Circuit:
@@ -157,6 +291,9 @@ class Circuit:
         self.proof_system = ProofSystem[self.metadata.proof_system]
         self.paths.set_proof_system_paths(self.proof_system)
         self.settings = {}
+        self.evaluation_data = CircuitEvaluationData(
+            model_id, self.paths.evaluation_data
+        )
         try:
             with open(self.paths.settings, "r", encoding="utf-8") as f:
                 self.settings = json.load(f)

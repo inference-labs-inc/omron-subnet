@@ -7,6 +7,7 @@ import time
 import traceback
 from functools import partial
 from typing import Optional
+from constants import FIVE_MINUTES
 
 # trunk-ignore(pylint/E0611)
 import bittensor as bt
@@ -47,7 +48,6 @@ def run_shared_preflight_checks(role: Optional[str] = None):
     """
 
     preflight_checks = [
-        ("Init configs", partial(cli_parser.init_config, role=role)),
         ("Resolve legacy folders", partial(resolve_legacy_folders, role=role)),
         ("Syncing model files", sync_model_files),
         ("Ensuring Node.js version", ensure_nodejs_version),
@@ -234,7 +234,9 @@ def sync_model_files():
 
             bt.logging.info(SYNC_LOG_PREFIX + f"Downloading {url} to {file_path}...")
             try:
-                with requests.get(url, timeout=600, stream=True) as response:
+                with requests.get(
+                    url, timeout=FIVE_MINUTES * 2, stream=True
+                ) as response:
                     response.raise_for_status()
                     with open(file_path, "wb") as f:
                         for chunk in response.iter_content(chunk_size=8192):
@@ -578,8 +580,9 @@ def resolve_legacy_folders(role: str):
 
     _move_files(
         os.path.join(legacy_full_path, role),
-        cli_parser.config.full_path_score,
+        cli_parser.config.full_path,
     )
+
     _move_files(
         os.path.join(legacy_full_path, "deployment_layer"),
         cli_parser.config.full_path_models,
@@ -588,7 +591,7 @@ def resolve_legacy_folders(role: str):
 
 def _move_files(src: str, dst: str):
     """
-    Move files recurcively from source to destination.
+    Move files recursively from source to destination.
     """
     if not os.path.exists(src) or not any(os.scandir(src)) or any(os.scandir(dst)):
         # if source does not exist or is empty, or destination is not empty -> skip
