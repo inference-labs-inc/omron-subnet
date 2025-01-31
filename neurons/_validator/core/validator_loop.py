@@ -143,7 +143,8 @@ class ValidatorLoop:
     async def maintain_request_pool(self):
         while True:
             try:
-                if len(self.active_tasks) < MAX_CONCURRENT_REQUESTS:
+                slots_available = MAX_CONCURRENT_REQUESTS - len(self.active_tasks)
+                if slots_available > 0:
                     available_uids = [
                         uid
                         for uid in self.queryable_uids
@@ -151,16 +152,13 @@ class ValidatorLoop:
                         and uid not in self.active_tasks
                     ]
 
-                    if available_uids:
-                        uid = available_uids[0]
+                    for uid in available_uids[:slots_available]:
                         request = self.request_pipeline.prepare_single_request(uid)
-
                         if request:
                             task = asyncio.create_task(
                                 self._process_single_request(request)
                             )
                             self.active_tasks[uid] = task
-
                             task.add_done_callback(
                                 lambda t, uid=uid: self._handle_completed_task(t, uid)
                             )
