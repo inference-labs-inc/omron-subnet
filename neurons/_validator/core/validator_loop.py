@@ -173,7 +173,7 @@ class ValidatorLoop:
     def _handle_completed_task(self, task: asyncio.Task, uid: int):
         try:
             response = task.result()
-            self.processed_uids.add(response.uid)
+            self.processed_uids.add(uid)
             self.response_queue.put_nowait(response)
         except Exception as e:
             bt.logging.error(f"Error in task for UID {uid}: {e}")
