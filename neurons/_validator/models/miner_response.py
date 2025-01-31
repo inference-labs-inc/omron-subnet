@@ -175,7 +175,7 @@ class MinerResponse:
             "response_duration": self.response_time,
             "is_verified": self.verification_result,
             "input_hash": self.input_hash,
-            "request_type": self.request_type,
+            "request_type": self.request_type.value,
             "error": self.error,
             "save": self.save,
         }
