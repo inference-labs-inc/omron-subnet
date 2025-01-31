@@ -32,8 +32,8 @@ IGNORED_MODEL_HASHES = [
 
 # The maximum timespan allowed for miners to respond to a query
 VALIDATOR_REQUEST_TIMEOUT_SECONDS = 120
-# The timeout for aggregation requests
-VALIDATOR_AGG_REQUEST_TIMEOUT_SECONDS = 600
+# An additional queueing time for external requests
+EXTERNAL_REQUEST_QUEUE_TIME_SECONDS = 10
 # Maximum number of concurrent requests that the validator will handle
 MAX_CONCURRENT_REQUESTS = 16
 # Default proof size when we're unable to determine the actual size
@@ -46,8 +46,10 @@ MINIMUM_SCORE_SHIFT = 0.0
 WEIGHTS_VERSION = 1652
 # Rate limit for weight updates
 WEIGHT_RATE_LIMIT: int = 100
-# Delay between requests
-REQUEST_DELAY_SECONDS = 6
+# Delay between loop iterations
+LOOP_DELAY_SECONDS = 0.1
+# Exception delay for loop
+EXCEPTION_DELAY_SECONDS = 10
 # Default maximum score
 DEFAULT_MAX_SCORE = 1 / 235
 # Default subnet UID
@@ -126,5 +128,16 @@ MAINNET_TESTNET_UIDS = [
 ]
 # GitHub repository URL
 REPO_URL = "https://github.com/inference-labs-inc/omron-subnet"
+# Various time constants in seconds
+ONE_SECOND = 1
+ONE_MINUTE = 60
+FIVE_MINUTES = ONE_MINUTE * 5
+ONE_HOUR = ONE_MINUTE * 60
+ONE_DAY = ONE_HOUR * 24
+ONE_YEAR = ONE_DAY * 365
 # Temporary folder for storing proof files
 TEMP_FOLDER = "/tmp/omron"
+
+# Queue size limits
+MAX_POW_QUEUE_SIZE = 1024
+MAX_EVALUATION_ITEMS = 1024

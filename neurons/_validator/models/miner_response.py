@@ -12,6 +12,7 @@ from constants import (
 from deployment_layer.circuit_store import circuit_store
 from _validator.core.request import Request
 from execution_layer.circuit import ProofSystem, Circuit
+from _validator.models.request_type import RequestType
 
 
 @dataclass
@@ -23,6 +24,7 @@ class MinerResponse:
         uid (int): Unique identifier of the miner.
         verification_result (bool): Whether the miner's response was verified.
         response_time (float): Time taken by the miner to respond.
+        verification_time (float): Time taken to verify the proof.
         proof_size (int): Size of the proof provided by the miner.
         circuit (Circuit): Circuit used.
         proof_content (Any): Content of the proof - either a string or a dict.
@@ -32,13 +34,17 @@ class MinerResponse:
 
     uid: int
     verification_result: bool
+    input_hash: str
     response_time: float
     proof_size: int
     circuit: Circuit
+    verification_time: float | None = None
     proof_content: dict | str | None = None
     public_json: list[str] | None = None
+    request_type: RequestType | None = None
     raw: dict | None = None
     error: str | None = None
+    save: bool = False
 
     @classmethod
     def from_raw_response(cls, response: Request) -> "MinerResponse":
@@ -109,8 +115,11 @@ class MinerResponse:
                 proof_size=proof_size,
                 circuit=response.circuit,
                 proof_content=proof_content,
+                request_type=response.request_type,
+                input_hash=response.request_hash,
                 public_json=public_json,
                 raw=deserialized_response,
+                save=response.save,
             )
         except json.JSONDecodeError as e:
             bt.logging.error(f"JSON decoding error: {e}")
@@ -133,12 +142,16 @@ class MinerResponse:
             uid=uid,
             verification_result=False,
             response_time=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+            verification_time=None,
             proof_size=DEFAULT_PROOF_SIZE,
             circuit=circuit,
             proof_content=None,
             public_json=None,
+            request_type=None,
+            input_hash=None,
             raw=None,
             error="Empty response",
+            save=False,
         )
 
     def to_log_dict(self, metagraph: bt.metagraph) -> dict:  # type: ignore
@@ -161,6 +174,10 @@ class MinerResponse:
             "proof_size": self.proof_size,
             "response_duration": self.response_time,
             "is_verified": self.verification_result,
+            "input_hash": self.input_hash,
+            "request_type": self.request_type,
+            "error": self.error,
+            "save": self.save,
         }
 
     def set_verification_result(self, result: bool):

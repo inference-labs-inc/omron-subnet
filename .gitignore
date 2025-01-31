@@ -58,6 +58,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+model_stats.png
 neurons/execution_layer/temp/*
 # Translations
 *.mo
