@@ -39,6 +39,7 @@ from constants import (
     ONE_HOUR,
 )
 from utils import AutoUpdate, clean_temp_files, with_rate_limit
+from _validator.utils.logging import log_responses
 
 
 class ValidatorLoop:
@@ -89,6 +90,8 @@ class ValidatorLoop:
         self.response_thread_pool = concurrent.futures.ThreadPoolExecutor(
             max_workers=16
         )
+
+        self.recent_responses: list[MinerResponse] = []
 
         if self.config.bt_config.prometheus_monitoring:
             start_prometheus_logging(self.config.bt_config.prometheus_port)
@@ -142,6 +145,12 @@ class ValidatorLoop:
         if len(self.processed_uids) >= len(self.queryable_uids):
             self.processed_uids.clear()
 
+    @with_rate_limit(period=ONE_MINUTE)
+    def log_pow_responses(self):
+        if self.recent_responses:
+            log_responses(self.recent_responses)
+            self.recent_responses = []
+
     async def maintain_request_pool(self):
         while True:
             try:
@@ -191,6 +200,7 @@ class ValidatorLoop:
                 self.update_queryable_uids()
                 self.update_processed_uids()
                 self.log_health()
+                self.log_pow_responses()
                 await asyncio.sleep(LOOP_DELAY_SECONDS)
             except Exception as e:
                 bt.logging.error(f"Error in periodic tasks: {e}")
@@ -248,6 +258,7 @@ class ValidatorLoop:
         """
         try:
             request_hash = response.input_hash
+            self.recent_responses.append(response)
             if response.request_type == RequestType.RWR:
                 if response.verification_result:
                     self.api.set_request_result(
