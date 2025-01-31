@@ -87,6 +87,9 @@ class ValidatorLoop:
         self._should_run = True
 
         self.thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=16)
+        self.response_thread_pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=16
+        )
 
         if self.config.bt_config.prometheus_monitoring:
             start_prometheus_logging(self.config.bt_config.prometheus_port)
@@ -123,6 +126,9 @@ class ValidatorLoop:
     def log_health(self):
         bt.logging.info(
             f"In-flight requests: {len(self.active_tasks)} / {MAX_CONCURRENT_REQUESTS}"
+        )
+        bt.logging.info(
+            f"Response queue size: {self.response_queue.qsize()} tasks pending processing"
         )
         bt.logging.debug(f"Processed UIDs: {len(self.processed_uids)}")
         bt.logging.debug(f"Queryable UIDs: {len(self.queryable_uids)}")
@@ -239,8 +245,10 @@ class ValidatorLoop:
                 response = await self.response_queue.get()
                 if asyncio.iscoroutine(response):
                     response = await response
-                processed_response = self.response_processor.process_single_response(
-                    response
+                processed_response = await asyncio.get_event_loop().run_in_executor(
+                    self.response_thread_pool,
+                    self.response_processor.process_single_response,
+                    response,
                 )
                 if processed_response:
                     await self._handle_response(processed_response)
