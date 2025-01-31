@@ -148,7 +148,7 @@ class ValidatorLoop:
             self.processed_uids.clear()
 
     @with_rate_limit(period=ONE_MINUTE)
-    async def log_pow_responses(self):
+    async def log_responses(self):
         if self.recent_responses:
             console_log_responses(self.recent_responses)
 
@@ -217,7 +217,7 @@ class ValidatorLoop:
                 self.update_queryable_uids()
                 self.update_processed_uids()
                 self.log_health()
-                await self.log_pow_responses()
+                await self.log_responses()
                 await asyncio.sleep(LOOP_DELAY_SECONDS)
             except Exception as e:
                 bt.logging.error(f"Error in periodic tasks: {e}")
