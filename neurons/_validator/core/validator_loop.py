@@ -168,6 +168,7 @@ class ValidatorLoop:
                 await asyncio.sleep(0)
             except Exception as e:
                 bt.logging.error(f"Error maintaining request pool: {e}")
+                traceback.print_exc()
                 await asyncio.sleep(EXCEPTION_DELAY_SECONDS)
 
     def _handle_completed_task(self, task: asyncio.Task, uid: int):
@@ -222,7 +223,6 @@ class ValidatorLoop:
         Process a single request and return the response.
         """
         try:
-
             response = await asyncio.get_event_loop().run_in_executor(
                 self.thread_pool,
                 lambda: query_single_axon(self.config.dendrite, request),
@@ -230,8 +230,8 @@ class ValidatorLoop:
             return response
         except Exception as e:
             bt.logging.error(f"Error processing request for UID {request.uid}: {e}")
-            log_error("request_processing", "axon_query", str(e))
             traceback.print_exc()
+            log_error("request_processing", "axon_query", str(e))
         return request
 
     async def process_responses_worker(self):
@@ -241,10 +241,12 @@ class ValidatorLoop:
                 processed_response = self.response_processor.process_single_response(
                     response
                 )
-                await self._handle_response(processed_response)
+                if processed_response:
+                    await self._handle_response(processed_response)
                 self.response_queue.task_done()
             except Exception as e:
                 bt.logging.error(f"Error in response worker: {e}")
+                traceback.print_exc()
                 await asyncio.sleep(EXCEPTION_DELAY_SECONDS)
 
     async def _handle_response(self, response: MinerResponse) -> None:
@@ -297,8 +299,8 @@ class ValidatorLoop:
 
         except Exception as e:
             bt.logging.error(f"Error handling response: {e}")
-            log_error("response_handling", "response_processor", str(e))
             traceback.print_exc()
+            log_error("response_handling", "response_processor", str(e))
 
     def _handle_auto_update(self):
         """Handle automatic updates if enabled."""
