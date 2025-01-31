@@ -224,7 +224,7 @@ class ValidatorLoop:
         except Exception as e:
             bt.logging.error(f"Error processing request for UID {request.uid}: {e}")
             log_error("request_processing", "axon_query", str(e))
-
+            traceback.print_exc()
         return request.uid, None
 
     async def _handle_response(self, response: MinerResponse) -> None:
@@ -278,6 +278,7 @@ class ValidatorLoop:
         except Exception as e:
             bt.logging.error(f"Error handling response: {e}")
             log_error("response_handling", "response_processor", str(e))
+            traceback.print_exc()
 
     def _handle_auto_update(self):
         """Handle automatic updates if enabled."""
