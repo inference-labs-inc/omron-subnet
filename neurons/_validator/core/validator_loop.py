@@ -150,10 +150,8 @@ class ValidatorLoop:
     @with_rate_limit(period=ONE_MINUTE)
     def log_pow_responses(self):
         if self.recent_responses:
-            # Log to console for visibility
             console_log_responses(self.recent_responses)
 
-            # Log to GC for metrics collection
             gc_log_responses(
                 self.config.metagraph,
                 self.config.wallet.hotkey,
@@ -223,6 +221,7 @@ class ValidatorLoop:
                 await asyncio.sleep(LOOP_DELAY_SECONDS)
             except Exception as e:
                 bt.logging.error(f"Error in periodic tasks: {e}")
+                traceback.print_exc()
                 await asyncio.sleep(EXCEPTION_DELAY_SECONDS)
 
     async def run(self) -> NoReturn:
