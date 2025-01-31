@@ -79,7 +79,6 @@ class ValidatorLoop:
         )
 
         self.request_queue = asyncio.Queue()
-        self.response_queue = asyncio.Queue()
         self.active_tasks: dict[int, asyncio.Task] = {}
         self.processed_uids: set[int] = set()
         self.queryable_uids: list[int] = []
@@ -127,14 +126,11 @@ class ValidatorLoop:
         bt.logging.info(
             f"In-flight requests: {len(self.active_tasks)} / {MAX_CONCURRENT_REQUESTS}"
         )
-        bt.logging.info(
-            f"Response queue size: {self.response_queue.qsize()} tasks pending processing"
-        )
         bt.logging.debug(f"Processed UIDs: {len(self.processed_uids)}")
         bt.logging.debug(f"Queryable UIDs: {len(self.queryable_uids)}")
 
         log_system_metrics()
-        queue_size = self.response_queue.qsize()
+        queue_size = self.request_queue.qsize()
         est_latency = (
             queue_size * (LOOP_DELAY_SECONDS / MAX_CONCURRENT_REQUESTS)
             if queue_size > 0
@@ -212,7 +208,6 @@ class ValidatorLoop:
             await asyncio.gather(
                 self.maintain_request_pool(),
                 self.run_periodic_tasks(),
-                # self.process_responses_worker(),
             )
         except KeyboardInterrupt:
             self._should_run = False
@@ -243,25 +238,6 @@ class ValidatorLoop:
             traceback.print_exc()
             log_error("request_processing", "axon_query", str(e))
         return request
-
-    async def process_responses_worker(self):
-        while self._should_run:
-            try:
-                response = await self.response_queue.get()
-                if asyncio.iscoroutine(response):
-                    response = await response
-                processed_response = await asyncio.get_event_loop().run_in_executor(
-                    self.response_thread_pool,
-                    self.response_processor.process_single_response,
-                    response,
-                )
-                if processed_response:
-                    await self._handle_response(processed_response)
-                self.response_queue.task_done()
-            except Exception as e:
-                bt.logging.error(f"Error in response worker: {e}")
-                traceback.print_exc()
-                await asyncio.sleep(EXCEPTION_DELAY_SECONDS)
 
     async def _handle_response(self, response: MinerResponse) -> None:
         """
