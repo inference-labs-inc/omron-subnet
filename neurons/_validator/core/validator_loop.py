@@ -153,7 +153,7 @@ class ValidatorLoop:
             console_log_responses(self.recent_responses)
 
             try:
-                await asyncio.get_event_loop().run_in_executor(
+                _ = await asyncio.get_event_loop().run_in_executor(
                     self.thread_pool,
                     lambda: gc_log_responses(
                         self.config.metagraph,
