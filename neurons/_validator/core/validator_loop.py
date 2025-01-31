@@ -177,9 +177,7 @@ class ValidatorLoop:
 
     def _handle_completed_task(self, task: asyncio.Task, uid: int):
         try:
-            response = task.result()
             self.processed_uids.add(uid)
-            self.response_queue.put_nowait(response)
         except Exception as e:
             bt.logging.error(f"Error in task for UID {uid}: {e}")
             traceback.print_exc()
@@ -232,7 +230,13 @@ class ValidatorLoop:
                 self.thread_pool,
                 lambda: query_single_axon(self.config.dendrite, request),
             )
-            return response
+            processed_response = await asyncio.get_event_loop().run_in_executor(
+                self.response_thread_pool,
+                self.response_processor.process_single_response,
+                response,
+            )
+            if processed_response:
+                await self._handle_response(processed_response)
         except Exception as e:
             bt.logging.error(f"Error processing request for UID {request.uid}: {e}")
             traceback.print_exc()
