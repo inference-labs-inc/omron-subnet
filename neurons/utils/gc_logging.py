@@ -21,7 +21,7 @@ retries = Retry(total=3, backoff_factor=0.1)
 session.mount("https://", HTTPAdapter(max_retries=retries))
 
 
-async def log_responses(
+def log_responses(
     metagraph: bt.metagraph,
     hotkey: bt.Keypair,
     uid: int,

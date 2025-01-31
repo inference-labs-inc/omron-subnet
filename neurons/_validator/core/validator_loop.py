@@ -153,18 +153,21 @@ class ValidatorLoop:
             console_log_responses(self.recent_responses)
 
             try:
-                await gc_log_responses(
-                    self.config.metagraph,
-                    self.config.wallet.hotkey,
-                    self.config.user_uid,
-                    self.recent_responses,
-                    (
-                        time.time() - self.last_response_time
-                        if hasattr(self, "last_response_time")
-                        else 0
+                await asyncio.get_event_loop().run_in_executor(
+                    self.thread_pool,
+                    lambda: gc_log_responses(
+                        self.config.metagraph,
+                        self.config.wallet.hotkey,
+                        self.config.user_uid,
+                        self.recent_responses,
+                        (
+                            time.time() - self.last_response_time
+                            if hasattr(self, "last_response_time")
+                            else 0
+                        ),
+                        self.config.metagraph.block.item(),
+                        self.score_manager.scores,
                     ),
-                    self.config.metagraph.block.item(),
-                    self.score_manager.scores,
                 )
             except Exception as e:
                 bt.logging.error(f"Error in GC logging: {e}")
