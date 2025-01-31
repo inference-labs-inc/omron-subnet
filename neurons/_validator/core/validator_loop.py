@@ -5,6 +5,7 @@ import sys
 import traceback
 import time
 from typing import NoReturn
+import concurrent.futures
 
 import bittensor as bt
 
@@ -77,17 +78,19 @@ class ValidatorLoop:
             self.config, self.score_manager, self.api
         )
 
-        self.request_pool = asyncio.Queue()
+        self.request_queue = asyncio.Queue()
+        self.response_queue = asyncio.Queue()
         self.active_tasks: dict[int, asyncio.Task] = {}
         self.processed_uids: set[int] = set()
         self.queryable_uids: list[int] = []
 
+        self._should_run = True
+
+        self.thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+
         if self.config.bt_config.prometheus_monitoring:
             start_prometheus_logging(self.config.bt_config.prometheus_port)
 
-    # Note that this rate limit is less than the weights rate limit
-    # This is to reduce extra subtensor calls but ensure that we check
-    # regularly with the updater
     @with_rate_limit(period=FIVE_MINUTES)
     def update_weights(self):
         start_time = time.time()
@@ -125,15 +128,13 @@ class ValidatorLoop:
         bt.logging.debug(f"Queryable UIDs: {len(self.queryable_uids)}")
 
         log_system_metrics()
-        if hasattr(self, "request_pool"):
-            queue_size = self.request_pool.qsize()
-            # Estimate latency based on queue size and processing rate
-            est_latency = (
-                queue_size * (LOOP_DELAY_SECONDS / MAX_CONCURRENT_REQUESTS)
-                if queue_size > 0
-                else 0
-            )
-            log_queue_metrics(queue_size, est_latency)
+        queue_size = self.response_queue.qsize()
+        est_latency = (
+            queue_size * (LOOP_DELAY_SECONDS / MAX_CONCURRENT_REQUESTS)
+            if queue_size > 0
+            else 0
+        )
+        log_queue_metrics(queue_size, est_latency)
 
     def update_processed_uids(self):
         if len(self.processed_uids) >= len(self.queryable_uids):
@@ -164,17 +165,16 @@ class ValidatorLoop:
                                 lambda t, uid=uid: self._handle_completed_task(t, uid)
                             )
 
-                await asyncio.sleep(0.1)  # Small delay to prevent CPU thrashing
+                await asyncio.sleep(0)
             except Exception as e:
                 bt.logging.error(f"Error maintaining request pool: {e}")
-                await asyncio.sleep(1)  # Longer delay on error
+                await asyncio.sleep(EXCEPTION_DELAY_SECONDS)
 
     def _handle_completed_task(self, task: asyncio.Task, uid: int):
         try:
-            uid, response = task.result()
-            self.processed_uids.add(uid)
-            if response is not None:
-                asyncio.create_task(self._handle_response(response))
+            response = task.result()
+            self.processed_uids.add(response.uid)
+            self.response_queue.put_nowait(response)
         except Exception as e:
             bt.logging.error(f"Error in task for UID {uid}: {e}")
         finally:
@@ -206,38 +206,46 @@ class ValidatorLoop:
 
         try:
             await asyncio.gather(
-                self.maintain_request_pool(), self.run_periodic_tasks()
+                self.maintain_request_pool(),
+                self.run_periodic_tasks(),
+                self.process_responses_worker(),
             )
         except KeyboardInterrupt:
+            self._should_run = False
             self._handle_keyboard_interrupt()
         except Exception as e:
             bt.logging.error(f"Fatal error in validator loop: {e}")
             raise
 
-    async def _process_single_request(
-        self, request: Request
-    ) -> tuple[int, MinerResponse | None]:
+    async def _process_single_request(self, request: Request) -> Request:
         """
         Process a single request and return the response.
-
-        Args:
-            request (Request): The request to process.
-
-        Returns:
-            tuple[int, MinerResponse | None]: The UID and processed response (if successful).
         """
         try:
-            response = await query_single_axon(self.config.dendrite, request)
-            if response:
-                processed_response = self.response_processor.process_single_response(
-                    response
-                )
-                return request.uid, processed_response
+
+            response = await asyncio.get_event_loop().run_in_executor(
+                self.thread_pool,
+                lambda: query_single_axon(self.config.dendrite, request),
+            )
+            return response
         except Exception as e:
             bt.logging.error(f"Error processing request for UID {request.uid}: {e}")
             log_error("request_processing", "axon_query", str(e))
             traceback.print_exc()
-        return request.uid, None
+        return request
+
+    async def process_responses_worker(self):
+        while self._should_run:
+            try:
+                response = await self.response_queue.get()
+                processed_response = self.response_processor.process_single_response(
+                    response
+                )
+                await self._handle_response(processed_response)
+                self.response_queue.task_done()
+            except Exception as e:
+                bt.logging.error(f"Error in response worker: {e}")
+                await asyncio.sleep(EXCEPTION_DELAY_SECONDS)
 
     async def _handle_response(self, response: MinerResponse) -> None:
         """
