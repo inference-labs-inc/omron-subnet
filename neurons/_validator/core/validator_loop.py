@@ -212,7 +212,7 @@ class ValidatorLoop:
             await asyncio.gather(
                 self.maintain_request_pool(),
                 self.run_periodic_tasks(),
-                self.process_responses_worker(),
+                # self.process_responses_worker(),
             )
         except KeyboardInterrupt:
             self._should_run = False
