@@ -153,6 +153,11 @@ class ValidatorLoop:
             console_log_responses(self.recent_responses)
 
             try:
+                block = (
+                    self.config.metagraph.block.item()
+                    if self.config.metagraph.block is not None
+                    else 0
+                )
                 _ = await asyncio.get_event_loop().run_in_executor(
                     self.thread_pool,
                     lambda: gc_log_responses(
@@ -165,7 +170,7 @@ class ValidatorLoop:
                             if hasattr(self, "last_response_time")
                             else 0
                         ),
-                        self.config.metagraph.block.item(),
+                        block,
                         self.score_manager.scores,
                     ),
                 )
