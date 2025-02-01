@@ -173,18 +173,18 @@ class ValidatorAPI:
             websocket: WebSocket, **params: dict[str, object]
         ) -> dict[str, object]:
             input_json = params.get("input")
-            circuit_hash = params.get("circuit")
+            circuit_id = params.get("circuit")
 
             if not input_json:
                 return InvalidParams("Missing input to the circuit")
 
-            if not circuit_hash:
-                return InvalidParams("Missing circuit hash")
+            if not circuit_id:
+                return InvalidParams("Missing circuit id")
 
             try:
                 try:
                     external_request = ProofOfComputationRPCRequest(
-                        circuit_name=circuit_hash,
+                        circuit_id=circuit_id,
                         inputs=input_json,
                     )
                 except ValueError as e:
