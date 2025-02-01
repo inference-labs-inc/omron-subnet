@@ -49,6 +49,12 @@ case "$(uname)" in
 
         brew link --force "python@${PYTHON_VERSION}"
         brew link --force "node@${NODE_VERSION}"
+
+        npm config set cafile /etc/ssl/cert.pem
+
+        if [ -d "$HOME/.npm" ]; then
+            sudo chown -R $(whoami):$(id -g) "$HOME/.npm"
+        fi
         ;;
 
     "Linux")
@@ -92,6 +98,8 @@ for pkg in "${NPM_PACKAGES[@]}"; do
 done
 
 curl -LsSf https://astral.sh/uv/install.sh | sh
+
+source "$HOME/.local/bin/env"
 
 echo "Installing Python packages with UV..."
 uv venv "${INSTALL_PATH}/venv"
