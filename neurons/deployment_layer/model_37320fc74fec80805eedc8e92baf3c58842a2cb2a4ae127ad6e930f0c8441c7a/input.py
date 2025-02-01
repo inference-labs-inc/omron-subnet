@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from execution_layer.base_input import BaseInput
 from execution_layer.input_registry import InputRegistry
 from _validator.models.request_type import RequestType
+from constants import ONE_MINUTE
 import random
 import secrets
 
@@ -46,7 +47,7 @@ class CircuitInput(BaseInput):
         }
 
         data["minimum_response_time"] = [
-            random.random() * 60 for _ in range(BATCH_SIZE)
+            random.random() * ONE_MINUTE for _ in range(BATCH_SIZE)
         ]
         data["maximum_response_time"] = [
             min_time + 1 + random.random() for min_time in data["minimum_response_time"]

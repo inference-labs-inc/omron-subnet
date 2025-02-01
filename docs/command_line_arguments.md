@@ -40,6 +40,7 @@ The below arguments are specific to validator software and have no effect on min
 | `--prometheus-monitoring`             |    No    | `False`   | `True`, `False` | Whether to enable sering of metrics for Prometheus monitoring.                                                                                                                              |
 | `--prometheus-port`                   |    No    | `9090`    | Integer         | The port for the Prometheus data source.                                                                                                                                                    |
 | `--use-rapidsnark`                    |    No    | `False`   | Boolean         | Use rapidsnark for verifying Circom proofs.                                                                                                                                                 |
+| `--serve-axon`                        |    No    | `False`   | `True`, `False` | Whether to serve the axon displaying your API information.                                                                                                                                  |
 
 ## Built-in Arguments
 

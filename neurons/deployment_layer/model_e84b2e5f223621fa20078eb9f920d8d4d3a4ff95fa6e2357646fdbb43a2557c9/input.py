@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from execution_layer.base_input import BaseInput
 from execution_layer.input_registry import InputRegistry
 from _validator.models.request_type import RequestType
+from constants import ONE_MINUTE
 import random
 import secrets
 
@@ -52,10 +53,10 @@ class CircuitInput(BaseInput):
     @staticmethod
     def generate() -> dict[str, object]:
 
-        minimum_response_time = int(random.random() * 60 * SCALING)
+        minimum_response_time = int(random.random() * ONE_MINUTE * SCALING)
 
         maximum_response_time = minimum_response_time + int(
-            random.random() * 60 * SCALING
+            random.random() * ONE_MINUTE * SCALING
         )
 
         response_time = (

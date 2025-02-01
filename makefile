@@ -1,7 +1,13 @@
+OS := $(shell uname)
 NETUID ?= 2
 WALLET_NAME ?= default
 WALLET_HOTKEY ?= default
 WALLET_PATH ?= $(HOME)/.bittensor
+ifeq ($(OS),Darwin)
+    PUID ?= $(shell stat -f %u $(WALLET_PATH))
+else
+    PUID ?= $(shell stat -c %u $(WALLET_PATH))
+endif
 MINER_PORT ?= 8091
 VALIDATOR_PORT ?= 8443
 
@@ -30,13 +36,15 @@ validator-logs:
 
 miner:
 	@echo "Using wallet path: $(WALLET_PATH)"
+	@echo "Setting PUID to $(PUID)"
 	docker stop omron-miner || true
 	docker rm omron-miner || true
 	docker run \
 		--detach \
 		--name omron-miner \
 		-p $(MINER_PORT):8091 \
-		-v $(WALLET_PATH):/root/.bittensor \
+		-v $(WALLET_PATH):/home/ubuntu/.bittensor \
+		-e PUID=$(PUID) \
 		omron miner.py \
 		--wallet.name $(WALLET_NAME) \
 		--wallet.hotkey $(WALLET_HOTKEY) \
@@ -44,13 +52,15 @@ miner:
 
 validator:
 	@echo "Using wallet path: $(WALLET_PATH)"
+	@echo "Setting PUID to $(PUID)"
 	docker stop omron-validator || true
 	docker rm omron-validator || true
 	docker run \
 		--detach \
 		--name omron-validator \
 		-p $(VALIDATOR_PORT):8443 \
-		-v $(WALLET_PATH):/root/.bittensor \
+		-v $(WALLET_PATH):/home/ubuntu/.bittensor \
+		-e PUID=$(PUID) \
 		omron validator.py \
 		--wallet.name $(WALLET_NAME) \
 		--wallet.hotkey $(WALLET_HOTKEY) \
@@ -58,13 +68,15 @@ validator:
 
 test-miner:
 	@echo "Using wallet path: $(WALLET_PATH)"
+	@echo "Setting PUID to $(PUID)"
 	docker stop omron-miner || true
 	docker rm omron-miner || true
 	docker run \
 		--detach \
 		--name omron-miner \
 		-p $(MINER_PORT):8091 \
-		-v $(WALLET_PATH):/root/.bittensor \
+		-v $(WALLET_PATH):/home/ubuntu/.bittensor \
+		-e PUID=$(PUID) \
 		omron miner.py \
 		--wallet.name $(WALLET_NAME) \
 		--wallet.hotkey $(WALLET_HOTKEY) \
@@ -74,13 +86,15 @@ test-miner:
 
 test-validator:
 	@echo "Using wallet path: $(WALLET_PATH)"
+	@echo "Setting PUID to $(PUID)"
 	docker stop omron-validator || true
 	docker rm omron-validator || true
 	docker run \
 		--detach \
 		--name omron-validator \
 		-p $(VALIDATOR_PORT):8443 \
-		-v $(WALLET_PATH):/root/.bittensor \
+		-v $(WALLET_PATH):/home/ubuntu/.bittensor \
+		-e PUID=$(PUID) \
 		omron validator.py \
 		--wallet.name $(WALLET_NAME) \
 		--wallet.hotkey $(WALLET_HOTKEY) \

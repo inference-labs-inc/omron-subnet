@@ -6,5 +6,6 @@
     "proof_system": "JOLT",
     "netuid": 27,
     "type": "proof_of_weights",
-    "external_files": {}
+    "external_files": {},
+    "benchmark_choice_weight": 0
 }

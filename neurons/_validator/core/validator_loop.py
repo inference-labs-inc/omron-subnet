@@ -1,20 +1,24 @@
 from __future__ import annotations
 
 import asyncio
-import random
 import sys
-import time
 import traceback
+import time
 from typing import NoReturn
+import concurrent.futures
 
 import bittensor as bt
 
 from _validator.config import ValidatorConfig
 from _validator.api import ValidatorAPI
 from _validator.core.prometheus import (
-    log_validation_time,
     start_prometheus_logging,
     stop_prometheus_logging,
+    log_system_metrics,
+    log_queue_metrics,
+    log_weight_update,
+    log_score_change,
+    log_error,
 )
 from _validator.core.request import Request
 from _validator.core.request_pipeline import RequestPipeline
@@ -22,17 +26,21 @@ from _validator.core.response_processor import ResponseProcessor
 from _validator.models.miner_response import MinerResponse
 from _validator.scoring.score_manager import ScoreManager
 from _validator.scoring.weights import WeightsManager
-from _validator.utils.api import hash_inputs
-from _validator.utils.axon import query_axons
+from _validator.utils.axon import query_single_axon
 from _validator.models.request_type import RequestType
 from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
+from utils import AutoUpdate, clean_temp_files, with_rate_limit
+from utils.gc_logging import log_responses as gc_log_responses
+from _validator.utils.logging import log_responses as console_log_responses
 from constants import (
-    REQUEST_DELAY_SECONDS,
+    LOOP_DELAY_SECONDS,
+    EXCEPTION_DELAY_SECONDS,
+    MAX_CONCURRENT_REQUESTS,
+    ONE_MINUTE,
+    FIVE_MINUTES,
+    ONE_HOUR,
 )
-from execution_layer.circuit import Circuit, CircuitType
-from utils import AutoUpdate, clean_temp_files, wandb_logger
-from utils.gc_logging import log_responses as log_responses_gc
 
 
 class ValidatorLoop:
@@ -73,73 +81,258 @@ class ValidatorLoop:
             self.config, self.score_manager, self.api
         )
 
+        self.request_queue = asyncio.Queue()
+        self.active_tasks: dict[int, asyncio.Task] = {}
+        self.processed_uids: set[int] = set()
+        self.queryable_uids: list[int] = []
+        self.last_response_time = time.time()
+
+        self._should_run = True
+
+        self.thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=16)
+        self.response_thread_pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=16
+        )
+
+        self.recent_responses: list[MinerResponse] = []
+
         if self.config.bt_config.prometheus_monitoring:
             start_prometheus_logging(self.config.bt_config.prometheus_port)
 
-    def run(self) -> NoReturn:
+    @with_rate_limit(period=FIVE_MINUTES)
+    def update_weights(self):
+        start_time = time.time()
+        try:
+            self.weights_manager.update_weights(self.score_manager.scores)
+            duration = time.time() - start_time
+            log_weight_update(duration, success=True)
+        except Exception as e:
+            log_weight_update(0.0, success=False, failure_reason=str(e))
+            log_error("weight_update", "weights_manager", str(e))
+            raise
+
+    @with_rate_limit(period=ONE_HOUR)
+    def sync_scores_uids(self):
+        self.score_manager.sync_scores_uids(self.config.metagraph.uids.tolist())
+
+    @with_rate_limit(period=ONE_HOUR)
+    def sync_metagraph(self):
+        self.config.metagraph.sync(subtensor=self.config.subtensor)
+
+    @with_rate_limit(period=FIVE_MINUTES)
+    def check_auto_update(self):
+        self._handle_auto_update()
+
+    @with_rate_limit(period=FIVE_MINUTES)
+    def update_queryable_uids(self):
+        self.queryable_uids = list(get_queryable_uids(self.config.metagraph))
+
+    @with_rate_limit(period=ONE_MINUTE / 4)
+    def log_health(self):
+        bt.logging.info(
+            f"In-flight requests: {len(self.active_tasks)} / {MAX_CONCURRENT_REQUESTS}"
+        )
+        bt.logging.debug(f"Processed UIDs: {len(self.processed_uids)}")
+        bt.logging.debug(f"Queryable UIDs: {len(self.queryable_uids)}")
+
+        log_system_metrics()
+        queue_size = self.request_queue.qsize()
+        est_latency = (
+            queue_size * (LOOP_DELAY_SECONDS / MAX_CONCURRENT_REQUESTS)
+            if queue_size > 0
+            else 0
+        )
+        log_queue_metrics(queue_size, est_latency)
+
+    def update_processed_uids(self):
+        if len(self.processed_uids) >= len(self.queryable_uids):
+            self.processed_uids.clear()
+
+    @with_rate_limit(period=ONE_MINUTE)
+    async def log_responses(self):
+        if self.recent_responses:
+            console_log_responses(self.recent_responses)
+
+            try:
+                block = (
+                    self.config.metagraph.block.item()
+                    if self.config.metagraph.block is not None
+                    else 0
+                )
+                _ = await asyncio.get_event_loop().run_in_executor(
+                    self.thread_pool,
+                    lambda: gc_log_responses(
+                        self.config.metagraph,
+                        self.config.wallet.hotkey,
+                        self.config.user_uid,
+                        self.recent_responses,
+                        (
+                            time.time() - self.last_response_time
+                            if hasattr(self, "last_response_time")
+                            else 0
+                        ),
+                        block,
+                        self.score_manager.scores,
+                    ),
+                )
+            except Exception as e:
+                bt.logging.error(f"Error in GC logging: {e}")
+
+            self.last_response_time = time.time()
+            self.recent_responses = []
+
+    async def maintain_request_pool(self):
+        while True:
+            try:
+                slots_available = MAX_CONCURRENT_REQUESTS - len(self.active_tasks)
+                if slots_available > 0:
+                    available_uids = [
+                        uid
+                        for uid in self.queryable_uids
+                        if uid not in self.processed_uids
+                        and uid not in self.active_tasks
+                    ]
+
+                    for uid in available_uids[:slots_available]:
+                        request = self.request_pipeline.prepare_single_request(uid)
+                        if request:
+                            task = asyncio.create_task(
+                                self._process_single_request(request)
+                            )
+                            self.active_tasks[uid] = task
+                            task.add_done_callback(
+                                lambda t, uid=uid: self._handle_completed_task(t, uid)
+                            )
+
+                await asyncio.sleep(0)
+            except Exception as e:
+                bt.logging.error(f"Error maintaining request pool: {e}")
+                traceback.print_exc()
+                await asyncio.sleep(EXCEPTION_DELAY_SECONDS)
+
+    def _handle_completed_task(self, task: asyncio.Task, uid: int):
+        try:
+            self.processed_uids.add(uid)
+        except Exception as e:
+            bt.logging.error(f"Error in task for UID {uid}: {e}")
+            traceback.print_exc()
+        finally:
+            if uid in self.active_tasks:
+                del self.active_tasks[uid]
+
+    async def run_periodic_tasks(self):
+        while True:
+            try:
+                self.check_auto_update()
+                self.sync_metagraph()
+                self.sync_scores_uids()
+                self.update_weights()
+                self.update_queryable_uids()
+                self.update_processed_uids()
+                self.log_health()
+                await self.log_responses()
+                await asyncio.sleep(LOOP_DELAY_SECONDS)
+            except Exception as e:
+                bt.logging.error(f"Error in periodic tasks: {e}")
+                traceback.print_exc()
+                await asyncio.sleep(EXCEPTION_DELAY_SECONDS)
+
+    async def run(self) -> NoReturn:
         """
         Run the main validator loop indefinitely.
         """
-        bt.logging.debug("Validator started its running loop")
-
-        while True:
-            try:
-                self._handle_auto_update()
-                self.config.metagraph.sync(subtensor=self.config.subtensor)
-                self.run_step()
-            except KeyboardInterrupt:
-                self._handle_keyboard_interrupt()
-            except Exception as e:
-                bt.logging.error(
-                    f"Error in validator loop \n {e} \n {traceback.format_exc()}"
-                )
-            time.sleep(REQUEST_DELAY_SECONDS)
-
-    def run_step(self) -> None:
-        """
-        Execute a single step of the validation process.
-        """
-        self.score_manager.sync_scores_uids(self.config.metagraph.uids.tolist())
-
-        filtered_uids = list(get_queryable_uids(self.config.metagraph))
-
-        random.shuffle(filtered_uids)
-
-        requests: list[Request] = self.request_pipeline.prepare_requests(filtered_uids)
-
-        if len(requests) == 0:
-            bt.logging.error("No requests prepared")
-            return
-
-        bt.logging.info(
-            f"\033[92m >> Sending {len(requests)} queries for proofs to miners in the subnet \033[0m"
+        bt.logging.success(
+            f"Validator started on subnet {self.config.subnet_uid} using UID {self.config.user_uid}"
         )
 
         try:
-            start_time = time.time()
-            responses: list[MinerResponse] = self._process_requests(requests)
-            overhead_time: float = self._log_overhead_time(start_time)
-            if not self.config.bt_config.disable_statistic_logging:
-                log_responses_gc(
-                    metagraph=self.config.metagraph,
-                    hotkey=self.config.wallet.hotkey,
-                    uid=self.config.user_uid,
-                    responses=responses,
-                    overhead_time=overhead_time,
-                    block=self.config.subtensor.get_current_block(),
-                    scores=self.score_manager.scores,
-                )
-        except RuntimeError as e:
-            bt.logging.error(
-                f"A runtime error occurred in the main validator loop\n{e}"
-            )
-            traceback.print_exc()
-        except Exception as e:
-            bt.logging.error(
-                f"An error occurred in the main validator loop\n{e}\n{traceback.format_exc()}"
+            await asyncio.gather(
+                self.maintain_request_pool(),
+                self.run_periodic_tasks(),
             )
         except KeyboardInterrupt:
+            self._should_run = False
             self._handle_keyboard_interrupt()
+        except Exception as e:
+            bt.logging.error(f"Fatal error in validator loop: {e}")
+            raise
+
+    async def _process_single_request(self, request: Request) -> Request:
+        """
+        Process a single request and return the response.
+        """
+        try:
+            response = await asyncio.get_event_loop().run_in_executor(
+                self.thread_pool,
+                lambda: query_single_axon(self.config.dendrite, request),
+            )
+            response = await response
+            processed_response = await asyncio.get_event_loop().run_in_executor(
+                self.response_thread_pool,
+                self.response_processor.process_single_response,
+                response,
+            )
+            if processed_response:
+                await self._handle_response(processed_response)
+        except Exception as e:
+            bt.logging.error(f"Error processing request for UID {request.uid}: {e}")
+            traceback.print_exc()
+            log_error("request_processing", "axon_query", str(e))
+        return request
+
+    async def _handle_response(self, response: MinerResponse) -> None:
+        """
+        Handle a processed response, updating scores and weights as needed.
+
+        Args:
+            response (MinerResponse): The processed response to handle.
+        """
+        try:
+            request_hash = response.input_hash
+            self.recent_responses.append(response)
+            if response.request_type == RequestType.RWR:
+                if response.verification_result:
+                    self.api.set_request_result(
+                        request_hash,
+                        {
+                            "hash": request_hash,
+                            "public_signals": response.public_json,
+                            "proof": response.proof_content,
+                            "success": True,
+                        },
+                    )
+                else:
+                    self.api.set_request_result(
+                        request_hash,
+                        {
+                            "success": False,
+                        },
+                    )
+
+            if response.verification_result and response.save:
+                save_proof_of_weights(
+                    public_signals=[response.public_json],
+                    proof=[response.proof_content],
+                    proof_filename=request_hash,
+                )
+
+            old_score = (
+                float(self.score_manager.scores[response.uid])
+                if response.uid < len(self.score_manager.scores)
+                else 0.0
+            )
+            self.score_manager.update_single_score(response, self.queryable_uids)
+            new_score = (
+                float(self.score_manager.scores[response.uid])
+                if response.uid < len(self.score_manager.scores)
+                else 0.0
+            )
+            log_score_change(old_score, new_score)
+
+        except Exception as e:
+            bt.logging.error(f"Error handling response: {e}")
+            traceback.print_exc()
+            log_error("response_handling", "response_processor", str(e))
 
     def _handle_auto_update(self):
         """Handle automatic updates if enabled."""
@@ -147,74 +340,6 @@ class ValidatorLoop:
             self.auto_update.try_update()
         else:
             bt.logging.debug("Automatic updates are disabled, skipping version check")
-
-    def _process_requests(self, requests: list[Request]) -> list[MinerResponse]:
-        """
-        Process requests, update scores and weights.
-
-        Args:
-            requests (list): List of prepared requests.
-        """
-        loop = asyncio.get_event_loop()
-
-        responses: list[Request] = loop.run_until_complete(
-            query_axons(self.config.dendrite, requests)
-        )
-
-        processed_responses: list[MinerResponse] = (
-            self.response_processor.process_responses(responses)
-        )
-
-        circuit: Circuit = requests[0].circuit
-
-        if circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS:
-            verified_responses = [
-                r for r in processed_responses if r.verification_result
-            ]
-            if verified_responses:
-                random_verified_response = random.choice(verified_responses)
-                request_hash = requests[0].request_hash or hash_inputs(
-                    requests[0].inputs
-                )
-                save_proof_of_weights(
-                    public_signals=[random_verified_response.public_json],
-                    proof=[random_verified_response.proof_content],
-                    proof_filename=request_hash,
-                )
-
-                if requests[0].request_type == RequestType.RWR:
-                    self.api.set_request_result(
-                        request_hash,
-                        {
-                            "hash": request_hash,
-                            "public_signals": random_verified_response.public_json,
-                            "proof": random_verified_response.proof_content,
-                        },
-                    )
-
-        self.score_manager.update_scores(processed_responses)
-        self.weights_manager.update_weights(self.score_manager.scores)
-
-        return processed_responses
-
-    def _log_overhead_time(self, start_time) -> float:
-        """
-        Log the overhead time for processing.
-        This is time that the validator spent verifying proofs, updating scores and performing other tasks.
-
-        Args:
-            start_time (float): Start time of processing.
-        """
-        end_time = time.time()
-        overhead_time = end_time - start_time
-        bt.logging.info(f"Overhead time: {overhead_time} seconds")
-        wandb_logger.safe_log(
-            {
-                "overhead_time": overhead_time,
-            }
-        )
-        log_validation_time(overhead_time)
-        return overhead_time
 
     def _handle_keyboard_interrupt(self):
         """Handle keyboard interrupt by cleaning up and exiting."""
