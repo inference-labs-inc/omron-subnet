@@ -19,7 +19,12 @@ import bittensor as bt
 from _validator.models.poc_rpc_request import ProofOfComputationRPCRequest
 from _validator.models.pow_rpc_request import ProofOfWeightsRPCRequest
 import hashlib
-from constants import MAX_SIGNATURE_LIFESPAN, MAINNET_TESTNET_UIDS
+from constants import (
+    MAX_SIGNATURE_LIFESPAN,
+    MAINNET_TESTNET_UIDS,
+    VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+    EXTERNAL_REQUEST_QUEUE_TIME_SECONDS,
+)
 from _validator.config import ValidatorConfig
 import base64
 import substrateinterface
@@ -63,7 +68,7 @@ class ValidatorAPI:
 
         self.setup_rpc_methods()
         self.start_server()
-        bt.logging.success("WebSocket API server started")
+        bt.logging.success("Ready to serve external requests")
 
     def setup_rpc_methods(self) -> None:
         @self.app.websocket("/rpc")
@@ -131,11 +136,12 @@ class ValidatorAPI:
                 try:
                     await asyncio.wait_for(
                         self.pending_requests[external_request.hash].wait(),
-                        timeout=900,
+                        timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS
+                        + EXTERNAL_REQUEST_QUEUE_TIME_SECONDS,
                     )
                     result = self.request_results.pop(external_request.hash, None)
 
-                    if result:
+                    if result["success"]:
                         bt.logging.success(
                             f"External request with hash {external_request.hash} processed successfully"
                         )
@@ -175,11 +181,23 @@ class ValidatorAPI:
             daemon=True,
         )
         self.server_thread.start()
+        if not self.config.api.serve_axon:
+            return
         try:
             bt.logging.info(f"Serving axon on port {self.config.api.port}")
             axon = bt.axon(
                 wallet=self.config.wallet, external_port=self.config.api.port
             )
+            existing_axon = self.config.metagraph.axons[self.config.user_uid]
+            if (
+                existing_axon
+                and existing_axon.port == axon.external_port
+                and existing_axon.ip == axon.external_ip
+            ):
+                bt.logging.debug(
+                    f"Axon already serving on ip {axon.external_ip} and port {axon.external_port}"
+                )
+                return
             axon.serve(self.config.bt_config.netuid, self.config.subtensor)
             bt.logging.success("Axon served")
         except Exception as e:
@@ -257,7 +275,7 @@ class ValidatorAPI:
                     bt.logging.error(f"Error committing certificate hash: {str(e)}")
                     traceback.print_exc()
             else:
-                bt.logging.info("Certificate hash already committed to chain.")
+                bt.logging.debug("Certificate hash already committed to chain.")
 
     def set_request_result(self, request_hash: str, result: dict[str, any]):
         """Set the result for a pending request and signal its completion."""
