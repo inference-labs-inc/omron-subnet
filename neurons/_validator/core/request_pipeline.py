@@ -21,6 +21,7 @@ from execution_layer.circuit import Circuit, CircuitType
 from execution_layer.generic_input import GenericInput
 from protocol import ProofOfWeightsSynapse, QueryZkProof
 from utils.wandb_logger import safe_log
+from execution_layer.base_input import BaseInput
 
 
 class RequestPipeline:
@@ -143,8 +144,10 @@ class RequestPipeline:
         )[0]
 
     def format_for_query(
-        self, inputs: dict[str, object], circuit: Circuit
+        self, inputs: dict[str, object] | BaseInput, circuit: Circuit
     ) -> dict[str, object]:
+        if hasattr(inputs, "to_json"):
+            inputs = inputs.to_json()
         return {"public_inputs": inputs, "model_id": circuit.id}
 
     def get_synapse_request(
