@@ -111,14 +111,13 @@ if [[ ! -d ${INSTALL_PATH} ]]; then
     fi
 fi
 
-
-"$HOME/.local/bin/uv" venv
-source "${INSTALL_PATH}/.venv/bin/activate"
-
 cd "${INSTALL_PATH}" || {
     echo "Failed to change to ${INSTALL_PATH} directory"
     exit 1
 }
+
+"$HOME/.local/bin/uv" venv
+source ".venv/bin/activate"
 
 "$HOME/.local/bin/uv" sync --locked
 
