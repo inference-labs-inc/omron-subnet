@@ -3,6 +3,8 @@ import json
 import time
 import traceback
 from typing import Tuple, Union
+from rich.console import Console
+from rich.table import Table
 
 import bittensor as bt
 import websocket
@@ -56,20 +58,32 @@ class MinerSession:
         )
         bt.logging.info("Attached forward functions to axon")
 
-        # Serve passes the axon information to the network + netuid we are hosting on.
-        # This will auto-update if the axon port of external ip has changed.
-        bt.logging.info(
-            f"Serving axon on network: {self.subtensor.chain_endpoint} with netuid: {cli_parser.config.netuid}"
-        )
-        axon.serve(netuid=cli_parser.config.netuid, subtensor=self.subtensor)
-        bt.logging.info(
-            f"Served axon on network: {self.subtensor.chain_endpoint} with netuid: {cli_parser.config.netuid}"
-        )
-
         # Start the miner's axon, making it active on the network.
         bt.logging.info(f"Starting axon server: {axon.info()}")
         axon.start()
         bt.logging.info(f"Started axon server: {axon.info()}")
+
+        # Serve passes the axon information to the network + netuid we are hosting on.
+        # This will auto-update if the axon port of external ip has changed.
+        existing_axon = self.metagraph.axons[self.subnet_uid]
+
+        if (
+            existing_axon
+            and existing_axon.port == axon.external_port
+            and existing_axon.ip == axon.external_ip
+        ):
+            bt.logging.debug(
+                f"Axon already serving on ip {axon.external_ip} and port {axon.external_port}"
+            )
+            return
+        bt.logging.info(
+            f"Serving axon on network: {self.subtensor.chain_endpoint} with netuid: {cli_parser.config.netuid}"
+        )
+
+        axon.serve(netuid=cli_parser.config.netuid, subtensor=self.subtensor)
+        bt.logging.info(
+            f"Served axon on network: {self.subtensor.chain_endpoint} with netuid: {cli_parser.config.netuid}"
+        )
 
         self.axon = axon
 
@@ -113,16 +127,25 @@ class MinerSession:
                         self.metagraph = self.subtensor.metagraph(
                             cli_parser.config.netuid
                         )
-                        bt.logging.info(
-                            f"Step:{step} | "
-                            f"Block:{self.metagraph.block.item()} | "
-                            f"Stake:{self.metagraph.S[self.subnet_uid]} | "
-                            f"Rank:{self.metagraph.R[self.subnet_uid]} | "
-                            f"Trust:{self.metagraph.T[self.subnet_uid]} | "
-                            f"Consensus:{self.metagraph.C[self.subnet_uid]} | "
-                            f"Incentive:{self.metagraph.I[self.subnet_uid]} | "
-                            f"Emission:{self.metagraph.E[self.subnet_uid]}"
+                        table = Table(title=f"Miner Status (UID: {self.subnet_uid})")
+                        table.add_column("Block", justify="center", style="cyan")
+                        table.add_column("Stake", justify="center", style="cyan")
+                        table.add_column("Rank", justify="center", style="cyan")
+                        table.add_column("Trust", justify="center", style="cyan")
+                        table.add_column("Consensus", justify="center", style="cyan")
+                        table.add_column("Incentive", justify="center", style="cyan")
+                        table.add_column("Emission", justify="center", style="cyan")
+                        table.add_row(
+                            str(self.metagraph.block.item()),
+                            str(self.metagraph.S[self.subnet_uid]),
+                            str(self.metagraph.R[self.subnet_uid]),
+                            str(self.metagraph.T[self.subnet_uid]),
+                            str(self.metagraph.C[self.subnet_uid]),
+                            str(self.metagraph.I[self.subnet_uid]),
+                            str(self.metagraph.E[self.subnet_uid]),
                         )
+                        console = Console()
+                        console.print(table)
                     except Exception:
                         bt.logging.warning(
                             f"Failed to sync metagraph: {traceback.format_exc()}"
@@ -152,7 +175,6 @@ class MinerSession:
         else:
             # Each miner gets a unique identity (UID) in the network for differentiation.
             subnet_uid = self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
-            bt.logging.info(f"Running miner on uid: {subnet_uid}")
             self.subnet_uid = subnet_uid
 
     def configure(self):

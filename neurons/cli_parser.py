@@ -12,10 +12,8 @@ from constants import (
 
 SHOW_HELP = False
 
-### A dirty hack to show help message when running the script with --help or -h ###
-# Bittensor is the culprit of this ugly piece of code.
-# It intercepts the --help and -h flags, shows its own help message and exits the script.
-# So this should be executed before the Bittensor is first time imported.
+# Intercept --help/-h flags before importing bittensor since it overrides help behavior
+# This allows showing our custom help message instead of bittensor's default one
 if "--help" in sys.argv:
     SHOW_HELP = True
     sys.argv.remove("--help")
@@ -23,9 +21,8 @@ elif "-h" in sys.argv:
     SHOW_HELP = True
     sys.argv.remove("-h")
 
+# flake8: noqa
 import bittensor as bt
-
-###################################################################################
 
 parser: Optional[argparse.ArgumentParser]
 config: Optional[bt.config]
@@ -133,7 +130,7 @@ def init_config(role: Optional[str] = None):
         config.verbose = config.verbose if config.verbose is None else True
 
     config.full_path = os.path.expanduser("~/.bittensor/omron")  # type: ignore
-    config.full_path_score = os.path.join(config.full_path, "scores")
+    config.full_path_score = os.path.join(config.full_path, "scores", "scores.pt")
     if not config.certificate_path:
         config.certificate_path = os.path.join(config.full_path, "cert")
 
@@ -148,10 +145,9 @@ def init_config(role: Optional[str] = None):
         config.whitelisted_public_keys = config.whitelisted_public_keys.split(",")
 
     os.makedirs(config.full_path, exist_ok=True)
-    os.makedirs(config.full_path_score, exist_ok=True)
     os.makedirs(config.full_path_models, exist_ok=True)
     os.makedirs(config.certificate_path, exist_ok=True)
-
+    os.makedirs(os.path.dirname(config.full_path_score), exist_ok=True)
     bt.logging(config=config, logging_dir=config.logging.logging_dir)
     bt.logging.enable_info()
 
@@ -252,7 +248,7 @@ def _validator_config():
     parser.add_argument(
         "--external-api-port",
         type=int,
-        default=8000,
+        default=8443,
         help="The port for the external API.",
     )
 
@@ -261,6 +257,13 @@ def _validator_config():
         type=int,
         default=1,
         help="The number of workers for the external API.",
+    )
+
+    parser.add_argument(
+        "--serve-axon",
+        type=bool,
+        default=False,
+        help="Whether to serve the axon displaying your API information.",
     )
 
     parser.add_argument(
@@ -316,6 +319,6 @@ def _validator_config():
         if config.wallet.name == "default":
             config.wallet.name = "validator"
         config.external_api_workers = config.external_api_workers or 1
-        config.external_api_port = config.external_api_port or 8000
+        config.external_api_port = config.external_api_port or 8443
         config.do_not_verify_external_signatures = True
         config.disable_statistic_logging = True

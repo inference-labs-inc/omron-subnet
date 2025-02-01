@@ -24,7 +24,7 @@ class CircuitInput(BaseInput):
     @staticmethod
     def generate() -> dict[str, object]:
         return {
-            "list_items": [min(0.85, random.random()) for _ in range(LIST_SIZE)],
+            "list_items": [random.uniform(0.0, 0.85) for _ in range(LIST_SIZE)],
         }
 
     @staticmethod
