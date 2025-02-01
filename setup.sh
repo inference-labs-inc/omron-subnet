@@ -117,7 +117,7 @@ cd "${INSTALL_PATH}" || {
 }
 
 "$HOME/.local/bin/uv" venv
-source "${INSTALL_PATH}/.venv/bin/activate"
+source "./.venv/bin/activate"
 
 
 "$HOME/.local/bin/uv" sync --locked
