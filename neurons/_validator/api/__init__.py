@@ -277,12 +277,18 @@ class ValidatorAPI:
     async def validate_connection(self, headers) -> bool:
         required_headers = ["x-timestamp", "x-origin-ss58", "x-signature"]
         if not all(header in headers for header in required_headers):
+            bt.logging.warning(
+                f"Incoming request is missing required headers: {required_headers}"
+            )
             return False
 
         try:
             timestamp = int(headers["x-timestamp"])
             current_time = time.time()
             if current_time - timestamp > MAX_SIGNATURE_LIFESPAN:
+                bt.logging.warning(
+                    f"Incoming request signature timestamp {timestamp} is too old. Current time: {current_time}"
+                )
                 return False
 
             ss58_address = headers["x-origin-ss58"]
@@ -290,6 +296,9 @@ class ValidatorAPI:
 
             public_key = substrateinterface.Keypair(ss58_address=ss58_address)
             if not public_key.verify(str(timestamp).encode(), signature):
+                bt.logging.warning(
+                    f"Incoming request signature verification failed for address {ss58_address}"
+                )
                 return False
 
             if "x-netuid" in headers:
