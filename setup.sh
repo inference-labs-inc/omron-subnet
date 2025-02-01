@@ -152,8 +152,8 @@ echo "
 ███████║╚██████╔╝██████╔╝██║ ╚████║███████╗   ██║
 ╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚══════╝   ╚═╝
 "
-echo "🥩 Setup complete! 🥩\nNext steps:"
+echo "🥩 Setup complete! 🥩"
+echo "Next steps:"
 echo "1. cd ${INSTALL_PATH}"
 echo "2. source .venv/bin/activate"
 echo "3. Check docs/shared_setup_steps.md"
-
