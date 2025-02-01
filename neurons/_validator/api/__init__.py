@@ -97,6 +97,11 @@ class ValidatorAPI:
         async def omron_proof_of_weights(
             websocket: WebSocket, **params: dict[str, object]
         ) -> dict[str, object]:
+            if not websocket.headers.get("x-netuid"):
+                return InvalidParams(
+                    "Missing x-netuid header (required for proof of weights requests)"
+                )
+
             evaluation_data = params.get("evaluation_data")
             weights_version = params.get("weights_version")
 
@@ -267,9 +272,7 @@ class ValidatorAPI:
         self.ws_manager.active_connections.clear()
 
     async def validate_connection(self, headers) -> bool:
-        """Validate WebSocket connection request headers"""
-        required_headers = ["x-timestamp", "x-origin-ss58", "x-signature", "x-netuid"]
-
+        required_headers = ["x-timestamp", "x-origin-ss58", "x-signature"]
         if not all(header in headers for header in required_headers):
             return False
 
@@ -281,15 +284,20 @@ class ValidatorAPI:
 
             ss58_address = headers["x-origin-ss58"]
             signature = base64.b64decode(headers["x-signature"])
-            netuid = int(headers["x-netuid"])
 
             public_key = substrateinterface.Keypair(ss58_address=ss58_address)
             if not public_key.verify(str(timestamp).encode(), signature):
                 return False
 
-            return await self.validator_keys_cache.check_validator_key(
-                ss58_address, netuid
-            )
+            if "x-netuid" in headers:
+                netuid = int(headers["x-netuid"])
+                return await self.validator_keys_cache.check_validator_key(
+                    ss58_address, netuid
+                )
+            else:
+                return await self.validator_keys_cache.check_whitelisted_key(
+                    ss58_address
+                )
 
         except Exception as e:
             bt.logging.error(f"Validation error: {str(e)}")
