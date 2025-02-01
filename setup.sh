@@ -103,10 +103,6 @@ export PATH="$HOME/.local/bin:$PATH"
 chmod +x "$HOME/.local/bin/uv"
 chmod +x "$HOME/.local/bin/uvx"
 
-echo "Installing Python packages with UV..."
-"$HOME/.local/bin/uv" venv "${INSTALL_PATH}/venv"
-source "${INSTALL_PATH}/venv/bin/activate"
-
 if [[ ! -d ${INSTALL_PATH} ]]; then
     echo "Cloning omron-subnet repository..."
     if ! git clone https://github.com/inference-labs-inc/omron-subnet.git "${INSTALL_PATH}"; then
@@ -119,6 +115,9 @@ cd "${INSTALL_PATH}" || {
     echo "Failed to change to ${INSTALL_PATH} directory"
     exit 1
 }
+
+"$HOME/.local/bin/uv" venv
+source "${INSTALL_PATH}/.venv/bin/activate"
 
 
 "$HOME/.local/bin/uv" sync --locked
