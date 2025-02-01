@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import traceback
 import random
 
 import bittensor as bt
@@ -94,19 +95,28 @@ class RequestPipeline:
         requests = []
 
         for uid in filtered_uids:
-            synapse, save = self.get_synapse_request(
-                RequestType.RWR, external_request.circuit, external_request
-            )
-            request = self._check_and_create_request(
-                uid=uid,
-                synapse=synapse,
-                circuit=external_request.circuit,
-                request_type=RequestType.RWR,
-                request_hash=external_request.hash,
-                save=save,
-            )
-            if request:
-                requests.append(request)
+            try:
+                synapse, save = self.get_synapse_request(
+                    RequestType.RWR, external_request.circuit, external_request
+                )
+                request = self._check_and_create_request(
+                    uid=uid,
+                    synapse=synapse,
+                    circuit=external_request.circuit,
+                    request_type=RequestType.RWR,
+                    request_hash=external_request.hash,
+                    save=save,
+                )
+                if request:
+                    requests.append(request)
+            except Exception as e:
+                bt.logging.error(f"Error preparing request for UID {uid}: {e}")
+                traceback.print_exc()
+                self.api.set_request_result(
+                    external_request.hash,
+                    {"success": False, "error": "Error preparing request"},
+                )
+                continue
         return requests
 
     def _prepare_benchmark_requests(self, filtered_uids: list[int]) -> list[Request]:
