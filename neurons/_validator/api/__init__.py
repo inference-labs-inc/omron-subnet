@@ -97,6 +97,11 @@ class ValidatorAPI:
         async def omron_proof_of_weights(
             websocket: WebSocket, **params: dict[str, object]
         ) -> dict[str, object]:
+            if not websocket.headers.get("x-netuid"):
+                return InvalidParams(
+                    "Missing x-netuid header (required for proof of weights requests)"
+                )
+
             evaluation_data = params.get("evaluation_data")
             weights_version = params.get("weights_version")
 
@@ -126,6 +131,66 @@ class ValidatorAPI:
                         weights_version=weights_version,
                     )
                 except ValueError as e:
+                    return InvalidParams(str(e))
+
+                self.pending_requests[external_request.hash] = asyncio.Event()
+                self.external_requests_queue.insert(0, external_request)
+                bt.logging.success(
+                    f"External request with hash {external_request.hash} added to queue"
+                )
+                try:
+                    await asyncio.wait_for(
+                        self.pending_requests[external_request.hash].wait(),
+                        timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS
+                        + EXTERNAL_REQUEST_QUEUE_TIME_SECONDS,
+                    )
+                    result = self.request_results.pop(external_request.hash, None)
+
+                    if result["success"]:
+                        bt.logging.success(
+                            f"External request with hash {external_request.hash} processed successfully"
+                        )
+                        return Success(result)
+                    bt.logging.error(
+                        f"External request with hash {external_request.hash} failed to process"
+                    )
+                    return Error(9, "Request processing failed")
+                except asyncio.TimeoutError:
+                    bt.logging.error(
+                        f"External request with hash {external_request.hash} timed out"
+                    )
+                    return Error(9, "Request processing failed", "Request timed out")
+                finally:
+                    self.pending_requests.pop(external_request.hash, None)
+
+            except Exception as e:
+                bt.logging.error(f"Error processing request: {str(e)}")
+                traceback.print_exc()
+                return Error(9, "Request processing failed", str(e))
+
+        @method(name="omron.proof_of_computation")
+        async def omron_proof_of_computation(
+            websocket: WebSocket, **params: dict[str, object]
+        ) -> dict[str, object]:
+            input_json = params.get("input")
+            circuit_id = params.get("circuit")
+
+            if not input_json:
+                return InvalidParams("Missing input to the circuit")
+
+            if not circuit_id:
+                return InvalidParams("Missing circuit id")
+
+            try:
+                try:
+                    external_request = ProofOfComputationRPCRequest(
+                        circuit_id=circuit_id,
+                        inputs=input_json,
+                    )
+                except ValueError as e:
+                    bt.logging.error(
+                        f"Error creating proof of computation request: {str(e)}"
+                    )
                     return InvalidParams(str(e))
 
                 self.pending_requests[external_request.hash] = asyncio.Event()
@@ -210,29 +275,41 @@ class ValidatorAPI:
         self.ws_manager.active_connections.clear()
 
     async def validate_connection(self, headers) -> bool:
-        """Validate WebSocket connection request headers"""
-        required_headers = ["x-timestamp", "x-origin-ss58", "x-signature", "x-netuid"]
-
+        required_headers = ["x-timestamp", "x-origin-ss58", "x-signature"]
         if not all(header in headers for header in required_headers):
+            bt.logging.warning(
+                f"Incoming request is missing required headers: {required_headers}"
+            )
             return False
 
         try:
             timestamp = int(headers["x-timestamp"])
             current_time = time.time()
             if current_time - timestamp > MAX_SIGNATURE_LIFESPAN:
+                bt.logging.warning(
+                    f"Incoming request signature timestamp {timestamp} is too old. Current time: {current_time}"
+                )
                 return False
 
             ss58_address = headers["x-origin-ss58"]
             signature = base64.b64decode(headers["x-signature"])
-            netuid = int(headers["x-netuid"])
 
             public_key = substrateinterface.Keypair(ss58_address=ss58_address)
             if not public_key.verify(str(timestamp).encode(), signature):
+                bt.logging.warning(
+                    f"Incoming request signature verification failed for address {ss58_address}"
+                )
                 return False
 
-            return await self.validator_keys_cache.check_validator_key(
-                ss58_address, netuid
-            )
+            if "x-netuid" in headers:
+                netuid = int(headers["x-netuid"])
+                return await self.validator_keys_cache.check_validator_key(
+                    ss58_address, netuid
+                )
+            else:
+                return await self.validator_keys_cache.check_whitelisted_key(
+                    ss58_address
+                )
 
         except Exception as e:
             bt.logging.error(f"Validation error: {str(e)}")
