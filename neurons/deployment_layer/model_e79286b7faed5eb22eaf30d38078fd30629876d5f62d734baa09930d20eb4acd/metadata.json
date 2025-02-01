@@ -1,0 +1,14 @@
+{
+    "name": "SN27 PoW 256",
+    "description": "The validator's reward model for SN27, designed to batch a single round of weight updates (256 changes per proof).",
+    "author": "Inference Labs",
+    "version": "0.0.7",
+    "proof_system": "EZKL",
+    "netuid": 27,
+    "weights_version": 160,
+    "type": "proof_of_weights",
+    "external_files": {
+        "pk.key": "https://storage.omron.ai/e79286b7faed5eb22eaf30d38078fd30629876d5f62d734baa09930d20eb4acd/pk.key"
+    },
+    "benchmark_choice_weight": 0.2
+}
