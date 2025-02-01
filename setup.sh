@@ -108,10 +108,19 @@ echo "Installing Python packages with UV..."
 source "${INSTALL_PATH}/venv/bin/activate"
 
 if [[ ! -d ${INSTALL_PATH} ]]; then
-    git clone https://github.com/inference-labs-inc/omron-subnet.git "${INSTALL_PATH}"
+    echo "Cloning omron-subnet repository..."
+    if ! git clone https://github.com/inference-labs-inc/omron-subnet.git "${INSTALL_PATH}"; then
+        echo "Failed to clone repository. Check your internet connection and try again."
+        exit 1
+    fi
 fi
 
-cd "${INSTALL_PATH}"
+cd "${INSTALL_PATH}" || {
+    echo "Failed to change to ${INSTALL_PATH} directory"
+    exit 1
+}
+
+
 "$HOME/.local/bin/uv" sync --locked
 
 echo "
