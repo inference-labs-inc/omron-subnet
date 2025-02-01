@@ -147,7 +147,7 @@ class MinerResponse:
             circuit=circuit,
             proof_content=None,
             public_json=None,
-            request_type=None,
+            request_type=RequestType.BENCHMARK,
             input_hash=None,
             raw=None,
             error="Empty response",
