@@ -201,7 +201,7 @@ class RequestPipeline:
             return (
                 QueryZkProof(
                     model_id=circuit.id,
-                    query_input=self.format_for_query(inputs.to_json(), circuit),
+                    query_input=self.format_for_query(inputs, circuit),
                     query_output="",
                 ),
                 False,
