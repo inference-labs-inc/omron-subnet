@@ -10,8 +10,19 @@ class ProofOfComputationRPCRequest(RealWorldRequest):
 
     circuit_id: str = Field(..., description="The ID of the circuit to use")
 
-    def __init__(self, circuit_id: str, inputs: dict[str, any]):
+    class Config:
+        arbitrary_types_allowed = True
+        extra = "allow"
+
+    def __init__(self, **data):
+        circuit_id = data.get("circuit_id")
+        if not circuit_id:
+            raise ValueError("circuit_id is required")
+
         circuit = circuit_store.get_circuit(circuit_id)
         if circuit is None:
             raise ValueError(f"No circuit found for ID {circuit_id}")
-        super().__init__(circuit=circuit, inputs=inputs)
+
+        super().__init__(
+            circuit=circuit, inputs=data.get("inputs"), circuit_id=circuit_id
+        )
