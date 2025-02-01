@@ -188,6 +188,9 @@ class ValidatorAPI:
                         inputs=input_json,
                     )
                 except ValueError as e:
+                    bt.logging.error(
+                        f"Error creating proof of computation request: {str(e)}"
+                    )
                     return InvalidParams(str(e))
 
                 self.pending_requests[external_request.hash] = asyncio.Event()
