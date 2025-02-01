@@ -99,10 +99,12 @@ done
 
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-source "$HOME/.local/bin/env"
+export PATH="$HOME/.local/bin:$PATH"
+chmod +x "$HOME/.local/bin/uv"
+chmod +x "$HOME/.local/bin/uvx"
 
 echo "Installing Python packages with UV..."
-uv venv "${INSTALL_PATH}/venv"
+"$HOME/.local/bin/uv" venv "${INSTALL_PATH}/venv"
 source "${INSTALL_PATH}/venv/bin/activate"
 
 if [[ ! -d ${INSTALL_PATH} ]]; then
@@ -110,7 +112,7 @@ if [[ ! -d ${INSTALL_PATH} ]]; then
 fi
 
 cd "${INSTALL_PATH}"
-uv sync --locked
+"$HOME/.local/bin/uv" sync --locked
 
 echo "
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
