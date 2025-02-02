@@ -63,12 +63,12 @@ class RequestPipeline:
         save: bool = False,
     ) -> Request | None:
         """Check hash and create request if valid."""
-        if isinstance(synapse, ProofOfWeightsSynapse):
-            input_data = synapse.inputs
-        else:
-            input_data = synapse.query_input["public_inputs"]
-
         try:
+            if isinstance(synapse, ProofOfWeightsSynapse):
+                input_data = synapse.inputs
+            else:
+                input_data = synapse.query_input["public_inputs"]
+
             self.hash_guard.check_hash(input_data)
         except Exception as e:
             bt.logging.error(f"Hash already exists: {e}")
@@ -85,7 +85,7 @@ class RequestPipeline:
             synapse=synapse,
             circuit=circuit,
             request_type=request_type,
-            inputs=GenericInput(RequestType.RWR, input_data),
+            inputs=GenericInput(request_type, input_data),
             request_hash=request_hash,
             save=save,
         )

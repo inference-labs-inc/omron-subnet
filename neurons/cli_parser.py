@@ -95,7 +95,6 @@ def init_config(role: Optional[str] = None):
         default=None,
         help="Custom location for storing models data (optional)",
     )
-
     if role == Roles.VALIDATOR:
         # CLI arguments specific to the validator
         _validator_config()
@@ -174,6 +173,49 @@ def _miner_config():
         default=None,
         action="store_true",
         help="Disables request filtering and allows all incoming requests.",
+    )
+
+    parser.add_argument(
+        "--storage.provider",
+        type=str,
+        choices=["r2", "s3"],
+        help="Storage provider (r2 or s3)",
+        default=os.getenv("STORAGE_PROVIDER", "r2"),
+    )
+
+    parser.add_argument(
+        "--storage.bucket",
+        type=str,
+        help="Storage bucket name for competition files",
+        default=os.getenv("STORAGE_BUCKET") or os.getenv("R2_BUCKET"),
+    )
+
+    parser.add_argument(
+        "--storage.account_id",
+        type=str,
+        help="Storage account ID (required for R2)",
+        default=os.getenv("STORAGE_ACCOUNT_ID") or os.getenv("R2_ACCOUNT_ID"),
+    )
+
+    parser.add_argument(
+        "--storage.access_key",
+        type=str,
+        help="Storage access key ID",
+        default=os.getenv("STORAGE_ACCESS_KEY") or os.getenv("R2_ACCESS_KEY"),
+    )
+
+    parser.add_argument(
+        "--storage.secret_key",
+        type=str,
+        help="Storage secret key",
+        default=os.getenv("STORAGE_SECRET_KEY") or os.getenv("R2_SECRET_KEY"),
+    )
+
+    parser.add_argument(
+        "--storage.region",
+        type=str,
+        help="Storage region (required for S3)",
+        default=os.getenv("STORAGE_REGION", "us-east-1"),
     )
 
     bt.subtensor.add_args(parser)

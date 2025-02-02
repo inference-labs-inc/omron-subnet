@@ -15,6 +15,7 @@ dependencies = [
   "fastapi==0.110.3",
   "jsonrpcserver>=5.0.9",
   "numpy==2.0.2",
+  "onnxruntime>=1.20.1",
   "packaging==24.2",
   "prometheus_client==0.21.1",
   "psutil==6.1.1",
@@ -27,12 +28,23 @@ dependencies = [
   "wandb==0.18.7",
 ]
 
+[project.optional-dependencies]
+dev = ["black>=24.10.0", "pytest>=8.0.0"]
+
 [tool.setuptools]
-packages = ["omron"]
 package-dir = { "omron" = "neurons" }
+packages = ["omron", "omron.utils", "omron._validator", "omron._validator.competitions", "omron._validator.core", "omron._validator.api"]
 
 [tool.setuptools.dynamic]
 version = { attr = "omron.__version__" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+pythonpath = [".", "neurons"]
 
 [tool.uv.sources]
 torch = { index = "pytorch" }
@@ -41,6 +53,3 @@ torch = { index = "pytorch" }
 name = "pytorch"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
-
-[dependency-groups]
-dev = ["black>=24.10.0"]

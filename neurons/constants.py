@@ -153,3 +153,6 @@ TEMP_FOLDER = "/tmp/omron"
 # Queue size limits
 MAX_POW_QUEUE_SIZE = 1024
 MAX_EVALUATION_ITEMS = 1024
+
+# Maximum circuit size in GB for competitions
+MAX_CIRCUIT_SIZE_GB = 50

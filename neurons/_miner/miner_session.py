@@ -28,6 +28,7 @@ from protocol import (
     Competition,
 )
 from utils import AutoUpdate, clean_temp_files, wandb_logger
+from deployment_layer.circuit_manager import CircuitManager
 
 CIRCUIT_CID_PATH = os.path.join(os.path.dirname(__file__), "CIRCUIT_CID")
 
@@ -200,6 +201,28 @@ class MinerSession:
         self.metagraph = self.subtensor.metagraph(cli_parser.config.netuid)
         wandb_logger.safe_init("Miner", self.wallet, self.metagraph, cli_parser.config)
 
+        # Initialize circuit manager with storage config
+        storage_config = {
+            "provider": cli_parser.config.storage_provider,
+            "bucket": cli_parser.config.storage_bucket,
+            "account_id": cli_parser.config.storage_account_id,
+            "access_key": cli_parser.config.storage_access_key,
+            "secret_key": cli_parser.config.storage_secret_key,
+            "region": cli_parser.config.storage_region,
+        }
+
+        self.circuit_manager = CircuitManager(
+            wallet=self.wallet,
+            subtensor=self.subtensor,
+            netuid=cli_parser.config.netuid,
+            circuit_dir=COMPETITION_DIR,
+            storage_config=storage_config,
+        )
+
+    def __del__(self):
+        if hasattr(self, "circuit_manager"):
+            self.circuit_manager.stop()
+
     def proof_blacklist(self, synapse: QueryZkProof) -> Tuple[bool, str]:
         """
         Blacklist method for the proof generation endpoint
@@ -221,6 +244,12 @@ class MinerSession:
     def pow_blacklist(self, synapse: ProofOfWeightsSynapse) -> Tuple[bool, str]:
         """
         Blacklist method for the proof generation endpoint
+        """
+        return self._blacklist(synapse)
+
+    def competition_blacklist(self, synapse: Competition) -> Tuple[bool, str]:
+        """
+        Blacklist method for the competition endpoint
         """
         return self._blacklist(synapse)
 
@@ -275,16 +304,52 @@ class MinerSession:
             return True, "An error occurred while filtering the request"
 
     def handleCompetitionRequest(self, synapse: Competition) -> Competition:
-        verification_key_path = os.path.join(
-            COMPETITION_DIR, str(synapse.competition_id), synapse.hash
-        )
+        """
+        Handle competition circuit requests from validators.
 
-        if os.path.exists(verification_key_path):
-            synapse.verification_key = open(verification_key_path, "rb").read().hex()
-        else:
-            raise ValueError(f"Competition circuit {synapse.competition_id} not found")
+        This endpoint provides signed URLs for validators to download circuit files.
+        The process ensures:
+        1. Files are uploaded to R2/S3
+        2. VK hash matches chain commitment
+        3. URLs are signed and time-limited
+        4. All operations are thread-safe
+        """
+        try:
+            commitment = self.circuit_manager.get_current_commitment()
+            if not commitment:
+                bt.logging.warning("No valid circuit commitment available")
+                return synapse
 
-        return synapse
+            chain_commitment = self.subtensor.get_commitment(
+                cli_parser.config.netuid, self.wallet.hotkey.ss58_address
+            )
+            if commitment.vk_hash != chain_commitment:
+                bt.logging.error(
+                    f"Hash mismatch - local: {commitment.vk_hash[:8]} "
+                    f"chain: {chain_commitment[:8]}"
+                )
+                return synapse
+
+            # Get signed URLs for all required files
+            required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
+            signed_urls = {}
+            for file_name in required_files:
+                url = self.circuit_manager.get_signed_url(commitment.vk_hash, file_name)
+                if not url:
+                    bt.logging.error(f"Failed to get signed URL for {file_name}")
+                    return synapse
+                signed_urls[file_name] = url
+
+            # Add signed URLs to commitment data
+            commitment_data = commitment.dict()
+            commitment_data["signed_urls"] = signed_urls
+            synapse.commitment = json.dumps(commitment_data)
+
+            return synapse
+
+        except Exception as e:
+            bt.logging.error(f"Error handling competition request: {str(e)}")
+            return synapse
 
     def queryZkProof(self, synapse: QueryZkProof) -> QueryZkProof:
         """
@@ -304,7 +369,6 @@ class MinerSession:
         model_id = synapse.query_input.get("model_id", SINGLE_PROOF_OF_WEIGHTS_MODEL_ID)
         public_inputs = synapse.query_input["public_inputs"]
 
-        # Run inputs through the model and generate a proof.
         try:
             circuit = circuit_store.get_circuit(str(model_id))
             if not circuit:

@@ -11,7 +11,7 @@ from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
 from _validator.models.request_type import RequestType
 from execution_layer.circuit import CircuitEvaluationItem
-from utils import with_rate_limit
+from utils.rate_limiter import with_rate_limit
 
 
 class ScoreManager:

@@ -5,7 +5,7 @@ from rich.console import Console, JustifyMethod
 from rich.table import Table
 
 from deployment_layer.circuit_store import circuit_store
-import utils.wandb_logger as wandb_logger
+from utils import wandb_logger
 from _validator.models.miner_response import MinerResponse
 
 

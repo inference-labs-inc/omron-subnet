@@ -14,7 +14,7 @@ import bittensor as bt
 import ezkl
 import requests
 
-import cli_parser
+from cli_parser import init_config
 from constants import IGNORED_MODEL_HASHES
 from execution_layer.circuit import ProofSystem
 
@@ -221,9 +221,7 @@ def sync_model_files():
 
         external_files = metadata.get("external_files", {})
         for key, url in external_files.items():
-            file_path = os.path.join(
-                cli_parser.config.full_path_models, model_hash, key
-            )
+            file_path = os.path.join(init_config().full_path_models, model_hash, key)
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             if os.path.isfile(file_path):
                 bt.logging.info(
@@ -564,28 +562,28 @@ def resolve_legacy_folders(role: str):
         # dry run - no actions needed
         return
 
-    if cli_parser.config.external_model_dir:
+    if init_config().external_model_dir:
         # user have specified a custom location for storing models data
         # that means we don't need to move files from the legacy folders
         return
 
     legacy_full_path = os.path.expanduser(
         "{}/{}/{}/netuid{}".format(
-            cli_parser.config.logging.logging_dir,  # type: ignore
-            cli_parser.config.wallet.name,  # type: ignore
-            cli_parser.config.wallet.hotkey,  # type: ignore
-            cli_parser.config.netuid,
+            init_config().logging.logging_dir,  # type: ignore
+            init_config().wallet.name,  # type: ignore
+            init_config().wallet.hotkey,  # type: ignore
+            init_config().netuid,
         )
     )
 
     _move_files(
         os.path.join(legacy_full_path, role),
-        cli_parser.config.full_path,
+        init_config().full_path,
     )
 
     _move_files(
         os.path.join(legacy_full_path, "deployment_layer"),
-        cli_parser.config.full_path_models,
+        init_config().full_path_models,
     )
 
 
