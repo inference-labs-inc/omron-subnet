@@ -128,7 +128,6 @@ def init_config(role: Optional[str] = None):
         )
         config.disable_wandb = True
         config.verbose = config.verbose if config.verbose is None else True
-        config.max_workers = config.max_workers or 1
 
     config.full_path = os.path.expanduser("~/.bittensor/omron")  # type: ignore
     config.full_path_score = os.path.join(config.full_path, "scores", "scores.pt")
@@ -172,7 +171,7 @@ def _miner_config():
 
     parser.add_argument(
         "--disable-blacklist",
-        default=False,
+        default=None,
         action="store_true",
         help="Disables request filtering and allows all incoming requests.",
     )
@@ -329,3 +328,4 @@ def _validator_config():
         config.external_api_workers = config.external_api_workers or 1
         config.external_api_port = config.external_api_port or 8443
         config.do_not_verify_external_signatures = True
+        config.disable_statistic_logging = True

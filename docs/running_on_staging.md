@@ -1,6 +1,6 @@
 ## Running Your Own Subtensor Chain Locally
 
-This tutorial will guide you through setting up a local subtensor chain, creating a subnetwork, and connecting your mechanism to it.
+This tutorial will guide you through setting up a local subtensor chain, creating a subnetwork, and connecting your mechanism to it. The devcontainer provided in this repository already takes care of everything in this tutorial for you.
 
 ### 1. Install substrate dependencies
 
