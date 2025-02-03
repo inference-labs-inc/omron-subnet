@@ -212,10 +212,10 @@ class CircuitManager:
                         object_keys = self._upload_circuit_files()
                         upload_time = int(time.time())
 
-                        self.subtensor.set_commitment(
-                            netuid=self.netuid,
-                            commitment=new_vk_hash,
+                        self.subtensor.commit(
                             wallet=self.wallet,
+                            netuid=self.netuid,
+                            data=new_vk_hash,
                         )
 
                         self.current_vk_hash = new_vk_hash
