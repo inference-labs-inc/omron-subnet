@@ -12,6 +12,7 @@ from .services.sota_manager import SotaManager
 from .competition_manager import CompetitionManager
 from .utils.cleanup import register_cleanup_handlers
 from constants import TEMP_FOLDER
+from utils.uid import get_queryable_uids
 
 
 class Competition:
@@ -78,12 +79,10 @@ class Competition:
         hotkeys = self.metagraph.hotkeys
         self.miner_states = {k: v for k, v in self.miner_states.items() if k in hotkeys}
 
-        for hotkey in [
-            h
-            for h in hotkeys
-            if not self.metagraph.validator_permit[self.metagraph.hotkeys.index(h)]
-        ]:
-            uid = self.metagraph.hotkeys.index(hotkey)
+        queryable_uids = get_queryable_uids(self.metagraph)
+        for uid in queryable_uids:
+            hotkey = self.metagraph.hotkeys[uid]
+
             try:
                 hash = self.subtensor.get_commitment(self.metagraph.netuid, uid)
                 if not hash:
