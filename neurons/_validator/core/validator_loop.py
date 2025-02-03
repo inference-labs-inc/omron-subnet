@@ -81,7 +81,15 @@ class ValidatorLoop:
             self.config, self.score_manager, self.api
         )
         self.last_competition_sync = 0
-        self.competition = Competition(1, self.config.metagraph, self.config.subtensor)
+        try:
+            self.competition = Competition(
+                1, self.config.metagraph, self.config.subtensor
+            )
+        except Exception as e:
+            bt.logging.warning(
+                f"Failed to initialize competition, continuing without competition support: {e}"
+            )
+            self.competition = None
         self.is_syncing_competition = False
 
         self.request_queue = asyncio.Queue()
@@ -186,9 +194,9 @@ class ValidatorLoop:
 
     @with_rate_limit(period=ONE_HOUR)
     async def sync_competition(self):
-        """
-        Sync and evaluate competition circuits. This is a blocking operation.
-        """
+        if not self.competition:
+            return
+
         if self.is_syncing_competition:
             return
 

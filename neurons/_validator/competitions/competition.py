@@ -43,9 +43,10 @@ class Competition:
         self.subtensor = subtensor
         self.miner_states: Dict[str, NeuronState] = {}
 
-    def _load_model(self) -> Union[torch.nn.Module, str]:
+    def _load_model(self) -> Union[torch.nn.Module, str, None]:
         if not self.competition_manager.current_competition:
-            raise ValueError("No competition configured")
+            bt.logging.info("No competition currently configured")
+            return None
 
         model_path = self.competition_manager.current_competition.baseline_model_path
         if model_path.endswith(".pt"):
