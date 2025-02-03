@@ -12,7 +12,7 @@ from .services.sota_manager import SotaManager
 from .competition_manager import CompetitionManager
 from .utils.cleanup import register_cleanup_handlers
 from constants import TEMP_FOLDER
-from utils.uid import get_queryable_uids
+from _validator.utils.uid import get_queryable_uids
 
 
 class Competition:
