@@ -1,9 +1,8 @@
 import os
 import shutil
-from typing import Dict, Generator, Tuple
+from typing import Dict, Generator, Tuple, Union
 import bittensor as bt
 import torch
-import onnxruntime as ort
 
 from .models.neuron import NeuronState
 from .services.circuit_validator import CircuitValidator
@@ -44,7 +43,7 @@ class Competition:
         self.subtensor = subtensor
         self.miner_states: Dict[str, NeuronState] = {}
 
-    def _load_model(self) -> torch.nn.Module | ort.InferenceSession:
+    def _load_model(self) -> Union[torch.nn.Module, str]:
         if not self.competition_manager.current_competition:
             raise ValueError("No competition configured")
 
@@ -52,7 +51,7 @@ class Competition:
         if model_path.endswith(".pt"):
             return torch.load(model_path)
         elif model_path.endswith(".onnx"):
-            return ort.InferenceSession(model_path)
+            return model_path
         else:
             raise ValueError(f"Unsupported model format: {model_path}")
 
