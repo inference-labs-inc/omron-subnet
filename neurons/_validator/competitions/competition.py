@@ -88,7 +88,10 @@ class Competition:
                     self.metagraph.netuid, self.metagraph.hotkeys.index(hotkey)
                 )
                 if not hash:
+                    bt.logging.warning(f"No commitment found for {hotkey}")
                     continue
+
+                bt.logging.info(f"Commitment found for {hotkey}: {hash}")
 
                 if (
                     hotkey not in self.miner_states
@@ -120,6 +123,8 @@ class Competition:
                         )
                         if os.path.exists(circuit_dir):
                             shutil.rmtree(circuit_dir)
+                else:
+                    bt.logging.warning(f"Circuit already exists for {hotkey}")
 
             except Exception as e:
                 bt.logging.error(f"Error getting commitment for {hotkey}: {e}")
