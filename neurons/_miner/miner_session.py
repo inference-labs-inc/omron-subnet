@@ -336,14 +336,25 @@ class MinerSession:
                 bt.logging.critical(
                     "Circuit manager not initialized, unable to respond to validator."
                 )
-                return synapse
+                # Create new synapse to ensure required fields are present
+                return Competition(
+                    id=synapse.id,
+                    hash=synapse.hash,
+                    file_name=synapse.file_name,
+                    error="Circuit manager not initialized",
+                )
 
             commitment = self.circuit_manager.get_current_commitment()
             if not commitment:
                 bt.logging.critical(
                     "No valid circuit commitment available. Unable to respond to validator."
                 )
-                return synapse
+                return Competition(
+                    id=synapse.id,
+                    hash=synapse.hash,
+                    file_name=synapse.file_name,
+                    error="No valid circuit commitment available",
+                )
 
             chain_commitment = self.subtensor.get_commitment(
                 cli_parser.config.netuid,
@@ -354,7 +365,12 @@ class MinerSession:
                     f"Hash mismatch - local: {commitment.vk_hash[:8]} "
                     f"chain: {chain_commitment[:8]}"
                 )
-                return synapse
+                return Competition(
+                    id=synapse.id,
+                    hash=synapse.hash,
+                    file_name=synapse.file_name,
+                    error="Hash mismatch between local and chain commitment",
+                )
 
             required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
             object_keys = {}
@@ -363,17 +379,32 @@ class MinerSession:
             signed_urls = self.circuit_manager._get_signed_urls(object_keys)
             if not signed_urls:
                 bt.logging.error("Failed to get signed URLs")
-                return synapse
+                return Competition(
+                    id=synapse.id,
+                    hash=synapse.hash,
+                    file_name=synapse.file_name,
+                    error="Failed to get signed URLs",
+                )
 
             commitment_data = commitment.model_dump()
             commitment_data["signed_urls"] = signed_urls
-            synapse.commitment = json.dumps(commitment_data)
 
-            return synapse
+            response = Competition(
+                id=synapse.id,
+                hash=synapse.hash,
+                file_name=synapse.file_name,
+                commitment=json.dumps(commitment_data),
+            )
+            return response
 
         except Exception as e:
             bt.logging.error(f"Error handling competition request: {str(e)}")
-            return synapse
+            return Competition(
+                id=synapse.id,
+                hash=synapse.hash,
+                file_name=synapse.file_name,
+                error=str(e),
+            )
 
     def queryZkProof(self, synapse: QueryZkProof) -> QueryZkProof:
         """
