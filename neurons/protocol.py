@@ -77,8 +77,11 @@ class Competition(bt.Synapse):
     error: Optional[str] = None  # Error message if something goes wrong
 
     def deserialize(self) -> dict:
-        """Return the file content and commitment data"""
+        """Return all fields including required ones"""
         return {
+            "id": self.id,
+            "hash": self.hash,
+            "file_name": self.file_name,
             "file_content": self.file_content,
             "commitment": self.commitment,
             "error": self.error,
