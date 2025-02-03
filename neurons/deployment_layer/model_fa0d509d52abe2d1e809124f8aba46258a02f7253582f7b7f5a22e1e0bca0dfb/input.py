@@ -84,7 +84,7 @@ class CircuitInput(BaseInput):
             "minimum_response_time": [minimum_response_time for _ in range(BATCH_SIZE)],
             "maximum_response_time": [maximum_response_time for _ in range(BATCH_SIZE)],
             "response_time": [response_time for _ in range(BATCH_SIZE)],
-            "competition": [random.random() * SCALING for _ in range(BATCH_SIZE)],
+            "competition": [int(random.random() * SCALING) for _ in range(BATCH_SIZE)],
             "scaling": SCALING,
             "RATE_OF_DECAY": int(RATE_OF_DECAY * SCALING),
             "RATE_OF_RECOVERY": int(RATE_OF_RECOVERY * SCALING),
