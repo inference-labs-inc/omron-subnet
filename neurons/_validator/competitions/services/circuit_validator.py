@@ -1,8 +1,7 @@
 import os
 import json
-import subprocess
 import bittensor as bt
-from constants import LOCAL_EZKL_PATH, MAX_CIRCUIT_SIZE_GB
+from constants import MAX_CIRCUIT_SIZE_GB
 
 
 class CircuitValidator:
@@ -11,8 +10,6 @@ class CircuitValidator:
         "pk.key",
         "settings.json",
         "model.compiled",
-        "network.onnx",
-        "input.json",
     ]
 
     REQUIRED_SETTINGS = [
@@ -82,35 +79,3 @@ class CircuitValidator:
         except json.JSONDecodeError:
             bt.logging.error("Invalid JSON in settings.json")
             return False
-
-    @classmethod
-    def _validate_input_format(cls, circuit_dir: str) -> bool:
-        try:
-            with open(os.path.join(circuit_dir, "input.json")) as f:
-                input_data = json.load(f)
-                if "input_data" not in input_data or not isinstance(
-                    input_data["input_data"], list
-                ):
-                    bt.logging.error("Invalid input.json format")
-                    return False
-            return True
-        except json.JSONDecodeError:
-            bt.logging.error("Invalid JSON in input.json")
-            return False
-
-    @classmethod
-    def _validate_ezkl_setup(cls, circuit_dir: str) -> bool:
-        result = subprocess.run(
-            [
-                LOCAL_EZKL_PATH,
-                "setup",
-                "--settings-path",
-                os.path.join(circuit_dir, "settings.json"),
-            ],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            bt.logging.error(f"EZKL setup validation failed: {result.stderr}")
-            return False
-        return True
