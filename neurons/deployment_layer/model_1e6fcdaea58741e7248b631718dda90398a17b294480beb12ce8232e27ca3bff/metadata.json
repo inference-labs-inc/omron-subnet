@@ -4,6 +4,7 @@
     "author": "Inference Labs",
     "version": "0.0.6",
     "proof_system": "CIRCOM",
+    "netuid": "2",
     "type": "proof_of_weights",
     "external_files": {
         "circuit.zkey": "https://storage.omron.ai/1e6fcdaea58741e7248b631718dda90398a17b294480beb12ce8232e27ca3bff/circuit.zkey"
