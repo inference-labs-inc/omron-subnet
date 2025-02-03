@@ -71,7 +71,7 @@ class MinerSession:
         )
         axon.attach(
             forward_fn=self.handleCompetitionRequest,
-            blacklist_fn=self.vk_blacklist,
+            blacklist_fn=self.competition_blacklist,
         )
 
         bt.logging.info("Attached forward functions to axon")
