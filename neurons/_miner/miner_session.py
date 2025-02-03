@@ -347,18 +347,16 @@ class MinerSession:
                 )
                 return synapse
 
-            # Get signed URLs for all required files
             required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
-            signed_urls = {}
+            object_keys = {}
             for file_name in required_files:
-                url = self.circuit_manager.get_signed_url(commitment.vk_hash, file_name)
-                if not url:
-                    bt.logging.error(f"Failed to get signed URL for {file_name}")
-                    return synapse
-                signed_urls[file_name] = url
+                object_keys[file_name] = f"{commitment.vk_hash}/{file_name}"
+            signed_urls = self.circuit_manager._get_signed_urls(object_keys)
+            if not signed_urls:
+                bt.logging.error("Failed to get signed URLs")
+                return synapse
 
-            # Add signed URLs to commitment data
-            commitment_data = commitment.dict()
+            commitment_data = commitment.model_dump()
             commitment_data["signed_urls"] = signed_urls
             synapse.commitment = json.dumps(commitment_data)
 
