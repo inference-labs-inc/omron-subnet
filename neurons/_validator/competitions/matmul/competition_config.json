@@ -1,0 +1,10 @@
+{
+    "id": 2,
+    "name": "Matrix Multiplication Competition",
+    "description": "Implement matrix multiplication in a ZK circuit. Input is a flattened vector of 25 elements representing two matrices (2x5 and 5x3). Output should be the flattened 2x3 matrix multiplication result.",
+    "start_timestamp": 1738600653,
+    "end_timestamp": 1738859853,
+    "baseline_model_path": "neurons/_validator/competitions/matmul/network.onnx",
+    "max_accuracy_weight": 0.25,
+    "min_accuracy_weight": 0.0
+}
