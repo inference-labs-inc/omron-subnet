@@ -201,15 +201,21 @@ class MinerSession:
         self.metagraph = self.subtensor.metagraph(cli_parser.config.netuid)
         wandb_logger.safe_init("Miner", self.wallet, self.metagraph, cli_parser.config)
 
-        # Initialize circuit manager with storage config
-        storage_config = {
-            "provider": cli_parser.config.storage_provider,
-            "bucket": cli_parser.config.storage_bucket,
-            "account_id": cli_parser.config.storage_account_id,
-            "access_key": cli_parser.config.storage_access_key,
-            "secret_key": cli_parser.config.storage_secret_key,
-            "region": cli_parser.config.storage_region,
-        }
+        if cli_parser.config.storage:
+            # Initialize circuit manager with storage config
+            storage_config = {
+                "provider": cli_parser.config.storage.provider,
+                "bucket": cli_parser.config.storage.bucket,
+                "account_id": cli_parser.config.storage.account_id,
+                "access_key": cli_parser.config.storage.access_key,
+                "secret_key": cli_parser.config.storage.secret_key,
+                "region": cli_parser.config.storage.region,
+            }
+        else:
+            bt.logging.warning(
+                "No storage config provided, circuit manager will not be initialized."
+            )
+            storage_config = None
 
         try:
             self.circuit_manager = CircuitManager(
