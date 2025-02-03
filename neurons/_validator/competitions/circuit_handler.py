@@ -30,7 +30,8 @@ class CircuitHandler:
 
     def sync_circuits(self):
         for hotkey in self.metagraph.hotkeys:
-            cid = self.subtensor.get_commitment(self.metagraph.netuid, hotkey)
+            uid = self.metagraph.hotkeys.index(hotkey)
+            cid = self.subtensor.get_commitment(self.metagraph.netuid, uid)
             if cid not in self.cids[hotkey] and cid is not None:
                 self.cids[hotkey] = cid
 

@@ -337,7 +337,8 @@ class MinerSession:
                 return synapse
 
             chain_commitment = self.subtensor.get_commitment(
-                cli_parser.config.netuid, self.wallet.hotkey.ss58_address
+                cli_parser.config.netuid,
+                self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address),
             )
             if commitment.vk_hash != chain_commitment:
                 bt.logging.error(
