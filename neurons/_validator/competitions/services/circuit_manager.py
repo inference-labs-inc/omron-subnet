@@ -2,6 +2,7 @@ import os
 import shutil
 import json
 import requests
+import asyncio
 import bittensor as bt
 from protocol import Competition
 from urllib.parse import urlparse
@@ -50,19 +51,16 @@ class CircuitManager:
             synapse = Competition(
                 id=self.competition_id, hash=hash, file_name="commitment"
             )
-            response: Competition = dendrite.call(target_axon=axon, synapse=synapse)
+            response = asyncio.run(dendrite.call(target_axon=axon, synapse=synapse))
 
             bt.logging.debug(f"Response from miner: {response}")
 
-            if hasattr(response, "error") or (
-                isinstance(response, dict) and response.get("error")
-            ):
-                error_msg = (
-                    response.error
-                    if hasattr(response, "error")
-                    else response.get("error")
-                )
-                bt.logging.error(f"Error from miner: {error_msg}")
+            if not isinstance(response, Competition):
+                bt.logging.error("Invalid response type from miner")
+                return False
+
+            if response.error:
+                bt.logging.error(f"Error from miner: {response.error}")
                 return False
 
             if not response.commitment:
