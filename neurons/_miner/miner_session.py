@@ -211,13 +211,17 @@ class MinerSession:
             "region": cli_parser.config.storage_region,
         }
 
-        self.circuit_manager = CircuitManager(
-            wallet=self.wallet,
-            subtensor=self.subtensor,
-            netuid=cli_parser.config.netuid,
-            circuit_dir=COMPETITION_DIR,
-            storage_config=storage_config,
-        )
+        try:
+            self.circuit_manager = CircuitManager(
+                wallet=self.wallet,
+                subtensor=self.subtensor,
+                netuid=cli_parser.config.netuid,
+                circuit_dir=COMPETITION_DIR,
+                storage_config=storage_config,
+            )
+        except Exception as e:
+            bt.logging.error(f"Error initializing circuit manager: {e}")
+            self.circuit_manager = None
 
     def __del__(self):
         if hasattr(self, "circuit_manager"):
@@ -315,6 +319,10 @@ class MinerSession:
         4. All operations are thread-safe
         """
         try:
+            if not self.circuit_manager:
+                bt.logging.warning("Circuit manager not initialized")
+                return synapse
+
             commitment = self.circuit_manager.get_current_commitment()
             if not commitment:
                 bt.logging.warning("No valid circuit commitment available")

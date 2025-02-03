@@ -83,6 +83,10 @@ class CircuitManager:
         self.check_interval = check_interval
         self.storage_config = storage_config
         self.bucket = storage_config["bucket"]
+        if not storage_config or not storage_config["provider"]:
+            raise ValueError(
+                "Storage configuration is required to initialize CircuitManager."
+            )
 
         if storage_config["provider"] == "r2":
             self.storage = boto3.client(
