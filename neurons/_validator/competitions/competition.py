@@ -83,24 +83,24 @@ class Competition:
             for h in hotkeys
             if not self.metagraph.validator_permit[self.metagraph.hotkeys.index(h)]
         ]:
+            uid = self.metagraph.hotkeys.index(hotkey)
             try:
-                hash = self.subtensor.get_commitment(
-                    self.metagraph.netuid, self.metagraph.hotkeys.index(hotkey)
-                )
+                hash = self.subtensor.get_commitment(self.metagraph.netuid, uid)
                 if not hash:
                     bt.logging.warning(f"No commitment found for {hotkey}")
                     continue
 
-                bt.logging.info(f"Commitment found for {hotkey}: {hash}")
+                bt.logging.info(f"Commitment found for {hotkey} (UID {uid}): {hash}")
 
                 if (
                     hotkey not in self.miner_states
                     or self.miner_states[hotkey].hash != hash
                 ):
+
                     bt.logging.success(
                         f"New circuit detected for {hotkey} with hash {hash}"
                     )
-                    axon = self.metagraph.axons[self.metagraph.hotkeys.index(hotkey)]
+                    axon = self.metagraph.axons[uid]
 
                     circuit_dir = os.path.join(self.temp_directory, hash)
                     os.makedirs(circuit_dir, exist_ok=True)
@@ -108,7 +108,7 @@ class Competition:
                     if self.circuit_manager.download_files(axon, hash, circuit_dir):
                         self.miner_states[hotkey] = NeuronState(
                             hotkey=hotkey,
-                            uid=self.metagraph.hotkeys.index(hotkey),
+                            uid=uid,
                             score=0.0,
                             proof_size=0,
                             response_time=0.0,
