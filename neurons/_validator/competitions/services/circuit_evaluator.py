@@ -7,7 +7,7 @@ import torch
 import numpy as np
 import bittensor as bt
 from typing import Tuple, Union, List
-from constants import LOCAL_EZKL_PATH, OMRON_TEMP_DIR
+from constants import LOCAL_EZKL_PATH, TEMP_FOLDER
 
 ONNX_VENV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "onnx_venv")
 ONNX_RUNNER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "onnx_runner.py")
@@ -122,13 +122,13 @@ class CircuitEvaluator:
     ) -> Tuple[str, dict] | None:
         try:
             with tempfile.NamedTemporaryFile(
-                mode="w+", suffix=".json", dir=OMRON_TEMP_DIR, delete=False
+                mode="w+", suffix=".json", dir=TEMP_FOLDER, delete=False
             ) as temp_input:
                 json.dump({"input_data": test_inputs.tolist()}, temp_input)
                 temp_input_path = temp_input.name
 
             with tempfile.NamedTemporaryFile(
-                mode="w+", suffix=".json", dir=OMRON_TEMP_DIR, delete=False
+                mode="w+", suffix=".json", dir=TEMP_FOLDER, delete=False
             ) as temp_proof:
                 temp_proof_path = temp_proof.name
 
