@@ -4,7 +4,6 @@ import os
 import subprocess
 import time
 import traceback
-from functools import partial
 from typing import Optional
 from constants import FIVE_MINUTES
 
@@ -13,7 +12,7 @@ import bittensor as bt
 import ezkl
 import requests
 
-from cli_parser import init_config
+import cli_parser
 from constants import IGNORED_MODEL_HASHES
 from execution_layer.circuit import ProofSystem
 
@@ -47,7 +46,7 @@ def run_shared_preflight_checks(role: Optional[str] = None):
     """
 
     preflight_checks = [
-        ("Syncing model files", partial(sync_model_files, role=role)),
+        ("Syncing model files", sync_model_files),
         ("Ensuring Node.js version", ensure_nodejs_version),
         ("Checking SnarkJS installation", ensure_snarkjs_installed),
         ("Checking EZKL installation", ensure_ezkl_installed),
@@ -159,7 +158,7 @@ def ensure_snarkjs_installed():
             ) from e
 
 
-def sync_model_files(role: Optional[str] = None):
+def sync_model_files():
     """
     Sync external model files
     """
@@ -220,7 +219,7 @@ def sync_model_files(role: Optional[str] = None):
         external_files = metadata.get("external_files", {})
         for key, url in external_files.items():
             file_path = os.path.join(
-                init_config(role).full_path_models, model_hash, key
+                cli_parser.config.full_path_models, model_hash, key
             )
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             if os.path.isfile(file_path):
