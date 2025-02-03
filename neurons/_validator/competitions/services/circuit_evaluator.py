@@ -32,25 +32,39 @@ class CircuitEvaluator:
     ) -> Tuple[float, float, float, bool]:
         scores, proof_sizes, response_times, verification_results = [], [], [], []
         input_shape = self._get_input_shape(circuit_dir)
+        bt.logging.info(f"Got input shape: {input_shape}")
         if not input_shape:
+            bt.logging.error("Failed to get input shape")
             return 0.0, 0.0, 0.0, False
 
         for i in range(10):
             bt.logging.info(f"Running evaluation {i + 1}/10")
             try:
                 test_inputs = torch.randn(*input_shape)
+                bt.logging.info(
+                    f"Generated test inputs with shape: {test_inputs.shape}"
+                )
+
                 baseline_output = self._run_baseline_model(test_inputs)
                 if baseline_output is None:
+                    bt.logging.error("Baseline model run failed")
                     scores.append(0.0)
                     continue
+                bt.logging.info(
+                    f"Got baseline output with shape: {np.array(baseline_output).shape}"
+                )
 
                 start_time = time.time()
                 proof_result = self._generate_proof(circuit_dir, test_inputs)
                 if not proof_result:
+                    bt.logging.error("Proof generation failed")
                     scores.append(0.0)
                     continue
 
                 proof_path, proof_data = proof_result
+                bt.logging.info(
+                    f"Generated proof with size: {len(proof_data['proof'])}"
+                )
                 response_time = time.time() - start_time
                 response_times.append(response_time)
 
@@ -59,17 +73,19 @@ class CircuitEvaluator:
                 proof_sizes.append(len(proof))
 
                 verify_result = self._verify_proof(circuit_dir, proof_path)
+                bt.logging.info(f"Proof verification result: {verify_result}")
                 verification_results.append(verify_result)
 
                 if verify_result:
                     raw_score = self._compare_outputs(baseline_output, public_signals)
+                    bt.logging.info(f"Comparison score: {raw_score}")
                     scores.append(raw_score * accuracy_weight)
                 else:
                     bt.logging.error("Proof verification failed")
                     scores.append(0.0)
 
             except Exception as e:
-                bt.logging.error(f"Error in evaluation iteration: {e}")
+                bt.logging.error(f"Error in evaluation iteration: {str(e)}")
                 scores.append(0.0)
 
         return self._calculate_averages(
