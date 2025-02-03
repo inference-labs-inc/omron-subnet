@@ -333,7 +333,9 @@ class MinerSession:
 
             commitment = self.circuit_manager.get_current_commitment()
             if not commitment:
-                bt.logging.warning("No valid circuit commitment available")
+                bt.logging.critical(
+                    "No valid circuit commitment available. Unable to respond to validator."
+                )
                 return synapse
 
             chain_commitment = self.subtensor.get_commitment(
