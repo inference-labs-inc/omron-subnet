@@ -52,8 +52,7 @@ class CircuitManager:
                 id=self.competition_id, hash=hash, file_name="commitment"
             )
             response = asyncio.run(dendrite.call(target_axon=axon, synapse=synapse))
-
-            bt.logging.debug(f"Response from miner: {response}")
+            response = Competition.model_validate(response)
 
             if not isinstance(response, Competition):
                 bt.logging.error("Invalid response type from miner")
