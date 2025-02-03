@@ -28,7 +28,7 @@ from protocol import (
     Competition,
 )
 from utils import AutoUpdate, clean_temp_files, wandb_logger
-from deployment_layer.circuit_manager import CircuitManager
+from .circuit_manager import CircuitManager
 
 CIRCUIT_CID_PATH = os.path.join(os.path.dirname(__file__), "CIRCUIT_CID")
 
