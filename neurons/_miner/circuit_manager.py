@@ -2,6 +2,7 @@ from __future__ import annotations
 import time
 import hashlib
 import boto3
+import traceback
 import threading
 from typing import Optional, Dict
 from pathlib import Path
@@ -223,7 +224,7 @@ class CircuitManager:
 
             except Exception as e:
                 bt.logging.error(f"Error in circuit monitor: {str(e)}")
-
+                bt.logging.error(traceback.format_exc())
             time.sleep(self.check_interval)
 
     def get_current_commitment(self) -> Optional[CircuitCommitment]:
