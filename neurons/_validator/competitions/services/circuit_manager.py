@@ -50,7 +50,7 @@ class CircuitManager:
             synapse = Competition(
                 id=self.competition_id, hash=hash, file_name="commitment"
             )
-            response: Competition = dendrite.call(axons=axon, synapse=synapse)
+            response: Competition = dendrite.call(target_axon=axon, synapse=synapse)
 
             bt.logging.debug(f"Response from miner: {response}")
 
