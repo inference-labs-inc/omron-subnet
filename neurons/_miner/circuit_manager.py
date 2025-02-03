@@ -58,6 +58,7 @@ class CircuitManager:
         circuit_dir: str,
         storage_config: dict,
         check_interval: int = 60,
+        existing_vk_hash: Optional[str] = None,
     ):
         """
         Initialize the CircuitManager.
@@ -112,10 +113,24 @@ class CircuitManager:
                 ),
             )
 
-        self.current_vk_hash: Optional[str] = None
+        self.current_vk_hash = existing_vk_hash
         self.last_upload_time: Optional[int] = None
+        self._current_object_keys: Optional[Dict[str, str]] = None
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
+
+        if existing_vk_hash and self._calculate_vk_hash() == existing_vk_hash:
+            try:
+                required_files = ["vk.key", "pk.key", "model.compiled", "settings.json"]
+                self._current_object_keys = {
+                    fname: f"{existing_vk_hash}/{fname}" for fname in required_files
+                }
+                self.last_upload_time = int(time.time())
+                bt.logging.info(
+                    f"Initialized with existing VK hash: {existing_vk_hash[:8]}..."
+                )
+            except Exception as e:
+                bt.logging.error(f"Failed to initialize with existing hash: {str(e)}")
 
         self._monitor_thread = threading.Thread(
             target=self._monitor_circuit_files, daemon=True

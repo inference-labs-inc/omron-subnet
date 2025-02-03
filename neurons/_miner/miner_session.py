@@ -218,12 +218,19 @@ class MinerSession:
             storage_config = None
 
         try:
+            # Get current commitment from chain
+            current_commitment = self.subtensor.get_commitment(
+                cli_parser.config.netuid,
+                self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address),
+            )
+
             self.circuit_manager = CircuitManager(
                 wallet=self.wallet,
                 subtensor=self.subtensor,
                 netuid=cli_parser.config.netuid,
                 circuit_dir=COMPETITION_DIR,
                 storage_config=storage_config,
+                existing_vk_hash=current_commitment,
             )
         except Exception as e:
             bt.logging.error(f"Error initializing circuit manager: {e}")
@@ -343,7 +350,7 @@ class MinerSession:
                 self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address),
             )
             if commitment.vk_hash != chain_commitment:
-                bt.logging.error(
+                bt.logging.critical(
                     f"Hash mismatch - local: {commitment.vk_hash[:8]} "
                     f"chain: {chain_commitment[:8]}"
                 )
