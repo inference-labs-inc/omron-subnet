@@ -112,7 +112,7 @@ class MinerResponse:
                 uid=response.uid,
                 verification_result=False,
                 response_time=response.response_time,
-                proof_size=proof_size,
+                proof_size=proof_size or DEFAULT_PROOF_SIZE,
                 circuit=response.circuit,
                 proof_content=proof_content,
                 request_type=response.request_type,
