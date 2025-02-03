@@ -320,7 +320,9 @@ class MinerSession:
         """
         try:
             if not self.circuit_manager:
-                bt.logging.warning("Circuit manager not initialized")
+                bt.logging.critical(
+                    "Circuit manager not initialized, unable to respond to validator."
+                )
                 return synapse
 
             commitment = self.circuit_manager.get_current_commitment()
