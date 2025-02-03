@@ -73,7 +73,7 @@ class Competition:
             finally:
                 self.circuit_manager.cleanup_temp_files(circuit_dir)
 
-    def _sync_circuits(self) -> Generator[Tuple[bt.axon, str]]:
+    def _sync_circuits(self) -> Generator[Tuple[bt.axon, str], None, None]:
         hotkeys = self.metagraph.hotkeys
         self.miner_states = {k: v for k, v in self.miner_states.items() if k in hotkeys}
 
