@@ -87,7 +87,7 @@ class Competition:
             try:
                 hash = self.subtensor.get_commitment(self.metagraph.netuid, uid)
                 if not hash:
-                    bt.logging.warning(f"No commitment found for {hotkey}")
+                    bt.logging.warning(f"No commitment found for {hotkey} (UID {uid})")
                     continue
 
                 bt.logging.info(f"Commitment found for {hotkey} (UID {uid}): {hash}")
