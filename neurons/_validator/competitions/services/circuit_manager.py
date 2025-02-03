@@ -50,10 +50,19 @@ class CircuitManager:
             synapse = Competition(
                 id=self.competition_id, hash=hash, file_name="commitment"
             )
-            response = dendrite.query(axons=[axon], synapse=synapse)[0]
+            response: Competition = dendrite.call(axons=axon, synapse=synapse)
 
-            if response.error:
-                bt.logging.error(f"Error from miner: {response.error}")
+            bt.logging.debug(f"Response from miner: {response}")
+
+            if hasattr(response, "error") or (
+                isinstance(response, dict) and response.get("error")
+            ):
+                error_msg = (
+                    response.error
+                    if hasattr(response, "error")
+                    else response.get("error")
+                )
+                bt.logging.error(f"Error from miner: {error_msg}")
                 return False
 
             if not response.commitment:
