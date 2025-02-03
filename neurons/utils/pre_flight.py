@@ -1,11 +1,9 @@
 import asyncio
 import json
 import os
-import shutil
 import subprocess
 import time
 import traceback
-from functools import partial
 from typing import Optional
 from constants import FIVE_MINUTES
 
@@ -48,7 +46,6 @@ def run_shared_preflight_checks(role: Optional[str] = None):
     """
 
     preflight_checks = [
-        ("Resolve legacy folders", partial(resolve_legacy_folders, role=role)),
         ("Syncing model files", sync_model_files),
         ("Ensuring Node.js version", ensure_nodejs_version),
         ("Checking SnarkJS installation", ensure_snarkjs_installed),
@@ -550,58 +547,3 @@ def safe_extract(tar, path):
         if not is_safe_path(path, member_path):
             continue
         tar.extract(member, path)
-
-
-def resolve_legacy_folders(role: str):
-    """
-    Move files from legacy folders to the new locations.
-    This step gonna be removed in the future.
-    """
-
-    if not role:
-        # dry run - no actions needed
-        return
-
-    if init_config().external_model_dir:
-        # user have specified a custom location for storing models data
-        # that means we don't need to move files from the legacy folders
-        return
-
-    legacy_full_path = os.path.expanduser(
-        "{}/{}/{}/netuid{}".format(
-            init_config().logging.logging_dir,  # type: ignore
-            init_config().wallet.name,  # type: ignore
-            init_config().wallet.hotkey,  # type: ignore
-            init_config().netuid,
-        )
-    )
-
-    _move_files(
-        os.path.join(legacy_full_path, role),
-        init_config().full_path,
-    )
-
-    _move_files(
-        os.path.join(legacy_full_path, "deployment_layer"),
-        init_config().full_path_models,
-    )
-
-
-def _move_files(src: str, dst: str):
-    """
-    Move files recursively from source to destination.
-    """
-    if not os.path.exists(src) or not any(os.scandir(src)) or any(os.scandir(dst)):
-        # if source does not exist or is empty, or destination is not empty -> skip
-        return
-
-    try:
-        for item in os.listdir(src):
-            s = os.path.join(src, item)
-            d = os.path.join(dst, item)
-            shutil.move(s, d)
-
-        os.rmdir(src)
-        bt.logging.info(f"Moved files from {src} to {dst}")
-    except Exception as e:
-        bt.logging.error(f"Oops. Failed to move files from {src} to {dst}: {e}")
