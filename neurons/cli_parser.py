@@ -8,6 +8,7 @@ from constants import (
     PROOF_OF_WEIGHTS_INTERVAL,
     TEMP_FOLDER,
     Roles,
+    COMPETITION_SYNC_INTERVAL,
 )
 
 SHOW_HELP = False
