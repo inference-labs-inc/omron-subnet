@@ -4,24 +4,33 @@ import time
 import tempfile
 import subprocess
 import torch
-import onnxruntime as ort
+import numpy as np
 import bittensor as bt
-from typing import Tuple
+from typing import Tuple, Union, List
 from constants import LOCAL_EZKL_PATH, OMRON_TEMP_DIR
+
+ONNX_VENV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "onnx_venv")
+ONNX_RUNNER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "onnx_runner.py")
 
 
 class CircuitEvaluator:
-    def __init__(self, baseline_model: torch.nn.Module | ort.InferenceSession):
+    def __init__(self, baseline_model: Union[torch.nn.Module, str]):
         self.baseline_model = baseline_model
+        self.is_onnx = not isinstance(baseline_model, torch.nn.Module)
+        if self.is_onnx and not os.path.exists(ONNX_VENV):
+            self._setup_onnx_env()
+
+    def _setup_onnx_env(self):
+        subprocess.run(["python", "-m", "venv", ONNX_VENV], check=True)
+        pip_path = os.path.join(ONNX_VENV, "bin", "pip")
+        subprocess.run(
+            [pip_path, "install", "numpy==1.24.3", "onnxruntime==1.17.0"], check=True
+        )
 
     def evaluate(
         self, circuit_dir: str, accuracy_weight: float
     ) -> Tuple[float, float, float, bool]:
-        scores = []
-        proof_sizes = []
-        response_times = []
-        verification_results = []
-
+        scores, proof_sizes, response_times, verification_results = [], [], [], []
         input_shape = self._get_input_shape(circuit_dir)
         if not input_shape:
             return 0.0, 0.0, 0.0, False
@@ -54,8 +63,7 @@ class CircuitEvaluator:
 
                 if verify_result:
                     raw_score = self._compare_outputs(baseline_output, public_signals)
-                    weighted_score = raw_score * accuracy_weight
-                    scores.append(weighted_score)
+                    scores.append(raw_score * accuracy_weight)
                 else:
                     bt.logging.error("Proof verification failed")
                     scores.append(0.0)
@@ -63,7 +71,6 @@ class CircuitEvaluator:
             except Exception as e:
                 bt.logging.error(f"Error in evaluation iteration: {e}")
                 scores.append(0.0)
-                continue
 
         return self._calculate_averages(
             scores, proof_sizes, response_times, verification_results
@@ -74,22 +81,38 @@ class CircuitEvaluator:
             with open(os.path.join(circuit_dir, "settings.json")) as f:
                 settings = json.load(f)
                 input_shape = settings["input_shape"]
-                if len(input_shape) != 2:
-                    bt.logging.error(f"Invalid input shape: {input_shape}")
-                    return None
-                return tuple(input_shape)
+                return tuple(input_shape) if len(input_shape) == 2 else None
         except Exception as e:
             bt.logging.error(f"Error reading input shape: {e}")
             return None
 
-    def _run_baseline_model(self, test_inputs: torch.Tensor) -> list | None:
+    def _run_baseline_model(self, test_inputs: torch.Tensor) -> List | None:
         try:
-            if isinstance(self.baseline_model, torch.nn.Module):
+            if not self.is_onnx:
                 return self.baseline_model(test_inputs).tolist()
-            else:
-                return self.baseline_model.run(None, {"input": test_inputs.numpy()})[
-                    0
-                ].tolist()
+
+            with (
+                tempfile.NamedTemporaryFile(suffix=".npy") as input_file,
+                tempfile.NamedTemporaryFile(suffix=".npy") as output_file,
+            ):
+                np.save(input_file.name, test_inputs.numpy())
+                python_path = os.path.join(ONNX_VENV, "bin", "python")
+                result = subprocess.run(
+                    [
+                        python_path,
+                        ONNX_RUNNER,
+                        self.baseline_model,
+                        input_file.name,
+                        output_file.name,
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+                return (
+                    np.load(output_file.name).tolist()
+                    if result.returncode == 0
+                    else None
+                )
         except Exception as e:
             bt.logging.error(f"Error running baseline model: {e}")
             return None
@@ -128,17 +151,13 @@ class CircuitEvaluator:
                 text=True,
                 timeout=300,
             )
-            os.unlink(temp_input_path)
 
+            os.unlink(temp_input_path)
             if prove_result.returncode != 0:
-                bt.logging.error(f"Proof generation failed: {prove_result.stderr}")
                 return None
 
             with open(temp_proof_path) as f:
-                proof_data = json.load(f)
-
-            return temp_proof_path, proof_data
-
+                return temp_proof_path, json.load(f)
         except Exception as e:
             bt.logging.error(f"Error generating proof: {e}")
             return None
