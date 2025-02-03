@@ -4,6 +4,7 @@ import os
 import subprocess
 import time
 import traceback
+from functools import partial
 from typing import Optional
 from constants import FIVE_MINUTES
 
@@ -46,7 +47,7 @@ def run_shared_preflight_checks(role: Optional[str] = None):
     """
 
     preflight_checks = [
-        ("Syncing model files", sync_model_files),
+        ("Syncing model files", partial(sync_model_files, role=role)),
         ("Ensuring Node.js version", ensure_nodejs_version),
         ("Checking SnarkJS installation", ensure_snarkjs_installed),
         ("Checking EZKL installation", ensure_ezkl_installed),
@@ -158,7 +159,7 @@ def ensure_snarkjs_installed():
             ) from e
 
 
-def sync_model_files():
+def sync_model_files(role: Optional[str] = None):
     """
     Sync external model files
     """
@@ -218,7 +219,9 @@ def sync_model_files():
 
         external_files = metadata.get("external_files", {})
         for key, url in external_files.items():
-            file_path = os.path.join(init_config().full_path_models, model_hash, key)
+            file_path = os.path.join(
+                init_config(role).full_path_models, model_hash, key
+            )
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             if os.path.isfile(file_path):
                 bt.logging.info(
