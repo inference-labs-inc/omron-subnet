@@ -80,8 +80,15 @@ class CircuitEvaluator:
         try:
             with open(os.path.join(circuit_dir, "settings.json")) as f:
                 settings = json.load(f)
-                input_shape = settings["input_shape"]
-                return tuple(input_shape) if len(input_shape) == 2 else None
+                if "input_shape" in settings:
+                    input_shape = settings["input_shape"]
+                    return tuple(input_shape) if len(input_shape) == 2 else None
+
+                public_inputs = settings.get("public_inputs", {})
+                if public_inputs:
+                    num_inputs = len(public_inputs["order"])
+                    return (1, num_inputs)
+                return None
         except Exception as e:
             bt.logging.error(f"Error reading input shape: {e}")
             return None

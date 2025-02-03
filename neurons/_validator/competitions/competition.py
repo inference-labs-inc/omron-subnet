@@ -139,25 +139,34 @@ class Competition:
             self.circuit_evaluator.evaluate(circuit_dir, accuracy_weight)
         )
 
-        hotkey = next(
-            k for k, v in self.miner_states.items() if v.uid == miner_axon.uid
+        uid = next(
+            (
+                i
+                for i, axon in enumerate(self.metagraph.axons)
+                if axon.hotkey == miner_axon.hotkey
+            ),
+            None,
         )
-        if hotkey:
-            self.miner_states[hotkey].score = score
-            self.miner_states[hotkey].proof_size = proof_size
-            self.miner_states[hotkey].response_time = response_time
-            self.miner_states[hotkey].verification_result = verification_success
-            self.miner_states[hotkey].accuracy = score
+        if uid is not None:
+            hotkey = self.metagraph.hotkeys[uid]
+            if hotkey:
+                self.miner_states[hotkey].score = score
+                self.miner_states[hotkey].proof_size = proof_size
+                self.miner_states[hotkey].response_time = response_time
+                self.miner_states[hotkey].verification_result = verification_success
+                self.miner_states[hotkey].accuracy = score
 
-            if (
-                self.competition_manager.is_competition_active()
-                and self.sota_manager.check_if_sota(score, proof_size, response_time)
-            ):
-                self.sota_manager.preserve_circuit(
-                    circuit_dir, self.miner_states[hotkey]
-                )
+                if (
+                    self.competition_manager.is_competition_active()
+                    and self.sota_manager.check_if_sota(
+                        score, proof_size, response_time
+                    )
+                ):
+                    self.sota_manager.preserve_circuit(
+                        circuit_dir, self.miner_states[hotkey]
+                    )
 
-            self._update_competition_metrics(hotkey)
+                self._update_competition_metrics(hotkey)
 
         status = self.competition_manager.get_competition_status()
         bt.logging.info(f"Competition status: {status}")
