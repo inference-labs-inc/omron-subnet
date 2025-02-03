@@ -85,7 +85,7 @@ class RequestPipeline:
             synapse=synapse,
             circuit=circuit,
             request_type=request_type,
-            inputs=GenericInput(request_type, input_data),
+            inputs=GenericInput(RequestType.RWR, input_data),
             request_hash=request_hash,
             save=save,
         )
