@@ -12,14 +12,14 @@ class CircuitValidator:
         "model.compiled",
     ]
 
-    REQUIRED_SETTINGS = [
-        "model_path",
-        "input_shape",
-        "output_shape",
-        "param_visibility",
-        "scale",
-        "bits",
-    ]
+    REQUIRED_SETTINGS = {
+        "run_args": {
+            "input_visibility": "Private",
+            "output_visibility": "Public",
+            "param_visibility": "Private",
+            "commitment": "KZG",
+        }
+    }
 
     @classmethod
     def validate_files(cls, circuit_dir: str) -> bool:
@@ -72,9 +72,23 @@ class CircuitValidator:
         try:
             with open(os.path.join(circuit_dir, "settings.json")) as f:
                 settings = json.load(f)
-                if not all(k in settings for k in cls.REQUIRED_SETTINGS):
-                    bt.logging.error("Invalid settings.json format")
+                if "run_args" not in settings:
+                    bt.logging.error("Missing run_args in settings.json")
                     return False
+
+                run_args = settings["run_args"]
+                required_args = cls.REQUIRED_SETTINGS["run_args"]
+
+                for key, value in required_args.items():
+                    if key not in run_args:
+                        bt.logging.error(f"Missing required run_args setting: {key}")
+                        return False
+                    if run_args[key] != value:
+                        bt.logging.error(
+                            f"Invalid value for {key}: expected {value}, got {run_args[key]}"
+                        )
+                        return False
+
             return True
         except json.JSONDecodeError:
             bt.logging.error("Invalid JSON in settings.json")
