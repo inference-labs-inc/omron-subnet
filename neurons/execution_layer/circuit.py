@@ -80,10 +80,19 @@ class CircuitPaths:
             "deployment_layer",
             f"model_{self.model_id}",
         )
-        self.external_base_path = os.path.join(
-            cli_parser.config.full_path_models,
-            f"model_{self.model_id}",
-        )
+        if hasattr(cli_parser, "config") and cli_parser.config.full_path_models:
+            self.external_base_path = os.path.join(
+                cli_parser.config.full_path_models,
+                f"model_{self.model_id}",
+            )
+        else:
+            self.external_base_path = os.path.join(
+                os.path.expanduser("~"),
+                ".bittensor",
+                "omron",
+                "models",
+                f"model_{self.model_id}",
+            )
         self.input = os.path.join(self.base_path, "input.json")
         self.metadata = os.path.join(self.base_path, "metadata.json")
         self.compiled_model = os.path.join(self.base_path, "model.compiled")
