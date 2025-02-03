@@ -211,7 +211,7 @@ class CompetitionManager:
             comp_metrics = {
                 "competition_id": self.current_competition.id,
                 "name": self.current_competition.name,
-                "status": self.get_competition_status()["status"],
+                "status": self.get_competition_status()["status"].value,
                 "accuracy_weight": self.state.current_accuracy_weight,
                 "total_circuits_evaluated": self.state.total_circuits_evaluated,
                 "timestamp": int(time.time()),
