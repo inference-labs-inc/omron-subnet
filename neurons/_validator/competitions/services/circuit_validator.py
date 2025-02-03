@@ -33,12 +33,6 @@ class CircuitValidator:
             if not cls._validate_settings(circuit_dir):
                 return False
 
-            if not cls._validate_input_format(circuit_dir):
-                return False
-
-            if not cls._validate_ezkl_setup(circuit_dir):
-                return False
-
             return True
 
         except Exception as e:
