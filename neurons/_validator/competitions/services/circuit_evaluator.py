@@ -97,9 +97,11 @@ class CircuitEvaluator:
 
     def _get_input_shape(self, circuit_dir: str) -> Tuple[int, int] | None:
         try:
-            with open(
-                os.path.join(self.competition_directory, "competition_config.json")
-            ) as f:
+            config_path = os.path.join(
+                self.competition_directory, "competition_config.json"
+            )
+            bt.logging.info(f"Reading config from: {config_path}")
+            with open(config_path) as f:
                 config = json.load(f)
                 if (
                     "circuit_settings" in config

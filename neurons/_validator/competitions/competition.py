@@ -39,7 +39,7 @@ class Competition:
         self.circuit_manager = CircuitManager(self.temp_directory, self.competition_id)
         self.circuit_validator = CircuitValidator()
         self.circuit_evaluator = CircuitEvaluator(
-            self.baseline_model, self.competition_id
+            self.baseline_model, self.competition_directory
         )
 
         self.metagraph = metagraph
