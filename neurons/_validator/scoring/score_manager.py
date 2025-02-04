@@ -238,7 +238,7 @@ class ScoreManager:
             circuit.evaluation_data.minimum_response_time,
             self.metagraph.block.item(),
             self.user_uid,
-            competition_score,
+            competition_score if competition_score is not None else 0,
         )
 
         self._update_pow_queue([pow_item])
