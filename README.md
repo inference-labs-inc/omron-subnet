@@ -51,7 +51,7 @@ btcli subnet register --subtensor.network finney --netuid 2 --wallet.name {your_
 ### Run the miner
 
 <details>
-<summary>Docker Instructions (not supported during the competition period)</summary>
+<summary>Docker Instructions (not supported during the competition running from Feb 6 - Apr 20)</summary>
 #### With docker compose (recommended)
 
 ```yaml
@@ -121,7 +121,7 @@ Or run this command with `make pm2-miner WALLET_NAME={your_miner_key_name} HOTKE
 ### Run the validator
 
 <details>
-<summary>Docker Instructions (not supported during the competition period)</summary>
+<summary>Docker Instructions (not supported during the competition running from Feb 6 - Apr 20)</summary>
 #### With docker compose (recommended)
 
 ```yaml
