@@ -137,7 +137,7 @@ class Competition:
                 continue
 
     def _evaluate_circuit(self, miner_axon: bt.axon, circuit_dir: str) -> float:
-        bt.logging.info(f"Evaluating circuit for {miner_axon}")
+        bt.logging.info(f"Evaluating circuit for {miner_axon.hotkey}")
 
         accuracy_weight = self.competition_manager.get_accuracy_weight()
         bt.logging.info(f"Current accuracy weight: {accuracy_weight}")
