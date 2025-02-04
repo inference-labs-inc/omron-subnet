@@ -1,0 +1,12 @@
+{
+    "name": "Age Verification",
+    "description": "Accepts 224x224x3 image and returns the predicted age.",
+    "author": "External",
+    "version": "0.0.1",
+    "proof_system": "EZKL",
+    "type": "proof_of_computation",
+    "external_files": {
+        "circuit.zkey": "https://storage.omron.ai/73703fec8ab88ca4f481d91f0b8e53f1da880da25fa2668736c4f8ce74b8da83/pk.key"
+    },
+    "benchmark_choice_weight": 0.2
+}
