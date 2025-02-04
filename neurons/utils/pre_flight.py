@@ -167,7 +167,7 @@ def sync_model_files():
     loop = asyncio.get_event_loop()
     for logrows in range(1, 26):
         if os.path.exists(
-            os.path.join(os.expanduser("~"), ".ezkl", "srs", f"kzg{logrows}.srs")
+            os.path.join(os.path.expanduser("~"), ".ezkl", "srs", f"kzg{logrows}.srs")
         ):
             bt.logging.info(
                 f"{SYNC_LOG_PREFIX}SRS for logrows={logrows} already exists, skipping..."
