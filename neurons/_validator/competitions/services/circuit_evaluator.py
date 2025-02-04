@@ -157,8 +157,33 @@ class CircuitEvaluator:
 
             with tempfile.NamedTemporaryFile(
                 mode="w+", suffix=".json", dir=TEMP_FOLDER, delete=False
+            ) as temp_witness:
+                witness_path = temp_witness.name
+
+            with tempfile.NamedTemporaryFile(
+                mode="w+", suffix=".json", dir=TEMP_FOLDER, delete=False
             ) as temp_proof:
                 temp_proof_path = temp_proof.name
+
+            witness_result = subprocess.run(
+                [
+                    LOCAL_EZKL_PATH,
+                    "gen-witness",
+                    "--data",
+                    temp_input_path,
+                    "--compiled-circuit",
+                    os.path.join(circuit_dir, "model.compiled"),
+                    "--output",
+                    witness_path,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+
+            if witness_result.returncode != 0:
+                bt.logging.error(f"Witness generation failed: {witness_result.stderr}")
+                return None
 
             prove_result = subprocess.run(
                 [
@@ -167,7 +192,7 @@ class CircuitEvaluator:
                     "--compiled-circuit",
                     os.path.join(circuit_dir, "model.compiled"),
                     "--witness",
-                    temp_input_path,
+                    witness_path,
                     "--pk-path",
                     os.path.join(circuit_dir, "pk.key"),
                     "--proof-path",
@@ -179,6 +204,8 @@ class CircuitEvaluator:
             )
 
             os.unlink(temp_input_path)
+            os.unlink(witness_path)
+
             if prove_result.returncode != 0:
                 bt.logging.error(f"Proof generation failed: {prove_result.stderr}")
                 return None
