@@ -235,10 +235,6 @@ class MinerSession:
         """
         return self._blacklist(synapse)
 
-    def vk_blacklist(self, synapse: Competition) -> Tuple[bool, str]:
-
-        return self._blacklist(synapse)
-
     def aggregation_blacklist(
         self, synapse: QueryForProofAggregation
     ) -> Tuple[bool, str]:
