@@ -72,12 +72,13 @@ echo "Installing pm2..."
 sudo npm install -g pm2
 
 pipx ensurepath
+export PATH="$HOME/.local/bin:$PATH"
 
 echo "Installing uv..."
 pipx install uv
 
 echo "Installing btcli..."
-uv tool install --python 3.12 bittensor-cli
+"$HOME/.local/bin/uv" tool install --python 3.12 bittensor-cli
 
 if [[ ! -d ${INSTALL_PATH} ]]; then
     echo "Cloning omron-subnet repository..."
