@@ -61,8 +61,21 @@ class ValidatorLoop:
         self.config = config
         self.config.check_register()
         self.auto_update = AutoUpdate()
+        try:
+            self.competition = Competition(
+                1, self.config.metagraph, self.config.subtensor
+            )
+        except Exception as e:
+            bt.logging.warning(
+                f"Failed to initialize competition, continuing without competition support: {e}"
+            )
+            self.competition = None
+
         self.score_manager = ScoreManager(
-            self.config.metagraph, self.config.user_uid, self.config.full_path_score
+            self.config.metagraph,
+            self.config.user_uid,
+            self.config.full_path_score,
+            self.competition,
         )
         self.response_processor = ResponseProcessor(
             self.config.metagraph,
@@ -81,15 +94,6 @@ class ValidatorLoop:
             self.config, self.score_manager, self.api
         )
         self.last_competition_sync = 0
-        try:
-            self.competition = Competition(
-                1, self.config.metagraph, self.config.subtensor
-            )
-        except Exception as e:
-            bt.logging.warning(
-                f"Failed to initialize competition, continuing without competition support: {e}"
-            )
-            self.competition = None
         self.is_syncing_competition = False
 
         self.request_queue = asyncio.Queue()

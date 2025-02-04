@@ -8,6 +8,7 @@ import numpy as np
 import bittensor as bt
 from typing import Tuple, Union, List
 from constants import LOCAL_EZKL_PATH, TEMP_FOLDER
+from neurons._validator.competitions.services.sota_manager import SotaManager
 
 ONNX_VENV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "onnx_venv")
 ONNX_RUNNER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "onnx_runner.py")
@@ -15,10 +16,14 @@ ONNX_RUNNER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "onnx_run
 
 class CircuitEvaluator:
     def __init__(
-        self, baseline_model: Union[torch.nn.Module, str], competition_directory: str
+        self,
+        baseline_model: Union[torch.nn.Module, str],
+        competition_directory: str,
+        sota_manager: SotaManager,
     ):
         self.baseline_model = baseline_model
         self.competition_directory = competition_directory
+        self.sota_manager = sota_manager
         self.is_onnx = not isinstance(baseline_model, torch.nn.Module)
         if self.is_onnx and not os.path.exists(ONNX_VENV):
             self._setup_onnx_env()
@@ -29,6 +34,25 @@ class CircuitEvaluator:
         subprocess.run(
             [pip_path, "install", "numpy==1.24.3", "onnxruntime==1.17.0"], check=True
         )
+
+    def _calculate_relative_score(
+        self, accuracy: float, proof_size: float, response_time: float
+    ) -> float:
+        sota_state = self.sota_manager.current_state
+
+        accuracy_diff = max(0, sota_state.accuracy - accuracy)
+        proof_size_diff = max(
+            0, (proof_size - sota_state.proof_size) / sota_state.proof_size
+        )
+        response_time_diff = max(
+            0, (response_time - sota_state.response_time) / sota_state.response_time
+        )
+
+        total_diff = (
+            accuracy_diff * 0.4 + proof_size_diff * 0.3 + response_time_diff * 0.3
+        )
+
+        return torch.exp(-total_diff).item()
 
     def evaluate(
         self, circuit_dir: str, accuracy_weight: float
@@ -86,9 +110,11 @@ class CircuitEvaluator:
                 verification_results.append(verify_result)
 
                 if verify_result:
-                    raw_score = self._compare_outputs(baseline_output, public_signals)
-                    bt.logging.info(f"Comparison score: {raw_score}")
-                    scores.append(raw_score * accuracy_weight)
+                    accuracy_score = self._compare_outputs(
+                        baseline_output, public_signals
+                    )
+                    bt.logging.info(f"Accuracy score: {accuracy_score}")
+                    scores.append(accuracy_score)
                 else:
                     bt.logging.error("Proof verification failed")
                     scores.append(0.0)
@@ -97,9 +123,31 @@ class CircuitEvaluator:
                 bt.logging.error(f"Error in evaluation iteration: {str(e)}")
                 scores.append(0.0)
 
-        return self._calculate_averages(
-            scores, proof_sizes, response_times, verification_results
+        if not all(verification_results):
+            bt.logging.error(
+                "One or more verifications failed - setting all scores to 0"
+            )
+            return 0.0, float("inf"), float("inf"), False
+
+        avg_accuracy = sum(scores) / len(scores) if scores else 0
+        avg_proof_size = (
+            sum(proof_sizes) / len(proof_sizes) if proof_sizes else float("inf")
         )
+        avg_response_time = (
+            sum(response_times) / len(response_times)
+            if response_times
+            else float("inf")
+        )
+
+        final_score = self._calculate_relative_score(
+            avg_accuracy, avg_proof_size, avg_response_time
+        )
+
+        bt.logging.info(
+            f"Final metrics - Accuracy: {avg_accuracy}, Proof Size: {avg_proof_size}, "
+            f"Response Time: {avg_response_time}, Relative Score: {final_score}"
+        )
+        return final_score, avg_proof_size, avg_response_time, True
 
     def _get_input_shape(self, circuit_dir: str) -> Tuple[int, int] | None:
         try:
@@ -259,28 +307,10 @@ class CircuitEvaluator:
             )
 
             mse = torch.nn.functional.mse_loss(actual_array, expected_array)
-            bt.logging.info(f"MSE: {mse.item()}")
+            accuracy = torch.exp(-mse).item()
+            bt.logging.info(f"MSE: {mse.item()}, Accuracy: {accuracy}")
 
-            score = torch.exp(-mse).item()
-            bt.logging.info(f"Score: {score}")
-
-            return score
+            return accuracy
         except Exception as e:
             bt.logging.error(f"Error comparing outputs: {e}")
             return 0.0
-
-    def _calculate_averages(
-        self,
-        scores: list[float],
-        proof_sizes: list[int],
-        response_times: list[float],
-        verification_results: list[bool],
-    ) -> Tuple[float, float, float, bool]:
-        avg_score = sum(scores) / len(scores) if scores else 0
-        avg_proof_size = sum(proof_sizes) / len(proof_sizes) if proof_sizes else 0
-        avg_response_time = (
-            sum(response_times) / len(response_times) if response_times else 0
-        )
-        verification_success = all(verification_results)
-
-        return avg_score, avg_proof_size, avg_response_time, verification_success

@@ -61,15 +61,24 @@ class SotaManager:
     def check_if_sota(
         self, score: float, proof_size: float, response_time: float
     ) -> bool:
-        if score > self.sota_state.score:
-            return True
-        elif abs(score - self.sota_state.score) < 1e-6:
-            if proof_size < self.sota_state.proof_size:
-                return True
-            elif abs(proof_size - self.sota_state.proof_size) < 1e-6:
-                if response_time < self.sota_state.response_time:
-                    return True
-        return False
+        EPSILON = 1e-6
+
+        if score < self.sota_state.score - EPSILON:
+            return False
+        if proof_size > self.sota_state.proof_size + EPSILON:
+            return False
+        if response_time > self.sota_state.response_time + EPSILON:
+            return False
+
+        metrics_equal = (
+            abs(score - self.sota_state.score) < EPSILON
+            and abs(proof_size - self.sota_state.proof_size) < EPSILON
+            and abs(response_time - self.sota_state.response_time) < EPSILON
+        )
+        if metrics_equal:
+            return False
+
+        return True
 
     @property
     def current_state(self) -> SotaState:
