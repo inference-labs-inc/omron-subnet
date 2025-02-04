@@ -38,7 +38,9 @@ class Competition:
         self.sota_manager = SotaManager(self.sota_directory)
         self.circuit_manager = CircuitManager(self.temp_directory, self.competition_id)
         self.circuit_validator = CircuitValidator()
-        self.circuit_evaluator = CircuitEvaluator(self.baseline_model)
+        self.circuit_evaluator = CircuitEvaluator(
+            self.baseline_model, self.competition_id
+        )
 
         self.metagraph = metagraph
         self.subtensor = subtensor

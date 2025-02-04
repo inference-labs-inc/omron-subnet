@@ -6,5 +6,15 @@
     "end_timestamp": 1738859853,
     "baseline_model_path": "neurons/_validator/competitions/1/network.onnx",
     "max_accuracy_weight": 0.25,
-    "min_accuracy_weight": 0.0
+    "min_accuracy_weight": 0.0,
+    "circuit_settings": {
+        "input_shape": [
+            1,
+            25
+        ],
+        "output_shape": [
+            1,
+            6
+        ]
+    }
 }

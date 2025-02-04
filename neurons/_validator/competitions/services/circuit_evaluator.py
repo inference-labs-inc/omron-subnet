@@ -14,8 +14,11 @@ ONNX_RUNNER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "onnx_run
 
 
 class CircuitEvaluator:
-    def __init__(self, baseline_model: Union[torch.nn.Module, str]):
+    def __init__(
+        self, baseline_model: Union[torch.nn.Module, str], competition_directory: str
+    ):
         self.baseline_model = baseline_model
+        self.competition_directory = competition_directory
         self.is_onnx = not isinstance(baseline_model, torch.nn.Module)
         if self.is_onnx and not os.path.exists(ONNX_VENV):
             self._setup_onnx_env()
@@ -94,17 +97,16 @@ class CircuitEvaluator:
 
     def _get_input_shape(self, circuit_dir: str) -> Tuple[int, int] | None:
         try:
-            with open(os.path.join(circuit_dir, "settings.json")) as f:
-                settings = json.load(f)
-                if "input_shape" in settings:
-                    input_shape = settings["input_shape"]
-                    return tuple(input_shape) if len(input_shape) == 2 else None
-
-                public_inputs = settings.get("public_inputs", {})
-                if public_inputs:
-                    num_inputs = len(public_inputs["order"])
-                    return (1, num_inputs)
-                return None
+            with open(
+                os.path.join(self.competition_directory, "competition_config.json")
+            ) as f:
+                config = json.load(f)
+                if (
+                    "circuit_settings" in config
+                    and "input_shape" in config["circuit_settings"]
+                ):
+                    return tuple(config["circuit_settings"]["input_shape"])
+            return None
         except Exception as e:
             bt.logging.error(f"Error reading input shape: {e}")
             return None
