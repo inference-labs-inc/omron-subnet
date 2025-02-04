@@ -164,15 +164,13 @@ class CircuitEvaluator:
                 [
                     LOCAL_EZKL_PATH,
                     "prove",
-                    "-D",
+                    "--compiled-circuit",
                     os.path.join(circuit_dir, "model.compiled"),
-                    "--input",
+                    "--witness",
                     temp_input_path,
-                    "--params",
-                    os.path.join(circuit_dir, "settings.json"),
-                    "--pk",
+                    "--pk-path",
                     os.path.join(circuit_dir, "pk.key"),
-                    "--proof",
+                    "--proof-path",
                     temp_proof_path,
                 ],
                 capture_output=True,
@@ -182,6 +180,7 @@ class CircuitEvaluator:
 
             os.unlink(temp_input_path)
             if prove_result.returncode != 0:
+                bt.logging.error(f"Proof generation failed: {prove_result.stderr}")
                 return None
 
             with open(temp_proof_path) as f:
