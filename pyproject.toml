@@ -32,7 +32,7 @@ dev = ["black>=24.10.0", "pytest>=8.0.0"]
 
 [tool.setuptools]
 package-dir = { "omron" = "neurons" }
-packages = ["omron", "omron.utils", "omron._validator", "omron._validator.competitions", "omron._validator.core", "omron._validator.api"]
+packages = ["omron"]
 
 [tool.setuptools.dynamic]
 version = { attr = "omron.__version__" }

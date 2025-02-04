@@ -7,8 +7,6 @@ from datetime import datetime
 import json
 import os
 import enum
-import wandb
-from utils import wandb_logger
 from utils.gc_logging import gc_log_competition_metrics
 
 
@@ -74,34 +72,6 @@ class CompetitionManager:
 
         self._load_state()
         self._load_config()
-
-        if wandb.run is None:
-            config = type(
-                "Config",
-                (),
-                {
-                    "disable_wandb": False,
-                    "competition_id": (
-                        self.current_competition.id
-                        if self.current_competition
-                        else None
-                    ),
-                    "competition_name": (
-                        self.current_competition.name
-                        if self.current_competition
-                        else None
-                    ),
-                    "competition_description": (
-                        self.current_competition.description
-                        if self.current_competition
-                        else None
-                    ),
-                },
-            )()
-            wandb_logger.safe_init(
-                project="omron-competitions",
-                config=config,
-            )
 
     def _load_state(self):
         """Load competition state from disk"""
