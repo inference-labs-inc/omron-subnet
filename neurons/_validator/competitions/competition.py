@@ -175,16 +175,6 @@ class Competition:
 
                 self._update_competition_metrics(hotkey)
 
-        status = self.competition_manager.get_competition_status()
-        bt.logging.info(f"Competition status: {status}")
-
-        bt.logging.info(f"Average accuracy score: {score}")
-        bt.logging.info(f"Average proof size: {proof_size} bytes")
-        bt.logging.info(f"Average response time: {response_time}s")
-        bt.logging.info(
-            f"Verification success rate: {1.0 if verification_success else 0.0}"
-        )
-
         return score
 
     def _update_competition_metrics(self, hotkey: str):
