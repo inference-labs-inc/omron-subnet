@@ -8,7 +8,7 @@ import numpy as np
 import bittensor as bt
 from typing import Tuple, Union, List
 from constants import LOCAL_EZKL_PATH, TEMP_FOLDER
-from neurons._validator.competitions.services.sota_manager import SotaManager
+from _validator.competitions.services.sota_manager import SotaManager
 
 ONNX_VENV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "onnx_venv")
 ONNX_RUNNER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "onnx_runner.py")
