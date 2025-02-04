@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -eo pipefail
 
@@ -22,12 +22,6 @@ APT_PACKAGES=(
     "libssl-dev"
     "openssl"
 )
-
-NPM_PACKAGES=(
-    "pm2"
-    "snarkjs@0.7.4"
-)
-
 
 case "$(uname)" in
     "Darwin")
@@ -62,25 +56,21 @@ case "$(uname)" in
         ;;
 esac
 
+echo "Checking for SnarkJS..."
 local_snarkjs_dir="${HOME}/.snarkjs"
 local_snarkjs_path="${local_snarkjs_dir}/node_modules/.bin/snarkjs"
+if ! command -v "${local_snarkjs_path} r1cs info --help" >/dev/null 2>&1; then
+    echo "SnarkJS 0.7.4 not found in local directory. Installing..."
+    mkdir -p "${local_snarkjs_dir}"
+    npm install --prefix "${local_snarkjs_dir}" snarkjs@0.7.4
+    echo "SnarkJS has been installed in the local directory."
+fi
 
-echo "Installing npm packages..."
-for pkg in "${NPM_PACKAGES[@]}"; do
-    if [[ "$pkg" == "snarkjs@0.7.4" ]]; then
-        if ! command -v "${local_snarkjs_path} r1cs info --help" >/dev/null 2>&1; then
-            echo "SnarkJS 0.7.4 not found in local directory. Installing..."
-            mkdir -p "${local_snarkjs_dir}"
-            npm install --prefix "${local_snarkjs_dir}" snarkjs@0.7.4
-            echo "SnarkJS has been installed in the local directory."
-        fi
-    else
-        sudo npm install -g "$pkg"
-    fi
-done
+echo "Installing pm2..."
+sudo npm install -g pm2
 
+echo "Installing uv..."
 curl -LsSf https://astral.sh/uv/install.sh | sh
-
 export PATH="$HOME/.local/bin:$PATH"
 chmod +x "$HOME/.local/bin/uv"
 chmod +x "$HOME/.local/bin/uvx"
@@ -134,5 +124,4 @@ echo "
 echo "🥩 Setup complete! 🥩"
 echo "Next steps:"
 echo "1. cd ${INSTALL_PATH}"
-echo "2. source .venv/bin/activate"
-echo "3. Check docs/shared_setup_steps.md"
+echo "2. make <pm2-miner|pm2-validator> WALLET_NAME=<your_wallet_name> WALLET_HOTKEY=<your_wallet_hotkey>"
