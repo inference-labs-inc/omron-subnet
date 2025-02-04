@@ -124,6 +124,7 @@ class CircuitEvaluator:
             ):
                 np.save(input_file.name, test_inputs.numpy())
                 python_path = os.path.join(ONNX_VENV, "bin", "python")
+                bt.logging.info(f"Running ONNX model: {self.baseline_model}")
                 result = subprocess.run(
                     [
                         python_path,
@@ -135,11 +136,10 @@ class CircuitEvaluator:
                     capture_output=True,
                     text=True,
                 )
-                return (
-                    np.load(output_file.name).tolist()
-                    if result.returncode == 0
-                    else None
-                )
+                if result.returncode != 0:
+                    bt.logging.error(f"ONNX runner failed: {result.stderr}")
+                    return None
+                return np.load(output_file.name).tolist()
         except Exception as e:
             bt.logging.error(f"Error running baseline model: {e}")
             return None
