@@ -48,7 +48,7 @@ class CircuitEvaluator:
             0, (response_time - sota_state.response_time) / sota_state.response_time
         )
 
-        total_diff = (
+        total_diff = torch.tensor(
             accuracy_diff * 0.4 + proof_size_diff * 0.3 + response_time_diff * 0.3
         )
 
