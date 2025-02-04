@@ -43,7 +43,7 @@ from constants import (
     FIVE_MINUTES,
     ONE_HOUR,
 )
-from _validator.competitions.sota_manager import SotaManager
+from _validator.competitions.services.sota_manager import SotaManager
 
 
 class ValidatorLoop:
