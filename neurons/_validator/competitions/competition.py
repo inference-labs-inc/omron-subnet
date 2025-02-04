@@ -52,6 +52,11 @@ class Competition:
             return None
 
         model_path = self.competition_manager.current_competition.baseline_model_path
+        model_path = os.path.join(
+            self.competition_directory, os.path.basename(model_path)
+        )
+        bt.logging.info(f"Loading model from: {model_path}")
+
         if model_path.endswith(".pt"):
             return torch.load(model_path)
         elif model_path.endswith(".onnx"):

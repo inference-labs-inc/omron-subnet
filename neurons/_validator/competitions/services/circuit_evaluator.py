@@ -124,12 +124,13 @@ class CircuitEvaluator:
             ):
                 np.save(input_file.name, test_inputs.numpy())
                 python_path = os.path.join(ONNX_VENV, "bin", "python")
-                bt.logging.info(f"Running ONNX model: {self.baseline_model}")
+                model_path = os.path.abspath(self.baseline_model)
+                bt.logging.info(f"Running ONNX model: {model_path}")
                 result = subprocess.run(
                     [
                         python_path,
                         ONNX_RUNNER,
-                        self.baseline_model,
+                        model_path,
                         input_file.name,
                         output_file.name,
                     ],
