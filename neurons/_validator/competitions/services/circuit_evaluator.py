@@ -71,8 +71,11 @@ class CircuitEvaluator:
                 response_time = time.time() - start_time
                 response_times.append(response_time)
 
-                proof = proof_data["proof"]
-                public_signals = proof_data["public"]
+                proof = proof_data.get("proof", [])
+                public_signals = proof_data.get("pretty_public_inputs", {}).get(
+                    "rescaled_outputs", [[]]
+                )[0]
+                bt.logging.info(f"Public signals: {public_signals}")
                 proof_sizes.append(len(proof))
 
                 verify_result = self._verify_proof(circuit_dir, proof_path)
@@ -211,7 +214,10 @@ class CircuitEvaluator:
                 return None
 
             with open(temp_proof_path) as f:
-                return temp_proof_path, json.load(f)
+                proof_data = json.load(f)
+                bt.logging.info(f"Proof data keys: {list(proof_data.keys())}")
+                bt.logging.info(f"Full proof data: {proof_data}")
+                return temp_proof_path, proof_data
         except Exception as e:
             bt.logging.error(f"Error generating proof: {e}")
             return None
@@ -242,18 +248,23 @@ class CircuitEvaluator:
                 os.unlink(proof_path)
 
     def _compare_outputs(self, expected: list[float], actual: list[float]) -> float:
-        expected_array = torch.tensor(expected).reshape(10, 7)
-        actual_array = torch.tensor(actual).reshape(10, 7)
+        try:
+            expected_array = torch.tensor(expected).reshape(1, 6)
+            actual_array = torch.tensor(actual).reshape(1, 6)
+            bt.logging.info(
+                f"Comparing expected {expected_array} with actual {actual_array}"
+            )
 
-        expected_probs = torch.softmax(expected_array, dim=1)
-        actual_probs = torch.softmax(actual_array, dim=1)
+            mse = torch.nn.functional.mse_loss(actual_array, expected_array)
+            bt.logging.info(f"MSE: {mse.item()}")
 
-        kl_divs = torch.nn.functional.kl_div(
-            actual_probs.log(), expected_probs, reduction="none"
-        ).sum(dim=1)
-        avg_kl = kl_divs.mean().item()
+            score = torch.exp(-mse).item()
+            bt.logging.info(f"Score: {score}")
 
-        return 1.0 / (1.0 + avg_kl)
+            return score
+        except Exception as e:
+            bt.logging.error(f"Error comparing outputs: {e}")
+            return 0.0
 
     def _calculate_averages(
         self,
