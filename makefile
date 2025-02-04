@@ -101,6 +101,9 @@ test-validator:
 		--netuid 118 \
 		--subtensor.network test
 
+pm2-setup:
+	INSTALL_PATH="." ./setup.sh
+
 pm2-stop:
 	pm2 stop omron-miner || true
 	pm2 stop omron-validator || true
