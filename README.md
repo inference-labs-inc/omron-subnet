@@ -102,10 +102,6 @@ docker run -d \
 
 #### With pm2
 
-```console
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/inference-labs-inc/omron-subnet/main/setup.sh)"
-```
-
 > [!IMPORTANT]
 > Ensure you are within the `./neurons` directory before using the commands below to start your miner
 >
@@ -178,10 +174,6 @@ docker run -d \
 
 #### With pm2
 
-```console
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/inference-labs-inc/omron-subnet/main/setup.sh)"
-```
-
 > [!IMPORTANT]
 > Ensure you are within the `./neurons` directory before using the commands below to start your validator
 >
@@ -192,8 +184,8 @@ docker run -d \
 ```console
 pm2 start validator.py --name validator --interpreter ../.venv/bin/python --kill-timeout 3000 -- \
 --netuid 2 \
---wallet.name {validator_key_name} \
---wallet.hotkey {validator_hot_key_name}
+--wallet.name {your_validator_key_name} \
+--wallet.hotkey {your_validator_hotkey_name}
 ```
 
 Or run this command with `make pm2-validator WALLET_NAME={validator_key_name} HOTKEY_NAME={validator_hot_key_name}`
