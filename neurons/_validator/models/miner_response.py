@@ -188,3 +188,6 @@ class MinerResponse:
             result (bool): The verification result to set.
         """
         self.verification_result = result
+
+    def __iter__(self):
+        return iter(self.__dict__.items())

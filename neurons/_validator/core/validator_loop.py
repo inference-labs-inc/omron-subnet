@@ -32,6 +32,7 @@ from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
 from utils import AutoUpdate, clean_temp_files, with_rate_limit
 from utils.gc_logging import log_responses as gc_log_responses
+from _validator.competitions.competition import Competition
 from _validator.utils.logging import log_responses as console_log_responses
 from constants import (
     LOOP_DELAY_SECONDS,
@@ -60,8 +61,25 @@ class ValidatorLoop:
         self.config = config
         self.config.check_register()
         self.auto_update = AutoUpdate()
+
+        try:
+            competition_id = 1
+            self.competition = Competition(
+                competition_id,
+                self.config.metagraph,
+                self.config.subtensor,
+            )
+        except Exception as e:
+            bt.logging.warning(
+                f"Failed to initialize competition, continuing without competition support: {e}"
+            )
+            self.competition = None
+
         self.score_manager = ScoreManager(
-            self.config.metagraph, self.config.user_uid, self.config.full_path_score
+            self.config.metagraph,
+            self.config.user_uid,
+            self.config.full_path_score,
+            self.competition,
         )
         self.response_processor = ResponseProcessor(
             self.config.metagraph,
@@ -79,6 +97,8 @@ class ValidatorLoop:
         self.request_pipeline = RequestPipeline(
             self.config, self.score_manager, self.api
         )
+        self.last_competition_sync = 0
+        self.is_syncing_competition = False
 
         self.request_queue = asyncio.Queue()
         self.active_tasks: dict[int, asyncio.Task] = {}
@@ -180,28 +200,63 @@ class ValidatorLoop:
             self.last_response_time = time.time()
             self.recent_responses = []
 
+    @with_rate_limit(period=ONE_HOUR)
+    async def sync_competition(self):
+        if not self.competition:
+            return
+
+        if self.is_syncing_competition:
+            return
+
+        try:
+            self.is_syncing_competition = True
+            bt.logging.info("Starting competition sync and evaluation...")
+
+            for task in self.active_tasks.values():
+                task.cancel()
+            self.active_tasks.clear()
+
+            while not self.request_queue.empty():
+                try:
+                    self.request_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+
+            self.competition.sync_and_eval()
+
+            bt.logging.success("Competition sync and evaluation complete")
+
+        except Exception as e:
+            bt.logging.error(f"Error in competition sync: {e}")
+            traceback.print_exc()
+        finally:
+            self.is_syncing_competition = False
+
     async def maintain_request_pool(self):
         while True:
             try:
-                slots_available = MAX_CONCURRENT_REQUESTS - len(self.active_tasks)
-                if slots_available > 0:
-                    available_uids = [
-                        uid
-                        for uid in self.queryable_uids
-                        if uid not in self.processed_uids
-                        and uid not in self.active_tasks
-                    ]
+                if not self.is_syncing_competition:
+                    slots_available = MAX_CONCURRENT_REQUESTS - len(self.active_tasks)
+                    if slots_available > 0:
+                        available_uids = [
+                            uid
+                            for uid in self.queryable_uids
+                            if uid not in self.processed_uids
+                            and uid not in self.active_tasks
+                        ]
 
-                    for uid in available_uids[:slots_available]:
-                        request = self.request_pipeline.prepare_single_request(uid)
-                        if request:
-                            task = asyncio.create_task(
-                                self._process_single_request(request)
-                            )
-                            self.active_tasks[uid] = task
-                            task.add_done_callback(
-                                lambda t, uid=uid: self._handle_completed_task(t, uid)
-                            )
+                        for uid in available_uids[:slots_available]:
+                            request = self.request_pipeline.prepare_single_request(uid)
+                            if request:
+                                task = asyncio.create_task(
+                                    self._process_single_request(request)
+                                )
+                                self.active_tasks[uid] = task
+                                task.add_done_callback(
+                                    lambda t, uid=uid: self._handle_completed_task(
+                                        t, uid
+                                    )
+                                )
 
                 await asyncio.sleep(0)
             except Exception as e:
@@ -222,14 +277,16 @@ class ValidatorLoop:
     async def run_periodic_tasks(self):
         while True:
             try:
-                self.check_auto_update()
-                self.sync_metagraph()
-                self.sync_scores_uids()
-                self.update_weights()
-                self.update_queryable_uids()
-                self.update_processed_uids()
-                self.log_health()
-                await self.log_responses()
+                if not self.is_syncing_competition:
+                    self.check_auto_update()
+                    self.sync_metagraph()
+                    self.sync_scores_uids()
+                    self.update_weights()
+                    self.update_queryable_uids()
+                    self.update_processed_uids()
+                    self.log_health()
+                    await self.log_responses()
+                await self.sync_competition()
                 await asyncio.sleep(LOOP_DELAY_SECONDS)
             except Exception as e:
                 bt.logging.error(f"Error in periodic tasks: {e}")

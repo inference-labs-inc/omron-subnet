@@ -11,13 +11,20 @@ from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
 from _validator.models.request_type import RequestType
 from execution_layer.circuit import CircuitEvaluationItem
-from utils import with_rate_limit
+from utils.rate_limiter import with_rate_limit
+from _validator.competitions.competition import Competition
 
 
 class ScoreManager:
     """Manages the scoring of miners."""
 
-    def __init__(self, metagraph: bt.metagraph, user_uid: int, score_path: str):
+    def __init__(
+        self,
+        metagraph: bt.metagraph,
+        user_uid: int,
+        score_path: str,
+        competition: Competition | None = None,
+    ):
         """
         Initialize the ScoreManager.
 
@@ -31,6 +38,7 @@ class ScoreManager:
         self.scores = self.init_scores()
         self.last_processed_queue_step = -1
         self.proof_of_weights_queue = []
+        self.competition = competition
 
     def init_scores(self) -> torch.Tensor:
         """Initialize or load existing scores."""
@@ -203,6 +211,11 @@ class ScoreManager:
             return
 
         circuit = response.circuit
+        hotkey = self.metagraph.hotkeys[response.uid]
+
+        competition_score = None
+        if self.competition and hotkey in self.competition.miner_states:
+            competition_score = self.competition.miner_states[hotkey].score
 
         evaluation_data = CircuitEvaluationItem(
             circuit_id=circuit.id,
@@ -225,7 +238,7 @@ class ScoreManager:
             circuit.evaluation_data.minimum_response_time,
             self.metagraph.block.item(),
             self.user_uid,
-            0,
+            competition_score if competition_score is not None else 0,
         )
 
         self._update_pow_queue([pow_item])

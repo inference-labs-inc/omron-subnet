@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 
 
@@ -74,6 +75,10 @@ PROOF_OF_WEIGHTS_INTERVAL = 1000
 MAX_PROOFS_TO_LOG = 0
 # Era period for proof of weights (mortality of the pow log)
 PROOF_OF_WEIGHTS_LIFESPAN = 2
+# Active competition
+ACTIVE_COMPETITION = 1
+# Frequency in terms of seconds at which the competition is synced and evaluated
+COMPETITION_SYNC_INTERVAL = 60 * 60 * 24
 # Maximum signature lifespan for WebSocket requests
 MAX_SIGNATURE_LIFESPAN = 300
 # Whitelisted public keys (ss58 addresses) we accept external requests from by default
@@ -130,6 +135,8 @@ MAINNET_TESTNET_UIDS = [
     (57, 237),  # gaia
     (59, 249),  # agent-arena
 ]
+# EZKL path
+LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")
 # GitHub repository URL
 REPO_URL = "https://github.com/inference-labs-inc/omron-subnet"
 # Various time constants in seconds
@@ -145,3 +152,6 @@ TEMP_FOLDER = "/tmp/omron"
 # Queue size limits
 MAX_POW_QUEUE_SIZE = 1024
 MAX_EVALUATION_ITEMS = 1024
+
+# Maximum circuit size in GB for competitions
+MAX_CIRCUIT_SIZE_GB = 50
