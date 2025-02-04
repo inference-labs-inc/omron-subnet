@@ -59,16 +59,16 @@ class CircuitEvaluator:
     ) -> Tuple[float, float, float, bool]:
         scores, proof_sizes, response_times, verification_results = [], [], [], []
         input_shape = self._get_input_shape(circuit_dir)
-        bt.logging.info(f"Got input shape: {input_shape}")
+        bt.logging.debug(f"Got input shape: {input_shape}")
         if not input_shape:
             bt.logging.error("Failed to get input shape")
             return 0.0, 0.0, 0.0, False
 
         for i in range(10):
-            bt.logging.info(f"Running evaluation {i + 1}/10")
+            bt.logging.debug(f"Running evaluation {i + 1}/10")
             try:
                 test_inputs = torch.randn(*input_shape)
-                bt.logging.info(
+                bt.logging.debug(
                     f"Generated test inputs with shape: {test_inputs.shape}"
                 )
 
@@ -77,22 +77,20 @@ class CircuitEvaluator:
                     bt.logging.error("Baseline model run failed")
                     scores.append(0.0)
                     continue
-                bt.logging.info(
+                bt.logging.debug(
                     f"Got baseline output with shape: {np.array(baseline_output).shape}"
                 )
 
-                start_time = time.time()
                 proof_result = self._generate_proof(circuit_dir, test_inputs)
                 if not proof_result:
                     bt.logging.error("Proof generation failed")
                     scores.append(0.0)
                     continue
 
-                proof_path, proof_data = proof_result
-                bt.logging.info(
+                proof_path, proof_data, response_time = proof_result
+                bt.logging.debug(
                     f"Generated proof with size: {len(proof_data['proof'])}"
                 )
-                response_time = time.time() - start_time
                 response_times.append(response_time)
 
                 proof = proof_data.get("proof", [])
@@ -102,18 +100,18 @@ class CircuitEvaluator:
                         "rescaled_outputs", [[]]
                     )[0]
                 ]
-                bt.logging.info(f"Public signals: {public_signals}")
+                bt.logging.debug(f"Public signals: {public_signals}")
                 proof_sizes.append(len(proof))
 
                 verify_result = self._verify_proof(circuit_dir, proof_path)
-                bt.logging.info(f"Proof verification result: {verify_result}")
+                bt.logging.debug(f"Proof verification result: {verify_result}")
                 verification_results.append(verify_result)
 
                 if verify_result:
                     accuracy_score = self._compare_outputs(
                         baseline_output, public_signals
                     )
-                    bt.logging.info(f"Accuracy score: {accuracy_score}")
+                    bt.logging.debug(f"Accuracy score: {accuracy_score}")
                     scores.append(accuracy_score)
                 else:
                     bt.logging.error("Proof verification failed")
@@ -144,8 +142,8 @@ class CircuitEvaluator:
         )
 
         bt.logging.info(
-            f"Final metrics - Accuracy: {avg_accuracy}, Proof Size: {avg_proof_size}, "
-            f"Response Time: {avg_response_time}, Relative Score: {final_score}"
+            f"Circuit evaluation complete - Score: {final_score:.4f}, Accuracy: {avg_accuracy:.4f}, "
+            f"Proof Size: {avg_proof_size:.0f}, Response Time: {avg_response_time:.2f}s"
         )
         return final_score, avg_proof_size, avg_response_time, True
 
@@ -154,7 +152,7 @@ class CircuitEvaluator:
             config_path = os.path.join(
                 self.competition_directory, "competition_config.json"
             )
-            bt.logging.info(f"Reading config from: {config_path}")
+            bt.logging.debug(f"Reading config from: {config_path}")
             with open(config_path) as f:
                 config = json.load(f)
                 if (
@@ -179,7 +177,7 @@ class CircuitEvaluator:
                 np.save(input_file.name, test_inputs.numpy())
                 python_path = os.path.join(ONNX_VENV, "bin", "python")
                 model_path = os.path.abspath(self.baseline_model)
-                bt.logging.info(f"Running ONNX model: {model_path}")
+                bt.logging.debug(f"Running ONNX model: {model_path}")
                 result = subprocess.run(
                     [
                         python_path,
@@ -239,6 +237,7 @@ class CircuitEvaluator:
                 bt.logging.error(f"Witness generation failed: {witness_result.stderr}")
                 return None
 
+            proof_start = time.perf_counter()
             prove_result = subprocess.run(
                 [
                     LOCAL_EZKL_PATH,
@@ -256,6 +255,7 @@ class CircuitEvaluator:
                 text=True,
                 timeout=300,
             )
+            proof_time = time.perf_counter() - proof_start
 
             os.unlink(temp_input_path)
             os.unlink(witness_path)
@@ -266,9 +266,10 @@ class CircuitEvaluator:
 
             with open(temp_proof_path) as f:
                 proof_data = json.load(f)
-                bt.logging.info(f"Proof data keys: {list(proof_data.keys())}")
-                bt.logging.info(f"Full proof data: {proof_data}")
-                return temp_proof_path, proof_data
+                bt.logging.debug(f"Proof data keys: {list(proof_data.keys())}")
+                bt.logging.debug(f"Full proof data: {proof_data}")
+                bt.logging.debug(f"Proof timing - Proof: {proof_time:.3f}s")
+                return temp_proof_path, proof_data, proof_time
         except Exception as e:
             bt.logging.error(f"Error generating proof: {e}")
             return None
@@ -302,13 +303,13 @@ class CircuitEvaluator:
         try:
             expected_array = torch.tensor(expected).reshape(1, 6)
             actual_array = torch.tensor(actual).reshape(1, 6)
-            bt.logging.info(
+            bt.logging.debug(
                 f"Comparing expected {expected_array} with actual {actual_array}"
             )
 
             mse = torch.nn.functional.mse_loss(actual_array, expected_array)
             accuracy = torch.exp(-mse).item()
-            bt.logging.info(f"MSE: {mse.item()}, Accuracy: {accuracy}")
+            bt.logging.debug(f"MSE: {mse.item()}, Accuracy: {accuracy}")
 
             return accuracy
         except Exception as e:
