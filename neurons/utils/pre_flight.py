@@ -24,6 +24,14 @@ LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")
 TOOLCHAIN = "nightly-2024-09-30"
 JOLT_VERSION = "dd9e5c4bcf36ffeb75a576351807f8d86c33ec66"
 
+MINER_EXTERNAL_FILES = [
+    "circuit.zkey",
+    "pk.key",
+]
+VALIDATOR_EXTERNAL_FILES = [
+    "circuit.zkey",
+]
+
 
 async def download_srs(logrows):
     await ezkl.get_srs(logrows=logrows, commitment=ezkl.PyCommitments.KZG)
@@ -218,6 +226,17 @@ def sync_model_files():
 
         external_files = metadata.get("external_files", {})
         for key, url in external_files.items():
+            if (
+                cli_parser.config.role == "validator"
+                and key not in VALIDATOR_EXTERNAL_FILES
+            ) or (
+                cli_parser.config.role == "miner" and key not in MINER_EXTERNAL_FILES
+            ):
+                bt.logging.info(
+                    SYNC_LOG_PREFIX
+                    + f"Skipping {key} for {model_hash} as it is not required for the {cli_parser.config.role}."
+                )
+                continue
             file_path = os.path.join(
                 cli_parser.config.full_path_models, model_hash, key
             )
