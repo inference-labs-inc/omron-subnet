@@ -72,9 +72,12 @@ class CircuitEvaluator:
                 response_times.append(response_time)
 
                 proof = proof_data.get("proof", [])
-                public_signals = proof_data.get("pretty_public_inputs", {}).get(
-                    "rescaled_outputs", [[]]
-                )[0]
+                public_signals = [
+                    float(input)
+                    for input in proof_data.get("pretty_public_inputs", {}).get(
+                        "rescaled_outputs", [[]]
+                    )[0]
+                ]
                 bt.logging.info(f"Public signals: {public_signals}")
                 proof_sizes.append(len(proof))
 
