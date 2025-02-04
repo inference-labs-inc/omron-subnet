@@ -140,7 +140,6 @@ class Competition:
         bt.logging.info(f"Evaluating circuit for {miner_axon.hotkey}")
 
         accuracy_weight = self.competition_manager.get_accuracy_weight()
-        bt.logging.info(f"Current accuracy weight: {accuracy_weight}")
 
         score, proof_size, response_time, verification_success = (
             self.circuit_evaluator.evaluate(circuit_dir, accuracy_weight)
