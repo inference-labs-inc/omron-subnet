@@ -3,13 +3,11 @@
 set -eo pipefail
 
 
-PYTHON_VERSION="3.10"
 NODE_VERSION="20"
 INSTALL_PATH="./omron"
 
 
 BREW_PACKAGES=(
-    "python@${PYTHON_VERSION}"
     "node@${NODE_VERSION}"
     "jq"
     "aria2"
@@ -23,9 +21,6 @@ APT_PACKAGES=(
     "pkg-config"
     "libssl-dev"
     "openssl"
-    "python${PYTHON_VERSION}"
-    "python${PYTHON_VERSION}-venv"
-    "python3-pip"
 )
 
 NPM_PACKAGES=(
@@ -47,28 +42,15 @@ case "$(uname)" in
             brew install "$pkg" || brew upgrade "$pkg"
         done
 
-        brew link --force "python@${PYTHON_VERSION}"
         brew link --force "node@${NODE_VERSION}"
 
         npm config set cafile /etc/ssl/cert.pem
-
-        if [ -d "$HOME/.npm" ]; then
-            sudo chown -R $(whoami):$(id -g) "$HOME/.npm"
-        fi
         ;;
 
     "Linux")
         echo "Installing apt packages..."
         sudo apt update
-        sudo apt install -y software-properties-common
-        sudo add-apt-repository -y ppa:deadsnakes/ppa
-        sudo apt update
         sudo apt install -y "${APT_PACKAGES[@]}"
-
-
-        sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python${PYTHON_VERSION} 1
-        sudo update-alternatives --set python3 /usr/bin/python${PYTHON_VERSION}
-
 
         curl -fsSL "https://deb.nodesource.com/setup_${NODE_VERSION}.x" | sudo -E bash -
         sudo apt install -y nodejs
@@ -116,10 +98,7 @@ cd "${INSTALL_PATH}" || {
     exit 1
 }
 
-"$HOME/.local/bin/uv" venv
-source ".venv/bin/activate"
-
-"$HOME/.local/bin/uv" sync --locked
+"$HOME/.local/bin/uv" sync --locked --no-dev
 
 echo "
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
