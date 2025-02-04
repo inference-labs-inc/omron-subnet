@@ -30,8 +30,6 @@ from protocol import (
 from utils import AutoUpdate, clean_temp_files, wandb_logger
 from .circuit_manager import CircuitManager
 
-CIRCUIT_CID_PATH = os.path.join(os.path.dirname(__file__), "CIRCUIT_CID")
-
 COMPETITION_DIR = os.path.join(
     os.path.dirname(__file__), "..", "..", "competition_circuit"
 )
@@ -62,7 +60,6 @@ class MinerSession:
         axon = bt.axon(wallet=self.wallet, config=cli_parser.config)
         bt.logging.info(f"Axon created: {axon.info()}")
 
-        # Attach determines which functions are called when a request is received.
         bt.logging.info("Attaching forward functions to axon...")
         axon.attach(forward_fn=self.queryZkProof, blacklist_fn=self.proof_blacklist)
         axon.attach(
@@ -76,13 +73,10 @@ class MinerSession:
 
         bt.logging.info("Attached forward functions to axon")
 
-        # Start the miner's axon, making it active on the network.
         bt.logging.info(f"Starting axon server: {axon.info()}")
         axon.start()
         bt.logging.info(f"Started axon server: {axon.info()}")
 
-        # Serve passes the axon information to the network + netuid we are hosting on.
-        # This will auto-update if the axon port of external ip has changed.
         existing_axon = self.metagraph.axons[self.subnet_uid]
 
         if (
@@ -170,12 +164,10 @@ class MinerSession:
 
                 time.sleep(1)
 
-            # If someone intentionally stops the miner, it'll safely terminate operations.
             except KeyboardInterrupt:
                 bt.logging.success("Miner killed via keyboard interrupt.")
                 clean_temp_files()
                 break
-            # In case of unforeseen errors, the miner will log the error and continue operations.
             except Exception:
                 bt.logging.error(traceback.format_exc())
                 continue
@@ -190,7 +182,6 @@ class MinerSession:
                 exit()
             self.subnet_uid = None
         else:
-            # Each miner gets a unique identity (UID) in the network for differentiation.
             subnet_uid = self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
             self.subnet_uid = subnet_uid
 
@@ -202,7 +193,6 @@ class MinerSession:
         wandb_logger.safe_init("Miner", self.wallet, self.metagraph, cli_parser.config)
 
         if cli_parser.config.storage:
-            # Initialize circuit manager with storage config
             storage_config = {
                 "provider": cli_parser.config.storage.provider,
                 "bucket": cli_parser.config.storage.bucket,
@@ -218,7 +208,6 @@ class MinerSession:
             storage_config = None
 
         try:
-            # Get current commitment from chain
             current_commitment = self.subtensor.get_commitment(
                 cli_parser.config.netuid,
                 self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address),
@@ -336,7 +325,6 @@ class MinerSession:
                 bt.logging.critical(
                     "Circuit manager not initialized, unable to respond to validator."
                 )
-                # Create new synapse to ensure required fields are present
                 return Competition(
                     id=synapse.id,
                     hash=synapse.hash,

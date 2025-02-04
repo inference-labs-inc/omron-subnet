@@ -1,228 +1,82 @@
-# Competition System Technical Documentation
+# Omron Competitions Framework
 
-## Overview
+🥩 **Competitions Overview**
+Omron's competition system drives innovation in zkML performance by creating structured challenges where miners optimize circuits for specific tasks. Competitions leverage Omron's Proof-of-Inference mechanism([1](https://docs.omron.ai/intro-to-omron)) to verify miner submissions while maintaining computational integrity.
 
-The competition system enables miners to submit optimized circuits that are evaluated by validators. Due to large file sizes (particularly proving keys), the system uses cloud storage (R2/S3) for file distribution.
+## Competition Lifecycle
 
-## Architecture
+### Phases
 
-### Components
+1. **Pending**
 
-1. **CircuitManager** (Miner-side)
+   - Competition scheduled but not yet active
+   - Baseline model and evaluation criteria published
+   - Miners prepare circuits using competition template
 
-   - Manages circuit files and storage
-   - Handles R2/S3 uploads
-   - Manages chain commitments
-   - Provides signed URLs to validators
+2. **Active**
 
-2. **CircuitManager** (Validator-side)
+   - Open submission period (typically 7-14 days)
+   - Real-time leaderboard tracking
+   - Continuous circuit evaluation
 
-   - Downloads circuit files using signed URLs
-   - Validates URLs and file integrity
-   - Manages temporary storage
-   - Cleans up after evaluation
+3. **Completed**
 
-3. **Competition Protocol**
-   - Chain commitment: SHA256 hash of verification key
-   - File distribution: Signed R2/S3 URLs
-   - Required files: vk.key, pk.key, settings.json, model.compiled
+   - Final scores calculated
+   - Rewards distributed
+   - SOTA circuit preserved for future benchmarking
 
-### Security Model
+4. **Inactive**
+   - Between competition periods
+   - Historical data analysis
+   - Preparation for next challenge
 
-1. **Chain Commitment**
+## Miner Participation
 
-   - VK hash stored on-chain
-   - Prevents circuit switching after commitment
-   - Enables validator verification
+### Requirements
 
-2. **File Distribution**
+- Submit optimized zk-circuits matching competition template
+- Meet minimum hardware specs([2](https://docs.omron.ai/miner-validator-resources))
 
-   - Time-limited signed URLs
-   - Domain validation for R2/S3
-   - Atomic state updates
-   - Thread-safe operations
+### Submission Process
 
-3. **Validation**
-   - Hash verification before download
-   - URL domain validation
-   - Required file verification
+1. Clone competition circuit template
+2. Optimize model while maintaining I/O spec
+3. Generate verification artifacts:
+   - `settings.json
+   - `model.compiled`
+   - `vk.key`
+   - `pk.key`
+4. Commit circuit to the blockchain
 
-## Implementation
+## Evaluation Criteria
 
-### Miner Setup
+| Metric        | Weight | Description                         |
+| ------------- | ------ | ----------------------------------- |
+| Accuracy      | 40%    | Output similarity vs baseline model |
+| Proof Size    | 30%    | Byte size of generated ZK proofs    |
+| Response Time | 30%    | End-to-end proof generation latency |
 
-1. Configure storage credentials in config:
+> [!CAUTION]
+> Should any proofs fail to verify, the miner will be assigned a zero score.
 
-```python
-config = {
-    "storage_provider": "r2",  # or "s3"
-    "bucket": "your-bucket",
-    "account_id": "your-account-id",
-    "access_key": "your-access-key",
-    "secret": "your-secret"
-}
-```
+## Competition Management
 
-2. Required circuit files:
+### Key Features
 
-```
-circuit_dir/
-  ├── vk.key
-  ├── pk.key
-  ├── settings.json
-  └── model.compiled
-```
+- Automatic state transitions
+- Real-time metrics tracking
+- Fraud detection via proof verification
 
-### Flow
+### Monitoring
 
-1. **Validator Request Flow**
+- WandB integration for performance tracking
+- Public leaderboard on Omron dashboard
+- Daily score snapshots
 
-```mermaid
-sequenceDiagram
-    participant Validator
-    participant Miner
-    participant Storage
+## Risks
 
-    Validator->>Miner: Competition request
-    Miner->>Miner: Verify chain commitment
-    Miner->>Miner: Generate signed URLs
-    Miner->>Validator: Return URLs in commitment
-    Validator->>Validator: Validate URLs
-    Validator->>Storage: Download files
-    Note right of Validator: Verify files
-```
+- Invalid proofs result in immediate disqualification
+- Late submissions not accepted after end timestamp
 
-### Error Handling
-
-1. **Chain Commitment**
-
-   - Miner verifies local VK hash matches chain
-   - Returns empty response on mismatch
-   - Logs error with hash details
-
-2. **URL Generation**
-
-   - Validates all required files exist
-   - Returns error if URL generation fails
-   - Logs failures per file
-
-3. **Downloads**
-   - Validates URL domains
-   - Retries failed downloads
-   - Cleans up partial downloads
-
-## Best Practices
-
-### Miners
-
-1. **File Management**
-
-   - Keep circuit files in designated directory
-   - Verify files before commitment
-   - Monitor storage usage
-
-2. **Security**
-   - Secure storage credentials
-   - Set appropriate URL expiry
-   - Monitor URL usage
-
-### Validators
-
-1. **Download Strategy**
-
-   - Validate URLs before download
-   - Clean up temporary files
-   - Cache common files
-
-2. **Security Checks**
-   - Verify URL domains
-   - Check file integrity
-   - Validate commitment data
-
-## Configuration
-
-### Required Settings
-
-```python
-COMPETITION_CONFIG = {
-    # Storage Settings
-    "storage_provider": str,  # "r2" or "s3"
-    "bucket": str,
-    "account_id": str,
-    "access_key": str,
-    "secret": str,
-
-    # Circuit Settings
-    "circuit_dir": str,
-    "netuid": int
-}
-```
-
-### Required Files
-
-1. **Verification Key (vk.key)**
-
-   - Binary format
-   - Required for commitment
-   - Hash used on-chain
-
-2. **Proving Key (pk.key)**
-
-   - Binary format
-   - Required for proofs
-   - Size varies
-
-3. **Settings (settings.json)**
-
-   - JSON format
-   - Circuit parameters
-   - Required for setup
-
-4. **Model (model.compiled)**
-   - Compiled circuit
-   - Required for execution
-   - Format specific to EZKL
-
-## Monitoring
-
-### Key Metrics
-
-1. **Chain State**
-
-   - Commitment updates
-   - Hash verification
-   - Timing data
-
-2. **File Operations**
-   - Download success/failure
-   - URL validation
-   - Storage usage
-
-### Logging
-
-```python
-bt.logging.info("Downloading circuit files...")
-bt.logging.error(f"Invalid URL domain: {url}")
-bt.logging.success("Circuit files downloaded successfully")
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Hash Mismatch**
-
-   - Check chain commitment
-   - Verify local VK hash
-   - Check file integrity
-
-2. **URL Issues**
-
-   - Validate domain whitelist
-   - Check URL expiry
-   - Verify all required files
-
-3. **Download Failures**
-   - Check network connectivity
-   - Verify URL validity
-   - Clean up partial downloads
+**Links**
+[Technical Roadmap](https://docs.omron.ai/technical-roadmap) • [Miner Setup](https://docs.omron.ai/miner-validator-resources) • [zkML Documentation](https://docs.omron.ai/custom_circuit_integrations)
