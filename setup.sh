@@ -13,6 +13,7 @@ BREW_PACKAGES=(
     "aria2"
     "pkg-config"
     "openssl"
+    "pipx"
 )
 
 APT_PACKAGES=(
@@ -21,6 +22,7 @@ APT_PACKAGES=(
     "pkg-config"
     "libssl-dev"
     "openssl"
+    "pipx"
 )
 
 case "$(uname)" in
@@ -69,11 +71,13 @@ fi
 echo "Installing pm2..."
 sudo npm install -g pm2
 
+pipx ensurepath
+
 echo "Installing uv..."
-curl -LsSf https://astral.sh/uv/install.sh | sh
-export PATH="$HOME/.local/bin:$PATH"
-chmod +x "$HOME/.local/bin/uv"
-chmod +x "$HOME/.local/bin/uvx"
+pipx install uv
+
+echo "Installing btcli..."
+uv tool install --python 3.12 bittensor-cli
 
 if [[ ! -d ${INSTALL_PATH} ]]; then
     echo "Cloning omron-subnet repository..."
@@ -123,5 +127,6 @@ echo "
 "
 echo "🥩 Setup complete! 🥩"
 echo "Next steps:"
-echo "1. cd ${INSTALL_PATH}"
-echo "2. make <pm2-miner|pm2-validator> WALLET_NAME=<your_wallet_name> WALLET_HOTKEY=<your_wallet_hotkey>"
+echo "1. Check ${Install_PATH}/docs/shared_setup_steps.md to setup your wallet and register on the subnet"
+echo "2. cd ${INSTALL_PATH}"
+echo "3. make <pm2-miner|pm2-validator> WALLET_NAME=<your_wallet_name> WALLET_HOTKEY=<your_wallet_hotkey>"
