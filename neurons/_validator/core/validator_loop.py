@@ -6,6 +6,7 @@ import traceback
 import time
 from typing import NoReturn
 import concurrent.futures
+import os
 
 import bittensor as bt
 
@@ -42,6 +43,7 @@ from constants import (
     FIVE_MINUTES,
     ONE_HOUR,
 )
+from _validator.competitions.sota_manager import SotaManager
 
 
 class ValidatorLoop:
@@ -61,9 +63,24 @@ class ValidatorLoop:
         self.config = config
         self.config.check_register()
         self.auto_update = AutoUpdate()
+
         try:
+            competition_id = 1
+            competition_directory = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "..",
+                "competitions",
+                str(competition_id),
+            )
+            sota_directory = os.path.join(competition_directory, "sota")
+            os.makedirs(sota_directory, exist_ok=True)
+
+            sota_manager = SotaManager(sota_directory)
             self.competition = Competition(
-                1, self.config.metagraph, self.config.subtensor
+                competition_id,
+                self.config.metagraph,
+                self.config.subtensor,
+                sota_manager=sota_manager,
             )
         except Exception as e:
             bt.logging.warning(
