@@ -1,6 +1,6 @@
 import os
 import shutil
-from typing import Dict, Generator, Tuple, Union
+from typing import Dict, Tuple, Union, List
 import bittensor as bt
 import torch
 import platform
@@ -46,6 +46,7 @@ class Competition:
         self.metagraph = metagraph
         self.subtensor = subtensor
         self.miner_states: Dict[str, NeuronState] = {}
+        self.pending_evaluations: List[Tuple[bt.axon, str]] = []
 
     def _load_model(self) -> Union[torch.nn.Module, str, None]:
         if not self.competition_manager.current_competition:
@@ -65,25 +66,7 @@ class Competition:
         else:
             raise ValueError(f"Unsupported model format: {model_path}")
 
-    def sync_and_eval(self):
-        self.competition_manager.update_competition_state()
-
-        if not self.competition_manager.is_competition_active():
-            bt.logging.info("Competition not active, skipping circuit sync")
-            return
-
-        for axon, circuit_dir in self._sync_circuits():
-            try:
-                if self.circuit_validator.validate_files(circuit_dir):
-                    self._evaluate_circuit(axon, circuit_dir)
-                else:
-                    bt.logging.error(f"Circuit validation failed for {axon}")
-                    if os.path.exists(circuit_dir):
-                        shutil.rmtree(circuit_dir)
-            finally:
-                self.circuit_manager.cleanup_temp_files(circuit_dir)
-
-    def _sync_circuits(self) -> Generator[Tuple[bt.axon, str], None, None]:
+    def fetch_commitments(self) -> List[Tuple[int, str, str]]:
         if platform.system() != "Darwin" and platform.machine() != "arm64":
             bt.logging.critical(
                 "Competitions are only supported on macOS arm64 architecture\n"
@@ -91,65 +74,85 @@ class Competition:
                 "While the validator will continue to run, it will not be able to "
                 "correctly evaluate competitions."
             )
-            return
+            return []
 
         hotkeys = self.metagraph.hotkeys
         self.miner_states = {k: v for k, v in self.miner_states.items() if k in hotkeys}
 
+        commitments = []
         queryable_uids = get_queryable_uids(self.metagraph)
+
         for uid in queryable_uids:
             hotkey = self.metagraph.hotkeys[uid]
-
             try:
                 hash = self.subtensor.get_commitment(self.metagraph.netuid, uid)
                 if not hash:
                     bt.logging.warning(f"No commitment found for {hotkey} (UID {uid})")
                     continue
 
-                bt.logging.info(f"Commitment found for {hotkey} (UID {uid}): {hash}")
-
                 if (
                     hotkey not in self.miner_states
                     or self.miner_states[hotkey].hash != hash
                 ):
-
-                    bt.logging.success(
-                        f"New circuit detected for {hotkey} with hash {hash}"
-                    )
                     if hash in {state.hash for state in self.miner_states.values()}:
                         bt.logging.warning(
                             f"Circuit with hash {hash} already exists for another miner"
                         )
                         continue
-                    axon = self.metagraph.axons[uid]
-
-                    circuit_dir = os.path.join(self.temp_directory, hash)
-                    os.makedirs(circuit_dir, exist_ok=True)
-
-                    if self.circuit_manager.download_files(axon, hash, circuit_dir):
-                        self.miner_states[hotkey] = NeuronState(
-                            hotkey=hotkey,
-                            uid=uid,
-                            score=0.0,
-                            proof_size=0,
-                            response_time=0.0,
-                            verification_result=False,
-                            accuracy=0.0,
-                            hash=hash,
-                        )
-                        yield (axon, circuit_dir)
-                    else:
-                        bt.logging.error(
-                            f"Failed to download circuit files for {hotkey}"
-                        )
-                        if os.path.exists(circuit_dir):
-                            shutil.rmtree(circuit_dir)
-                else:
-                    bt.logging.warning(f"Circuit already exists for {hotkey}")
+                    commitments.append((uid, hotkey, hash))
+                    bt.logging.success(
+                        f"New circuit detected for {hotkey} with hash {hash}"
+                    )
 
             except Exception as e:
                 bt.logging.error(f"Error getting commitment for {hotkey}: {e}")
-                continue
+
+        return commitments
+
+    def prepare_evaluation(self, uid: int, hotkey: str, hash: str) -> bool:
+        try:
+            axon = self.metagraph.axons[uid]
+            circuit_dir = os.path.join(self.temp_directory, hash)
+            os.makedirs(circuit_dir, exist_ok=True)
+
+            if self.circuit_manager.download_files(axon, hash, circuit_dir):
+                if self.circuit_validator.validate_files(circuit_dir):
+                    self.miner_states[hotkey] = NeuronState(
+                        hotkey=hotkey,
+                        uid=uid,
+                        score=0.0,
+                        proof_size=0,
+                        response_time=0.0,
+                        verification_result=False,
+                        accuracy=0.0,
+                        hash=hash,
+                    )
+                    self.pending_evaluations.append((axon, circuit_dir))
+                    return True
+                else:
+                    bt.logging.error(f"Circuit validation failed for {hotkey}")
+                    if os.path.exists(circuit_dir):
+                        shutil.rmtree(circuit_dir)
+            else:
+                bt.logging.error(f"Failed to download circuit files for {hotkey}")
+                if os.path.exists(circuit_dir):
+                    shutil.rmtree(circuit_dir)
+        except Exception as e:
+            bt.logging.error(f"Error preparing evaluation for {hotkey}: {e}")
+            if os.path.exists(circuit_dir):
+                shutil.rmtree(circuit_dir)
+        return False
+
+    def run_single_evaluation(self) -> bool:
+        if not self.pending_evaluations:
+            return False
+
+        axon, circuit_dir = self.pending_evaluations.pop(0)
+        try:
+            self._evaluate_circuit(axon, circuit_dir)
+            return True
+        finally:
+            self.circuit_manager.cleanup_temp_files(circuit_dir)
 
     def _evaluate_circuit(self, miner_axon: bt.axon, circuit_dir: str) -> float:
         bt.logging.info(f"Evaluating circuit for {miner_axon.hotkey}")

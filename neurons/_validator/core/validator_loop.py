@@ -99,6 +99,7 @@ class ValidatorLoop:
         )
         self.last_competition_sync = 0
         self.is_syncing_competition = False
+        self.competition_commitments = []
 
         self.request_queue = asyncio.Queue()
         self.active_tasks: dict[int, asyncio.Task] = {}
@@ -210,21 +211,31 @@ class ValidatorLoop:
 
         try:
             self.is_syncing_competition = True
-            bt.logging.info("Starting competition sync and evaluation...")
+            bt.logging.info("Starting competition sync...")
 
-            for task in self.active_tasks.values():
-                task.cancel()
-            self.active_tasks.clear()
+            self.competition_commitments = self.competition.fetch_commitments()
+            if self.competition_commitments:
+                bt.logging.success(
+                    f"Found {len(self.competition_commitments)} new circuits to evaluate"
+                )
 
-            while not self.request_queue.empty():
-                try:
-                    self.request_queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    break
+                for task in self.active_tasks.values():
+                    task.cancel()
+                self.active_tasks.clear()
 
-            self.competition.sync_and_eval()
+                while not self.request_queue.empty():
+                    try:
+                        self.request_queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
 
-            bt.logging.success("Competition sync and evaluation complete")
+                bt.logging.info("Processing competition evaluations...")
+                while self.competition_commitments:
+                    uid, hotkey, hash = self.competition_commitments.pop(0)
+                    if self.competition.prepare_evaluation(uid, hotkey, hash):
+                        self.competition.run_single_evaluation()
+
+                bt.logging.success("Competition evaluations complete")
 
         except Exception as e:
             bt.logging.error(f"Error in competition sync: {e}")
