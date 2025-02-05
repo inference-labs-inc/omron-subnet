@@ -3,6 +3,7 @@ import shutil
 from typing import Dict, Generator, Tuple, Union
 import bittensor as bt
 import torch
+import platform
 
 from .models.neuron import NeuronState
 from .services.circuit_validator import CircuitValidator
@@ -83,6 +84,15 @@ class Competition:
                 self.circuit_manager.cleanup_temp_files(circuit_dir)
 
     def _sync_circuits(self) -> Generator[Tuple[bt.axon, str], None, None]:
+        if platform.system() != "Darwin" and platform.machine() != "arm64":
+            bt.logging.critical(
+                "Competitions are only supported on macOS arm64 architecture\n"
+                "To remain in consensus, please use a supported platform.\n"
+                "While the validator will continue to run, it will not be able to "
+                "correctly evaluate competitions."
+            )
+            return
+
         hotkeys = self.metagraph.hotkeys
         self.miner_states = {k: v for k, v in self.miner_states.items() if k in hotkeys}
 
