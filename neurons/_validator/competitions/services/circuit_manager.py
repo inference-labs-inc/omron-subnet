@@ -5,6 +5,7 @@ import requests
 import asyncio
 import bittensor as bt
 from protocol import Competition
+import hashlib
 from urllib.parse import urlparse
 
 
@@ -90,6 +91,16 @@ class CircuitManager:
                     with open(local_path, "wb") as f:
                         f.write(response.content)
                     bt.logging.debug(f"Downloaded {file_name} from signed URL")
+
+                    if file_name == "vk.key":
+                        with open(local_path, "rb") as f:
+                            file_hash = hashlib.sha256(f.read()).hexdigest()
+                        if file_hash != hash:
+                            bt.logging.error(
+                                f"Hash mismatch for vk.key: expected {hash}, got {file_hash}"
+                            )
+                            return False
+
                 except Exception as e:
                     bt.logging.error(f"Failed to download {file_name}: {e}")
                     return False
