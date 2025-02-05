@@ -64,6 +64,30 @@ class ProofOfWeightsSynapse(bt.Synapse):
         }
 
 
+class Competition(bt.Synapse):
+    """
+    A synapse for conveying competition messages and circuit files
+    """
+
+    id: int  # Competition ID
+    hash: str  # Circuit hash
+    file_name: str  # Name of file being requested
+    file_content: Optional[str] = None  # Hex encoded file content
+    commitment: Optional[str] = None  # Circuit commitment data from miner
+    error: Optional[str] = None  # Error message if something goes wrong
+
+    def deserialize(self) -> dict:
+        """Return all fields including required ones"""
+        return {
+            "id": self.id,
+            "hash": self.hash,
+            "file_name": self.file_name,
+            "file_content": self.file_content,
+            "commitment": self.commitment,
+            "error": self.error,
+        }
+
+
 class QueryForProofAggregation(bt.Synapse):
     """
     Query for aggregation of multiple proofs into a single proof

@@ -488,16 +488,16 @@ wheels = [
 
 [[package]]
 name = "ezkl"
-version = "16.2.3"
+version = "18.1.5"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/76/15/94c89ec97c4aeca58fea892a89fd6014e4167ff03ecbfb280a5798ead292/ezkl-16.2.3-cp37-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:78208b3859a621fdbb2bf36f1b1042a7661ad64f057370429877fd88ba78f6c6", size = 22403751 },
-    { url = "https://files.pythonhosted.org/packages/7d/e0/c8dce67eeb4bb900daa20cc0591e3fb6cd49059524f1172a66385987e005/ezkl-16.2.3-cp37-abi3-macosx_10_12_x86_64.whl", hash = "sha256:5ed5483de74a0de76b9e01b4b7e5c9348acee4d84ab7a76918e0e380e2d6881a", size = 11880778 },
-    { url = "https://files.pythonhosted.org/packages/d2/a6/9b4f2be31779e1fd196ff9c75a5c5e0b0c1e55392ca16332ae42a1454aab/ezkl-16.2.3-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7d6a5eb396628b80b52b8558a04650bc36397c2e964a4e901a31258a12215d24", size = 14233069 },
-    { url = "https://files.pythonhosted.org/packages/a7/e3/e7fe583a97252afabb2ae0faba847410d39a3f99fbff5fe42b4b790683ed/ezkl-16.2.3-cp37-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:22fc4e311c0ca34974ba93038601c2d5973e7c41ddb36c3d5044da9e923e8ee8", size = 13889046 },
-    { url = "https://files.pythonhosted.org/packages/b8/c0/d261c23dc30a98b9237a4c7a4cb37e2a370296c2ecdb4089b67922343916/ezkl-16.2.3-cp37-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:d5971f1194b4e97a4f246a049e767949a816f33e4ab09136d78d8cbee4e376d0", size = 14429198 },
-    { url = "https://files.pythonhosted.org/packages/6d/a3/d385c58eae4a586b1f6c34373f221247225508ccf107cb1bad2b4db2fb5a/ezkl-16.2.3-cp37-abi3-win32.whl", hash = "sha256:b91cdf8d80f7b8308634983750d57711dc364a4f5a03812276340e587f174c21", size = 10689296 },
-    { url = "https://files.pythonhosted.org/packages/72/54/44b14d94a097c48436f70c7bb8f4397fa985ed89360224dd391ea36b5810/ezkl-16.2.3-cp37-abi3-win_amd64.whl", hash = "sha256:01d749a2d316c057b6f87e68140548ef4b524da78e3ef5fdb050f59342ffa2ff", size = 12046478 },
+    { url = "https://files.pythonhosted.org/packages/56/bc/d43ad6370115f6a06a6e50829e11c29a1151c6fb449079979635d550a557/ezkl-18.1.5-cp37-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:9790eaba702e7ed59397630307b0e396d469c5908bd794d8c5529d8682055da2", size = 22425969 },
+    { url = "https://files.pythonhosted.org/packages/32/f4/6cd07d7993c6030808394b5ed8855bbef8cd74abed9686a2203688095fe9/ezkl-18.1.5-cp37-abi3-macosx_10_12_x86_64.whl", hash = "sha256:5845905e545186e870dcd7391de6de7699d6d8097d3af4126fb7c3d8160218af", size = 11884711 },
+    { url = "https://files.pythonhosted.org/packages/78/e6/17ac620c8d12a94aa9caff2e73ffa83e4108ae82680598e62b12f0fe3c27/ezkl-18.1.5-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4df889594aee1be06bf47bba3e4a46e3d31a2741cb58455f7e6da2e5ba12a678", size = 14267720 },
+    { url = "https://files.pythonhosted.org/packages/5b/b1/6f72fc1a40d6d3e6819361bc87e2e21443a265c61d854d6983daa612cb74/ezkl-18.1.5-cp37-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:42f651f09f097fc56a5f9ef6b870d0e99f38f57e576b0e7a13835b4868266de5", size = 13916194 },
+    { url = "https://files.pythonhosted.org/packages/81/5e/87bdda46998c8313c902251e77288e3451665cb2f44e03491216d7605870/ezkl-18.1.5-cp37-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:abb22f2994900ee7e9219a73b41bf89cf03bd9a0bddc1910d364d4c3e52b6c2c", size = 14450356 },
+    { url = "https://files.pythonhosted.org/packages/24/b0/811b3eedf66759473ddc6715d96119a59bfab652ad14537ac73bab5dacf1/ezkl-18.1.5-cp37-abi3-win32.whl", hash = "sha256:aa539decf9d323e1273eb10799742a6515090d89c1721e85d7f7d29d101200e9", size = 10714963 },
+    { url = "https://files.pythonhosted.org/packages/f5/a5/bc1975b306628572934cb3d8f2fab23c2d6b7251ba68e60e72639481c93d/ezkl-18.1.5-cp37-abi3-win_amd64.whl", hash = "sha256:cb80ff2b10a91873e00e2d6a573e1a521b2e4091e3bdac98e87225c2507da9f9", size = 12064934 },
 ]
 
 [[package]]
@@ -893,16 +893,18 @@ dependencies = [
     { name = "wandb" },
 ]
 
-[package.dev-dependencies]
+[package.optional-dependencies]
 dev = [
     { name = "black" },
+    { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "attrs", specifier = "==24.3.0" },
     { name = "bittensor", specifier = "==8.5.2" },
-    { name = "ezkl", specifier = "==16.2.3" },
+    { name = "black", marker = "extra == 'dev'", specifier = ">=24.10.0" },
+    { name = "ezkl", specifier = "==18.1.5" },
     { name = "fastapi", specifier = "==0.110.3" },
     { name = "jsonrpcserver", specifier = ">=5.0.9" },
     { name = "numpy", specifier = "==2.0.2" },
@@ -911,15 +913,13 @@ requires-dist = [
     { name = "psutil", specifier = "==6.1.1" },
     { name = "pydantic", specifier = "==2.10.6" },
     { name = "pyopenssl", specifier = ">=25.0.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "requests", specifier = "==2.32.3" },
     { name = "rich", specifier = "==13.8.1" },
     { name = "torch", specifier = "==2.4.1", index = "https://download.pytorch.org/whl/cpu" },
     { name = "uvicorn", specifier = "==0.34.0" },
     { name = "wandb", specifier = "==0.18.7" },
 ]
-
-[package.metadata.requires-dev]
-dev = [{ name = "black", specifier = ">=24.10.0" }]
 
 [[package]]
 name = "oslash"
@@ -1137,8 +1137,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/39/1b/d0b013bf7d1af7cf0a6a4fce13f5fe5813ab225313755367b36e714a63f8/pycryptodome-3.21.0-cp36-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:18caa8cfbc676eaaf28613637a89980ad2fd96e00c564135bf90bc3f0b34dd93", size = 2254397 },
     { url = "https://files.pythonhosted.org/packages/14/71/4cbd3870d3e926c34706f705d6793159ac49d9a213e3ababcdade5864663/pycryptodome-3.21.0-cp36-abi3-win32.whl", hash = "sha256:280b67d20e33bb63171d55b1067f61fbd932e0b1ad976b3a184303a3dad22764", size = 1775641 },
     { url = "https://files.pythonhosted.org/packages/43/1d/81d59d228381576b92ecede5cd7239762c14001a828bdba30d64896e9778/pycryptodome-3.21.0-cp36-abi3-win_amd64.whl", hash = "sha256:b7aa25fc0baa5b1d95b7633af4f5f1838467f1815442b22487426f94e0d66c53", size = 1812863 },
-    { url = "https://files.pythonhosted.org/packages/25/b3/09ff7072e6d96c9939c24cf51d3c389d7c345bf675420355c22402f71b68/pycryptodome-3.21.0-pp27-pypy_73-manylinux2010_x86_64.whl", hash = "sha256:2cb635b67011bc147c257e61ce864879ffe6d03342dc74b6045059dfbdedafca", size = 1691593 },
-    { url = "https://files.pythonhosted.org/packages/a8/91/38e43628148f68ba9b68dedbc323cf409e537fd11264031961fd7c744034/pycryptodome-3.21.0-pp27-pypy_73-win32.whl", hash = "sha256:4c26a2f0dc15f81ea3afa3b0c87b87e501f235d332b7f27e2225ecb80c0b1cdd", size = 1765997 },
 ]
 
 [[package]]

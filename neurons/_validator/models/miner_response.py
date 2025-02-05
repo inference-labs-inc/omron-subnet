@@ -112,7 +112,7 @@ class MinerResponse:
                 uid=response.uid,
                 verification_result=False,
                 response_time=response.response_time,
-                proof_size=proof_size,
+                proof_size=proof_size or DEFAULT_PROOF_SIZE,
                 circuit=response.circuit,
                 proof_content=proof_content,
                 request_type=response.request_type,
@@ -147,7 +147,7 @@ class MinerResponse:
             circuit=circuit,
             proof_content=None,
             public_json=None,
-            request_type=None,
+            request_type=RequestType.BENCHMARK,
             input_hash=None,
             raw=None,
             error="Empty response",
@@ -188,3 +188,6 @@ class MinerResponse:
             result (bool): The verification result to set.
         """
         self.verification_result = result
+
+    def __iter__(self):
+        return iter(self.__dict__.items())

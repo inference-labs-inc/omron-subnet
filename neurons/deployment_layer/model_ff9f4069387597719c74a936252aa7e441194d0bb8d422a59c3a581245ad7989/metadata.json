@@ -1,0 +1,14 @@
+{
+    "name": "SN48 PoW",
+    "description": "Generates weights based on miner scoring data from SN48.",
+    "author": "Inference Labs",
+    "version": "0.0.2",
+    "proof_system": "EZKL",
+    "netuid": 48,
+    "weights_version": 0,
+    "type": "proof_of_weights",
+    "external_files": {
+        "pk.key": "https://storage.omron.ai/ff9f4069387597719c74a936252aa7e441194d0bb8d422a59c3a581245ad7989/pk.key"
+    },
+    "benchmark_choice_weight": 0.2
+}

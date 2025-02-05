@@ -45,3 +45,8 @@ class ValidatorKeysCache:
         if cache_timestamp is None or cache_timestamp < datetime.datetime.now():
             await self.fetch_validator_keys(netuid)
         return ss58_address in self.cached_keys.get(netuid, [])
+
+    async def check_whitelisted_key(self, ss58_address: str) -> bool:
+        if not self.config.api.whitelisted_public_keys:
+            return False
+        return ss58_address in self.config.api.whitelisted_public_keys

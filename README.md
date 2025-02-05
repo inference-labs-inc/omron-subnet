@@ -50,6 +50,8 @@ btcli subnet register --subtensor.network finney --netuid 2 --wallet.name {your_
 
 ### Run the miner
 
+<details>
+<summary>Docker Instructions (not supported during the competition running from Feb 6 - Apr 20)</summary>
 #### With docker compose (recommended)
 
 ```yaml
@@ -96,36 +98,30 @@ docker run -d \
   --wallet.hotkey {your_miner_hotkey_name} \
   --netuid 2
 ```
+</details>
 
 #### With pm2
 
 > [!IMPORTANT]
-> Ensure you are within the `/neurons` directory before using the commands below to start your miner
+> Ensure you are within the `./neurons` directory before using the commands below to start your miner
 >
 > ```console
 > cd neurons
 > ```
 
-##### Within a virtual environment
-
 ```console
-pm2 start miner.py --name miner --interpreter ../omron-venv/bin/python --kill-timeout 3000 -- \
+pm2 start miner.py --name miner --interpreter ../.venv/bin/python --kill-timeout 3000 -- \
 --netuid 2 \
 --wallet.name {your_miner_key_name} \
 --wallet.hotkey {your_miner_hotkey_name}
 ```
 
-##### Outside of a virtual environment
-
-```console
-pm2 start miner.py --name miner --interpreter python3 --kill-timeout 3000 -- \
-  --netuid 2 \
-  --wallet.name {your_miner_key_name} \
-  --wallet.hotkey {your_miner_hotkey_name}
-```
+Or run this command with `make pm2-miner WALLET_NAME={your_miner_key_name} HOTKEY_NAME={your_miner_hotkey_name}`
 
 ### Run the validator
 
+<details>
+<summary>Docker Instructions (not supported during the competition running from Feb 6 - Apr 20)</summary>
 #### With docker compose (recommended)
 
 ```yaml
@@ -174,37 +170,32 @@ docker run -d \
   --wallet.hotkey {validator_hot_key_name} \
   --netuid 2
 ```
+</details>
 
 #### With pm2
 
 > [!IMPORTANT]
-> Ensure you are within the `/neurons` directory before using the commands below to start your validator
+> Ensure you are within the `./neurons` directory before using the commands below to start your validator
 >
 > ```console
 > cd neurons
 > ```
 
-##### Within a virtual environment
-
 ```console
-pm2 start validator.py --name validator --interpreter ../omron-venv/bin/python --kill-timeout 3000 -- \
+pm2 start validator.py --name validator --interpreter ../.venv/bin/python --kill-timeout 3000 -- \
 --netuid 2 \
---wallet.name {validator_key_name} \
---wallet.hotkey {validator_hot_key_name}
+--wallet.name {your_validator_key_name} \
+--wallet.hotkey {your_validator_hotkey_name}
 ```
 
-##### Outside of a virtual environment
-
-```console
-pm2 start validator.py --name validator --interpreter python3 --kill-timeout 3000 -- \
-  --netuid 2 \
-  --wallet.name {validator_key_name} \
-  --wallet.hotkey {validator_hot_key_name}
-```
+Or run this command with `make pm2-validator WALLET_NAME={validator_key_name} HOTKEY_NAME={validator_hot_key_name}`
 
 ## Miner
 
 Miners contribute to this subnet by providing compute to generate output from, and prove AI model inferences. Miners receive workloads from validators in the form of input data, perform verified inferences on those inputs and respond with output along with a zero knowledge proof of inference.
+
+> [!IMPORTANT]
+> As of February 2025, the miner **should** be run on a bare-metal MacOS machine with support for Metal GPU acceleration, to optimize for performance.
 
 ### Hardware requirements
 
@@ -238,23 +229,29 @@ Validators are responsible for verifying model outputs as provided by miners, an
 
 ### Hardware requirements
 
+> [!IMPORTANT]
+> As of February 2025, the validator **must** be run on a bare-metal MacOS machine with support for Metal GPU acceleration.
+
+Though AWS instances for metal are recommended, any MacOS machine with a Metal GPU is sufficient.
+
 #### Minimum
 
-| Component    | Requirement   |
-| ------------ | ------------- |
-| CPU          | 8 core 3.2GHz |
-| RAM          | 16GB          |
-| Network Up   | 400Mbps       |
-| Network Down | 400Mbps       |
-| Storage      | 1TB           |
+| Component    | Requirement            |
+| ------------ | ---------------------- |
+| Instance     | mac2-m2pro.metal (AWS) |
+| CPU          | Apple M2 Pro (12-core) |
+| RAM          | 32GB                   |
+| Network Up   | 10Gbps                 |
+| Network Down | 10Gbps                 |
+| Storage      | 2TB SSD                |
 
 #### Recommended
 
-| Component      | Recommendation |
-| -------------- | -------------- |
-| CPU            | 8 core 3.4GHz  |
-| RAM            | 32GB           |
-| Network Up     | 1+Gbps         |
-| Network Down   | 1+Gbps         |
-| Storage        | 2+TB           |
-| Storage Medium | SSD            |
+| Component    | Recommendation           |
+| ------------ | ------------------------ |
+| Instance     | mac2-m1ultra.metal (AWS) |
+| CPU          | Apple M1 Ultra (20-core) |
+| RAM          | 128GB                    |
+| Network Up   | 10Gbps                   |
+| Network Down | 10Gbps                   |
+| Storage      | 2TB+ SSD                 |
