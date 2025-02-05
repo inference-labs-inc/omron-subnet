@@ -48,7 +48,7 @@ MAXIMUM_SCORE_MEDIAN_SAMPLE = 0.05
 # Shift in seconds to apply to the minimum response time for vertical asymptote adjustment
 MINIMUM_SCORE_SHIFT = 0.0
 # Weights version hyperparameter
-WEIGHTS_VERSION = 1652
+WEIGHTS_VERSION = 1660
 # Rate limit for weight updates
 WEIGHT_RATE_LIMIT: int = 100
 # Delay between loop iterations
@@ -76,7 +76,7 @@ MAX_PROOFS_TO_LOG = 0
 # Era period for proof of weights (mortality of the pow log)
 PROOF_OF_WEIGHTS_LIFESPAN = 2
 # Active competition
-ACTIVE_COMPETITION = 1
+ACTIVE_COMPETITION = 0
 # Frequency in terms of seconds at which the competition is synced and evaluated
 COMPETITION_SYNC_INTERVAL = 60 * 60 * 24
 # Maximum signature lifespan for WebSocket requests
