@@ -1,5 +1,6 @@
 import os
 import shutil
+import json
 from typing import Dict, Generator, Tuple, Union
 import bittensor as bt
 import torch
@@ -10,6 +11,12 @@ from .services.circuit_validator import CircuitValidator
 from .services.circuit_manager import CircuitManager
 from .services.circuit_evaluator import CircuitEvaluator
 from .services.sota_manager import SotaManager
+from .services.data_source import (
+    CompetitionDataSource,
+    RandomDataSource,
+    RemoteDataSource,
+    CompetitionDataProcessor,
+)
 from .competition_manager import CompetitionManager
 from .utils.cleanup import register_cleanup_handlers
 from constants import TEMP_FOLDER
@@ -37,6 +44,7 @@ class Competition:
         self.competition_manager = CompetitionManager(self.competition_directory)
         self.baseline_model = self._load_model()
         self.sota_manager = SotaManager(self.sota_directory)
+        self.data_source = self._setup_data_source()
         self.circuit_manager = CircuitManager(self.temp_directory, self.competition_id)
         self.circuit_validator = CircuitValidator()
         self.circuit_evaluator = CircuitEvaluator(
@@ -46,6 +54,52 @@ class Competition:
         self.metagraph = metagraph
         self.subtensor = subtensor
         self.miner_states: Dict[str, NeuronState] = {}
+
+    def _setup_data_source(self) -> CompetitionDataSource:
+        try:
+            config_path = os.path.join(
+                self.competition_directory, "competition_config.json"
+            )
+            with open(config_path) as f:
+                config = json.load(f)
+                data_config = config.get("data_source", {})
+
+                processor = None
+                processor_path = os.path.join(
+                    self.competition_directory, "data_processor.py"
+                )
+                if os.path.exists(processor_path):
+                    import importlib.util
+
+                    spec = importlib.util.spec_from_file_location(
+                        "data_processor", processor_path
+                    )
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+
+                    for attr_name in dir(module):
+                        attr = getattr(module, attr_name)
+                        if (
+                            isinstance(attr, type)
+                            and issubclass(attr, CompetitionDataProcessor)
+                            and attr != CompetitionDataProcessor
+                        ):
+                            processor = attr()
+                            break
+
+                if data_config.get("type") == "remote":
+                    data_source = RemoteDataSource(
+                        self.competition_directory, processor
+                    )
+                    if not data_source.sync_data():
+                        bt.logging.error("Failed to sync remote data source")
+                        return RandomDataSource(self.competition_directory, processor)
+                    return data_source
+                return RandomDataSource(self.competition_directory, processor)
+
+        except Exception as e:
+            bt.logging.error(f"Error setting up data source: {e}")
+            return RandomDataSource(self.competition_directory)
 
     def _load_model(self) -> Union[torch.nn.Module, str, None]:
         if not self.competition_manager.current_competition:

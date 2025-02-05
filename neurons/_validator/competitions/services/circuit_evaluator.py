@@ -9,6 +9,11 @@ import bittensor as bt
 from typing import Tuple, Union, List
 from constants import LOCAL_EZKL_PATH, TEMP_FOLDER
 from _validator.competitions.services.sota_manager import SotaManager
+from _validator.competitions.services.data_source import (
+    CompetitionDataSource,
+    RandomDataSource,
+    RemoteDataSource,
+)
 
 ONNX_VENV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "onnx_venv")
 ONNX_RUNNER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "onnx_runner.py")
@@ -28,12 +33,29 @@ class CircuitEvaluator:
         if self.is_onnx and not os.path.exists(ONNX_VENV):
             self._setup_onnx_env()
 
+        self.data_source = self._setup_data_source()
+
     def _setup_onnx_env(self):
         subprocess.run(["python", "-m", "venv", ONNX_VENV], check=True)
         pip_path = os.path.join(ONNX_VENV, "bin", "pip")
         subprocess.run(
             [pip_path, "install", "numpy==1.24.3", "onnxruntime==1.17.0"], check=True
         )
+
+    def _setup_data_source(self) -> CompetitionDataSource:
+        try:
+            config_path = os.path.join(
+                self.competition_directory, "competition_config.json"
+            )
+            with open(config_path) as f:
+                config = json.load(f)
+                data_config = config.get("data_source", {})
+                if data_config.get("type") == "remote":
+                    return RemoteDataSource(self.competition_directory)
+        except Exception as e:
+            bt.logging.error(f"Error setting up data source: {e}")
+
+        return RandomDataSource(self.competition_directory)
 
     def _calculate_relative_score(
         self, accuracy: float, proof_size: float, response_time: float
@@ -67,10 +89,13 @@ class CircuitEvaluator:
         for i in range(10):
             bt.logging.debug(f"Running evaluation {i + 1}/10")
             try:
-                test_inputs = torch.randn(*input_shape)
-                bt.logging.debug(
-                    f"Generated test inputs with shape: {test_inputs.shape}"
-                )
+                test_inputs = self.data_source.get_benchmark_data()
+                if test_inputs is None:
+                    bt.logging.error("Failed to get benchmark data")
+                    scores.append(0.0)
+                    continue
+
+                bt.logging.debug(f"Got benchmark data with shape: {test_inputs.shape}")
 
                 baseline_output = self._run_baseline_model(test_inputs)
                 if baseline_output is None:

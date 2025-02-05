@@ -23,6 +23,7 @@ dependencies = [
   "requests==2.32.3",
   "rich==13.8.1",
   "torch==2.4.1",
+  "torchvision>=0.19.1",
   "uvicorn==0.34.0",
   "wandb==0.18.7",
 ]
