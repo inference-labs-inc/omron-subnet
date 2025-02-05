@@ -5,7 +5,7 @@ import subprocess
 import time
 import traceback
 from typing import Optional
-from constants import FIVE_MINUTES
+from constants import FIVE_MINUTES, Roles
 
 # trunk-ignore(pylint/E0611)
 import bittensor as bt
@@ -15,6 +15,8 @@ import requests
 import cli_parser
 from constants import IGNORED_MODEL_HASHES
 from execution_layer.circuit import ProofSystem
+
+from functools import partial
 
 LOCAL_SNARKJS_INSTALL_DIR = os.path.join(os.path.expanduser("~"), ".snarkjs")
 LOCAL_SNARKJS_PATH = os.path.join(
@@ -37,7 +39,7 @@ async def download_srs(logrows):
     await ezkl.get_srs(logrows=logrows, commitment=ezkl.PyCommitments.KZG)
 
 
-def run_shared_preflight_checks(role: Optional[str] = None):
+def run_shared_preflight_checks(role: Optional[Roles] = None):
     """
     This function executes a series of checks to ensure the environment is properly
     set up for both validator and miner operations.
@@ -54,7 +56,7 @@ def run_shared_preflight_checks(role: Optional[str] = None):
     """
 
     preflight_checks = [
-        ("Syncing model files", sync_model_files),
+        ("Syncing model files", partial(sync_model_files, role=role)),
         ("Ensuring Node.js version", ensure_nodejs_version),
         ("Checking SnarkJS installation", ensure_snarkjs_installed),
         ("Checking EZKL installation", ensure_ezkl_installed),
@@ -166,7 +168,7 @@ def ensure_snarkjs_installed():
             ) from e
 
 
-def sync_model_files():
+def sync_model_files(role: Optional[Roles] = None):
     """
     Sync external model files
     """
@@ -226,15 +228,12 @@ def sync_model_files():
 
         external_files = metadata.get("external_files", {})
         for key, url in external_files.items():
-            if (
-                cli_parser.config.role == "validator"
-                and key not in VALIDATOR_EXTERNAL_FILES
-            ) or (
-                cli_parser.config.role == "miner" and key not in MINER_EXTERNAL_FILES
+            if (role == Roles.VALIDATOR and key not in VALIDATOR_EXTERNAL_FILES) or (
+                role == Roles.MINER and key not in MINER_EXTERNAL_FILES
             ):
                 bt.logging.info(
                     SYNC_LOG_PREFIX
-                    + f"Skipping {key} for {model_hash} as it is not required for the {cli_parser.config.role}."
+                    + f"Skipping {key} for {model_hash} as it is not required for the {role}."
                 )
                 continue
             file_path = os.path.join(
