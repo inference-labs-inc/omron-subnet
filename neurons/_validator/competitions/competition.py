@@ -106,6 +106,11 @@ class Competition:
                     bt.logging.success(
                         f"New circuit detected for {hotkey} with hash {hash}"
                     )
+                    if hash in {state.hash for state in self.miner_states.values()}:
+                        bt.logging.warning(
+                            f"Circuit with hash {hash} already exists for another miner"
+                        )
+                        continue
                     axon = self.metagraph.axons[uid]
 
                     circuit_dir = os.path.join(self.temp_directory, hash)
