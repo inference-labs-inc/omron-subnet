@@ -17,6 +17,7 @@ from constants import IGNORED_MODEL_HASHES
 from execution_layer.circuit import ProofSystem
 
 from functools import partial
+from collections import OrderedDict
 
 LOCAL_SNARKJS_INSTALL_DIR = os.path.join(os.path.expanduser("~"), ".snarkjs")
 LOCAL_SNARKJS_PATH = os.path.join(
@@ -55,21 +56,21 @@ def run_shared_preflight_checks(role: Optional[Roles] = None):
         Exception: If any of the pre-flight checks fail.
     """
 
-    preflight_checks = [
-        ("Syncing model files", partial(sync_model_files, role=role)),
-        ("Ensuring Node.js version", ensure_nodejs_version),
-        ("Checking SnarkJS installation", ensure_snarkjs_installed),
-        ("Checking EZKL installation", ensure_ezkl_installed),
-    ]
+    preflight_checks = OrderedDict({
+        "Syncing model files": partial(sync_model_files, role=role),
+        "Ensuring Node.js version": ensure_nodejs_version,
+        "Checking SnarkJS installation": ensure_snarkjs_installed,
+        "Checking EZKL installation": ensure_ezkl_installed,
+    })
 
     bt.logging.info(" PreFlight | Running pre-flight checks")
 
     # Skip sync_model_files during docker build
     if os.getenv("OMRON_DOCKER_BUILD", False):
         bt.logging.info(" PreFlight | Skipping model file sync")
-        preflight_checks.remove(("Syncing model files", sync_model_files))
+        _ = preflight_checks.pop("Syncing model files")
 
-    for check_name, check_function in preflight_checks:
+    for check_name, check_function in preflight_checks.items():
         bt.logging.info(f" PreFlight | {check_name}")
         try:
             check_function()
