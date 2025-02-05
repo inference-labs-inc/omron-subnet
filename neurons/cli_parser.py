@@ -98,9 +98,11 @@ def init_config(role: Optional[str] = None):
     )
     if role == Roles.VALIDATOR:
         # CLI arguments specific to the validator
+        config.role = "validator"
         _validator_config()
     elif role == Roles.MINER:
         # CLI arguments specific to the miner
+        config.role = "miner"
         _miner_config()
     else:
         bt.subtensor.add_args(parser)

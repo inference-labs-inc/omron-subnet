@@ -1,20 +1,19 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -eo pipefail
 
 
-PYTHON_VERSION="3.10"
 NODE_VERSION="20"
 INSTALL_PATH="./omron"
 
 
 BREW_PACKAGES=(
-    "python@${PYTHON_VERSION}"
     "node@${NODE_VERSION}"
     "jq"
     "aria2"
     "pkg-config"
     "openssl"
+    "pipx"
 )
 
 APT_PACKAGES=(
@@ -23,16 +22,8 @@ APT_PACKAGES=(
     "pkg-config"
     "libssl-dev"
     "openssl"
-    "python${PYTHON_VERSION}"
-    "python${PYTHON_VERSION}-venv"
-    "python3-pip"
+    "pipx"
 )
-
-NPM_PACKAGES=(
-    "pm2"
-    "snarkjs@0.7.4"
-)
-
 
 case "$(uname)" in
     "Darwin")
@@ -47,28 +38,15 @@ case "$(uname)" in
             brew install "$pkg" || brew upgrade "$pkg"
         done
 
-        brew link --force "python@${PYTHON_VERSION}"
         brew link --force "node@${NODE_VERSION}"
 
         npm config set cafile /etc/ssl/cert.pem
-
-        if [ -d "$HOME/.npm" ]; then
-            sudo chown -R $(whoami):$(id -g) "$HOME/.npm"
-        fi
         ;;
 
     "Linux")
         echo "Installing apt packages..."
         sudo apt update
-        sudo apt install -y software-properties-common
-        sudo add-apt-repository -y ppa:deadsnakes/ppa
-        sudo apt update
         sudo apt install -y "${APT_PACKAGES[@]}"
-
-
-        sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python${PYTHON_VERSION} 1
-        sudo update-alternatives --set python3 /usr/bin/python${PYTHON_VERSION}
-
 
         curl -fsSL "https://deb.nodesource.com/setup_${NODE_VERSION}.x" | sudo -E bash -
         sudo apt install -y nodejs
@@ -80,28 +58,27 @@ case "$(uname)" in
         ;;
 esac
 
+echo "Checking for SnarkJS..."
 local_snarkjs_dir="${HOME}/.snarkjs"
 local_snarkjs_path="${local_snarkjs_dir}/node_modules/.bin/snarkjs"
+if ! command -v "${local_snarkjs_path} r1cs info --help" >/dev/null 2>&1; then
+    echo "SnarkJS 0.7.4 not found in local directory. Installing..."
+    mkdir -p "${local_snarkjs_dir}"
+    npm install --prefix "${local_snarkjs_dir}" snarkjs@0.7.4
+    echo "SnarkJS has been installed in the local directory."
+fi
 
-echo "Installing npm packages..."
-for pkg in "${NPM_PACKAGES[@]}"; do
-    if [[ "$pkg" == "snarkjs@0.7.4" ]]; then
-        if ! command -v "${local_snarkjs_path} r1cs info --help" >/dev/null 2>&1; then
-            echo "SnarkJS 0.7.4 not found in local directory. Installing..."
-            mkdir -p "${local_snarkjs_dir}"
-            npm install --prefix "${local_snarkjs_dir}" snarkjs@0.7.4
-            echo "SnarkJS has been installed in the local directory."
-        fi
-    else
-        sudo npm install -g "$pkg"
-    fi
-done
+echo "Installing pm2..."
+sudo npm install -g pm2
 
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
+pipx ensurepath
 export PATH="$HOME/.local/bin:$PATH"
-chmod +x "$HOME/.local/bin/uv"
-chmod +x "$HOME/.local/bin/uvx"
+
+echo "Installing uv..."
+pipx install uv
+
+echo "Installing btcli..."
+"$HOME/.local/bin/uv" tool install --python 3.12 bittensor-cli
 
 if [[ ! -d ${INSTALL_PATH} ]]; then
     echo "Cloning omron-subnet repository..."
@@ -116,10 +93,7 @@ cd "${INSTALL_PATH}" || {
     exit 1
 }
 
-"$HOME/.local/bin/uv" venv
-source ".venv/bin/activate"
-
-"$HOME/.local/bin/uv" sync --locked
+"$HOME/.local/bin/uv" sync --locked --no-dev
 
 echo "
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -154,6 +128,6 @@ echo "
 "
 echo "🥩 Setup complete! 🥩"
 echo "Next steps:"
-echo "1. cd ${INSTALL_PATH}"
-echo "2. source .venv/bin/activate"
-echo "3. Check docs/shared_setup_steps.md"
+echo "1. Check ${Install_PATH}/docs/shared_setup_steps.md to setup your wallet and register on the subnet"
+echo "2. cd ${INSTALL_PATH}"
+echo "3. make <pm2-miner|pm2-validator> WALLET_NAME=<your_wallet_name> WALLET_HOTKEY=<your_wallet_hotkey>"
