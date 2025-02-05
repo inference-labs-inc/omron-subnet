@@ -117,7 +117,7 @@ pm2-miner:
 	uv sync --locked --no-dev
 	cd neurons; \
 	pm2 start miner.py --name omron-miner --interpreter ../.venv/bin/python --kill-timeout 3000 -- \
-	--wallet.path $(WALLET_PATH) \
+	--wallet.path $(WALLET_PATH)/wallets \
 	--wallet.name $(WALLET_NAME) \
 	--wallet.hotkey $(WALLET_HOTKEY) \
 	--netuid $(NETUID) \
@@ -127,7 +127,7 @@ pm2-validator:
 	uv sync --locked --no-dev
 	cd neurons; \
 	pm2 start validator.py --name omron-validator --interpreter ../.venv/bin/python --kill-timeout 3000 -- \
-	--wallet.path $(WALLET_PATH) \
+	--wallet.path $(WALLET_PATH)/wallets \
 	--wallet.name $(WALLET_NAME) \
 	--wallet.hotkey $(WALLET_HOTKEY) \
 	--netuid $(NETUID) \
@@ -137,7 +137,7 @@ pm2-test-miner:
 	uv sync --locked --no-dev
 	cd neurons; \
 	pm2 start miner.py --name omron-miner --interpreter ../.venv/bin/python --kill-timeout 3000 -- \
-	--wallet.path $(WALLET_PATH) \
+	--wallet.path $(WALLET_PATH)/wallets \
 	--wallet.name $(WALLET_NAME) \
 	--wallet.hotkey $(WALLET_HOTKEY) \
 	--netuid 118 \
@@ -149,7 +149,7 @@ pm2-test-validator:
 	uv sync --locked --no-dev
 	cd neurons; \
 	pm2 start validator.py --name omron-validator --interpreter ../.venv/bin/python --kill-timeout 3000 -- \
-	--wallet.path $(WALLET_PATH) \
+	--wallet.path $(WALLET_PATH)/wallets \
 	--wallet.name $(WALLET_NAME) \
 	--wallet.hotkey $(WALLET_HOTKEY) \
 	--netuid 118 \
