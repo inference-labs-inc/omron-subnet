@@ -82,12 +82,36 @@ class Competition:
         commitments = []
         queryable_uids = get_queryable_uids(self.metagraph)
 
+        commitment_map = self.subtensor.substrate.query_map(
+            module="Commitments",
+            storage_function="CommitmentOf",
+            params=[self.metagraph.netuid],
+        )
+
         for uid in queryable_uids:
             hotkey = self.metagraph.hotkeys[uid]
             try:
-                hash = self.subtensor.get_commitment(self.metagraph.netuid, uid)
-                if not hash:
-                    bt.logging.warning(f"No commitment found for {hotkey} (UID {uid})")
+                commitment_info = None
+                for acc, info in commitment_map:
+                    if acc.value == hotkey:
+                        commitment_info = info
+                        break
+
+                if not commitment_info or "info" not in commitment_info:
+                    bt.logging.warning(
+                        f"No valid commitment found for {hotkey} (UID {uid})"
+                    )
+                    continue
+
+                try:
+                    raw64_field = commitment_info["info"]["fields"][0].get("Raw64")
+                    if not raw64_field:
+                        bt.logging.warning(f"Invalid commitment format for {hotkey}")
+                        continue
+
+                    hash = bytes.fromhex(raw64_field[2:]).decode("utf-8")
+                except (KeyError, IndexError, ValueError) as e:
+                    bt.logging.warning(f"Failed to parse commitment for {hotkey}: {e}")
                     continue
 
                 if (
