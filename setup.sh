@@ -12,6 +12,8 @@ BREW_PACKAGES=(
     "jq"
     "aria2"
     "pkg-config"
+    "certifi"
+    "ca-certificates"
     "openssl"
     "pipx"
 )
