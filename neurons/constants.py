@@ -76,7 +76,7 @@ MAX_PROOFS_TO_LOG = 0
 # Era period for proof of weights (mortality of the pow log)
 PROOF_OF_WEIGHTS_LIFESPAN = 2
 # Active competition
-ACTIVE_COMPETITION = 1
+ACTIVE_COMPETITION = 0
 # Frequency in terms of seconds at which the competition is synced and evaluated
 COMPETITION_SYNC_INTERVAL = 60 * 60 * 24
 # Maximum signature lifespan for WebSocket requests
