@@ -225,10 +225,6 @@ class MinerSession:
             bt.logging.error(f"Error initializing circuit manager: {e}")
             self.circuit_manager = None
 
-    def __del__(self):
-        if hasattr(self, "circuit_manager"):
-            self.circuit_manager.stop()
-
     def proof_blacklist(self, synapse: QueryZkProof) -> Tuple[bool, str]:
         """
         Blacklist method for the proof generation endpoint
