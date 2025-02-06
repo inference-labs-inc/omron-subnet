@@ -44,7 +44,9 @@ class CircuitManager:
         except Exception:
             return False
 
-    def download_files(self, axon: bt.axon, hash: str, circuit_dir: str) -> bool:
+    async def _download_files_async(
+        self, axon: bt.axon, hash: str, circuit_dir: str
+    ) -> bool:
         try:
             dendrite = bt.dendrite()
             required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
@@ -52,7 +54,7 @@ class CircuitManager:
             synapse = Competition(
                 id=self.competition_id, hash=hash, file_name="commitment"
             )
-            response = asyncio.run(dendrite.call(target_axon=axon, synapse=synapse))
+            response = await dendrite.call(target_axon=axon, synapse=synapse)
             response = Competition.model_validate(response)
 
             if not isinstance(response, Competition):
@@ -108,4 +110,17 @@ class CircuitManager:
             return True
         except Exception as e:
             bt.logging.error(f"Error downloading circuit files: {e}")
+            return False
+
+    def download_files(self, axon: bt.axon, hash: str, circuit_dir: str) -> bool:
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                return loop.run_until_complete(
+                    self._download_files_async(axon, hash, circuit_dir)
+                )
+            else:
+                return asyncio.run(self._download_files_async(axon, hash, circuit_dir))
+        except Exception as e:
+            bt.logging.error(f"Error in download_files: {e}")
             return False

@@ -107,16 +107,18 @@ class Competition:
                     )
                     continue
 
-                raw64_field = info["info"]["fields"][0].get("Raw64")
+                raw64_field = info["info"]["fields"][0][0].get("Raw64")
+                hash = None
                 if self.metagraph.netuid == next(
                     testnet for mainnet, testnet in MAINNET_TESTNET_UIDS if mainnet == 2
                 ):
                     raw64_field = raw64_field[0]
+                    hash = bytes(raw64_field).decode("utf-8")
+                else:
+                    hash = bytes.fromhex(raw64_field[2:]).decode("utf-8")
                 if not raw64_field:
                     bt.logging.warning(f"Invalid commitment format for {acc}")
                     continue
-
-                hash = bytes.fromhex(raw64_field[2:]).decode("utf-8")
 
                 if acc not in self.miner_states or self.miner_states[acc].hash != hash:
                     if hash in {state.hash for state in self.miner_states.values()}:
