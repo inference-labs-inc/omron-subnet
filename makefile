@@ -107,7 +107,7 @@ test-validator:
 		$(ARGS)
 
 pm2-setup:
-	INSTALL_PATH="." ./setup.sh
+	./setup.sh
 
 pm2-stop:
 	pm2 stop omron-miner || true
