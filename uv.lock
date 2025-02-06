@@ -516,16 +516,16 @@ wheels = [
 
 [[package]]
 name = "ezkl"
-version = "18.1.5"
+version = "19.0.7"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/56/bc/d43ad6370115f6a06a6e50829e11c29a1151c6fb449079979635d550a557/ezkl-18.1.5-cp37-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:9790eaba702e7ed59397630307b0e396d469c5908bd794d8c5529d8682055da2", size = 22425969 },
-    { url = "https://files.pythonhosted.org/packages/32/f4/6cd07d7993c6030808394b5ed8855bbef8cd74abed9686a2203688095fe9/ezkl-18.1.5-cp37-abi3-macosx_10_12_x86_64.whl", hash = "sha256:5845905e545186e870dcd7391de6de7699d6d8097d3af4126fb7c3d8160218af", size = 11884711 },
-    { url = "https://files.pythonhosted.org/packages/78/e6/17ac620c8d12a94aa9caff2e73ffa83e4108ae82680598e62b12f0fe3c27/ezkl-18.1.5-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4df889594aee1be06bf47bba3e4a46e3d31a2741cb58455f7e6da2e5ba12a678", size = 14267720 },
-    { url = "https://files.pythonhosted.org/packages/5b/b1/6f72fc1a40d6d3e6819361bc87e2e21443a265c61d854d6983daa612cb74/ezkl-18.1.5-cp37-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:42f651f09f097fc56a5f9ef6b870d0e99f38f57e576b0e7a13835b4868266de5", size = 13916194 },
-    { url = "https://files.pythonhosted.org/packages/81/5e/87bdda46998c8313c902251e77288e3451665cb2f44e03491216d7605870/ezkl-18.1.5-cp37-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:abb22f2994900ee7e9219a73b41bf89cf03bd9a0bddc1910d364d4c3e52b6c2c", size = 14450356 },
-    { url = "https://files.pythonhosted.org/packages/24/b0/811b3eedf66759473ddc6715d96119a59bfab652ad14537ac73bab5dacf1/ezkl-18.1.5-cp37-abi3-win32.whl", hash = "sha256:aa539decf9d323e1273eb10799742a6515090d89c1721e85d7f7d29d101200e9", size = 10714963 },
-    { url = "https://files.pythonhosted.org/packages/f5/a5/bc1975b306628572934cb3d8f2fab23c2d6b7251ba68e60e72639481c93d/ezkl-18.1.5-cp37-abi3-win_amd64.whl", hash = "sha256:cb80ff2b10a91873e00e2d6a573e1a521b2e4091e3bdac98e87225c2507da9f9", size = 12064934 },
+    { url = "https://files.pythonhosted.org/packages/a0/5c/ca7372cbebb42e7b9abaed3d72e20d300a9b62e448ee84ca79c25e6b8fc8/ezkl-19.0.7-cp37-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:bb06c9cc9be222dccdb79792b0b8ad60c3d83c911332c9c4c8355f30e46d99ec", size = 22402480 },
+    { url = "https://files.pythonhosted.org/packages/f2/f3/2e89ebe2c9e95bc55c131e2e5ebbd8136c7e41df1d91a2c324c3be4770de/ezkl-19.0.7-cp37-abi3-macosx_10_12_x86_64.whl", hash = "sha256:e0a17c46a44aa94c6178c2c8417ac0e1dc0999db4364ffbced474986e8c6144c", size = 11875843 },
+    { url = "https://files.pythonhosted.org/packages/05/81/8801c479c09c81e3644ffd56d6f33e40f62c30fd88028ad5ed68e7954061/ezkl-19.0.7-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5fcddc679bb316fab1227621bf66c780a8dae78babf15f235a27ea37ca600546", size = 14301103 },
+    { url = "https://files.pythonhosted.org/packages/87/79/cad6eb032d2a052309569cfc95973204696fc64b555548220324125fd53d/ezkl-19.0.7-cp37-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:9456f75dfcc7127a3dae1df98e9145651cf4b559224aa78c3e73d03f25164b06", size = 13967182 },
+    { url = "https://files.pythonhosted.org/packages/0f/39/f8c8292fa09eaf1ac226e631fdd7a82be104e9b98593fbea4acb50d2152c/ezkl-19.0.7-cp37-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:97e0a842ec1b6ef8402dca6a0721dcbc9c4815476f746bced42be1662bdc8cec", size = 14498696 },
+    { url = "https://files.pythonhosted.org/packages/60/10/1f2d629edd1264df9b1e24e59ae0bc034962ee2b0864778f99ae455cacc0/ezkl-19.0.7-cp37-abi3-win32.whl", hash = "sha256:a8b2f4fb876dbec7151262d89691c2afe18c4448df09e258b5b75f2d73dc7e54", size = 10681841 },
+    { url = "https://files.pythonhosted.org/packages/db/cc/3c4d5c130fe80327dcb1c5e0c85bca3237c8a34dc5bec2696d6971726e6f/ezkl-19.0.7-cp37-abi3-win_amd64.whl", hash = "sha256:07cdc57dccff139d1904dbed2aadece70c15e2e83283121a58646de066d9f1b5", size = 12041099 },
 ]
 
 [[package]]
@@ -947,7 +947,7 @@ requires-dist = [
     { name = "bittensor", specifier = "==8.5.2" },
     { name = "black", marker = "extra == 'dev'", specifier = ">=24.10.0" },
     { name = "boto3", specifier = ">=1.36.13" },
-    { name = "ezkl", specifier = "==18.1.5" },
+    { name = "ezkl", specifier = "==19.0.7" },
     { name = "fastapi", specifier = "==0.110.3" },
     { name = "jsonrpcserver", specifier = ">=5.0.9" },
     { name = "numpy", specifier = "==2.0.2" },

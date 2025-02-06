@@ -6,7 +6,7 @@
 
 ### Proof of Inference
 
-[Documentation](https://docs.omron.ai/) • [X](https://twitter.com/omron_ai) • [Inference Labs](https://twitter.com/inference_labs) • [Explorer](https://taostats.io/) • [Dashboard](https://wandb.ai/inferencelabs/omron)
+[Documentation](https://docs.omron.ai/) • [X](https://x.com/omron_ai) • [Inference Labs](https://x.com/inference_labs) • [Stats](https://stats.omron.ai/) • [Studio](https://studio.omron.ai/) • [Dashboard](https://wandb.ai/inferencelabs/omron)
 
 </div>
 
