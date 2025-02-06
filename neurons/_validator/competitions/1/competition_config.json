@@ -34,6 +34,16 @@
         "format": "zip"
     },
     "evaluation": {
-        "metric": "mean_absolute_error"
+        "metric": "mean_absolute_error",
+        "num_iterations": 10,
+        "scoring_weights": {
+            "accuracy": 0.4,
+            "proof_size": 0.3,
+            "response_time": 0.3
+        },
+        "output_shape": [
+            1,
+            6
+        ]
     }
 }

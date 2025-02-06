@@ -62,6 +62,16 @@ class CircuitEvaluator:
     ) -> float:
         sota_state = self.sota_manager.current_state
 
+        try:
+            with open(
+                os.path.join(self.competition_directory, "competition_config.json")
+            ) as f:
+                config = json.load(f)
+                weights = config["evaluation"]["scoring_weights"]
+        except Exception as e:
+            bt.logging.error(f"Error loading scoring weights, using defaults: {e}")
+            weights = {"accuracy": 0.4, "proof_size": 0.3, "response_time": 0.3}
+
         accuracy_diff = max(0, sota_state.accuracy - accuracy)
         proof_size_diff = max(
             0, (proof_size - sota_state.proof_size) / sota_state.proof_size
@@ -71,7 +81,9 @@ class CircuitEvaluator:
         )
 
         total_diff = torch.tensor(
-            accuracy_diff * 0.4 + proof_size_diff * 0.3 + response_time_diff * 0.3
+            accuracy_diff * weights["accuracy"]
+            + proof_size_diff * weights["proof_size"]
+            + response_time_diff * weights["response_time"]
         )
 
         return torch.exp(-total_diff).item()
@@ -86,8 +98,18 @@ class CircuitEvaluator:
             bt.logging.error("Failed to get input shape")
             return 0.0, 0.0, 0.0, False
 
-        for i in range(10):
-            bt.logging.debug(f"Running evaluation {i + 1}/10")
+        try:
+            with open(
+                os.path.join(self.competition_directory, "competition_config.json")
+            ) as f:
+                config = json.load(f)
+                num_iterations = config["evaluation"]["num_iterations"]
+        except Exception as e:
+            bt.logging.error(f"Error loading num_iterations, using default: {e}")
+            num_iterations = 10
+
+        for i in range(num_iterations):
+            bt.logging.debug(f"Running evaluation {i + 1}/{num_iterations}")
             try:
                 test_inputs = self.data_source.get_benchmark_data()
                 if test_inputs is None:
@@ -326,15 +348,25 @@ class CircuitEvaluator:
 
     def _compare_outputs(self, expected: list[float], actual: list[float]) -> float:
         try:
-            expected_array = torch.tensor(expected).reshape(1, 6)
-            actual_array = torch.tensor(actual).reshape(1, 6)
+            with open(
+                os.path.join(self.competition_directory, "competition_config.json")
+            ) as f:
+                config = json.load(f)
+                output_shape = tuple(config["evaluation"]["output_shape"])
+        except Exception as e:
+            bt.logging.error(f"Error loading output shape, using default: {e}")
+            output_shape = (1, 6)
+
+        try:
+            expected_array = torch.tensor(expected).reshape(output_shape)
+            actual_array = torch.tensor(actual).reshape(output_shape)
             bt.logging.debug(
                 f"Comparing expected {expected_array} with actual {actual_array}"
             )
 
-            mse = torch.nn.functional.mse_loss(actual_array, expected_array)
-            accuracy = torch.exp(-mse).item()
-            bt.logging.debug(f"MSE: {mse.item()}, Accuracy: {accuracy}")
+            mae = torch.nn.functional.l1_loss(actual_array, expected_array)
+            accuracy = torch.exp(-mae).item()
+            bt.logging.debug(f"MAE: {mae.item()}, Accuracy: {accuracy}")
 
             return accuracy
         except Exception as e:
