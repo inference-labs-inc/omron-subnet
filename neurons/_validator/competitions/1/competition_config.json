@@ -1,0 +1,39 @@
+{
+    "name": "Age Detection Competition",
+    "description": "Age detection model evaluation with 64x64x3 inputs",
+    "version": "1.0.0",
+    "circuit_settings": {
+        "input_shape": [
+            1,
+            3,
+            64,
+            64
+        ],
+        "output_names": [
+            "stage1_delta_k",
+            "prob_stage_1",
+            "index_offset_stage1"
+        ],
+        "output_shapes": {
+            "stage1_delta_k": [
+                1,
+                1
+            ],
+            "prob_stage_1": [
+                1,
+                3
+            ],
+            "index_offset_stage1": [
+                1,
+                3
+            ]
+        }
+    },
+    "data_source": {
+        "url": "https://storage.omron.ai/age.zip",
+        "format": "zip"
+    },
+    "evaluation": {
+        "metric": "mean_absolute_error"
+    }
+}
