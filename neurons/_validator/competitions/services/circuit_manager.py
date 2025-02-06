@@ -106,10 +106,17 @@ class CircuitManager:
 
     def download_files(self, axon: bt.axon, hash: str, circuit_dir: str) -> bool:
         try:
-            loop = self._get_event_loop()
-            return loop.run_until_complete(
-                self._download_files_async(axon, hash, circuit_dir)
-            )
+            if asyncio.get_event_loop().is_running():
+                return (
+                    asyncio.get_event_loop()
+                    .create_task(self._download_files_async(axon, hash, circuit_dir))
+                    .result()
+                )
+            else:
+                loop = self._get_event_loop()
+                return loop.run_until_complete(
+                    self._download_files_async(axon, hash, circuit_dir)
+                )
         except Exception as e:
             bt.logging.error(f"Error downloading circuit files: {e}")
             return False
