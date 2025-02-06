@@ -12,8 +12,9 @@ from .services.circuit_evaluator import CircuitEvaluator
 from .services.sota_manager import SotaManager
 from .competition_manager import CompetitionManager
 from .utils.cleanup import register_cleanup_handlers
-from constants import TEMP_FOLDER
+from constants import TEMP_FOLDER, MAINNET_TESTNET_UIDS
 from _validator.utils.uid import get_queryable_uids
+from scalecodec.utils.ss58 import ss58_encode
 
 
 class Competition:
@@ -93,6 +94,17 @@ class Competition:
             try:
                 commitment_info = None
                 for acc, info in commitment_map:
+
+                    if self.metagraph.netuid == next(
+                        testnet
+                        for mainnet, testnet in MAINNET_TESTNET_UIDS
+                        if mainnet == 2
+                    ):
+                        acc = ss58_encode(bytes(acc[0]))
+                        info = bytes(
+                            info["info"]["fields"][0][0].get("Raw64")[0]
+                        ).decode()
+
                     if acc == hotkey:
                         commitment_info = info
                         break
