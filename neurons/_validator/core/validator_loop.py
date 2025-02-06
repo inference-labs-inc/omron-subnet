@@ -412,6 +412,8 @@ class ValidatorLoop:
         """Handle keyboard interrupt by cleaning up and exiting."""
         bt.logging.success("Keyboard interrupt detected. Exiting validator.")
         loop = asyncio.get_event_loop()
+        if self.competition and hasattr(self.competition.circuit_manager, "close"):
+            loop.run_until_complete(self.competition.circuit_manager.close())
         loop.run_until_complete(self.api.stop())
         stop_prometheus_logging()
         clean_temp_files()

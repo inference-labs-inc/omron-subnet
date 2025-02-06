@@ -1,7 +1,7 @@
 import os
 import shutil
 import json
-import requests
+import aiohttp
 import bittensor as bt
 from protocol import Competition
 import hashlib
@@ -12,7 +12,18 @@ class CircuitManager:
     def __init__(self, temp_dir: str, competition_id: int):
         self.temp_dir = temp_dir
         self.competition_id = competition_id
+        self._session = None
         os.makedirs(temp_dir, exist_ok=True)
+
+    async def _get_session(self):
+        if self._session is None:
+            self._session = aiohttp.ClientSession()
+        return self._session
+
+    async def close(self):
+        if self._session:
+            await self._session.close()
+            self._session = None
 
     def cleanup_temp_files(self, circuit_dir: str):
         try:
@@ -72,6 +83,7 @@ class CircuitManager:
                 return False
 
             signed_urls = commitment["signed_urls"]
+            session = await self._get_session()
 
             for file_name in required_files:
                 if file_name not in signed_urls:
@@ -85,20 +97,25 @@ class CircuitManager:
 
                 local_path = os.path.join(circuit_dir, file_name)
                 try:
-                    response = requests.get(url)
-                    response.raise_for_status()
-                    with open(local_path, "wb") as f:
-                        f.write(response.content)
-                    bt.logging.debug(f"Downloaded {file_name} from signed URL")
-
-                    if file_name == "vk.key":
-                        with open(local_path, "rb") as f:
-                            file_hash = hashlib.sha256(f.read()).hexdigest()
-                        if file_hash != hash:
+                    async with session.get(url) as response:
+                        if response.status != 200:
                             bt.logging.error(
-                                f"Hash mismatch for vk.key: expected {hash}, got {file_hash}"
+                                f"Failed to download {file_name}: HTTP {response.status}"
                             )
                             return False
+                        content = await response.read()
+                        with open(local_path, "wb") as f:
+                            f.write(content)
+                        bt.logging.debug(f"Downloaded {file_name} from signed URL")
+
+                        if file_name == "vk.key":
+                            with open(local_path, "rb") as f:
+                                file_hash = hashlib.sha256(f.read()).hexdigest()
+                            if file_hash != hash:
+                                bt.logging.error(
+                                    f"Hash mismatch for vk.key: expected {hash}, got {file_hash}"
+                                )
+                                return False
 
                 except Exception as e:
                     bt.logging.error(f"Failed to download {file_name}: {e}")
