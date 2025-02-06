@@ -1,12 +1,12 @@
 import os
 import shutil
 import json
-import requests
 import asyncio
 import bittensor as bt
 from protocol import Competition
 import hashlib
 from urllib.parse import urlparse
+import aiohttp
 
 
 class CircuitManager:
@@ -27,6 +27,7 @@ class CircuitManager:
     async def _download_files_async(
         self, axon: bt.axon, hash: str, circuit_dir: str
     ) -> bool:
+        dendrite = None
         try:
             dendrite = bt.dendrite()
             required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
@@ -50,37 +51,43 @@ class CircuitManager:
                 if "signed_urls" in commitment:
                     signed_urls = commitment["signed_urls"]
 
-                    for file_name in required_files:
-                        if file_name not in signed_urls:
-                            bt.logging.error(f"Missing signed URL for {file_name}")
-                            return False
+                    async with aiohttp.ClientSession() as session:
+                        for file_name in required_files:
+                            if file_name not in signed_urls:
+                                bt.logging.error(f"Missing signed URL for {file_name}")
+                                return False
 
-                        url = signed_urls[file_name]
-                        if not self._validate_url(url):
-                            bt.logging.error(f"Invalid URL for {file_name}: {url}")
-                            return False
+                            url = signed_urls[file_name]
+                            if not self._validate_url(url):
+                                bt.logging.error(f"Invalid URL for {file_name}: {url}")
+                                return False
 
-                        local_path = os.path.join(circuit_dir, file_name)
-                        try:
-                            response = requests.get(url)
-                            response.raise_for_status()
-                            with open(local_path, "wb") as f:
-                                f.write(response.content)
-                            bt.logging.debug(f"Downloaded {file_name} from signed URL")
-
-                            if file_name == "vk.key":
-                                with open(local_path, "rb") as f:
-                                    file_hash = hashlib.sha256(f.read()).hexdigest()
-                                if file_hash != hash:
-                                    bt.logging.error(
-                                        f"Hash mismatch for vk.key: expected {hash}, got {file_hash}"
+                            local_path = os.path.join(circuit_dir, file_name)
+                            try:
+                                async with session.get(url) as response:
+                                    response.raise_for_status()
+                                    content = await response.read()
+                                    with open(local_path, "wb") as f:
+                                        f.write(content)
+                                    bt.logging.debug(
+                                        f"Downloaded {file_name} from signed URL"
                                     )
-                                    return False
 
-                        except Exception as e:
-                            bt.logging.error(f"Failed to download {file_name}: {e}")
-                            return False
-                    return True
+                                    if file_name == "vk.key":
+                                        with open(local_path, "rb") as f:
+                                            file_hash = hashlib.sha256(
+                                                f.read()
+                                            ).hexdigest()
+                                        if file_hash != hash:
+                                            bt.logging.error(
+                                                f"Hash mismatch for vk.key: expected {hash}, got {file_hash}"
+                                            )
+                                            return False
+
+                            except Exception as e:
+                                bt.logging.error(f"Failed to download {file_name}: {e}")
+                                return False
+                        return True
 
             synapse = Competition(
                 competition_id=self.competition_id,
@@ -103,17 +110,19 @@ class CircuitManager:
         except Exception as e:
             bt.logging.error(f"Error downloading circuit files: {e}")
             return False
+        finally:
+            if dendrite:
+                await dendrite.close()
 
     def download_files(self, axon: bt.axon, hash: str, circuit_dir: str) -> bool:
         try:
-            if asyncio.get_event_loop().is_running():
-                return (
-                    asyncio.get_event_loop()
-                    .create_task(self._download_files_async(axon, hash, circuit_dir))
-                    .result()
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._download_files_async(axon, hash, circuit_dir), loop
                 )
+                return future.result()
             else:
-                loop = self._get_event_loop()
                 return loop.run_until_complete(
                     self._download_files_async(axon, hash, circuit_dir)
                 )
