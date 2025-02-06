@@ -2,7 +2,6 @@ import os
 import shutil
 import json
 import requests
-import asyncio
 import bittensor as bt
 from protocol import Competition
 import hashlib
@@ -44,9 +43,7 @@ class CircuitManager:
         except Exception:
             return False
 
-    async def _download_files_async(
-        self, axon: bt.axon, hash: str, circuit_dir: str
-    ) -> bool:
+    async def download_files(self, axon: bt.axon, hash: str, circuit_dir: str) -> bool:
         try:
             dendrite = bt.dendrite()
             required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
@@ -110,17 +107,4 @@ class CircuitManager:
             return True
         except Exception as e:
             bt.logging.error(f"Error downloading circuit files: {e}")
-            return False
-
-    def download_files(self, axon: bt.axon, hash: str, circuit_dir: str) -> bool:
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                return loop.run_until_complete(
-                    self._download_files_async(axon, hash, circuit_dir)
-                )
-            else:
-                return asyncio.run(self._download_files_async(axon, hash, circuit_dir))
-        except Exception as e:
-            bt.logging.error(f"Error in download_files: {e}")
             return False
