@@ -9,9 +9,10 @@ from urllib.parse import urlparse
 import requests
 import random
 import zipfile
-import io
 from PIL import Image
 import torchvision.transforms as T
+import cv2
+from tqdm import tqdm
 
 
 class ImageTransforms:
@@ -122,29 +123,58 @@ class RemoteDataSource(CompetitionDataSource):
             return False
 
     def sync_data(self) -> bool:
-        if not self.data_url or not self._validate_url(self.data_url):
-            bt.logging.error(f"Invalid data URL: {self.data_url}")
-            return False
-
         try:
-            response = requests.get(self.data_url)
-            response.raise_for_status()
+            processed_path = os.path.join(self.competition_directory, "processed_64")
+            zip_path = os.path.join(self.competition_directory, "age.zip")
+            extracted_path = os.path.join(self.competition_directory, "extracted")
 
-            if self.format == "npz":
-                data = np.load(io.BytesIO(response.content))
-                os.makedirs(os.path.dirname(self.local_cache_path), exist_ok=True)
-                np.savez(f"{self.local_cache_path}.npz", **data)
-                self.data_cache = data
-            else:  # zip/tar
-                os.makedirs(self.local_cache_path, exist_ok=True)
-                with open(f"{self.local_cache_path}.zip", "wb") as f:
-                    f.write(response.content)
-                with zipfile.ZipFile(f"{self.local_cache_path}.zip") as zf:
-                    zf.extractall(self.local_cache_path)
+            if not os.path.exists(processed_path):
+                os.makedirs(processed_path, exist_ok=True)
+                os.makedirs(extracted_path, exist_ok=True)
+
+                url = "https://storage.omron.ai/age.zip"
+
+                print("Downloading dataset...")
+                response = requests.get(url, stream=True)
+                total_size = int(response.headers.get("content-length", 0))
+
+                with (
+                    open(zip_path, "wb") as f,
+                    tqdm(
+                        desc="Downloading", total=total_size, unit="iB", unit_scale=True
+                    ) as pbar,
+                ):
+                    for data in response.iter_content(chunk_size=1024):
+                        size = f.write(data)
+                        pbar.update(size)
+
+                print("Extracting zip...")
+                with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                    zip_ref.extractall(extracted_path)
+
+                print("Processing images to 64x64...")
+                for img_name in tqdm(os.listdir(extracted_path)):
+                    if img_name.lower().endswith((".png", ".jpg", ".jpeg")):
+                        img_path = os.path.join(extracted_path, img_name)
+                        try:
+                            img = cv2.imread(img_path)
+                            if img is not None:
+                                img = cv2.resize(img, (64, 64))
+                                cv2.imwrite(os.path.join(processed_path, img_name), img)
+                        except Exception as e:
+                            bt.logging.warning(f"Failed to process {img_name}: {e}")
+
+                os.remove(zip_path)
+                import shutil
+
+                shutil.rmtree(extracted_path)
+
+                print(f"Dataset processed and saved to {processed_path}")
 
             return True
+
         except Exception as e:
-            bt.logging.error(f"Error syncing data: {e}")
+            bt.logging.error(f"Failed to download/process dataset: {e}")
             return False
 
     def _load_image_batch(self, batch_size: int = 1) -> torch.Tensor:
