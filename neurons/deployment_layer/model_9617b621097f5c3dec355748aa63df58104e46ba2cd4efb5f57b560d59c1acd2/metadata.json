@@ -2,11 +2,11 @@
     "name": "LSTM",
     "description": "Default LSTM benchmarker model.",
     "author": "Inference Labs",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "proof_system": "EZKL",
     "type": "proof_of_computation",
     "external_files": {
-        "pk.key": "https://storage.omron.ai/50818a54b31b3e0fe3306a7fb7826156fc2c42c9d64c6ba106ba135fbe7b7b19/pk.key"
+        "pk.key": "https://storage.omron.ai/9617b621097f5c3dec355748aa63df58104e46ba2cd4efb5f57b560d59c1acd2/pk.key"
     },
     "benchmark_choice_weight": 0.2
 }
