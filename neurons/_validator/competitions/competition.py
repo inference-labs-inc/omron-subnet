@@ -136,13 +136,16 @@ class Competition:
 
         return commitments
 
-    def prepare_evaluation(self, uid: int, hotkey: str, hash: str) -> bool:
+    async def prepare_evaluation(self, uid: int, hotkey: str, hash: str) -> bool:
         try:
             axon = self.metagraph.axons[uid]
             circuit_dir = os.path.join(self.temp_directory, hash)
             os.makedirs(circuit_dir, exist_ok=True)
 
-            if self.circuit_manager.download_files(axon, hash, circuit_dir):
+            dendrite = bt.dendrite(axon)
+            if await self.circuit_manager.download_files(
+                dendrite, axon, hash, circuit_dir
+            ):
                 if self.circuit_validator.validate_files(circuit_dir):
                     self.miner_states[hotkey] = NeuronState(
                         hotkey=hotkey,
