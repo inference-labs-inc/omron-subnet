@@ -232,7 +232,7 @@ class ValidatorLoop:
                 bt.logging.info("Processing competition evaluations...")
                 while self.competition_commitments:
                     uid, hotkey, hash = self.competition_commitments.pop(0)
-                    if await self.competition.prepare_evaluation(uid, hotkey, hash):
+                    if self.competition.prepare_evaluation(uid, hotkey, hash):
                         self.competition.run_single_evaluation()
 
                 bt.logging.success("Competition evaluations complete")
