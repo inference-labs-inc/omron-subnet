@@ -101,8 +101,6 @@ class Competition:
                         if mainnet == 2
                     ):
                         acc = ss58_encode(bytes(acc[0]))
-                        raw = info["info"]["fields"][0][0].get("Raw64")
-                        info = bytes(raw[0]).decode()
 
                     if acc == hotkey:
                         commitment_info = info
@@ -116,6 +114,12 @@ class Competition:
 
                 try:
                     raw64_field = commitment_info["info"]["fields"][0].get("Raw64")
+                    if self.metagraph.netuid == next(
+                        testnet
+                        for mainnet, testnet in MAINNET_TESTNET_UIDS
+                        if mainnet == 2
+                    ):
+                        raw64_field = raw64_field[0]
                     if not raw64_field:
                         bt.logging.warning(f"Invalid commitment format for {hotkey}")
                         continue
