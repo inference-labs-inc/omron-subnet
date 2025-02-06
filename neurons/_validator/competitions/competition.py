@@ -82,6 +82,7 @@ class Competition:
 
         commitments = []
         queryable_uids = get_queryable_uids(self.metagraph)
+        hotkey_to_uid = {self.metagraph.hotkeys[uid]: uid for uid in queryable_uids}
 
         commitment_map = self.subtensor.substrate.query_map(
             module="Commitments",
@@ -89,62 +90,47 @@ class Competition:
             params=[self.metagraph.netuid],
         )
 
-        for uid in queryable_uids:
-            hotkey = self.metagraph.hotkeys[uid]
+        for acc, info in commitment_map:
             try:
-                commitment_info = None
-                for acc, info in commitment_map:
+                if self.metagraph.netuid == next(
+                    testnet for mainnet, testnet in MAINNET_TESTNET_UIDS if mainnet == 2
+                ):
+                    acc = ss58_encode(bytes(acc[0]))
 
-                    if self.metagraph.netuid == next(
-                        testnet
-                        for mainnet, testnet in MAINNET_TESTNET_UIDS
-                        if mainnet == 2
-                    ):
-                        acc = ss58_encode(bytes(acc[0]))
+                if acc not in hotkey_to_uid:
+                    continue
 
-                    if acc == hotkey:
-                        commitment_info = info
-                        break
-
-                if not commitment_info or "info" not in commitment_info:
+                uid = hotkey_to_uid[acc]
+                if not info or "info" not in info:
                     bt.logging.warning(
-                        f"No valid commitment found for {hotkey} (UID {uid})"
+                        f"No valid commitment found for {acc} (UID {uid})"
                     )
                     continue
 
-                try:
-                    raw64_field = commitment_info["info"]["fields"][0].get("Raw64")
-                    if self.metagraph.netuid == next(
-                        testnet
-                        for mainnet, testnet in MAINNET_TESTNET_UIDS
-                        if mainnet == 2
-                    ):
-                        raw64_field = raw64_field[0]
-                    if not raw64_field:
-                        bt.logging.warning(f"Invalid commitment format for {hotkey}")
-                        continue
-
-                    hash = bytes.fromhex(raw64_field[2:]).decode("utf-8")
-                except (KeyError, IndexError, ValueError) as e:
-                    bt.logging.warning(f"Failed to parse commitment for {hotkey}: {e}")
+                raw64_field = info["info"]["fields"][0].get("Raw64")
+                if self.metagraph.netuid == next(
+                    testnet for mainnet, testnet in MAINNET_TESTNET_UIDS if mainnet == 2
+                ):
+                    raw64_field = raw64_field[0]
+                if not raw64_field:
+                    bt.logging.warning(f"Invalid commitment format for {acc}")
                     continue
 
-                if (
-                    hotkey not in self.miner_states
-                    or self.miner_states[hotkey].hash != hash
-                ):
+                hash = bytes.fromhex(raw64_field[2:]).decode("utf-8")
+
+                if acc not in self.miner_states or self.miner_states[acc].hash != hash:
                     if hash in {state.hash for state in self.miner_states.values()}:
                         bt.logging.warning(
                             f"Circuit with hash {hash} already exists for another miner"
                         )
                         continue
-                    commitments.append((uid, hotkey, hash))
+                    commitments.append((uid, acc, hash))
                     bt.logging.success(
-                        f"New circuit detected for {hotkey} with hash {hash}"
+                        f"New circuit detected for {acc} with hash {hash}"
                     )
 
             except Exception as e:
-                bt.logging.error(f"Error getting commitment for {hotkey}: {e}")
+                bt.logging.error(f"Error processing commitment for {acc}: {e}")
 
         return commitments
 
