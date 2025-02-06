@@ -101,9 +101,8 @@ class Competition:
                         if mainnet == 2
                     ):
                         acc = ss58_encode(bytes(acc[0]))
-                        info = bytes(
-                            info["info"]["fields"][0][0].get("Raw64")[0]
-                        ).decode()
+                        raw = info["info"]["fields"][0][0].get("Raw64")
+                        info = bytes(raw[0]).decode()
 
                     if acc == hotkey:
                         commitment_info = info
