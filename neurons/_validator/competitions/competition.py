@@ -93,7 +93,7 @@ class Competition:
             try:
                 commitment_info = None
                 for acc, info in commitment_map:
-                    if acc.value == hotkey:
+                    if acc == hotkey:
                         commitment_info = info
                         break
 
