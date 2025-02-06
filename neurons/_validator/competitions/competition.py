@@ -142,10 +142,7 @@ class Competition:
             circuit_dir = os.path.join(self.temp_directory, hash)
             os.makedirs(circuit_dir, exist_ok=True)
 
-            dendrite = bt.dendrite(axon)
-            if await self.circuit_manager.download_files(
-                dendrite, axon, hash, circuit_dir
-            ):
+            if await self.circuit_manager.download_files(axon, hash, circuit_dir):
                 if self.circuit_validator.validate_files(circuit_dir):
                     self.miner_states[hotkey] = NeuronState(
                         hotkey=hotkey,

@@ -1,7 +1,7 @@
 import os
 import shutil
 import json
-import requests
+import aiohttp
 import bittensor as bt
 from protocol import Competition
 import hashlib
@@ -13,6 +13,18 @@ class CircuitManager:
         self.temp_dir = temp_dir
         self.competition_id = competition_id
         os.makedirs(temp_dir, exist_ok=True)
+        self._session = None
+
+    @property
+    async def session(self):
+        if self._session is None:
+            self._session = aiohttp.ClientSession()
+        return self._session
+
+    async def close(self):
+        if self._session:
+            await self._session.close()
+            self._session = None
 
     def cleanup_temp_files(self, circuit_dir: str):
         try:
@@ -43,7 +55,7 @@ class CircuitManager:
         except Exception:
             return False
 
-    def download_files(self, axon: bt.axon, hash: str, circuit_dir: str) -> bool:
+    async def download_files(self, axon: bt.axon, hash: str, circuit_dir: str) -> bool:
         try:
             dendrite = bt.dendrite()
             required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
@@ -51,7 +63,7 @@ class CircuitManager:
             synapse = Competition(
                 id=self.competition_id, hash=hash, file_name="commitment"
             )
-            response = dendrite(axon, synapse)
+            response = await dendrite(axon, synapse)
             response = Competition.model_validate(response)
 
             if not isinstance(response, Competition):
@@ -85,10 +97,12 @@ class CircuitManager:
 
                 local_path = os.path.join(circuit_dir, file_name)
                 try:
-                    response = requests.get(url)
-                    response.raise_for_status()
-                    with open(local_path, "wb") as f:
-                        f.write(response.content)
+                    session = await self.session
+                    async with session.get(url) as response:
+                        response.raise_for_status()
+                        content = await response.read()
+                        with open(local_path, "wb") as f:
+                            f.write(content)
                     bt.logging.debug(f"Downloaded {file_name} from signed URL")
 
                     if file_name == "vk.key":
