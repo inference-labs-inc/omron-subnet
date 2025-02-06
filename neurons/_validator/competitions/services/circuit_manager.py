@@ -6,6 +6,8 @@ import bittensor as bt
 from protocol import Competition
 import hashlib
 from urllib.parse import urlparse
+import asyncio
+from contextlib import asynccontextmanager
 
 
 class CircuitManager:
@@ -15,15 +17,27 @@ class CircuitManager:
         self.dendrite = dendrite
         os.makedirs(temp_dir, exist_ok=True)
         self._session = None
+        self._session_lock = asyncio.Lock()
 
+    @asynccontextmanager
     async def _get_session(self):
-        if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession()
-        return self._session
+        async with self._session_lock:
+            if self._session is None or self._session.closed:
+                self._session = aiohttp.ClientSession(
+                    connector=aiohttp.TCPConnector(force_close=True)
+                )
+            try:
+                yield self._session
+            except Exception as e:
+                if self._session and not self._session.closed:
+                    await self._session.close()
+                self._session = None
+                raise e
 
     async def close(self):
-        if self._session and not self._session.closed:
-            await self._session.close()
+        async with self._session_lock:
+            if self._session and not self._session.closed:
+                await self._session.close()
             self._session = None
 
     def cleanup_temp_files(self, circuit_dir: str):
@@ -96,12 +110,12 @@ class CircuitManager:
 
                 local_path = os.path.join(circuit_dir, file_name)
                 try:
-                    session = await self._get_session()
-                    async with session.get(url) as response:
-                        response.raise_for_status()
-                        content = await response.read()
-                        with open(local_path, "wb") as f:
-                            f.write(content)
+                    async with self._get_session() as session:
+                        async with session.get(url) as response:
+                            response.raise_for_status()
+                            content = await response.read()
+                            with open(local_path, "wb") as f:
+                                f.write(content)
                     bt.logging.debug(f"Downloaded {file_name} from signed URL")
 
                     if file_name == "vk.key":
