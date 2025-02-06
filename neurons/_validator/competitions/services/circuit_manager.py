@@ -9,20 +9,20 @@ from urllib.parse import urlparse
 
 
 class CircuitManager:
-    def __init__(self, temp_dir: str, competition_id: int):
+    def __init__(self, temp_dir: str, competition_id: int, dendrite: bt.dendrite):
         self.temp_dir = temp_dir
         self.competition_id = competition_id
+        self.dendrite = dendrite
         os.makedirs(temp_dir, exist_ok=True)
         self._session = None
 
-    @property
-    async def session(self):
-        if self._session is None:
+    async def _get_session(self):
+        if self._session is None or self._session.closed:
             self._session = aiohttp.ClientSession()
         return self._session
 
     async def close(self):
-        if self._session:
+        if self._session and not self._session.closed:
             await self._session.close()
             self._session = None
 
@@ -57,13 +57,12 @@ class CircuitManager:
 
     async def download_files(self, axon: bt.axon, hash: str, circuit_dir: str) -> bool:
         try:
-            dendrite = bt.dendrite()
             required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
 
             synapse = Competition(
                 id=self.competition_id, hash=hash, file_name="commitment"
             )
-            response = await dendrite(axon, synapse)
+            response = await self.dendrite(axon, synapse)
             response = Competition.model_validate(response)
 
             if not isinstance(response, Competition):
@@ -97,7 +96,7 @@ class CircuitManager:
 
                 local_path = os.path.join(circuit_dir, file_name)
                 try:
-                    session = await self.session
+                    session = await self._get_session()
                     async with session.get(url) as response:
                         response.raise_for_status()
                         content = await response.read()

@@ -38,7 +38,7 @@ class Competition:
         self.competition_manager = CompetitionManager(self.competition_directory)
         self.baseline_model = self._load_model()
         self.sota_manager = SotaManager(self.sota_directory)
-        self.circuit_manager = CircuitManager(self.temp_directory, self.competition_id)
+        self.circuit_manager = None  # Will be set when dendrite is available
         self.circuit_validator = CircuitValidator()
         self.circuit_evaluator = CircuitEvaluator(
             self.baseline_model, self.competition_directory, self.sota_manager
@@ -263,3 +263,8 @@ class Competition:
             "sota_response_time": sota_state.response_time,
         }
         self.competition_manager.log_metrics(metrics)
+
+    def initialize_circuit_manager(self, dendrite: bt.dendrite):
+        self.circuit_manager = CircuitManager(
+            self.temp_directory, self.competition_id, dendrite
+        )

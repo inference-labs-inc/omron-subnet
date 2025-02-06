@@ -69,6 +69,7 @@ class ValidatorLoop:
                 self.config.metagraph,
                 self.config.subtensor,
             )
+            self.competition.initialize_circuit_manager(self.config.dendrite)
         except Exception as e:
             bt.logging.warning(
                 f"Failed to initialize competition, continuing without competition support: {e}"
