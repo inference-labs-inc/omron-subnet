@@ -5,6 +5,9 @@ set -eo pipefail
 
 NODE_VERSION="20"
 INSTALL_PATH="./omron"
+if git rev-parse --is-inside-work-tree &>/dev/null; then
+    INSTALL_PATH="."
+fi
 
 
 BREW_PACKAGES=(
@@ -131,6 +134,6 @@ echo "
 echo "🥩 Setup complete! 🥩"
 echo "Next steps:"
 echo "1. Re-login for PATH changes to take effect, or run 'source ~/.bashrc' or 'source ~/.zshrc'"
-echo "2. Check ${Install_PATH}/docs/shared_setup_steps.md to setup your wallet and register on the subnet"
+echo "2. Check ${INSTALL_PATH}/docs/shared_setup_steps.md to setup your wallet and register on the subnet"
 echo "3. cd ${INSTALL_PATH}"
 echo "4. make <pm2-miner|pm2-validator> WALLET_NAME=<your_wallet_name> WALLET_HOTKEY=<your_wallet_hotkey>"

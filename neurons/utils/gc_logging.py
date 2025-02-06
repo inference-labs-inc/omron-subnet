@@ -69,16 +69,27 @@ def log_responses(
         return None
 
 
-def gc_log_competition_metrics(metrics: dict) -> Optional[requests.Response]:
+def gc_log_competition_metrics(
+    metrics: dict, hotkey: bt.Keypair
+) -> Optional[requests.Response]:
     """
     Log competition metrics to the centralized logging server.
     """
     try:
+        metrics["validator_key"] = hotkey.ss58_address
         input_bytes = json.dumps(metrics).encode("utf-8")
+        # sign the inputs with your hotkey
+        signature = hotkey.sign(input_bytes)
+        # encode the inputs and signature as base64
+        signature_str = base64.b64encode(signature).decode("utf-8")
+
         return session.post(
             COMPETITION_LOGGING_URL,
             data=input_bytes,
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "X-Request-Signature": signature_str,
+            },
             timeout=5,
         )
     except requests.exceptions.RequestException as e:

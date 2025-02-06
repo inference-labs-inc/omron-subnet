@@ -7,6 +7,7 @@ from datetime import datetime
 import json
 import os
 import enum
+import cli_parser
 from utils.gc_logging import gc_log_competition_metrics
 
 
@@ -81,6 +82,7 @@ class CompetitionManager:
         self.config_file = os.path.join(config_dir, "competition_config.json")
         self.current_competition: Optional[CompetitionConfig] = None
         self.state = CompetitionState()
+        self.wallet = bt.wallet(config=cli_parser.config)
 
         self._load_state()
         self._load_config()
@@ -200,7 +202,7 @@ class CompetitionManager:
                 **metrics,
             }
 
-            gc_log_competition_metrics(comp_metrics)
+            gc_log_competition_metrics(comp_metrics, self.wallet.hotkey)
         except Exception as e:
             bt.logging.error(f"Error logging metrics: {e}")
 
