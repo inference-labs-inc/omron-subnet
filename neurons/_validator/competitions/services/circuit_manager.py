@@ -14,6 +14,105 @@ class CircuitManager:
         self.temp_dir = temp_dir
         self.competition_id = competition_id
         os.makedirs(temp_dir, exist_ok=True)
+        self._loop = None
+
+    def _get_event_loop(self):
+        try:
+            return asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop
+
+    async def _download_files_async(
+        self, axon: bt.axon, hash: str, circuit_dir: str
+    ) -> bool:
+        try:
+            dendrite = bt.dendrite()
+            required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
+
+            synapse = Competition(
+                id=self.competition_id, hash=hash, file_name="commitment"
+            )
+            response = await dendrite.call(target_axon=axon, synapse=synapse)
+            response = Competition.model_validate(response)
+
+            if not isinstance(response, Competition):
+                bt.logging.error("Invalid response type from miner")
+                return False
+
+            if response.error:
+                bt.logging.error(f"Error from miner: {response.error}")
+                return False
+
+            if response.commitment:
+                commitment = json.loads(response.commitment)
+                if "signed_urls" in commitment:
+                    signed_urls = commitment["signed_urls"]
+
+                    for file_name in required_files:
+                        if file_name not in signed_urls:
+                            bt.logging.error(f"Missing signed URL for {file_name}")
+                            return False
+
+                        url = signed_urls[file_name]
+                        if not self._validate_url(url):
+                            bt.logging.error(f"Invalid URL for {file_name}: {url}")
+                            return False
+
+                        local_path = os.path.join(circuit_dir, file_name)
+                        try:
+                            response = requests.get(url)
+                            response.raise_for_status()
+                            with open(local_path, "wb") as f:
+                                f.write(response.content)
+                            bt.logging.debug(f"Downloaded {file_name} from signed URL")
+
+                            if file_name == "vk.key":
+                                with open(local_path, "rb") as f:
+                                    file_hash = hashlib.sha256(f.read()).hexdigest()
+                                if file_hash != hash:
+                                    bt.logging.error(
+                                        f"Hash mismatch for vk.key: expected {hash}, got {file_hash}"
+                                    )
+                                    return False
+
+                        except Exception as e:
+                            bt.logging.error(f"Failed to download {file_name}: {e}")
+                            return False
+                    return True
+
+            synapse = Competition(
+                competition_id=self.competition_id,
+                commitment_hash=hash,
+                request_type="DOWNLOAD",
+            )
+
+            response = await axon.call(synapse)
+            if not response or not response.success:
+                bt.logging.error(f"Failed to download circuit files from {axon.hotkey}")
+                return False
+
+            for file_name, file_data in response.files.items():
+                file_path = os.path.join(circuit_dir, file_name)
+                with open(file_path, "wb") as f:
+                    f.write(file_data)
+
+            return True
+
+        except Exception as e:
+            bt.logging.error(f"Error downloading circuit files: {e}")
+            return False
+
+    def download_files(self, axon: bt.axon, hash: str, circuit_dir: str) -> bool:
+        try:
+            loop = self._get_event_loop()
+            return loop.run_until_complete(
+                self._download_files_async(axon, hash, circuit_dir)
+            )
+        except Exception as e:
+            bt.logging.error(f"Error downloading circuit files: {e}")
+            return False
 
     def cleanup_temp_files(self, circuit_dir: str):
         try:
@@ -42,70 +141,4 @@ class CircuitManager:
                 ]
             )
         except Exception:
-            return False
-
-    def download_files(self, axon: bt.axon, hash: str, circuit_dir: str) -> bool:
-        try:
-            dendrite = bt.dendrite()
-            required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
-
-            synapse = Competition(
-                id=self.competition_id, hash=hash, file_name="commitment"
-            )
-            response = asyncio.run(dendrite.call(target_axon=axon, synapse=synapse))
-            response = Competition.model_validate(response)
-
-            if not isinstance(response, Competition):
-                bt.logging.error("Invalid response type from miner")
-                return False
-
-            if response.error:
-                bt.logging.error(f"Error from miner: {response.error}")
-                return False
-
-            if not response.commitment:
-                bt.logging.error("No commitment data received from miner")
-                return False
-
-            commitment = json.loads(response.commitment)
-            if "signed_urls" not in commitment:
-                bt.logging.error("No signed URLs in commitment data")
-                return False
-
-            signed_urls = commitment["signed_urls"]
-
-            for file_name in required_files:
-                if file_name not in signed_urls:
-                    bt.logging.error(f"Missing signed URL for {file_name}")
-                    return False
-
-                url = signed_urls[file_name]
-                if not self._validate_url(url):
-                    bt.logging.error(f"Invalid URL for {file_name}: {url}")
-                    return False
-
-                local_path = os.path.join(circuit_dir, file_name)
-                try:
-                    response = requests.get(url)
-                    response.raise_for_status()
-                    with open(local_path, "wb") as f:
-                        f.write(response.content)
-                    bt.logging.debug(f"Downloaded {file_name} from signed URL")
-
-                    if file_name == "vk.key":
-                        with open(local_path, "rb") as f:
-                            file_hash = hashlib.sha256(f.read()).hexdigest()
-                        if file_hash != hash:
-                            bt.logging.error(
-                                f"Hash mismatch for vk.key: expected {hash}, got {file_hash}"
-                            )
-                            return False
-
-                except Exception as e:
-                    bt.logging.error(f"Failed to download {file_name}: {e}")
-                    return False
-
-            return True
-        except Exception as e:
-            bt.logging.error(f"Error downloading circuit files: {e}")
             return False
