@@ -17,9 +17,6 @@ from _validator.competitions.services.data_source import (
 from utils.wandb_logger import safe_log
 import shutil
 
-ONNX_VENV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "onnx_venv")
-ONNX_RUNNER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "onnx_runner.py")
-
 
 class CircuitEvaluator:
     def __init__(
@@ -32,16 +29,24 @@ class CircuitEvaluator:
         self.competition_directory = competition_directory
         self.sota_manager = sota_manager
         self.is_onnx = not isinstance(baseline_model, torch.nn.Module)
-        if self.is_onnx and not os.path.exists(ONNX_VENV):
+
+        self.onnx_venv = os.path.abspath(
+            os.path.join(competition_directory, "onnx_venv")
+        )
+        self.onnx_runner = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "onnx_runner.py"
+        )
+
+        if self.is_onnx and not os.path.exists(self.onnx_venv):
             self._setup_onnx_env()
 
         self.data_source = self._setup_data_source()
 
     def _setup_onnx_env(self):
-        os.makedirs(ONNX_VENV, exist_ok=True)
-        subprocess.run(["python", "-m", "venv", ONNX_VENV], check=True)
-        pip_path = os.path.join(ONNX_VENV, "bin", "pip")
-        python_path = os.path.join(ONNX_VENV, "bin", "python")
+        os.makedirs(self.onnx_venv, exist_ok=True)
+        subprocess.run(["python", "-m", "venv", self.onnx_venv], check=True)
+        pip_path = os.path.join(self.onnx_venv, "bin", "pip")
+        python_path = os.path.join(self.onnx_venv, "bin", "python")
 
         version_result = subprocess.run(
             [
@@ -60,12 +65,12 @@ class CircuitEvaluator:
         subprocess.run([pip_path, "install", "numpy", "onnxruntime"], check=True)
 
         site_packages = os.path.join(
-            ONNX_VENV, "lib", f"python{python_version}", "site-packages"
+            self.onnx_venv, "lib", f"python{python_version}", "site-packages"
         )
         os.makedirs(site_packages, exist_ok=True)
-        shutil.copy2(ONNX_RUNNER, os.path.join(site_packages, "onnx_runner.py"))
+        shutil.copy2(self.onnx_runner, os.path.join(site_packages, "onnx_runner.py"))
         bt.logging.success(
-            f"ONNX environment set up at {ONNX_VENV} with Python {python_version}"
+            f"ONNX environment set up at {self.onnx_venv} with Python {python_version}"
         )
 
     def _setup_data_source(self) -> CompetitionDataSource:
@@ -390,7 +395,7 @@ class CircuitEvaluator:
                 tempfile.NamedTemporaryFile(suffix=".npy") as output_file,
             ):
                 np.save(input_file.name, test_inputs.numpy())
-                python_path = os.path.join(ONNX_VENV, "bin", "python")
+                python_path = os.path.join(self.onnx_venv, "bin", "python")
                 model_path = os.path.abspath(self.baseline_model)
 
                 version_result = subprocess.run(
@@ -405,7 +410,7 @@ class CircuitEvaluator:
                 )
                 python_version = version_result.stdout.strip()
                 runner_path = os.path.join(
-                    ONNX_VENV,
+                    self.onnx_venv,
                     "lib",
                     f"python{python_version}",
                     "site-packages",

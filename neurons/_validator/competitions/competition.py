@@ -79,7 +79,6 @@ class CompetitionThread(threading.Thread):
                                     bt.logging.success(
                                         "Circuit download successful, starting evaluation..."
                                     )
-                                    axon = self.competition.metagraph.axons[uid]
                                     circuit_dir = os.path.join(
                                         self.competition.temp_directory, hash
                                     )
@@ -91,7 +90,10 @@ class CompetitionThread(threading.Thread):
 
                                     try:
                                         score = self.competition._evaluate_circuit(
-                                            axon, circuit_dir
+                                            circuit_dir,
+                                            hash,
+                                            hotkey,
+                                            self.competition.accuracy_weight,
                                         )
                                         bt.logging.debug(
                                             f"Circuit evaluation complete with score {score}"
@@ -670,78 +672,46 @@ class Competition:
 
         axon, circuit_dir = self.pending_evaluations.pop(0)
         try:
-            self._evaluate_circuit(axon, circuit_dir)
+            self._evaluate_circuit(
+                circuit_dir, axon.hotkey, axon.hotkey, self.accuracy_weight
+            )
             return True
         finally:
             self.circuit_manager.cleanup_temp_files(circuit_dir)
 
-    def _evaluate_circuit(self, miner_axon: bt.axon, circuit_dir: str) -> float:
-        bt.logging.info(f"Evaluating circuit for {miner_axon.hotkey}")
-        safe_log(
-            {
-                "competition_status": "evaluating_circuit",
-                "miner_hotkey": miner_axon.hotkey,
-            }
-        )
+    def _evaluate_circuit(
+        self,
+        circuit_dir: str,
+        circuit_uid: str,
+        circuit_owner: str,
+        accuracy_weight: float,
+    ) -> float:
+        try:
+            score, proof_size, response_time, success = self.circuit_evaluator.evaluate(
+                circuit_dir, accuracy_weight
+            )
 
-        accuracy_weight = self.competition_manager.get_accuracy_weight()
+            if not success:
+                return 0.0
 
-        score, proof_size, response_time, verification_success = (
-            self.circuit_evaluator.evaluate(circuit_dir, accuracy_weight)
-        )
+            safe_log(
+                {
+                    "circuit_eval_status": "eval_success",
+                    "circuit_uid": circuit_uid,
+                    "circuit_owner": circuit_owner,
+                    "score": float(score),
+                    "proof_size": -1 if proof_size == float("inf") else int(proof_size),
+                    "response_time": (
+                        -1 if response_time == float("inf") else float(response_time)
+                    ),
+                }
+            )
 
-        uid = next(
-            (
-                i
-                for i, axon in enumerate(self.metagraph.axons)
-                if axon.hotkey == miner_axon.hotkey
-            ),
-            None,
-        )
-        if uid is not None:
-            hotkey = self.metagraph.hotkeys[uid]
-            if hotkey:
-                self.miner_states[hotkey].score = score
-                self.miner_states[hotkey].proof_size = proof_size
-                self.miner_states[hotkey].response_time = response_time
-                self.miner_states[hotkey].verification_result = verification_success
-                self.miner_states[hotkey].accuracy = score
-
-                safe_log(
-                    {
-                        "competition_status": "evaluation_complete",
-                        "miner_hotkey": hotkey,
-                        "miner_uid": uid,
-                        "score": float(score),
-                        "proof_size": int(proof_size),
-                        "response_time": float(response_time),
-                        "verification_success": bool(verification_success),
-                    }
-                )
-
-                if (
-                    self.competition_manager.is_competition_active()
-                    and self.sota_manager.check_if_sota(
-                        score, proof_size, response_time
-                    )
-                ):
-                    safe_log(
-                        {
-                            "competition_status": "new_sota",
-                            "miner_hotkey": hotkey,
-                            "miner_uid": uid,
-                            "score": float(score),
-                            "proof_size": int(proof_size),
-                            "response_time": float(response_time),
-                        }
-                    )
-                    self.sota_manager.preserve_circuit(
-                        circuit_dir, self.miner_states[hotkey]
-                    )
-
-                self._update_competition_metrics(hotkey)
-
-        return score
+            return score
+        except Exception as e:
+            bt.logging.error(f"Error in competition thread cycle: {str(e)}")
+            bt.logging.error(f"Stack trace: {traceback.format_exc()}")
+            return 0.0
 
     def _update_competition_metrics(self, hotkey: str):
         self.competition_manager.increment_circuits_evaluated()
@@ -807,12 +777,11 @@ class Competition:
             circuit_dir = os.path.join(self.temp_directory, hash)
             os.makedirs(circuit_dir, exist_ok=True)
 
-            # Create event loop for async operations
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
             try:
-                # Run the async function in the loop
+
                 download_success = loop.run_until_complete(
                     self.circuit_manager.download_files(axon, hash, circuit_dir)
                 )
