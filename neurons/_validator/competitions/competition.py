@@ -14,6 +14,7 @@ import time
 from .models.neuron import NeuronState
 from .services.circuit_validator import CircuitValidator
 from .services.circuit_manager import CircuitManager
+from bittensor.core.chain_data import decode_account_id
 from .services.circuit_evaluator import CircuitEvaluator
 from .services.sota_manager import SotaManager
 from .services.data_source import (
@@ -24,9 +25,8 @@ from .services.data_source import (
 )
 from .competition_manager import CompetitionManager
 from .utils.cleanup import register_cleanup_handlers
-from constants import TEMP_FOLDER, MAINNET_TESTNET_UIDS, ONE_HOUR
+from constants import TEMP_FOLDER, ONE_HOUR
 from _validator.utils.uid import get_queryable_uids
-from scalecodec.utils.ss58 import ss58_encode
 from utils.wandb_logger import safe_log
 
 
@@ -91,7 +91,6 @@ class CompetitionThread(threading.Thread):
                             "Pausing main request loop for circuit evaluation..."
                         )
 
-                        # Process downloads synchronously
                         if self.competition.process_downloads_sync():
                             bt.logging.info(
                                 "Circuit download successful, starting evaluation..."
@@ -300,91 +299,69 @@ class Competition:
 
             for acc, info in commitment_map:
                 try:
-                    if self.metagraph.netuid == next(
-                        (
-                            testnet
-                            for mainnet, testnet in MAINNET_TESTNET_UIDS
-                            if mainnet == 2
-                        ),
-                        None,
-                    ):
-                        if not acc or not acc[0]:
-                            continue
-                        acc = ss58_encode(bytes(acc[0]))
 
-                    if acc not in hotkey_to_uid:
+                    hotkey = decode_account_id(acc[0])
+
+                    if hotkey not in hotkey_to_uid:
                         continue
 
-                    uid = hotkey_to_uid[acc]
+                    uid = hotkey_to_uid[hotkey]
 
                     if not info or not isinstance(info, dict):
                         bt.logging.debug(
-                            f"No valid commitment info for {acc} (UID {uid})"
+                            f"No valid commitment info for {hotkey} (UID {uid})"
                         )
                         continue
 
                     commitment_info = info.get("info", {})
                     if not commitment_info or not isinstance(commitment_info, dict):
-                        bt.logging.debug(f"Invalid commitment info structure for {acc}")
+                        bt.logging.debug(
+                            f"Invalid commitment info structure for {hotkey}"
+                        )
                         continue
 
                     fields = commitment_info.get("fields", [])
                     if not fields or not isinstance(fields, list) or not fields[0]:
-                        bt.logging.debug(f"Invalid fields structure for {acc}")
+                        bt.logging.debug(f"Invalid fields structure for {hotkey}")
                         continue
 
-                    raw64_data = fields[0][0].get("Raw64") if fields[0][0] else None
-                    if not raw64_data:
-                        bt.logging.debug(f"No Raw64 data for {acc}")
+                    commitment = fields[0][0]
+                    if not commitment:
+                        bt.logging.debug(f"Empty commitment for {hotkey}")
                         continue
 
-                    if self.metagraph.netuid == next(
-                        (
-                            testnet
-                            for mainnet, testnet in MAINNET_TESTNET_UIDS
-                            if mainnet == 2
-                        ),
-                        None,
-                    ):
-                        if not isinstance(raw64_data, list) or not raw64_data[0]:
-                            continue
-                        hash = bytes(raw64_data[0]).decode("utf-8")
-                    else:
-                        if not isinstance(raw64_data, str) or not raw64_data.startswith(
-                            "0x"
-                        ):
-                            continue
-                        hash = bytes.fromhex(raw64_data[2:]).decode("utf-8")
+                    commitment_type = next(iter(commitment.keys()))
+                    bytes_tuple = commitment[commitment_type][0]
+                    hash = bytes(bytes_tuple).decode()
 
                     if (
-                        acc not in self.miner_states
-                        or self.miner_states[acc].hash != hash
+                        hotkey not in self.miner_states
+                        or self.miner_states[hotkey].hash != hash
                     ):
                         if hash in {state.hash for state in self.miner_states.values()}:
                             bt.logging.warning(
                                 f"Circuit with hash {hash} already exists for another miner"
                             )
                             continue
-                        commitments.append((uid, acc, hash))
+                        commitments.append((uid, hotkey, hash))
                         bt.logging.success(
-                            f"New circuit detected for {acc} with hash {hash}"
+                            f"New circuit detected for {hotkey} with hash {hash}"
                         )
                         safe_log(
                             {
                                 "competition_status": "new_circuit_detected",
-                                "miner_hotkey": acc,
+                                "miner_hotkey": hotkey,
                                 "miner_uid": uid,
                                 "circuit_hash": hash,
                             }
                         )
 
                 except Exception as e:
-                    bt.logging.error(f"Error processing commitment for {acc}: {e}")
-                    traceback.print_exc()
+                    bt.logging.error(f"Error processing commitment: {e}")
+                    bt.logging.error(f"Stack trace: {traceback.format_exc()}")
                     safe_log(
                         {
                             "competition_status": "commitment_error",
-                            "miner_hotkey": acc,
                             "error": str(e),
                         }
                     )
@@ -392,7 +369,7 @@ class Competition:
 
         except Exception as e:
             bt.logging.error(f"Error fetching commitments: {e}")
-            traceback.print_exc()
+            bt.logging.error(f"Stack trace: {traceback.format_exc()}")
             safe_log(
                 {
                     "competition_status": "fetch_error",
@@ -652,7 +629,6 @@ class Competition:
                 f"Processing download for circuit {hash[:8]}... from {hotkey[:8]}..."
             )
 
-            # Download the circuit
             circuit_proto = self.dendrite.query(
                 [self.circuit_manager.axons[hotkey]],
                 self.circuit_manager.download_request(hash),
@@ -666,7 +642,6 @@ class Competition:
                 )
                 return False
 
-            # Save the circuit
             circuit_path = self.circuit_manager.save_circuit(circuit_proto[0], hash)
             if not circuit_path:
                 bt.logging.warning(f"Failed to save circuit {hash[:8]}...")
