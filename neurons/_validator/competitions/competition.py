@@ -48,7 +48,7 @@ class CompetitionThread(threading.Thread):
         self.task_queue = queue.Queue()
         self.daemon = True
 
-        self.subtensor = bt.subtensor(config)
+        self.subtensor = bt.subtensor(config=config)
 
         bt.logging.info("Competition thread initialized with:")
         bt.logging.info(f"- Competition ID: {self.competition.competition_id}")
