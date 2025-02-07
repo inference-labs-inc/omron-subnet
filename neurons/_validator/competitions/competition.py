@@ -130,7 +130,9 @@ class CompetitionThread(threading.Thread):
                                         )
                                 else:
                                     bt.logging.error(
-                                        "Circuit download or evaluation failed"
+                                        "Circuit download or evaluation failed "
+                                        f"for {self.competition.current_download[2][:8]} from "
+                                        f"{self.competition.current_download[1][:8]}"
                                     )
                             finally:
                                 self.competition.clear_current_download()
