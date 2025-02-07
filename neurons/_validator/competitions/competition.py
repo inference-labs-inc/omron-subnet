@@ -101,7 +101,7 @@ class CompetitionThread(threading.Thread):
                                             hotkey,
                                             self.competition.accuracy_weight,
                                         )
-                                        bt.logging.debug(
+                                        bt.logging.info(
                                             f"Circuit evaluation complete with score {score}"
                                         )
 
@@ -124,14 +124,22 @@ class CompetitionThread(threading.Thread):
                                                 circuit_dir,
                                                 self.competition.miner_states[hotkey],
                                             )
-                                        else:
-                                            if os.path.exists(circuit_dir):
-                                                shutil.rmtree(circuit_dir)
                                     finally:
+                                        if os.path.exists(circuit_dir) and not (
+                                            score > 0
+                                            and self.competition.sota_manager.check_if_sota(
+                                                score,
+                                                self.competition.miner_states[
+                                                    hotkey
+                                                ].proof_size,
+                                                self.competition.miner_states[
+                                                    hotkey
+                                                ].response_time,
+                                            )
+                                        ):
+                                            shutil.rmtree(circuit_dir)
                                         self.pause_requests_event.clear()
-                                        bt.logging.debug(
-                                            "Resuming main request loop..."
-                                        )
+                                        bt.logging.info("Resuming main request loop...")
                                 else:
                                     bt.logging.error(
                                         f"Circuit download or evaluation failed for {hash[:8]} from {hotkey[:8]}"
