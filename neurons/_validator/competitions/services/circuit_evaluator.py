@@ -471,7 +471,7 @@ class CircuitEvaluator:
                 if stderr:
                     for line in stderr.split("\n"):
                         if line.strip():
-                            if line.startswith("!!!"):
+                            if "ONNX RUNNER" in line:
                                 bt.logging.info(f"ONNX: {line}")
                             else:
                                 bt.logging.debug(f"ONNX Warning: {line}")

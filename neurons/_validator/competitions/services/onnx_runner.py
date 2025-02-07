@@ -14,7 +14,7 @@ def run_inference(model_path: str, input_path: str, output_path: str) -> None:
         input_data = np.load(input_path)
         print(f"Loaded input data shape: {input_data.shape}")
 
-        options = ort.SessionOptions()
+        options = ort.RunOptions()
         options.log_severity_level = 3
 
         output_names = [output.name for output in session.get_outputs()]
