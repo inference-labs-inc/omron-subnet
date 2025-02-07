@@ -468,7 +468,10 @@ class CircuitEvaluator:
                 if stderr:
                     for line in stderr.split("\n"):
                         if line.strip():
-                            bt.logging.error(f"STDERR: {line}")
+                            if line.startswith("###"):
+                                bt.logging.info(f"ONNX: {line}")
+                            else:
+                                bt.logging.debug(f"ONNX Warning: {line}")
                 bt.logging.info("ONNX Runner Output END ---")
 
                 if process.returncode != 0:
