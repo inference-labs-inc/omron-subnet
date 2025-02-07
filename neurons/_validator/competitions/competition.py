@@ -772,8 +772,9 @@ class Competition:
                 f"Processing download for circuit {hash[:8]}... from {hotkey[:8]}..."
             )
 
+            axon = self.metagraph.axons[uid]
             circuit_proto = self.dendrite.query(
-                [self.circuit_manager.axons[hotkey]],
+                [axon],
                 self.circuit_manager.download_request(hash),
                 timeout=60,
                 deserialize=True,
