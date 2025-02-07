@@ -37,11 +37,12 @@ class CircuitEvaluator:
         self.data_source = self._setup_data_source()
 
     def _setup_onnx_env(self):
+        os.makedirs(ONNX_VENV, exist_ok=True)
         subprocess.run(["python", "-m", "venv", ONNX_VENV], check=True)
         pip_path = os.path.join(ONNX_VENV, "bin", "pip")
-        subprocess.run(
-            [pip_path, "install", "numpy==1.24.3", "onnxruntime==1.17.0"], check=True
-        )
+        subprocess.run([pip_path, "install", "--upgrade", "pip"], check=True)
+        subprocess.run([pip_path, "install", "numpy", "onnxruntime"], check=True)
+        bt.logging.success(f"ONNX environment set up at {ONNX_VENV}")
 
     def _setup_data_source(self) -> CompetitionDataSource:
         try:
