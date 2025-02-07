@@ -773,28 +773,33 @@ class Competition:
             )
 
             axon = self.metagraph.axons[uid]
-            circuit_proto = self.dendrite.query(
-                [axon],
-                self.circuit_manager.download_request(hash),
-                timeout=60,
-                deserialize=True,
-            )
+            circuit_dir = os.path.join(self.temp_directory, hash)
+            os.makedirs(circuit_dir, exist_ok=True)
 
-            if not circuit_proto or not circuit_proto[0]:
-                bt.logging.warning(
-                    f"Failed to download circuit {hash[:8]}... from {hotkey[:8]}..."
-                )
-                return False
+            if self.circuit_manager.download_files(axon, hash, circuit_dir):
+                if self.circuit_validator.validate_files(circuit_dir):
+                    self.miner_states[hotkey] = NeuronState(
+                        hotkey=hotkey,
+                        uid=uid,
+                        score=0.0,
+                        proof_size=0,
+                        response_time=0.0,
+                        verification_result=False,
+                        accuracy=0.0,
+                        hash=hash,
+                    )
+                    bt.logging.success(
+                        f"Successfully downloaded and validated circuit {hash[:8]}..."
+                    )
+                    return True
+                else:
+                    bt.logging.warning(f"Circuit validation failed for {hash[:8]}...")
+            else:
+                bt.logging.warning(f"Failed to download circuit {hash[:8]}...")
 
-            circuit_path = self.circuit_manager.save_circuit(circuit_proto[0], hash)
-            if not circuit_path:
-                bt.logging.warning(f"Failed to save circuit {hash[:8]}...")
-                return False
-
-            bt.logging.success(
-                f"Successfully downloaded and saved circuit {hash[:8]}..."
-            )
-            return True
+            if os.path.exists(circuit_dir):
+                shutil.rmtree(circuit_dir)
+            return False
 
         except Exception as e:
             bt.logging.error(f"Error processing download: {e}")
