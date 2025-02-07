@@ -144,6 +144,7 @@ class Competition:
         )
         self.sota_directory = os.path.join(self.competition_directory, "sota")
         self.dendrite = dendrite
+        self._substrate_lock = threading.Lock()
 
         bt.logging.info("Creating competition directories...")
         os.makedirs(self.temp_directory, exist_ok=True)
@@ -291,7 +292,7 @@ class Competition:
                 }
             )
 
-            with self.subtensor.substrate.lock:
+            with self._substrate_lock:
                 commitment_map = self.subtensor.substrate.query_map(
                     module="Commitments",
                     storage_function="CommitmentOf",
