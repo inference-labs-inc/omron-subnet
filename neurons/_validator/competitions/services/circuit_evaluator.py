@@ -583,19 +583,6 @@ class CircuitEvaluator:
 
             with open(temp_proof_path) as f:
                 proof_data = json.load(f)
-                bt.logging.info(
-                    f"Proof data structure: {json.dumps(proof_data, indent=2)}"
-                )
-                bt.logging.info(f"Proof data keys: {list(proof_data.keys())}")
-                if "pretty_public_inputs" in proof_data:
-                    bt.logging.info(
-                        f"Pretty public inputs: {json.dumps(proof_data['pretty_public_inputs'], indent=2)}"
-                    )
-                    if "rescaled_outputs" in proof_data["pretty_public_inputs"]:
-                        bt.logging.info(
-                            f"Rescaled outputs: "
-                            f"{json.dumps(proof_data['pretty_public_inputs']['rescaled_outputs'], indent=2)}"
-                        )
                 bt.logging.debug(f"Proof timing - Proof: {proof_time:.3f}s")
                 return temp_proof_path, proof_data, proof_time
         except Exception as e:
