@@ -8,6 +8,7 @@ import asyncio
 from contextlib import asynccontextmanager
 import base64
 import traceback
+from protocol import Competition
 
 
 class CircuitManager:
@@ -74,49 +75,53 @@ class CircuitManager:
         try:
             bt.logging.debug(f"Requesting circuit files for hash {hash[:8]}...")
 
-            request = {"type": "circuit_request", "hash": hash}
-
             if not self.dendrite:
                 bt.logging.error("Dendrite not initialized")
                 return False
 
-            response = await self.dendrite.forward(
-                axons=[axon],
-                synapse=request,
-                timeout=60,
-                deserialize=True,
-                streaming=False,
-            )
+            expected_files = ["settings.json", "model.compiled", "pk.key", "vk.key"]
+            all_files_downloaded = True
 
-            if not response or not response[0]:
-                bt.logging.error(f"No response from axon for hash {hash[:8]}")
-                return False
+            for file_name in expected_files:
+                synapse = Competition(
+                    id=self.competition_id,
+                    hash=hash,
+                    file_name=file_name,
+                )
 
-            response = response[0]
-            bt.logging.debug(f"Got response for hash {hash[:8]}, saving files...")
+                response = await self.dendrite.forward(
+                    axons=[axon],
+                    synapse=synapse,
+                    timeout=60,
+                    deserialize=True,
+                )
 
-            expected_files = ["circuit.json", "circuit.wasm", "circuit.zkey", "vk.key"]
+                if not response or not response[0] or not response[0].file_content:
+                    bt.logging.error(f"Failed to download {file_name}")
+                    all_files_downloaded = False
+                    break
 
-            for file in expected_files:
-                if file not in response:
-                    bt.logging.error(f"Missing {file} in response")
-                    return False
-
-                file_path = os.path.join(circuit_dir, file)
+                file_path = os.path.join(circuit_dir, file_name)
                 try:
-                    if file.endswith(".json"):
+                    content = response[0].file_content
+                    if file_name.endswith(".json"):
                         with open(file_path, "w") as f:
-                            json.dump(response[file], f)
+                            json.dump(json.loads(content), f)
                     else:
                         with open(file_path, "wb") as f:
-                            f.write(base64.b64decode(response[file]))
-                    bt.logging.debug(f"Saved {file}")
+                            f.write(base64.b64decode(content))
+                    bt.logging.debug(f"Saved {file_name}")
                 except Exception as e:
-                    bt.logging.error(f"Failed to save {file}: {e}")
-                    return False
+                    bt.logging.error(f"Failed to save {file_name}: {e}")
+                    all_files_downloaded = False
+                    break
 
-            bt.logging.success(f"Successfully downloaded all files for {hash[:8]}")
-            return True
+            if all_files_downloaded:
+                bt.logging.success(f"Successfully downloaded all files for {hash[:8]}")
+                return True
+            else:
+                bt.logging.error(f"Failed to download all files for {hash[:8]}")
+                return False
 
         except Exception as e:
             bt.logging.error(f"Error downloading circuit files: {e}")
