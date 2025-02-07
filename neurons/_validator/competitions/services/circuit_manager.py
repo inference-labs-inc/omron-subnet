@@ -72,6 +72,12 @@ class CircuitManager:
     async def download_files(self, axon: bt.axon, hash: str, circuit_dir: str) -> bool:
         try:
             required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
+            file_timeouts = {
+                "vk.key": 60,
+                "pk.key": 300,
+                "settings.json": 30,
+                "model.compiled": 60,
+            }
 
             synapse = Competition(
                 id=self.competition_id, hash=hash, file_name="commitment"
@@ -91,7 +97,12 @@ class CircuitManager:
                 bt.logging.error("No commitment data received from miner")
                 return False
 
-            commitment = json.loads(response.commitment)
+            try:
+                commitment = json.loads(response.commitment)
+            except json.JSONDecodeError:
+                bt.logging.error("Invalid JSON in commitment data")
+                return False
+
             if "signed_urls" not in commitment:
                 bt.logging.error("No signed URLs in commitment data")
                 return False
@@ -99,6 +110,7 @@ class CircuitManager:
             signed_urls = commitment["signed_urls"]
 
             for file_name in required_files:
+
                 if file_name not in signed_urls:
                     bt.logging.error(f"Missing signed URL for {file_name}")
                     return False
@@ -111,7 +123,9 @@ class CircuitManager:
                 local_path = os.path.join(circuit_dir, file_name)
                 try:
                     async with self._get_session() as session:
-                        async with session.get(url) as response:
+                        async with session.get(
+                            url, timeout=file_timeouts[file_name]
+                        ) as response:
                             response.raise_for_status()
                             content = await response.read()
                             with open(local_path, "wb") as f:
@@ -132,6 +146,7 @@ class CircuitManager:
                     return False
 
             return True
+
         except Exception as e:
             bt.logging.error(f"Error downloading circuit files: {e}")
             return False
