@@ -278,7 +278,7 @@ class CircuitManager:
                         self._current_object_keys = object_keys
 
                         bt.logging.success(
-                            f"Updated circuit commitment: {new_vk_hash[:8]}..."
+                            f"Upload complete. Updated circuit commitment: {new_vk_hash[:8]}..."
                         )
 
             except Exception as e:
