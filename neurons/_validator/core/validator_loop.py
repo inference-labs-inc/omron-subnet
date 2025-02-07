@@ -250,52 +250,21 @@ class ValidatorLoop:
                 bt.logging.warning(
                     "Circuit manager not initialized during download, reinitializing..."
                 )
-                self.competition.initialize_circuit_manager(self.config.dendrite)
+                self.competition.initialize_circuit_manager(self.competition.dendrite)
 
             if self.competition.get_current_download():
-                uid, hotkey, hash = self.competition.get_current_download()
-                bt.logging.info(
-                    f"Processing download for circuit {hash[:8]}... from {hotkey[:8]}..."
+                bt.logging.debug(
+                    "Competition thread is handling downloads, skipping..."
                 )
+                return
 
-                task_count = len(self.active_tasks)
-                if task_count > 0:
-                    bt.logging.info(
-                        f"Pausing {task_count} active tasks for circuit evaluation"
-                    )
-                    for task in self.active_tasks.values():
-                        task.cancel()
-                    self.active_tasks.clear()
-
-                while not self.request_queue.empty():
-                    try:
-                        self.request_queue.get_nowait()
-                    except asyncio.QueueEmpty:
-                        break
-
-                await asyncio.sleep(1)
-                bt.logging.debug("Network tasks paused, starting circuit processing")
-
-            if await self.competition.process_downloads():
-                bt.logging.info("Circuit download successful, starting evaluation...")
-                self.competition.run_single_evaluation()
-                bt.logging.info("Circuit evaluation complete")
-            else:
-                bt.logging.debug("No circuit to process or download failed")
-
-            if self.competition.get_current_download():
-                uid, hotkey, hash = self.competition.get_current_download()
-                bt.logging.info(f"Cleaning up download for circuit {hash[:8]}...")
-                self.competition.clear_current_download()
+            if self.competition.pause_requests_event.is_set():
+                bt.logging.debug("Request loop already paused, skipping...")
+                return
 
         except Exception as e:
             bt.logging.error(f"Error processing competition downloads: {e}")
-            if self.competition.get_current_download():
-                uid, hotkey, hash = self.competition.get_current_download()
-                bt.logging.info(
-                    f"Cleaning up failed download for circuit {hash[:8]}..."
-                )
-                self.competition.clear_current_download()
+            traceback.print_exc()
 
     async def maintain_request_pool(self):
         while self._should_run:

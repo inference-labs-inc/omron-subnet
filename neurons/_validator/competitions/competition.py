@@ -27,7 +27,7 @@ from .services.data_source import (
 )
 from .competition_manager import CompetitionManager
 from .utils.cleanup import register_cleanup_handlers
-from constants import TEMP_FOLDER, ONE_HOUR
+from constants import TEMP_FOLDER
 from _validator.utils.uid import get_queryable_uids
 from utils.wandb_logger import safe_log
 
@@ -67,26 +67,20 @@ class CompetitionThread(threading.Thread):
                         )
                         bt.logging.debug("Circuit manager reinitialized")
 
-                    bt.logging.debug("Fetching commitments...")
-                    commitments = self.competition.fetch_commitments()
-                    bt.logging.debug(f"Found {len(commitments)} commitments")
-
-                    if commitments:
-                        bt.logging.success(
-                            f"Found {len(commitments)} new circuits to evaluate"
+                    bt.logging.debug("Checking download queue...")
+                    if self.competition.download_queue:
+                        bt.logging.debug(
+                            f"Found {len(self.competition.download_queue)} items in queue"
                         )
-                        for uid, hotkey, hash in commitments:
-                            bt.logging.debug(
-                                f"Queueing download for circuit {hash[:8]}... from {hotkey[:8]}..."
+                        if not self.competition.current_download:
+                            self.competition.current_download = (
+                                self.competition.download_queue.pop(0)
                             )
-                            self.competition.queue_download(uid, hotkey, hash)
+                            bt.logging.debug(
+                                f"Processing next download: {self.competition.current_download[2][:8]}..."
+                            )
 
-                    current_download = self.competition.get_current_download()
-                    bt.logging.debug(
-                        f"Current download status: {'Active' if current_download else 'None'}"
-                    )
-
-                    if current_download:
+                    if self.competition.current_download:
                         bt.logging.debug("=== Processing Download Start ===")
                         self.pause_requests_event.set()
                         bt.logging.debug(
@@ -107,12 +101,12 @@ class CompetitionThread(threading.Thread):
                         bt.logging.debug("=== Processing Download End ===")
 
                     bt.logging.debug("=== Competition Cycle End ===")
-                    bt.logging.debug(f"Sleeping for {ONE_HOUR} seconds...")
-                    time.sleep(ONE_HOUR)
+                    time.sleep(1)  # Shorter sleep to process queue faster
 
                 except Exception as e:
                     bt.logging.error(f"Error in competition thread cycle: {e}")
                     bt.logging.error(f"Stack trace: {traceback.format_exc()}")
+                    time.sleep(5)  # Back off on error
 
         except Exception as e:
             bt.logging.error(f"Fatal error in competition thread: {e}")
