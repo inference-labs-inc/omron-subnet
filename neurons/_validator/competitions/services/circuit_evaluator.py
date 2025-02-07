@@ -105,12 +105,20 @@ class CircuitEvaluator:
             weights = {"accuracy": 0.4, "proof_size": 0.3, "response_time": 0.3}
 
         accuracy_diff = max(0, sota_state.accuracy - accuracy)
-        proof_size_diff = max(
-            0, (proof_size - sota_state.proof_size) / sota_state.proof_size
-        )
-        response_time_diff = max(
-            0, (response_time - sota_state.response_time) / sota_state.response_time
-        )
+
+        if sota_state.proof_size > 0:
+            proof_size_diff = max(
+                0, (proof_size - sota_state.proof_size) / sota_state.proof_size
+            )
+        else:
+            proof_size_diff = 0 if proof_size == 0 else 1
+
+        if sota_state.response_time > 0:
+            response_time_diff = max(
+                0, (response_time - sota_state.response_time) / sota_state.response_time
+            )
+        else:
+            response_time_diff = 0 if response_time == 0 else 1
 
         total_diff = torch.tensor(
             accuracy_diff * weights["accuracy"]
@@ -609,6 +617,16 @@ class CircuitEvaluator:
                 bt.logging.debug(f"Actual output size: {len(actual)}")
                 bt.logging.debug(f"Expected output: {expected}")
                 bt.logging.debug(f"Actual output: {actual}")
+
+            # Extract outputs from proof data
+            if isinstance(actual, dict) and "rescaled_outputs" in actual:
+                actual = actual["rescaled_outputs"][0]
+            elif (
+                isinstance(actual, list)
+                and len(actual) == 1
+                and isinstance(actual[0], list)
+            ):
+                actual = actual[0]
 
             if len(actual) != total_size:
                 bt.logging.error(
