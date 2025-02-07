@@ -15,6 +15,7 @@ from _validator.competitions.services.data_source import (
     RemoteDataSource,
 )
 from utils.wandb_logger import safe_log
+import shutil
 
 ONNX_VENV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "onnx_venv")
 ONNX_RUNNER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "onnx_runner.py")
@@ -42,6 +43,10 @@ class CircuitEvaluator:
         pip_path = os.path.join(ONNX_VENV, "bin", "pip")
         subprocess.run([pip_path, "install", "--upgrade", "pip"], check=True)
         subprocess.run([pip_path, "install", "numpy", "onnxruntime"], check=True)
+
+        runner_dir = os.path.join(ONNX_VENV, "lib", "python3.12", "site-packages")
+        os.makedirs(runner_dir, exist_ok=True)
+        shutil.copy2(ONNX_RUNNER, os.path.join(runner_dir, "onnx_runner.py"))
         bt.logging.success(f"ONNX environment set up at {ONNX_VENV}")
 
     def _setup_data_source(self) -> CompetitionDataSource:
@@ -315,7 +320,7 @@ class CircuitEvaluator:
                 "total_iterations": num_iterations,
                 "successful_iterations": len([s for s in scores if s > 0]),
                 "verification_success_rate": sum(verification_results)
-                / len(verification_results),
+                / max(len(verification_results), 1),
                 "scores_distribution": scores,
                 "proof_sizes_distribution": proof_sizes,
                 "response_times_distribution": response_times,
@@ -362,7 +367,7 @@ class CircuitEvaluator:
                 result = subprocess.run(
                     [
                         python_path,
-                        ONNX_RUNNER,
+                        "onnx_runner.py",
                         model_path,
                         input_file.name,
                         output_file.name,
