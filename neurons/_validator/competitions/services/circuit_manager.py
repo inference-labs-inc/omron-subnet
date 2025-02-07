@@ -91,12 +91,22 @@ class CircuitManager:
                 deserialize=True,
             )
 
-            if not response or not response[0] or not response[0].commitment:
-                bt.logging.error("Failed to get commitment data")
+            if not response or not response[0]:
+                bt.logging.error("No response from axon")
+                return False
+
+            response_data = response[0]
+            if isinstance(response_data, dict):
+                response_synapse = Competition(**response_data)
+            else:
+                response_synapse = response_data
+
+            if not response_synapse.commitment:
+                bt.logging.error("No commitment data in response")
                 return False
 
             try:
-                commitment = json.loads(response[0].commitment)
+                commitment = json.loads(response_synapse.commitment)
             except json.JSONDecodeError:
                 bt.logging.error("Invalid commitment data")
                 return False
