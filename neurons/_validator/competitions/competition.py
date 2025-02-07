@@ -147,6 +147,9 @@ class Competition:
         hotkey_to_uid = {self.metagraph.hotkeys[uid]: uid for uid in queryable_uids}
 
         try:
+            bt.logging.debug(
+                f"Fetching commitments for {len(queryable_uids)} queryable UIDs"
+            )
             commitment_map = self.subtensor.substrate.query_map(
                 module="Commitments",
                 storage_function="CommitmentOf",
@@ -232,6 +235,7 @@ class Competition:
         except Exception as e:
             bt.logging.error(f"Error fetching commitments: {e}")
 
+        bt.logging.debug(f"Found {len(commitments)} total commitments")
         return commitments
 
     async def process_downloads(self) -> bool:
