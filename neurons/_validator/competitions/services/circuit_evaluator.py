@@ -476,12 +476,6 @@ class CircuitEvaluator:
                             else:
                                 bt.logging.debug(f"ONNX Warning: {line}")
 
-                log_file = "/tmp/onnx_runner_debug.log"
-                if os.path.exists(log_file):
-                    with open(log_file, "r") as f:
-                        log_contents = f.read()
-                        bt.logging.info(f"ONNX Runner Debug Log:\n{log_contents}")
-                    os.unlink(log_file)
                 bt.logging.info("ONNX Runner Output END ---")
 
                 if process.returncode != 0:
