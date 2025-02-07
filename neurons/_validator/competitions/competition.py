@@ -155,7 +155,6 @@ class Competition:
 
             for acc, info in commitment_map:
                 try:
-
                     if self.metagraph.netuid == next(
                         (
                             testnet
@@ -235,56 +234,51 @@ class Competition:
 
         return commitments
 
-    async def process_downloads(self) -> None:
-        while True:
-            try:
-                async with self.download_lock:
-                    if not self.download_queue and not self.current_download:
-                        self.download_complete.clear()
-                        await self.download_complete.wait()
-                        continue
-
-                    if not self.current_download and self.download_queue:
-                        self.current_download = self.download_queue.pop(0)
-
-                if self.current_download:
-                    uid, hotkey, hash = self.current_download
-                    axon = self.metagraph.axons[uid]
-                    circuit_dir = os.path.join(self.temp_directory, hash)
-                    os.makedirs(circuit_dir, exist_ok=True)
-
-                    if await self.circuit_manager.download_files(
-                        axon, hash, circuit_dir
-                    ):
-                        if self.circuit_validator.validate_files(circuit_dir):
-                            self.miner_states[hotkey] = NeuronState(
-                                hotkey=hotkey,
-                                uid=uid,
-                                score=0.0,
-                                proof_size=0,
-                                response_time=0.0,
-                                verification_result=False,
-                                accuracy=0.0,
-                                hash=hash,
-                            )
-                            return True
-
-                    if os.path.exists(circuit_dir):
-                        shutil.rmtree(circuit_dir)
-
-                    self.current_download = None
+    async def process_downloads(self) -> bool:
+        try:
+            async with self.download_lock:
+                if not self.download_queue and not self.current_download:
                     return False
 
-            except Exception as e:
-                bt.logging.error(f"Error in download processing: {e}")
-                if self.current_download:
-                    circuit_dir = os.path.join(
-                        self.temp_directory, self.current_download[2]
-                    )
-                    if os.path.exists(circuit_dir):
-                        shutil.rmtree(circuit_dir)
-                    self.current_download = None
+                if not self.current_download and self.download_queue:
+                    self.current_download = self.download_queue.pop(0)
+
+            if self.current_download:
+                uid, hotkey, hash = self.current_download
+                axon = self.metagraph.axons[uid]
+                circuit_dir = os.path.join(self.temp_directory, hash)
+                os.makedirs(circuit_dir, exist_ok=True)
+
+                if await self.circuit_manager.download_files(axon, hash, circuit_dir):
+                    if self.circuit_validator.validate_files(circuit_dir):
+                        self.miner_states[hotkey] = NeuronState(
+                            hotkey=hotkey,
+                            uid=uid,
+                            score=0.0,
+                            proof_size=0,
+                            response_time=0.0,
+                            verification_result=False,
+                            accuracy=0.0,
+                            hash=hash,
+                        )
+                        return True
+
+                if os.path.exists(circuit_dir):
+                    shutil.rmtree(circuit_dir)
+
+                self.current_download = None
                 return False
+
+        except Exception as e:
+            bt.logging.error(f"Error in download processing: {e}")
+            if self.current_download:
+                circuit_dir = os.path.join(
+                    self.temp_directory, self.current_download[2]
+                )
+                if os.path.exists(circuit_dir):
+                    shutil.rmtree(circuit_dir)
+                self.current_download = None
+            return False
 
     def queue_download(self, uid: int, hotkey: str, hash: str) -> None:
         self.download_queue.append((uid, hotkey, hash))

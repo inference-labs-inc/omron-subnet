@@ -245,12 +245,12 @@ class ValidatorLoop:
                 # Wait for all tasks to actually complete
                 await asyncio.sleep(1)  # Give tasks time to clean up
 
-                if await self.competition.process_downloads():
-                    bt.logging.info("Running competition evaluation...")
-                    self.competition.run_single_evaluation()
-                self.competition.clear_current_download()
-            else:
-                await self.competition.process_downloads()
+            # Process one download at a time
+            if await self.competition.process_downloads():
+                bt.logging.info("Running competition evaluation...")
+                self.competition.run_single_evaluation()
+            self.competition.clear_current_download()
+
         except Exception as e:
             bt.logging.error(f"Error processing competition downloads: {e}")
             if self.competition.get_current_download():
