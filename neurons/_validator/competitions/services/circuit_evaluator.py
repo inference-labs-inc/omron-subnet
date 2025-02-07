@@ -601,23 +601,32 @@ class CircuitEvaluator:
                 os.path.join(self.competition_directory, "competition_config.json")
             ) as f:
                 config = json.load(f)
-                output_shape = tuple(config["evaluation"]["output_shape"])
-        except Exception as e:
-            bt.logging.error(f"Error loading output shape, using default: {e}")
-            output_shape = (1, 6)
+                output_shapes = config["circuit_settings"]["output_shapes"]
+                total_size = sum(
+                    shape[0] * shape[1] for shape in output_shapes.values()
+                )
+                bt.logging.debug(f"Expected total output size: {total_size}")
+                bt.logging.debug(f"Actual output size: {len(actual)}")
+                bt.logging.debug(f"Expected output: {expected}")
+                bt.logging.debug(f"Actual output: {actual}")
 
-        try:
-            expected_array = torch.tensor(expected).reshape(output_shape)
-            actual_array = torch.tensor(actual).reshape(output_shape)
-            bt.logging.debug(
-                f"Comparing expected {expected_array} with actual {actual_array}"
-            )
+            if len(actual) != total_size:
+                bt.logging.error(
+                    f"Output size mismatch: expected {total_size}, got {len(actual)}"
+                )
+                return 0.0
 
-            mae = torch.nn.functional.l1_loss(actual_array, expected_array)
+            # Convert to tensors for comparison
+            expected_tensor = torch.tensor(expected)
+            actual_tensor = torch.tensor(actual)
+
+            # Calculate MAE on the raw outputs
+            mae = torch.nn.functional.l1_loss(actual_tensor, expected_tensor)
             accuracy = torch.exp(-mae).item()
             bt.logging.debug(f"MAE: {mae.item()}, Accuracy: {accuracy}")
 
             return accuracy
         except Exception as e:
             bt.logging.error(f"Error comparing outputs: {e}")
+            bt.logging.error(f"Stack trace: {traceback.format_exc()}")
             return 0.0
