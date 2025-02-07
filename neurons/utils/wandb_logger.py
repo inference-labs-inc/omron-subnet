@@ -49,7 +49,7 @@ def safe_login(api_key):
         bt.logging.error("Failed to login to WandB. Your run will not be logged.")
 
 
-def safe_init(name=None, wallet=None, metagraph=None, config=None, project=None):
+def safe_init(name=None, wallet=None, metagraph=None, config=None):
     """
     Attempts to initialize WandB, and logs if unsuccessful
     """
@@ -84,10 +84,15 @@ def safe_init(name=None, wallet=None, metagraph=None, config=None, project=None)
                         "gpu_memory": torch.cuda.get_device_properties(0).total_memory,
                     }
                 )
+        project_name = PROJECT_NAME
+        if config.dev:
+            project_name = PROJECT_NAME + "-development"
+        elif config.subtensor.network == "test":
+            project_name = PROJECT_NAME + "-testnet"
 
         wandb.init(
             entity=ENTITY_NAME,
-            project=project or PROJECT_NAME,
+            project=project_name,
             name=name,
             config=config_dict,
             reinit=True,
