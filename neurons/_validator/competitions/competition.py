@@ -6,6 +6,7 @@ import torch
 import platform
 import asyncio
 import json
+import traceback
 
 from .models.neuron import NeuronState
 from .services.circuit_validator import CircuitValidator
@@ -116,6 +117,7 @@ class Competition:
 
         except Exception as e:
             bt.logging.error(f"Error setting up data source: {e}")
+            traceback.print_exc()
             return RandomDataSource(self.competition_directory)
 
     def _load_model(self) -> Union[torch.nn.Module, str, None]:
@@ -153,7 +155,7 @@ class Competition:
         self.miner_states = {k: v for k, v in self.miner_states.items() if k in hotkeys}
 
         commitments = []
-        queryable_uids = get_queryable_uids(self.metagraph)
+        queryable_uids = list(get_queryable_uids(self.metagraph))
         hotkey_to_uid = {self.metagraph.hotkeys[uid]: uid for uid in queryable_uids}
 
         try:
@@ -255,6 +257,7 @@ class Competition:
 
                 except Exception as e:
                     bt.logging.error(f"Error processing commitment for {acc}: {e}")
+                    traceback.print_exc()
                     safe_log(
                         {
                             "competition_status": "commitment_error",
@@ -266,6 +269,7 @@ class Competition:
 
         except Exception as e:
             bt.logging.error(f"Error fetching commitments: {e}")
+            traceback.print_exc()
             safe_log(
                 {
                     "competition_status": "fetch_error",
@@ -351,6 +355,7 @@ class Competition:
 
         except Exception as e:
             bt.logging.error(f"Error in download processing: {e}")
+            traceback.print_exc()
             if self.current_download:
                 uid, hotkey, hash = self.current_download
                 safe_log(
