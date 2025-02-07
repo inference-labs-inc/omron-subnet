@@ -84,15 +84,11 @@ def safe_init(name=None, wallet=None, metagraph=None, config=None):
                         "gpu_memory": torch.cuda.get_device_properties(0).total_memory,
                     }
                 )
-        project_name = PROJECT_NAME
-        if config.dev:
-            project_name = PROJECT_NAME + "-development"
-        elif config.subtensor.network == "test":
-            project_name = PROJECT_NAME + "-testnet"
 
         wandb.init(
             entity=ENTITY_NAME,
-            project=project_name,
+            project=PROJECT_NAME
+            + ("-testnet" if config.subtensor.network == "test" else ""),
             name=name,
             config=config_dict,
             reinit=True,
