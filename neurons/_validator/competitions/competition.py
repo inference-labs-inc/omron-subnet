@@ -7,6 +7,9 @@ import platform
 import asyncio
 import json
 import traceback
+import threading
+import queue
+import time
 
 from .models.neuron import NeuronState
 from .services.circuit_validator import CircuitValidator
@@ -21,15 +24,86 @@ from .services.data_source import (
 )
 from .competition_manager import CompetitionManager
 from .utils.cleanup import register_cleanup_handlers
-from constants import TEMP_FOLDER, MAINNET_TESTNET_UIDS
+from constants import TEMP_FOLDER, MAINNET_TESTNET_UIDS, ONE_HOUR
 from _validator.utils.uid import get_queryable_uids
 from scalecodec.utils.ss58 import ss58_encode
 from utils.wandb_logger import safe_log
 
 
+class CompetitionThread(threading.Thread):
+    def __init__(
+        self, competition: "Competition", pause_requests_event: threading.Event
+    ):
+        super().__init__()
+        self.competition = competition
+        self.pause_requests_event = pause_requests_event
+        self._should_run = threading.Event()
+        self._should_run.set()
+        self.task_queue = queue.Queue()
+        self.daemon = True
+        self.loop = asyncio.new_event_loop()
+
+    def run(self):
+        asyncio.set_event_loop(self.loop)
+        while self._should_run.is_set():
+            try:
+                if not self.competition.circuit_manager:
+                    bt.logging.warning(
+                        "Circuit manager not initialized, reinitializing..."
+                    )
+                    self.competition.initialize_circuit_manager(
+                        self.competition.dendrite
+                    )
+
+                commitments = self.competition.fetch_commitments()
+                if commitments:
+                    bt.logging.success(
+                        f"Found {len(commitments)} new circuits to evaluate"
+                    )
+                    for uid, hotkey, hash in commitments:
+                        bt.logging.info(
+                            f"Queueing download for circuit {hash[:8]}... from {hotkey[:8]}..."
+                        )
+                        self.competition.queue_download(uid, hotkey, hash)
+
+                if self.competition.get_current_download():
+
+                    self.pause_requests_event.set()
+                    bt.logging.info(
+                        "Pausing main request loop for circuit evaluation..."
+                    )
+
+                    if self.loop.run_until_complete(
+                        self.competition.process_downloads()
+                    ):
+                        bt.logging.info(
+                            "Circuit download successful, starting evaluation..."
+                        )
+                        self.competition.run_single_evaluation()
+                        bt.logging.info("Circuit evaluation complete")
+
+                    self.pause_requests_event.clear()
+                    bt.logging.info("Resuming main request loop...")
+
+            except Exception as e:
+                bt.logging.error(f"Error in competition thread: {e}")
+                traceback.print_exc()
+
+            time.sleep(ONE_HOUR)
+
+    def stop(self):
+        self._should_run.clear()
+        self.loop.stop()
+        self.loop.close()
+
+
 class Competition:
     def __init__(
-        self, competition_id: int, metagraph: bt.metagraph, subtensor: bt.subtensor
+        self,
+        competition_id: int,
+        metagraph: bt.metagraph,
+        subtensor: bt.subtensor,
+        dendrite: bt.dendrite,
     ):
         self.competition_id = competition_id
         self.competition_directory = os.path.join(
@@ -39,6 +113,7 @@ class Competition:
             TEMP_FOLDER, f"competition_{str(competition_id)}"
         )
         self.sota_directory = os.path.join(self.competition_directory, "sota")
+        self.dendrite = dendrite
 
         os.makedirs(self.temp_directory, exist_ok=True)
         os.makedirs(self.sota_directory, exist_ok=True)
@@ -63,6 +138,10 @@ class Competition:
         self.download_complete = asyncio.Event()
         self.download_task: Optional[asyncio.Task] = None
         self.download_lock = asyncio.Lock()
+
+        self.pause_requests_event = threading.Event()
+        self.competition_thread = CompetitionThread(self, self.pause_requests_event)
+        self.competition_thread.start()
 
         safe_log(
             {

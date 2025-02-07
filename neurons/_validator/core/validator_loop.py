@@ -340,7 +340,11 @@ class ValidatorLoop:
     async def run_periodic_tasks(self):
         while self._should_run:
             try:
-                # Always update core metrics
+                if self.competition and self.competition.pause_requests_event.is_set():
+                    bt.logging.debug("Request loop paused for competition evaluation")
+                    await asyncio.sleep(1)
+                    continue
+
                 self.update_weights()
                 self.sync_scores_uids()
                 self.sync_metagraph()
@@ -348,27 +352,6 @@ class ValidatorLoop:
                 self.update_queryable_uids()
                 self.log_health()
                 await self.log_responses()
-
-                # Handle competition tasks
-                if self.competition:
-                    bt.logging.debug("Processing competition tasks...")
-
-                    # First sync competition if no active downloads
-                    if not self.competition.get_current_download():
-                        bt.logging.debug(
-                            "No active downloads, checking for new circuits..."
-                        )
-                        await self.sync_competition()
-
-                    # Then process any pending downloads
-                    bt.logging.debug("Processing any pending competition downloads...")
-                    await self.process_competition_downloads()
-
-                    if self.competition.get_current_download():
-                        bt.logging.info(
-                            "Competition download in progress, skipping other tasks"
-                        )
-                        continue
 
             except KeyboardInterrupt:
                 self._handle_keyboard_interrupt()
@@ -486,8 +469,10 @@ class ValidatorLoop:
         """Handle keyboard interrupt by cleaning up and exiting."""
         bt.logging.success("Keyboard interrupt detected. Exiting validator.")
         loop = asyncio.get_event_loop()
-        if self.competition and hasattr(self.competition.circuit_manager, "close"):
-            loop.run_until_complete(self.competition.circuit_manager.close())
+        if self.competition:
+            self.competition.competition_thread.stop()
+            if hasattr(self.competition.circuit_manager, "close"):
+                loop.run_until_complete(self.competition.circuit_manager.close())
         loop.run_until_complete(self.api.stop())
         stop_prometheus_logging()
         clean_temp_files()
