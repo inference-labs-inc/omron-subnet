@@ -779,12 +779,15 @@ class Competition:
             # Create event loop for async operations
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
+
             try:
+                # Run the async function in the loop
                 download_success = loop.run_until_complete(
                     self.circuit_manager.download_files(axon, hash, circuit_dir)
                 )
             finally:
                 loop.close()
+                asyncio.set_event_loop(None)
 
             if download_success:
                 bt.logging.debug(f"Download completed for {hash[:8]}, validating...")

@@ -76,8 +76,16 @@ class CircuitManager:
 
             request = {"type": "circuit_request", "hash": hash}
 
-            response = await self.dendrite.query(
-                [axon], request, timeout=60, deserialize=True
+            if not self.dendrite:
+                bt.logging.error("Dendrite not initialized")
+                return False
+
+            response = await self.dendrite.forward(
+                axons=[axon],
+                synapse=request,
+                timeout=60,
+                deserialize=True,
+                streaming=False,
             )
 
             if not response or not response[0]:
