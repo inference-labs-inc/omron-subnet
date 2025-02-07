@@ -14,6 +14,7 @@ from _validator.competitions.services.data_source import (
     RandomDataSource,
     RemoteDataSource,
 )
+from utils.wandb_logger import safe_log
 
 ONNX_VENV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "onnx_venv")
 ONNX_RUNNER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "onnx_runner.py")
@@ -94,8 +95,22 @@ class CircuitEvaluator:
         scores, proof_sizes, response_times, verification_results = [], [], [], []
         input_shape = self._get_input_shape(circuit_dir)
         bt.logging.debug(f"Got input shape: {input_shape}")
+
+        safe_log(
+            {
+                "circuit_eval_status": "started",
+                "input_shape": input_shape if input_shape else None,
+            }
+        )
+
         if not input_shape:
             bt.logging.error("Failed to get input shape")
+            safe_log(
+                {
+                    "circuit_eval_status": "failed",
+                    "error": "Failed to get input shape",
+                }
+            )
             return 0.0, 0.0, 0.0, False
 
         try:
@@ -107,30 +122,82 @@ class CircuitEvaluator:
         except Exception as e:
             bt.logging.error(f"Error loading num_iterations, using default: {e}")
             num_iterations = 10
+            safe_log(
+                {
+                    "circuit_eval_status": "config_error",
+                    "error": str(e),
+                    "using_default_iterations": num_iterations,
+                }
+            )
 
         for i in range(num_iterations):
+            iteration_start = time.time()
             bt.logging.debug(f"Running evaluation {i + 1}/{num_iterations}")
+            safe_log(
+                {
+                    "circuit_eval_status": "iteration_started",
+                    "iteration": i + 1,
+                    "total_iterations": num_iterations,
+                }
+            )
+
             try:
                 test_inputs = self.data_source.get_benchmark_data()
                 if test_inputs is None:
                     bt.logging.error("Failed to get benchmark data")
+                    safe_log(
+                        {
+                            "circuit_eval_status": "iteration_error",
+                            "iteration": i + 1,
+                            "error": "Failed to get benchmark data",
+                        }
+                    )
                     scores.append(0.0)
                     continue
 
                 bt.logging.debug(f"Got benchmark data with shape: {test_inputs.shape}")
+                safe_log(
+                    {
+                        "circuit_eval_status": "got_benchmark_data",
+                        "iteration": i + 1,
+                        "input_shape": list(test_inputs.shape),
+                    }
+                )
 
                 baseline_output = self._run_baseline_model(test_inputs)
                 if baseline_output is None:
                     bt.logging.error("Baseline model run failed")
+                    safe_log(
+                        {
+                            "circuit_eval_status": "iteration_error",
+                            "iteration": i + 1,
+                            "error": "Baseline model run failed",
+                        }
+                    )
                     scores.append(0.0)
                     continue
+
                 bt.logging.debug(
                     f"Got baseline output with shape: {np.array(baseline_output).shape}"
+                )
+                safe_log(
+                    {
+                        "circuit_eval_status": "baseline_complete",
+                        "iteration": i + 1,
+                        "output_shape": list(np.array(baseline_output).shape),
+                    }
                 )
 
                 proof_result = self._generate_proof(circuit_dir, test_inputs)
                 if not proof_result:
                     bt.logging.error("Proof generation failed")
+                    safe_log(
+                        {
+                            "circuit_eval_status": "iteration_error",
+                            "iteration": i + 1,
+                            "error": "Proof generation failed",
+                        }
+                    )
                     scores.append(0.0)
                     continue
 
@@ -139,6 +206,15 @@ class CircuitEvaluator:
                     f"Generated proof with size: {len(proof_data['proof'])}"
                 )
                 response_times.append(response_time)
+
+                safe_log(
+                    {
+                        "circuit_eval_status": "proof_generated",
+                        "iteration": i + 1,
+                        "proof_size": len(proof_data["proof"]),
+                        "response_time": response_time,
+                    }
+                )
 
                 proof = proof_data.get("proof", [])
                 public_signals = [
@@ -154,23 +230,63 @@ class CircuitEvaluator:
                 bt.logging.debug(f"Proof verification result: {verify_result}")
                 verification_results.append(verify_result)
 
+                safe_log(
+                    {
+                        "circuit_eval_status": "proof_verified",
+                        "iteration": i + 1,
+                        "verification_success": verify_result,
+                    }
+                )
+
                 if verify_result:
                     accuracy_score = self._compare_outputs(
                         baseline_output, public_signals
                     )
                     bt.logging.debug(f"Accuracy score: {accuracy_score}")
                     scores.append(accuracy_score)
+
+                    safe_log(
+                        {
+                            "circuit_eval_status": "iteration_complete",
+                            "iteration": i + 1,
+                            "accuracy_score": float(accuracy_score),
+                            "proof_size": len(proof),
+                            "response_time": response_time,
+                            "iteration_duration": time.time() - iteration_start,
+                        }
+                    )
                 else:
                     bt.logging.error("Proof verification failed")
+                    safe_log(
+                        {
+                            "circuit_eval_status": "iteration_error",
+                            "iteration": i + 1,
+                            "error": "Proof verification failed",
+                        }
+                    )
                     scores.append(0.0)
 
             except Exception as e:
                 bt.logging.error(f"Error in evaluation iteration: {str(e)}")
+                safe_log(
+                    {
+                        "circuit_eval_status": "iteration_error",
+                        "iteration": i + 1,
+                        "error": str(e),
+                    }
+                )
                 scores.append(0.0)
 
         if not all(verification_results):
             bt.logging.error(
                 "One or more verifications failed - setting all scores to 0"
+            )
+            safe_log(
+                {
+                    "circuit_eval_status": "eval_failed",
+                    "error": "One or more verifications failed",
+                    "verification_results": verification_results,
+                }
             )
             return 0.0, float("inf"), float("inf"), False
 
@@ -186,6 +302,23 @@ class CircuitEvaluator:
 
         final_score = self._calculate_relative_score(
             avg_accuracy, avg_proof_size, avg_response_time
+        )
+
+        safe_log(
+            {
+                "circuit_eval_status": "eval_complete",
+                "final_score": float(final_score),
+                "avg_accuracy": float(avg_accuracy),
+                "avg_proof_size": float(avg_proof_size),
+                "avg_response_time": float(avg_response_time),
+                "total_iterations": num_iterations,
+                "successful_iterations": len([s for s in scores if s > 0]),
+                "verification_success_rate": sum(verification_results)
+                / len(verification_results),
+                "scores_distribution": scores,
+                "proof_sizes_distribution": proof_sizes,
+                "response_times_distribution": response_times,
+            }
         )
 
         bt.logging.info(

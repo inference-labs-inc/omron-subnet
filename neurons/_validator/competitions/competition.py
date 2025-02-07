@@ -23,6 +23,7 @@ from .utils.cleanup import register_cleanup_handlers
 from constants import TEMP_FOLDER, MAINNET_TESTNET_UIDS
 from _validator.utils.uid import get_queryable_uids
 from scalecodec.utils.ss58 import ss58_encode
+from utils.wandb_logger import safe_log
 
 
 class Competition:
@@ -61,6 +62,15 @@ class Competition:
         self.download_complete = asyncio.Event()
         self.download_task: Optional[asyncio.Task] = None
         self.download_lock = asyncio.Lock()
+
+        safe_log(
+            {
+                "competition_id": competition_id,
+                "competition_status": "initialized",
+                "competition_directory": str(self.competition_directory),
+                "sota_directory": str(self.sota_directory),
+            }
+        )
 
     def _setup_data_source(self) -> CompetitionDataSource:
         try:
@@ -150,6 +160,13 @@ class Competition:
             bt.logging.debug(
                 f"Fetching commitments for {len(queryable_uids)} queryable UIDs"
             )
+            safe_log(
+                {
+                    "competition_status": "fetching_commitments",
+                    "queryable_uids_count": len(queryable_uids),
+                }
+            )
+
             commitment_map = self.subtensor.substrate.query_map(
                 module="Commitments",
                 storage_function="CommitmentOf",
@@ -227,15 +244,41 @@ class Competition:
                         bt.logging.success(
                             f"New circuit detected for {acc} with hash {hash}"
                         )
+                        safe_log(
+                            {
+                                "competition_status": "new_circuit_detected",
+                                "miner_hotkey": acc,
+                                "miner_uid": uid,
+                                "circuit_hash": hash,
+                            }
+                        )
 
                 except Exception as e:
                     bt.logging.error(f"Error processing commitment for {acc}: {e}")
+                    safe_log(
+                        {
+                            "competition_status": "commitment_error",
+                            "miner_hotkey": acc,
+                            "error": str(e),
+                        }
+                    )
                     continue
 
         except Exception as e:
             bt.logging.error(f"Error fetching commitments: {e}")
+            safe_log(
+                {
+                    "competition_status": "fetch_error",
+                    "error": str(e),
+                }
+            )
 
-        bt.logging.debug(f"Found {len(commitments)} total commitments")
+        safe_log(
+            {
+                "competition_status": "fetch_complete",
+                "total_commitments": len(commitments),
+            }
+        )
         return commitments
 
     async def process_downloads(self) -> bool:
@@ -249,6 +292,15 @@ class Competition:
 
             if self.current_download:
                 uid, hotkey, hash = self.current_download
+                safe_log(
+                    {
+                        "competition_status": "downloading_circuit",
+                        "miner_hotkey": hotkey,
+                        "miner_uid": uid,
+                        "circuit_hash": hash,
+                    }
+                )
+
                 axon = self.metagraph.axons[uid]
                 circuit_dir = os.path.join(self.temp_directory, hash)
                 os.makedirs(circuit_dir, exist_ok=True)
@@ -265,7 +317,31 @@ class Competition:
                             accuracy=0.0,
                             hash=hash,
                         )
+                        safe_log(
+                            {
+                                "competition_status": "download_success",
+                                "miner_hotkey": hotkey,
+                                "circuit_hash": hash,
+                            }
+                        )
                         return True
+                    else:
+                        safe_log(
+                            {
+                                "competition_status": "validation_failed",
+                                "miner_hotkey": hotkey,
+                                "circuit_hash": hash,
+                            }
+                        )
+
+                else:
+                    safe_log(
+                        {
+                            "competition_status": "download_failed",
+                            "miner_hotkey": hotkey,
+                            "circuit_hash": hash,
+                        }
+                    )
 
                 if os.path.exists(circuit_dir):
                     shutil.rmtree(circuit_dir)
@@ -276,9 +352,16 @@ class Competition:
         except Exception as e:
             bt.logging.error(f"Error in download processing: {e}")
             if self.current_download:
-                circuit_dir = os.path.join(
-                    self.temp_directory, self.current_download[2]
+                uid, hotkey, hash = self.current_download
+                safe_log(
+                    {
+                        "competition_status": "download_error",
+                        "miner_hotkey": hotkey,
+                        "circuit_hash": hash,
+                        "error": str(e),
+                    }
                 )
+                circuit_dir = os.path.join(self.temp_directory, hash)
                 if os.path.exists(circuit_dir):
                     shutil.rmtree(circuit_dir)
                 self.current_download = None
@@ -311,6 +394,12 @@ class Competition:
 
     def _evaluate_circuit(self, miner_axon: bt.axon, circuit_dir: str) -> float:
         bt.logging.info(f"Evaluating circuit for {miner_axon.hotkey}")
+        safe_log(
+            {
+                "competition_status": "evaluating_circuit",
+                "miner_hotkey": miner_axon.hotkey,
+            }
+        )
 
         accuracy_weight = self.competition_manager.get_accuracy_weight()
 
@@ -335,12 +424,34 @@ class Competition:
                 self.miner_states[hotkey].verification_result = verification_success
                 self.miner_states[hotkey].accuracy = score
 
+                safe_log(
+                    {
+                        "competition_status": "evaluation_complete",
+                        "miner_hotkey": hotkey,
+                        "miner_uid": uid,
+                        "score": float(score),
+                        "proof_size": int(proof_size),
+                        "response_time": float(response_time),
+                        "verification_success": bool(verification_success),
+                    }
+                )
+
                 if (
                     self.competition_manager.is_competition_active()
                     and self.sota_manager.check_if_sota(
                         score, proof_size, response_time
                     )
                 ):
+                    safe_log(
+                        {
+                            "competition_status": "new_sota",
+                            "miner_hotkey": hotkey,
+                            "miner_uid": uid,
+                            "score": float(score),
+                            "proof_size": int(proof_size),
+                            "response_time": float(response_time),
+                        }
+                    )
                     self.sota_manager.preserve_circuit(
                         circuit_dir, self.miner_states[hotkey]
                     )
