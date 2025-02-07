@@ -807,6 +807,14 @@ class Competition:
 
             if download_success:
                 bt.logging.debug(f"Download completed for {hash[:8]}, validating...")
+                bt.logging.debug("Circuit directory contents:")
+                for root, dirs, files in os.walk(circuit_dir):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        bt.logging.debug(
+                            f"- {file} ({os.path.getsize(file_path)} bytes)"
+                        )
+
                 if self.circuit_validator.validate_files(circuit_dir):
                     self.miner_states[hotkey] = NeuronState(
                         hotkey=hotkey,

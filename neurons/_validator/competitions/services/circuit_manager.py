@@ -73,6 +73,7 @@ class CircuitManager:
         """Download circuit files from a miner."""
         try:
             bt.logging.debug(f"Requesting circuit files for hash {hash[:8]}...")
+            bt.logging.debug(f"Circuit directory: {circuit_dir}")
 
             if not self.dendrite:
                 bt.logging.error("Dendrite not initialized")
@@ -84,6 +85,7 @@ class CircuitManager:
                 file_name="commitment",
             )
 
+            bt.logging.debug(f"Sending request to axon: {axon.ip}:{axon.port}")
             response = await self.dendrite.forward(
                 axons=[axon],
                 synapse=synapse,
@@ -107,6 +109,7 @@ class CircuitManager:
 
             try:
                 commitment = json.loads(response_synapse.commitment)
+                bt.logging.debug(f"Received commitment data: {commitment}")
             except json.JSONDecodeError:
                 bt.logging.error("Invalid commitment data")
                 return False
@@ -134,19 +137,31 @@ class CircuitManager:
 
                     file_path = os.path.join(circuit_dir, file_name)
                     try:
+                        bt.logging.debug(f"Downloading {file_name} from {url}")
                         async with session.get(url, timeout=60) as response:
                             response.raise_for_status()
                             content = await response.read()
+                            bt.logging.debug(
+                                f"Downloaded {len(content)} bytes for {file_name}"
+                            )
                             with open(file_path, "wb") as f:
                                 f.write(content)
-                        bt.logging.debug(f"Downloaded {file_name} from signed URL")
+                            bt.logging.debug(f"Saved {file_name} to {file_path}")
                     except Exception as e:
                         bt.logging.error(f"Failed to download {file_name}: {e}")
+                        bt.logging.error(f"Stack trace: {traceback.format_exc()}")
                         all_files_downloaded = False
                         break
 
             if all_files_downloaded:
                 bt.logging.success(f"Successfully downloaded all files for {hash[:8]}")
+                bt.logging.debug("Final circuit directory contents:")
+                for root, dirs, files in os.walk(circuit_dir):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        bt.logging.debug(
+                            f"- {file} ({os.path.getsize(file_path)} bytes)"
+                        )
                 return True
             else:
                 bt.logging.error(f"Failed to download all files for {hash[:8]}")
@@ -154,5 +169,5 @@ class CircuitManager:
 
         except Exception as e:
             bt.logging.error(f"Error downloading circuit files: {e}")
-            traceback.print_exc()
+            bt.logging.error(f"Stack trace: {traceback.format_exc()}")
             return False
