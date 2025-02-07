@@ -467,6 +467,9 @@ class CircuitEvaluator:
             ) as temp_proof:
                 temp_proof_path = temp_proof.name
 
+            bt.logging.debug(
+                f"Running witness generation with input shape: {test_inputs.shape}"
+            )
             witness_result = subprocess.run(
                 [
                     LOCAL_EZKL_PATH,
@@ -484,9 +487,22 @@ class CircuitEvaluator:
             )
 
             if witness_result.returncode != 0:
-                bt.logging.error(f"Witness generation failed: {witness_result.stderr}")
+                bt.logging.error(
+                    f"Witness generation failed with code {witness_result.returncode}"
+                )
+                bt.logging.error(f"STDOUT: {witness_result.stdout}")
+                bt.logging.error(f"STDERR: {witness_result.stderr}")
+                safe_log(
+                    {
+                        "circuit_eval_status": "witness_gen_failed",
+                        "error_code": witness_result.returncode,
+                        "stdout": witness_result.stdout,
+                        "stderr": witness_result.stderr,
+                    }
+                )
                 return None
 
+            bt.logging.debug("Witness generation successful, starting proof generation")
             proof_start = time.perf_counter()
             prove_result = subprocess.run(
                 [
@@ -511,7 +527,19 @@ class CircuitEvaluator:
             os.unlink(witness_path)
 
             if prove_result.returncode != 0:
-                bt.logging.error(f"Proof generation failed: {prove_result.stderr}")
+                bt.logging.error(
+                    f"Proof generation failed with code {prove_result.returncode}"
+                )
+                bt.logging.error(f"STDOUT: {prove_result.stdout}")
+                bt.logging.error(f"STDERR: {prove_result.stderr}")
+                safe_log(
+                    {
+                        "circuit_eval_status": "proof_gen_failed",
+                        "error_code": prove_result.returncode,
+                        "stdout": prove_result.stdout,
+                        "stderr": prove_result.stderr,
+                    }
+                )
                 return None
 
             with open(temp_proof_path) as f:
