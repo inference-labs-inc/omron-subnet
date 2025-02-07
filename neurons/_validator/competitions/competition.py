@@ -46,7 +46,7 @@ class Competition:
         self.competition_manager = CompetitionManager(self.competition_directory)
         self.baseline_model = self._load_model()
         self.sota_manager = SotaManager(self.sota_directory)
-        self.circuit_manager = None  # Will be set when dendrite is available
+        self.circuit_manager = None
         self.circuit_validator = CircuitValidator()
         self.circuit_evaluator = CircuitEvaluator(
             self.baseline_model, self.competition_directory, self.sota_manager
@@ -134,7 +134,6 @@ class Competition:
                 "While the validator will continue to run, it will not be able to "
                 "correctly evaluate competitions."
             )
-            return []
 
         hotkeys = self.metagraph.hotkeys
         self.miner_states = {k: v for k, v in self.miner_states.items() if k in hotkeys}
@@ -143,55 +142,92 @@ class Competition:
         queryable_uids = get_queryable_uids(self.metagraph)
         hotkey_to_uid = {self.metagraph.hotkeys[uid]: uid for uid in queryable_uids}
 
-        commitment_map = self.subtensor.substrate.query_map(
-            module="Commitments",
-            storage_function="CommitmentOf",
-            params=[self.metagraph.netuid],
-        )
+        try:
+            commitment_map = self.subtensor.substrate.query_map(
+                module="Commitments",
+                storage_function="CommitmentOf",
+                params=[self.metagraph.netuid],
+            )
 
-        for acc, info in commitment_map:
-            try:
-                if self.metagraph.netuid == next(
-                    testnet for mainnet, testnet in MAINNET_TESTNET_UIDS if mainnet == 2
-                ):
-                    acc = ss58_encode(bytes(acc[0]))
+            for acc, info in commitment_map:
+                try:
 
-                if acc not in hotkey_to_uid:
-                    continue
+                    if self.metagraph.netuid == next(
+                        (
+                            testnet
+                            for mainnet, testnet in MAINNET_TESTNET_UIDS
+                            if mainnet == 2
+                        ),
+                        None,
+                    ):
+                        if not acc or not acc[0]:
+                            continue
+                        acc = ss58_encode(bytes(acc[0]))
 
-                uid = hotkey_to_uid[acc]
-                if not info or "info" not in info:
-                    bt.logging.warning(
-                        f"No valid commitment found for {acc} (UID {uid})"
-                    )
-                    continue
+                    if acc not in hotkey_to_uid:
+                        continue
 
-                raw64_field = info["info"]["fields"][0][0].get("Raw64")
-                hash = None
-                if self.metagraph.netuid == next(
-                    testnet for mainnet, testnet in MAINNET_TESTNET_UIDS if mainnet == 2
-                ):
-                    raw64_field = raw64_field[0]
-                    hash = bytes(raw64_field).decode("utf-8")
-                else:
-                    hash = bytes.fromhex(raw64_field[2:]).decode("utf-8")
-                if not raw64_field:
-                    bt.logging.warning(f"Invalid commitment format for {acc}")
-                    continue
+                    uid = hotkey_to_uid[acc]
 
-                if acc not in self.miner_states or self.miner_states[acc].hash != hash:
-                    if hash in {state.hash for state in self.miner_states.values()}:
-                        bt.logging.warning(
-                            f"Circuit with hash {hash} already exists for another miner"
+                    if not info or not isinstance(info, dict):
+                        bt.logging.debug(
+                            f"No valid commitment info for {acc} (UID {uid})"
                         )
                         continue
-                    commitments.append((uid, acc, hash))
-                    bt.logging.success(
-                        f"New circuit detected for {acc} with hash {hash}"
-                    )
 
-            except Exception as e:
-                bt.logging.error(f"Error processing commitment for {acc}: {e}")
+                    commitment_info = info.get("info", {})
+                    if not commitment_info or not isinstance(commitment_info, dict):
+                        bt.logging.debug(f"Invalid commitment info structure for {acc}")
+                        continue
+
+                    fields = commitment_info.get("fields", [])
+                    if not fields or not isinstance(fields, list) or not fields[0]:
+                        bt.logging.debug(f"Invalid fields structure for {acc}")
+                        continue
+
+                    raw64_data = fields[0][0].get("Raw64") if fields[0][0] else None
+                    if not raw64_data:
+                        bt.logging.debug(f"No Raw64 data for {acc}")
+                        continue
+
+                    if self.metagraph.netuid == next(
+                        (
+                            testnet
+                            for mainnet, testnet in MAINNET_TESTNET_UIDS
+                            if mainnet == 2
+                        ),
+                        None,
+                    ):
+                        if not isinstance(raw64_data, list) or not raw64_data[0]:
+                            continue
+                        hash = bytes(raw64_data[0]).decode("utf-8")
+                    else:
+                        if not isinstance(raw64_data, str) or not raw64_data.startswith(
+                            "0x"
+                        ):
+                            continue
+                        hash = bytes.fromhex(raw64_data[2:]).decode("utf-8")
+
+                    if (
+                        acc not in self.miner_states
+                        or self.miner_states[acc].hash != hash
+                    ):
+                        if hash in {state.hash for state in self.miner_states.values()}:
+                            bt.logging.warning(
+                                f"Circuit with hash {hash} already exists for another miner"
+                            )
+                            continue
+                        commitments.append((uid, acc, hash))
+                        bt.logging.success(
+                            f"New circuit detected for {acc} with hash {hash}"
+                        )
+
+                except Exception as e:
+                    bt.logging.error(f"Error processing commitment for {acc}: {e}")
+                    continue
+
+        except Exception as e:
+            bt.logging.error(f"Error fetching commitments: {e}")
 
         return commitments
 
