@@ -194,6 +194,12 @@ class Competition:
         )
         with open(config_path) as f:
             self.config = json.load(f)
+            self.accuracy_weight = (
+                self.config.get("evaluation", {})
+                .get("scoring_weights", {})
+                .get("accuracy", 0.4)
+            )
+            bt.logging.debug(f"Loaded accuracy weight: {self.accuracy_weight}")
 
         self.metagraph = metagraph
         self.wallet = wallet
