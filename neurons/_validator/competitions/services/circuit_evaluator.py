@@ -635,11 +635,9 @@ class CircuitEvaluator:
                 )
                 return 0.0
 
-            # Convert to tensors for comparison
-            expected_tensor = torch.tensor(expected)
+            expected_tensor = torch.tensor(expected[:total_size])
             actual_tensor = torch.tensor(actual)
 
-            # Calculate MAE on the raw outputs
             mae = torch.nn.functional.l1_loss(actual_tensor, expected_tensor)
             accuracy = torch.exp(-mae).item()
             bt.logging.debug(f"MAE: {mae.item()}, Accuracy: {accuracy}")
