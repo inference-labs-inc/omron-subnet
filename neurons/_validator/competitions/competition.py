@@ -10,6 +10,8 @@ import traceback
 import threading
 import queue
 import time
+from async_substrate_interface.types import ScaleObj
+from substrateinterface.utils.ss58 import ss58_encode
 
 from .models.neuron import NeuronState
 from .services.circuit_validator import CircuitValidator
@@ -285,102 +287,161 @@ class Competition:
             bt.logging.debug(
                 f"Fetching commitments for {len(queryable_uids)} queryable UIDs"
             )
+            bt.logging.debug(f"Using netuid: {self.metagraph.netuid}")
             safe_log(
                 {
                     "competition_status": "fetching_commitments",
                     "queryable_uids_count": len(queryable_uids),
+                    "netuid": self.metagraph.netuid,
                 }
             )
 
             with self._substrate_lock:
-                commitment_map = self.subtensor.substrate.query_map(
-                    module="Commitments",
-                    storage_function="CommitmentOf",
-                    params=[self.metagraph.netuid],
-                )
+                try:
+                    commitment_map = self.subtensor.substrate.query_map(
+                        module="Commitments",
+                        storage_function="CommitmentOf",
+                        params=[self.metagraph.netuid],
+                    )
 
-                for acc, info in commitment_map:
-                    try:
-                        if not acc or not isinstance(acc, list) or len(acc) < 1:
-                            continue
+                    if not commitment_map:
+                        bt.logging.debug("No commitments found in query result")
+                        return []
 
-                        hotkey = decode_account_id(acc[0])
+                    if not hasattr(commitment_map, "__iter__"):
+                        bt.logging.warning("Query result is not iterable")
+                        return []
 
-                        if hotkey not in hotkey_to_uid:
-                            continue
-
-                        uid = hotkey_to_uid[hotkey]
-
-                        if not info or not isinstance(info, dict):
-                            bt.logging.debug(
-                                f"No valid commitment info for {hotkey} (UID {uid})"
-                            )
-                            continue
-
-                        commitment_info = info.get("info", {})
-                        if not commitment_info or not isinstance(commitment_info, dict):
-                            bt.logging.debug(
-                                f"Invalid commitment info structure for {hotkey}"
-                            )
-                            continue
-
-                        fields = commitment_info.get("fields", [])
-                        if not fields or not isinstance(fields, list) or not fields[0]:
-                            bt.logging.debug(f"Invalid fields structure for {hotkey}")
-                            continue
-
-                        commitment = fields[0][0]
-                        if not commitment or not isinstance(commitment, dict):
-                            bt.logging.debug(f"Empty commitment for {hotkey}")
-                            continue
-
-                        commitment_type = next(iter(commitment.keys()))
-                        bytes_tuple = commitment[commitment_type][0]
-
-                        if not isinstance(bytes_tuple, (list, tuple)):
-                            bt.logging.debug(f"Invalid bytes tuple for {hotkey}")
-                            continue
-
+                    result_count = 0
+                    for result in commitment_map:
+                        result_count += 1
                         try:
-                            hash = bytes(bytes_tuple).decode()
-                        except Exception as e:
-                            bt.logging.debug(f"Failed to decode hash for {hotkey}: {e}")
-                            continue
+                            if not result or len(result) != 2:
+                                continue
 
-                        if (
-                            hotkey not in self.miner_states
-                            or self.miner_states[hotkey].hash != hash
-                        ):
-                            if hash in {
-                                state.hash for state in self.miner_states.values()
-                            }:
-                                bt.logging.warning(
-                                    f"Circuit with hash {hash} already exists for another miner"
+                            acc, info = result
+                            if not acc:
+                                continue
+
+                            # Handle nested tuple structure
+                            if isinstance(acc, (list, tuple)) and len(acc) > 0:
+                                if isinstance(acc[0], (list, tuple)):
+                                    acc_bytes = bytes(acc[0])
+                                else:
+                                    acc_bytes = bytes(acc)
+                            else:
+                                continue
+
+                            try:
+                                ss58_address = ss58_encode(acc_bytes)
+                                hotkey = decode_account_id(acc_bytes)
+                                if ss58_address != hotkey:
+                                    bt.logging.warning(
+                                        f"SS58 address mismatch for {hotkey}"
+                                    )
+                                    continue
+                            except Exception as e:
+                                bt.logging.debug(f"Failed to decode account ID: {e}")
+                                continue
+
+                            if hotkey not in hotkey_to_uid:
+                                continue
+
+                            uid = hotkey_to_uid[hotkey]
+
+                            if not isinstance(info, (dict, ScaleObj)):
+                                bt.logging.debug(
+                                    f"No valid commitment info for {hotkey} (UID {uid})"
                                 )
                                 continue
-                            commitments.append((uid, hotkey, hash))
-                            bt.logging.success(
-                                f"New circuit detected for {hotkey} with hash {hash}"
-                            )
+
+                            # Handle ScaleType objects
+                            if isinstance(info, ScaleObj):
+                                info = info.value
+
+                            commitment_info = info.get("info", {})
+                            if not commitment_info or not isinstance(
+                                commitment_info, dict
+                            ):
+                                bt.logging.debug(
+                                    f"Invalid commitment info structure for {hotkey}"
+                                )
+                                continue
+
+                            fields = commitment_info.get("fields", [])
+                            if (
+                                not fields
+                                or not isinstance(fields, (list, tuple))
+                                or not fields[0]
+                            ):
+                                bt.logging.debug(
+                                    f"Invalid fields structure for {hotkey}"
+                                )
+                                continue
+
+                            commitment = fields[0][0]
+                            if not commitment or not isinstance(commitment, dict):
+                                bt.logging.debug(f"Empty commitment for {hotkey}")
+                                continue
+
+                            commitment_type = next(iter(commitment.keys()))
+                            bytes_tuple = commitment[commitment_type][0]
+
+                            if not isinstance(bytes_tuple, (list, tuple)):
+                                bt.logging.debug(f"Invalid bytes tuple for {hotkey}")
+                                continue
+
+                            try:
+                                hash = bytes(bytes_tuple).decode()
+                            except Exception as e:
+                                bt.logging.debug(
+                                    f"Failed to decode hash for {hotkey}: {e}"
+                                )
+                                continue
+
+                            if (
+                                hotkey not in self.miner_states
+                                or self.miner_states[hotkey].hash != hash
+                            ):
+                                if hash in {
+                                    state.hash for state in self.miner_states.values()
+                                }:
+                                    bt.logging.warning(
+                                        f"Circuit with hash {hash} already exists for another miner"
+                                    )
+                                    continue
+                                commitments.append((uid, hotkey, hash))
+                                bt.logging.success(
+                                    f"New circuit detected for {hotkey} with hash {hash}"
+                                )
+                                safe_log(
+                                    {
+                                        "competition_status": "new_circuit_detected",
+                                        "miner_hotkey": hotkey,
+                                        "miner_uid": uid,
+                                        "circuit_hash": hash,
+                                    }
+                                )
+
+                        except Exception as e:
+                            bt.logging.error(f"Error processing commitment: {e}")
+                            bt.logging.error(f"Stack trace: {traceback.format_exc()}")
                             safe_log(
                                 {
-                                    "competition_status": "new_circuit_detected",
-                                    "miner_hotkey": hotkey,
-                                    "miner_uid": uid,
-                                    "circuit_hash": hash,
+                                    "competition_status": "commitment_error",
+                                    "error": str(e),
                                 }
                             )
+                            continue
 
+                    bt.logging.debug(f"Processed {result_count} commitment results")
+
+                finally:
+                    try:
+                        self.subtensor.substrate._ws_close()
                     except Exception as e:
-                        bt.logging.error(f"Error processing commitment: {e}")
-                        bt.logging.error(f"Stack trace: {traceback.format_exc()}")
-                        safe_log(
-                            {
-                                "competition_status": "commitment_error",
-                                "error": str(e),
-                            }
-                        )
-                        continue
+                        bt.logging.debug(f"Failed to close websocket connection: {e}")
+                        pass
 
         except Exception as e:
             bt.logging.error(f"Error fetching commitments: {e}")
