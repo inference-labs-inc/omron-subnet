@@ -51,13 +51,13 @@ class CompetitionThread(threading.Thread):
         bt.logging.info("=== Competition Thread Constructor End ===")
 
     def run(self):
-        bt.logging.info("=== Competition Thread Run Start ===")
+        bt.logging.debug("=== Competition Thread Run Start ===")
         try:
-            bt.logging.info("Competition thread main loop starting...")
+            bt.logging.debug("Competition thread main loop starting...")
             while self._should_run.is_set():
                 try:
-                    bt.logging.info("=== Competition Cycle Start ===")
-                    bt.logging.info("Checking circuit manager...")
+                    bt.logging.debug("=== Competition Cycle Start ===")
+                    bt.logging.debug("Checking circuit manager...")
                     if not self.competition.circuit_manager:
                         bt.logging.warning(
                             "Circuit manager not initialized, reinitializing..."
@@ -65,49 +65,49 @@ class CompetitionThread(threading.Thread):
                         self.competition.initialize_circuit_manager(
                             self.competition.dendrite
                         )
-                        bt.logging.info("Circuit manager reinitialized")
+                        bt.logging.debug("Circuit manager reinitialized")
 
-                    bt.logging.info("Fetching commitments...")
+                    bt.logging.debug("Fetching commitments...")
                     commitments = self.competition.fetch_commitments()
-                    bt.logging.info(f"Found {len(commitments)} commitments")
+                    bt.logging.debug(f"Found {len(commitments)} commitments")
 
                     if commitments:
                         bt.logging.success(
                             f"Found {len(commitments)} new circuits to evaluate"
                         )
                         for uid, hotkey, hash in commitments:
-                            bt.logging.info(
+                            bt.logging.debug(
                                 f"Queueing download for circuit {hash[:8]}... from {hotkey[:8]}..."
                             )
                             self.competition.queue_download(uid, hotkey, hash)
 
                     current_download = self.competition.get_current_download()
-                    bt.logging.info(
+                    bt.logging.debug(
                         f"Current download status: {'Active' if current_download else 'None'}"
                     )
 
                     if current_download:
-                        bt.logging.info("=== Processing Download Start ===")
+                        bt.logging.debug("=== Processing Download Start ===")
                         self.pause_requests_event.set()
-                        bt.logging.info(
+                        bt.logging.debug(
                             "Pausing main request loop for circuit evaluation..."
                         )
 
                         if self.competition.process_downloads_sync():
-                            bt.logging.info(
+                            bt.logging.debug(
                                 "Circuit download successful, starting evaluation..."
                             )
                             self.competition.run_single_evaluation()
-                            bt.logging.info("Circuit evaluation complete")
+                            bt.logging.debug("Circuit evaluation complete")
                         else:
                             bt.logging.error("Circuit download or evaluation failed")
 
                         self.pause_requests_event.clear()
-                        bt.logging.info("Resuming main request loop...")
-                        bt.logging.info("=== Processing Download End ===")
+                        bt.logging.debug("Resuming main request loop...")
+                        bt.logging.debug("=== Processing Download End ===")
 
-                    bt.logging.info("=== Competition Cycle End ===")
-                    bt.logging.info(f"Sleeping for {ONE_HOUR} seconds...")
+                    bt.logging.debug("=== Competition Cycle End ===")
+                    bt.logging.debug(f"Sleeping for {ONE_HOUR} seconds...")
                     time.sleep(ONE_HOUR)
 
                 except Exception as e:
@@ -118,7 +118,7 @@ class CompetitionThread(threading.Thread):
             bt.logging.error(f"Fatal error in competition thread: {e}")
             bt.logging.error(f"Stack trace: {traceback.format_exc()}")
         finally:
-            bt.logging.info("=== Competition Thread Run End ===")
+            bt.logging.debug("=== Competition Thread Run End ===")
 
     def stop(self):
         bt.logging.info("=== Competition Thread Stop Start ===")

@@ -220,13 +220,13 @@ class ValidatorLoop:
 
             if not self.competition.circuit_manager:
                 bt.logging.warning("Circuit manager not initialized, reinitializing...")
-                self.competition.initialize_circuit_manager(self.config.dendrite)
+                self.competition.initialize_circuit_manager(self.competition.dendrite)
 
             commitments = self.competition.fetch_commitments()
             if commitments:
                 bt.logging.success(f"Found {len(commitments)} new circuits to evaluate")
                 for uid, hotkey, hash in commitments:
-                    bt.logging.info(
+                    bt.logging.debug(
                         f"Queueing download for circuit {hash[:8]}... from {hotkey[:8]}..."
                     )
                     self.competition.queue_download(uid, hotkey, hash)
