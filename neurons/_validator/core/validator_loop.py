@@ -256,6 +256,48 @@ class ValidatorLoop:
             if self.competition.get_current_download():
                 self.competition.clear_current_download()
 
+    async def maintain_request_pool(self):
+        while self._should_run:
+            try:
+                if not (self.competition and self.competition.get_current_download()):
+                    slots_available = MAX_CONCURRENT_REQUESTS - len(self.active_tasks)
+                    if slots_available > 0:
+                        available_uids = [
+                            uid
+                            for uid in self.queryable_uids
+                            if uid not in self.processed_uids
+                            and uid not in self.active_tasks
+                        ]
+
+                        for uid in available_uids[:slots_available]:
+                            request = self.request_pipeline.prepare_single_request(uid)
+                            if request:
+                                task = asyncio.create_task(
+                                    self._process_single_request(request)
+                                )
+                                self.active_tasks[uid] = task
+                                task.add_done_callback(
+                                    lambda t, uid=uid: self._handle_completed_task(
+                                        t, uid
+                                    )
+                                )
+
+                await asyncio.sleep(0.1)
+            except Exception as e:
+                bt.logging.error(f"Error maintaining request pool: {e}")
+                traceback.print_exc()
+                await asyncio.sleep(1)
+
+    def _handle_completed_task(self, task: asyncio.Task, uid: int):
+        try:
+            self.processed_uids.add(uid)
+        except Exception as e:
+            bt.logging.error(f"Error in task for UID {uid}: {e}")
+            traceback.print_exc()
+        finally:
+            if uid in self.active_tasks:
+                del self.active_tasks[uid]
+
     async def run_periodic_tasks(self):
         while self._should_run:
             try:
@@ -290,6 +332,7 @@ class ValidatorLoop:
 
         try:
             await asyncio.gather(
+                self.maintain_request_pool(),
                 self.run_periodic_tasks(),
             )
         except KeyboardInterrupt:
