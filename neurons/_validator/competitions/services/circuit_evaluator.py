@@ -260,12 +260,13 @@ class CircuitEvaluator:
 
                 proof = proof_data.get("proof", [])
                 public_signals = [
-                    float(input)
-                    for input in proof_data.get("pretty_public_inputs", {}).get(
-                        "rescaled_outputs", [[]]
-                    )[0]
+                    float(x)
+                    for sublist in proof_data.get("pretty_public_inputs", {}).get(
+                        "rescaled_outputs", []
+                    )
+                    for x in sublist
                 ]
-                bt.logging.debug(f"Public signals: {public_signals}")
+                bt.logging.info(f"Extracted public signals: {public_signals}")
                 proof_sizes.append(len(proof))
 
                 verify_result = self._verify_proof(circuit_dir, proof_path)
@@ -570,8 +571,19 @@ class CircuitEvaluator:
 
             with open(temp_proof_path) as f:
                 proof_data = json.load(f)
-                bt.logging.debug(f"Proof data keys: {list(proof_data.keys())}")
-                bt.logging.debug(f"Full proof data: {proof_data}")
+                bt.logging.info(
+                    f"Proof data structure: {json.dumps(proof_data, indent=2)}"
+                )
+                bt.logging.info(f"Proof data keys: {list(proof_data.keys())}")
+                if "pretty_public_inputs" in proof_data:
+                    bt.logging.info(
+                        f"Pretty public inputs: {json.dumps(proof_data['pretty_public_inputs'], indent=2)}"
+                    )
+                    if "rescaled_outputs" in proof_data["pretty_public_inputs"]:
+                        bt.logging.info(
+                            f"Rescaled outputs: "
+                            f"{json.dumps(proof_data['pretty_public_inputs']['rescaled_outputs'], indent=2)}"
+                        )
                 bt.logging.debug(f"Proof timing - Proof: {proof_time:.3f}s")
                 return temp_proof_path, proof_data, proof_time
         except Exception as e:
@@ -613,18 +625,20 @@ class CircuitEvaluator:
                 total_size = sum(
                     shape[0] * shape[1] for shape in output_shapes.values()
                 )
-                bt.logging.debug(f"Expected total output size: {total_size}")
-                bt.logging.debug(f"Expected output: {expected}")
-                bt.logging.debug(f"Raw actual output: {actual}")
+                bt.logging.info(f"Expected total output size: {total_size}")
+                bt.logging.info(f"Expected output: {expected}")
+                bt.logging.info(f"Raw actual output: {actual}")
 
             if isinstance(actual, dict) and "pretty_public_inputs" in actual:
                 rescaled = actual["pretty_public_inputs"].get("rescaled_outputs", [])
+                bt.logging.info(f"Found rescaled outputs in dict: {rescaled}")
                 actual = [float(x) for sublist in rescaled for x in sublist]
             elif isinstance(actual, list):
                 if len(actual) > 0 and isinstance(actual[0], list):
+                    bt.logging.info(f"Found nested list structure: {actual}")
                     actual = [float(x) for sublist in actual for x in sublist]
 
-            bt.logging.debug(f"Processed actual output: {actual}")
+            bt.logging.info(f"Processed actual output: {actual}")
 
             if len(actual) != total_size:
                 bt.logging.error(
@@ -633,14 +647,14 @@ class CircuitEvaluator:
                 return 0.0
 
             expected = expected[:total_size]
-            bt.logging.debug(f"Using expected values: {expected}")
+            bt.logging.info(f"Using expected values: {expected}")
 
             expected_tensor = torch.tensor(expected)
             actual_tensor = torch.tensor(actual)
 
             mae = torch.nn.functional.l1_loss(actual_tensor, expected_tensor)
             accuracy = torch.exp(-mae).item()
-            bt.logging.debug(f"MAE: {mae.item()}, Accuracy: {accuracy}")
+            bt.logging.info(f"MAE: {mae.item()}, Accuracy: {accuracy}")
 
             return accuracy
         except Exception as e:
