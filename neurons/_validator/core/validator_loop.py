@@ -204,9 +204,11 @@ class ValidatorLoop:
     @with_rate_limit(period=ONE_HOUR)
     async def sync_competition(self):
         if not self.competition:
+            bt.logging.debug("Competition module not initialized, skipping sync")
             return
 
         if self.is_syncing_competition:
+            bt.logging.debug("Competition sync already in progress, skipping")
             return
 
         try:
@@ -217,13 +219,19 @@ class ValidatorLoop:
             if commitments:
                 bt.logging.success(f"Found {len(commitments)} new circuits to evaluate")
                 for uid, hotkey, hash in commitments:
+                    bt.logging.info(
+                        f"Queueing download for circuit {hash[:8]}... from {hotkey[:8]}..."
+                    )
                     self.competition.queue_download(uid, hotkey, hash)
+            else:
+                bt.logging.debug("No new circuits found during sync")
 
         except Exception as e:
             bt.logging.error(f"Error in competition sync: {e}")
             traceback.print_exc()
         finally:
             self.is_syncing_competition = False
+            bt.logging.debug("Competition sync complete")
 
     async def process_competition_downloads(self):
         if not self.competition:
@@ -231,10 +239,19 @@ class ValidatorLoop:
 
         try:
             if self.competition.get_current_download():
-                # Cancel any ongoing tasks and clear queues before evaluation
-                for task in self.active_tasks.values():
-                    task.cancel()
-                self.active_tasks.clear()
+                uid, hotkey, hash = self.competition.get_current_download()
+                bt.logging.info(
+                    f"Processing download for circuit {hash[:8]}... from {hotkey[:8]}..."
+                )
+
+                task_count = len(self.active_tasks)
+                if task_count > 0:
+                    bt.logging.info(
+                        f"Pausing {task_count} active tasks for circuit evaluation"
+                    )
+                    for task in self.active_tasks.values():
+                        task.cancel()
+                    self.active_tasks.clear()
 
                 while not self.request_queue.empty():
                     try:
@@ -242,18 +259,28 @@ class ValidatorLoop:
                     except asyncio.QueueEmpty:
                         break
 
-                # Wait for all tasks to actually complete
-                await asyncio.sleep(1)  # Give tasks time to clean up
+                await asyncio.sleep(1)
+                bt.logging.debug("Network tasks paused, starting circuit processing")
 
-            # Process one download at a time
             if await self.competition.process_downloads():
-                bt.logging.info("Running competition evaluation...")
+                bt.logging.info("Circuit download successful, starting evaluation...")
                 self.competition.run_single_evaluation()
-            self.competition.clear_current_download()
+                bt.logging.info("Circuit evaluation complete")
+            else:
+                bt.logging.debug("No circuit to process or download failed")
+
+            if self.competition.get_current_download():
+                uid, hotkey, hash = self.competition.get_current_download()
+                bt.logging.info(f"Cleaning up download for circuit {hash[:8]}...")
+                self.competition.clear_current_download()
 
         except Exception as e:
             bt.logging.error(f"Error processing competition downloads: {e}")
             if self.competition.get_current_download():
+                uid, hotkey, hash = self.competition.get_current_download()
+                bt.logging.info(
+                    f"Cleaning up failed download for circuit {hash[:8]}..."
+                )
                 self.competition.clear_current_download()
 
     async def maintain_request_pool(self):
@@ -301,7 +328,7 @@ class ValidatorLoop:
     async def run_periodic_tasks(self):
         while self._should_run:
             try:
-                # Only run normal tasks if we're not evaluating a circuit
+
                 if not (self.competition and self.competition.get_current_download()):
                     self.update_weights()
                     self.sync_scores_uids()
@@ -312,7 +339,6 @@ class ValidatorLoop:
                     await self.log_responses()
                     await self.sync_competition()
 
-                # Always process downloads, but this will handle pausing other tasks
                 await self.process_competition_downloads()
             except KeyboardInterrupt:
                 self._handle_keyboard_interrupt()
