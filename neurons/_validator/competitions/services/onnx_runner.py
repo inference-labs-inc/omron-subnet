@@ -2,10 +2,6 @@ import sys
 import numpy as np
 import onnxruntime as ort
 import traceback
-import os
-
-os.environ["ONNXRUNTIME_LOGGING_LEVEL"] = "3"
-ort.set_default_logger_severity(3)
 
 
 def run_inference(model_path: str, input_path: str, output_path: str) -> None:
@@ -18,7 +14,10 @@ def run_inference(model_path: str, input_path: str, output_path: str) -> None:
         input_data = np.load(input_path)
         print(f"Loaded input data shape: {input_data.shape}")
 
-        outputs = session.run(None, {input_name: input_data})
+        options = ort.SessionOptions()
+        options.log_severity_level = 3
+
+        outputs = session.run(None, {input_name: input_data}, options)
         print(f"Raw output shapes: {[out.shape for out in outputs]}")
 
         flattened = []
