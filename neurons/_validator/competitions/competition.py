@@ -57,7 +57,6 @@ class CompetitionThread(threading.Thread):
             while self._should_run.is_set():
                 try:
                     bt.logging.debug("=== Competition Cycle Start ===")
-                    bt.logging.debug("Checking circuit manager...")
                     if not self.competition.circuit_manager:
                         bt.logging.warning(
                             "Circuit manager not initialized, reinitializing..."
@@ -67,11 +66,7 @@ class CompetitionThread(threading.Thread):
                         )
                         bt.logging.debug("Circuit manager reinitialized")
 
-                    bt.logging.debug("Checking download queue...")
                     if self.competition.download_queue:
-                        bt.logging.debug(
-                            f"Found {len(self.competition.download_queue)} items in queue"
-                        )
                         if not self.competition.current_download:
                             self.competition.current_download = (
                                 self.competition.download_queue.pop(0)
@@ -80,33 +75,73 @@ class CompetitionThread(threading.Thread):
                                 f"Processing next download: {self.competition.current_download[2][:8]}..."
                             )
 
-                    if self.competition.current_download:
-                        bt.logging.info("=== Processing Download Start ===")
-                        self.pause_requests_event.set()
-                        bt.logging.debug(
-                            "Pausing main request loop for circuit evaluation..."
-                        )
+                            try:
+                                if self.competition.process_downloads_sync():
+                                    bt.logging.success(
+                                        "Circuit download successful, starting evaluation..."
+                                    )
+                                    uid, hotkey, hash = (
+                                        self.competition.current_download
+                                    )
+                                    axon = self.competition.metagraph.axons[uid]
+                                    circuit_dir = os.path.join(
+                                        self.competition.temp_directory, hash
+                                    )
 
-                        if self.competition.process_downloads_sync():
-                            bt.logging.success(
-                                "Circuit download successful, starting evaluation..."
-                            )
-                            self.competition.run_single_evaluation()
-                            bt.logging.debug("Circuit evaluation complete")
-                        else:
-                            bt.logging.error("Circuit download or evaluation failed")
+                                    self.pause_requests_event.set()
+                                    bt.logging.debug(
+                                        "Pausing main request loop for circuit evaluation..."
+                                    )
 
-                        self.pause_requests_event.clear()
-                        bt.logging.debug("Resuming main request loop...")
-                        bt.logging.debug("=== Processing Download End ===")
+                                    try:
+                                        score = self.competition._evaluate_circuit(
+                                            axon, circuit_dir
+                                        )
+                                        bt.logging.debug(
+                                            f"Circuit evaluation complete with score {score}"
+                                        )
+
+                                        if (
+                                            score > 0
+                                            and self.competition.sota_manager.check_if_sota(
+                                                score,
+                                                self.competition.miner_states[
+                                                    hotkey
+                                                ].proof_size,
+                                                self.competition.miner_states[
+                                                    hotkey
+                                                ].response_time,
+                                            )
+                                        ):
+                                            bt.logging.success(
+                                                "New SOTA circuit detected, preserving..."
+                                            )
+                                            self.competition.sota_manager.preserve_circuit(
+                                                circuit_dir,
+                                                self.competition.miner_states[hotkey],
+                                            )
+                                        else:
+                                            if os.path.exists(circuit_dir):
+                                                shutil.rmtree(circuit_dir)
+                                    finally:
+                                        self.pause_requests_event.clear()
+                                        bt.logging.debug(
+                                            "Resuming main request loop..."
+                                        )
+                                else:
+                                    bt.logging.error(
+                                        "Circuit download or evaluation failed"
+                                    )
+                            finally:
+                                self.competition.clear_current_download()
 
                     bt.logging.debug("=== Competition Cycle End ===")
-                    time.sleep(1)  # Shorter sleep to process queue faster
+                    time.sleep(1)
 
                 except Exception as e:
                     bt.logging.error(f"Error in competition thread cycle: {e}")
                     bt.logging.error(f"Stack trace: {traceback.format_exc()}")
-                    time.sleep(5)  # Back off on error
+                    time.sleep(5)
 
         except Exception as e:
             bt.logging.error(f"Fatal error in competition thread: {e}")

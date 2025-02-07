@@ -203,7 +203,7 @@ class ValidatorLoop:
             self.last_response_time = time.time()
             self.recent_responses = []
 
-    @with_rate_limit(period=ONE_HOUR)
+    @with_rate_limit(period=FIVE_MINUTES)
     async def sync_competition(self):
         if not self.competition:
             bt.logging.debug("Competition module not initialized, skipping sync")
@@ -216,7 +216,6 @@ class ValidatorLoop:
         try:
             self.is_syncing_competition = True
             bt.logging.info("Starting competition sync...")
-            bt.logging.debug("Checking competition manager state...")
 
             if not self.competition.circuit_manager:
                 bt.logging.warning("Circuit manager not initialized, reinitializing...")
@@ -229,10 +228,13 @@ class ValidatorLoop:
             if commitments:
                 bt.logging.success(f"Found {len(commitments)} new circuits to evaluate")
                 for uid, hotkey, hash in commitments:
-                    bt.logging.debug(
-                        f"Queueing download for circuit {hash[:8]}... from {hotkey[:8]}..."
-                    )
-                    self.competition.queue_download(uid, hotkey, hash)
+                    if hash not in {
+                        state.hash for state in self.competition.miner_states.values()
+                    }:
+                        bt.logging.debug(
+                            f"Queueing download for circuit {hash[:8]}... from {hotkey[:8]}..."
+                        )
+                        self.competition.queue_download(uid, hotkey, hash)
                 bt.logging.debug(
                     f"Queue size after adding: {len(self.competition.download_queue)}"
                 )
@@ -245,32 +247,6 @@ class ValidatorLoop:
         finally:
             self.is_syncing_competition = False
             bt.logging.debug("Competition sync complete")
-
-    async def process_competition_downloads(self):
-        if not self.competition:
-            bt.logging.debug("Competition module not initialized, skipping downloads")
-            return
-
-        try:
-            if not self.competition.circuit_manager:
-                bt.logging.warning(
-                    "Circuit manager not initialized during download, reinitializing..."
-                )
-                self.competition.initialize_circuit_manager(self.competition.dendrite)
-
-            if self.competition.get_current_download():
-                bt.logging.debug(
-                    "Competition thread is handling downloads, skipping..."
-                )
-                return
-
-            if self.competition.pause_requests_event.is_set():
-                bt.logging.debug("Request loop already paused, skipping...")
-                return
-
-        except Exception as e:
-            bt.logging.error(f"Error processing competition downloads: {e}")
-            traceback.print_exc()
 
     async def maintain_request_pool(self):
         while self._should_run:
