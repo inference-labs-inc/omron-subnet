@@ -6,7 +6,6 @@ import bittensor as bt
 from urllib.parse import urlparse
 import asyncio
 from contextlib import asynccontextmanager
-import base64
 import traceback
 from protocol import Competition
 
@@ -79,42 +78,62 @@ class CircuitManager:
                 bt.logging.error("Dendrite not initialized")
                 return False
 
-            expected_files = ["settings.json", "model.compiled", "pk.key", "vk.key"]
+            synapse = Competition(
+                id=self.competition_id,
+                hash=hash,
+                file_name="commitment",
+            )
+
+            response = await self.dendrite.forward(
+                axons=[axon],
+                synapse=synapse,
+                timeout=60,
+                deserialize=True,
+            )
+
+            if not response or not response[0] or not response[0].commitment:
+                bt.logging.error("Failed to get commitment data")
+                return False
+
+            try:
+                commitment = json.loads(response[0].commitment)
+            except json.JSONDecodeError:
+                bt.logging.error("Invalid commitment data")
+                return False
+
+            if "signed_urls" not in commitment:
+                bt.logging.error("No signed URLs in commitment data")
+                return False
+
+            signed_urls = commitment["signed_urls"]
+            required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
             all_files_downloaded = True
 
-            for file_name in expected_files:
-                synapse = Competition(
-                    id=self.competition_id,
-                    hash=hash,
-                    file_name=file_name,
-                )
+            async with self._get_session() as session:
+                for file_name in required_files:
+                    if file_name not in signed_urls:
+                        bt.logging.error(f"Missing signed URL for {file_name}")
+                        all_files_downloaded = False
+                        break
 
-                response = await self.dendrite.forward(
-                    axons=[axon],
-                    synapse=synapse,
-                    timeout=60,
-                    deserialize=True,
-                )
+                    url = signed_urls[file_name]
+                    if not self._validate_url(url):
+                        bt.logging.error(f"Invalid URL for {file_name}: {url}")
+                        all_files_downloaded = False
+                        break
 
-                if not response or not response[0] or not response[0].file_content:
-                    bt.logging.error(f"Failed to download {file_name}")
-                    all_files_downloaded = False
-                    break
-
-                file_path = os.path.join(circuit_dir, file_name)
-                try:
-                    content = response[0].file_content
-                    if file_name.endswith(".json"):
-                        with open(file_path, "w") as f:
-                            json.dump(json.loads(content), f)
-                    else:
-                        with open(file_path, "wb") as f:
-                            f.write(base64.b64decode(content))
-                    bt.logging.debug(f"Saved {file_name}")
-                except Exception as e:
-                    bt.logging.error(f"Failed to save {file_name}: {e}")
-                    all_files_downloaded = False
-                    break
+                    file_path = os.path.join(circuit_dir, file_name)
+                    try:
+                        async with session.get(url, timeout=60) as response:
+                            response.raise_for_status()
+                            content = await response.read()
+                            with open(file_path, "wb") as f:
+                                f.write(content)
+                        bt.logging.debug(f"Downloaded {file_name} from signed URL")
+                    except Exception as e:
+                        bt.logging.error(f"Failed to download {file_name}: {e}")
+                        all_files_downloaded = False
+                        break
 
             if all_files_downloaded:
                 bt.logging.success(f"Successfully downloaded all files for {hash[:8]}")
