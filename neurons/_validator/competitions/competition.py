@@ -805,12 +805,12 @@ class Competition:
                 asyncio.set_event_loop(None)
 
             if download_success:
-                bt.logging.debug(f"Download completed for {hash[:8]}, validating...")
-                bt.logging.debug("Circuit directory contents:")
+                bt.logging.info(f"Download completed for {hash[:8]}, validating...")
+                bt.logging.info("Circuit directory contents:")
                 for root, dirs, files in os.walk(circuit_dir):
                     for file in files:
                         file_path = os.path.join(root, file)
-                        bt.logging.debug(
+                        bt.logging.info(
                             f"- {file} ({os.path.getsize(file_path)} bytes)"
                         )
 
@@ -824,7 +824,7 @@ class Competition:
                     else:
                         try:
                             size = os.path.getsize(file_path)
-                            bt.logging.debug(f"Found {file} ({size} bytes)")
+                            bt.logging.info(f"Found {file} ({size} bytes)")
                             if size == 0:
                                 missing_files.append(f"{file} (empty)")
                         except Exception as e:
