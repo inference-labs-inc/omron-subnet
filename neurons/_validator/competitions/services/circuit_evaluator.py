@@ -451,10 +451,14 @@ class CircuitEvaluator:
         self, circuit_dir: str, test_inputs: torch.Tensor
     ) -> Tuple[str, dict] | None:
         try:
+            input_data = {
+                "input_data": [[float(x) for x in test_inputs.flatten().tolist()]]
+            }
+
             with tempfile.NamedTemporaryFile(
                 mode="w+", suffix=".json", dir=TEMP_FOLDER, delete=False
             ) as temp_input:
-                json.dump({"input_data": test_inputs.tolist()}, temp_input)
+                json.dump(input_data, temp_input, indent=2)
                 temp_input_path = temp_input.name
 
             with tempfile.NamedTemporaryFile(
@@ -483,6 +487,7 @@ class CircuitEvaluator:
             bt.logging.info(
                 f"Running witness generation with input shape: {test_inputs.shape}"
             )
+            bt.logging.debug(f"Input data: {json.dumps(input_data, indent=2)}")
             witness_result = subprocess.run(
                 [
                     LOCAL_EZKL_PATH,
