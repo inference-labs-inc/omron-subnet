@@ -222,7 +222,10 @@ class ValidatorLoop:
                 bt.logging.warning("Circuit manager not initialized, reinitializing...")
                 self.competition.initialize_circuit_manager(self.competition.dendrite)
 
+            bt.logging.debug("Fetching commitments...")
             commitments = self.competition.fetch_commitments()
+            bt.logging.debug(f"Found {len(commitments)} commitments")
+
             if commitments:
                 bt.logging.success(f"Found {len(commitments)} new circuits to evaluate")
                 for uid, hotkey, hash in commitments:
@@ -230,6 +233,9 @@ class ValidatorLoop:
                         f"Queueing download for circuit {hash[:8]}... from {hotkey[:8]}..."
                     )
                     self.competition.queue_download(uid, hotkey, hash)
+                bt.logging.debug(
+                    f"Queue size after adding: {len(self.competition.download_queue)}"
+                )
             else:
                 bt.logging.debug("No new circuits found during sync")
 
@@ -323,6 +329,7 @@ class ValidatorLoop:
                 self.update_queryable_uids()
                 self.log_health()
                 await self.log_responses()
+                await self.sync_competition()
 
             except KeyboardInterrupt:
                 self._handle_keyboard_interrupt()

@@ -76,19 +76,19 @@ class CompetitionThread(threading.Thread):
                             self.competition.current_download = (
                                 self.competition.download_queue.pop(0)
                             )
-                            bt.logging.debug(
+                            bt.logging.info(
                                 f"Processing next download: {self.competition.current_download[2][:8]}..."
                             )
 
                     if self.competition.current_download:
-                        bt.logging.debug("=== Processing Download Start ===")
+                        bt.logging.info("=== Processing Download Start ===")
                         self.pause_requests_event.set()
                         bt.logging.debug(
                             "Pausing main request loop for circuit evaluation..."
                         )
 
                         if self.competition.process_downloads_sync():
-                            bt.logging.debug(
+                            bt.logging.success(
                                 "Circuit download successful, starting evaluation..."
                             )
                             self.competition.run_single_evaluation()
