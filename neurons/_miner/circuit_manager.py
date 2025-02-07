@@ -9,6 +9,7 @@ from pathlib import Path
 from botocore.config import Config
 import bittensor as bt
 from pydantic import BaseModel
+import cli_parser
 
 
 class CircuitCommitment(BaseModel):
@@ -53,7 +54,6 @@ class CircuitManager:
     def __init__(
         self,
         wallet: bt.wallet,
-        subtensor: bt.subtensor,
         netuid: int,
         circuit_dir: str,
         storage_config: dict,
@@ -65,7 +65,6 @@ class CircuitManager:
 
         Args:
             wallet: Bittensor wallet for signing
-            subtensor: Bittensor subtensor connection
             netuid: Network UID
             circuit_dir: Directory containing circuit files
             storage_config: Storage configuration dict containing:
@@ -78,12 +77,17 @@ class CircuitManager:
             check_interval: How often to check for changes (seconds)
         """
         self.wallet = wallet
-        self.subtensor = subtensor
         self.netuid = netuid
         self.circuit_dir = Path(circuit_dir)
         self.check_interval = check_interval
         self.storage_config = storage_config
         self.bucket = storage_config["bucket"]
+
+        self.subtensor = bt.subtensor(config=cli_parser.config)
+        bt.logging.debug(
+            "Created dedicated subtensor instance for circuit manager using cli config"
+        )
+
         if not storage_config or not storage_config["provider"]:
             raise ValueError(
                 "Storage configuration is required to initialize CircuitManager."
@@ -203,6 +207,41 @@ class CircuitManager:
             urls[fname] = url
         return urls
 
+    def _commit_to_chain(self, vk_hash: str, max_retries: int = 3) -> bool:
+        """
+        Commit circuit hash to chain with retries.
+
+        Args:
+            vk_hash: Hash to commit
+            max_retries: Maximum number of retry attempts
+
+        Returns:
+            bool: True if commit succeeded, False otherwise
+        """
+        for attempt in range(max_retries):
+            try:
+                bt.logging.debug(
+                    f"Committing hash {vk_hash[:8]}... (attempt {attempt + 1}/{max_retries})"
+                )
+                self.subtensor.commit(
+                    wallet=self.wallet,
+                    netuid=self.netuid,
+                    data=vk_hash,
+                )
+                bt.logging.success(f"Successfully committed hash {vk_hash[:8]}...")
+                return True
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    bt.logging.warning(f"Commit attempt {attempt + 1} failed: {str(e)}")
+                    time.sleep(2**attempt)
+                else:
+                    bt.logging.error(
+                        f"All commit attempts failed for hash {vk_hash[:8]}"
+                    )
+                    bt.logging.debug(f"Final error: {str(e)}")
+                    return False
+        return False
+
     def _monitor_circuit_files(self):
         """
         Continuously monitor circuit files for changes.
@@ -227,11 +266,12 @@ class CircuitManager:
                         object_keys = self._upload_circuit_files()
                         upload_time = int(time.time())
 
-                        self.subtensor.commit(
-                            wallet=self.wallet,
-                            netuid=self.netuid,
-                            data=new_vk_hash,
-                        )
+                        if not self._commit_to_chain(new_vk_hash):
+                            bt.logging.error(
+                                "Failed to commit to chain, will retry next cycle"
+                            )
+                            time.sleep(self.check_interval)
+                            continue
 
                         self.current_vk_hash = new_vk_hash
                         self.last_upload_time = upload_time
@@ -243,7 +283,7 @@ class CircuitManager:
 
             except Exception as e:
                 bt.logging.error(f"Error in circuit monitor: {str(e)}")
-                bt.logging.error(traceback.format_exc())
+                bt.logging.debug(traceback.format_exc())
             time.sleep(self.check_interval)
 
     def get_current_commitment(self) -> Optional[CircuitCommitment]:

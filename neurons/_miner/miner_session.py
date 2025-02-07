@@ -215,7 +215,6 @@ class MinerSession:
 
             self.circuit_manager = CircuitManager(
                 wallet=self.wallet,
-                subtensor=self.subtensor,
                 netuid=cli_parser.config.netuid,
                 circuit_dir=COMPETITION_DIR,
                 storage_config=storage_config,
