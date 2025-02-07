@@ -19,7 +19,6 @@ from .services.circuit_manager import CircuitManager
 from bittensor.core.chain_data import decode_account_id
 from .services.circuit_evaluator import CircuitEvaluator
 from .services.sota_manager import SotaManager
-import cli_parser
 from .services.data_source import (
     CompetitionDataSource,
     RandomDataSource,
@@ -35,7 +34,10 @@ from utils.wandb_logger import safe_log
 
 class CompetitionThread(threading.Thread):
     def __init__(
-        self, competition: "Competition", pause_requests_event: threading.Event
+        self,
+        competition: "Competition",
+        pause_requests_event: threading.Event,
+        config: bt.config,
     ):
         super().__init__()
         bt.logging.info("=== Competition Thread Constructor Start ===")
@@ -46,7 +48,7 @@ class CompetitionThread(threading.Thread):
         self.task_queue = queue.Queue()
         self.daemon = True
 
-        self.subtensor = bt.subtensor(cli_parser.config)
+        self.subtensor = bt.subtensor(config)
 
         bt.logging.info("Competition thread initialized with:")
         bt.logging.info(f"- Competition ID: {self.competition.competition_id}")
@@ -169,6 +171,7 @@ class Competition:
         competition_id: int,
         metagraph: bt.metagraph,
         wallet: bt.wallet,
+        config: bt.config,
     ):
         bt.logging.info("=== Competition Module Initialization Start ===")
         bt.logging.info(f"Initializing competition module with ID {competition_id}...")
@@ -224,7 +227,9 @@ class Competition:
         bt.logging.info("=== Starting Competition Thread ===")
         self.pause_requests_event = threading.Event()
         bt.logging.info("Created pause_requests_event")
-        self.competition_thread = CompetitionThread(self, self.pause_requests_event)
+        self.competition_thread = CompetitionThread(
+            self, self.pause_requests_event, config
+        )
         bt.logging.info("Competition thread instance created")
         self.competition_thread.start()
         bt.logging.info("Competition thread started")

@@ -68,6 +68,7 @@ class ValidatorLoop:
                 competition_id,
                 self.config.metagraph,
                 self.config.wallet,
+                self.config.bt_config,
             )
             bt.logging.success("Competition module initialized successfully")
         except Exception as e:
