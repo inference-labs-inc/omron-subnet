@@ -630,9 +630,7 @@ class CircuitEvaluator:
             ) as f:
                 config = json.load(f)
                 output_shapes = config["circuit_settings"]["output_shapes"]
-                total_size = sum(
-                    shape[0] * shape[1] for shape in output_shapes.values()
-                )
+                total_size = sum(np.prod(shape) for shape in output_shapes.values())
                 bt.logging.info(f"Expected total output size: {total_size}")
                 bt.logging.info(f"Expected output: {expected}")
                 bt.logging.info(f"Raw actual output: {actual}")
