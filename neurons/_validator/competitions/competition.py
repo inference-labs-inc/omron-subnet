@@ -19,6 +19,7 @@ from .services.circuit_manager import CircuitManager
 from bittensor.core.chain_data import decode_account_id
 from .services.circuit_evaluator import CircuitEvaluator
 from .services.sota_manager import SotaManager
+import cli_parser
 from .services.data_source import (
     CompetitionDataSource,
     RandomDataSource,
@@ -45,9 +46,7 @@ class CompetitionThread(threading.Thread):
         self.task_queue = queue.Queue()
         self.daemon = True
 
-        self.subtensor = bt.subtensor(
-            network=self.competition.config.get("network", "test")
-        )
+        self.subtensor = bt.subtensor(cli_parser.config)
 
         bt.logging.info("Competition thread initialized with:")
         bt.logging.info(f"- Competition ID: {self.competition.competition_id}")
