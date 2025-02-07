@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "start_timestamp": 1738870824,
     "end_timestamp": 1745178022,
-    "baseline_model_path": "baseline/age_detection_model.onnx",
+    "baseline_model_path": "age.onnx",
     "circuit_settings": {
         "input_shape": [
             1,
