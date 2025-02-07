@@ -449,7 +449,11 @@ class CircuitEvaluator:
                     text=True,
                 )
                 if result.returncode != 0:
-                    bt.logging.error(f"ONNX runner failed: {result.stderr}")
+                    bt.logging.error(
+                        f"ONNX runner failed with code {result.returncode}"
+                    )
+                    bt.logging.error(f"STDOUT: {result.stdout}")
+                    bt.logging.error(f"STDERR: {result.stderr}")
                     return None
 
                 output = np.load(output_file.name)

@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 import onnxruntime as ort
+import traceback
 
 
 def run_inference(model_path: str, input_path: str, output_path: str) -> None:
@@ -17,10 +18,15 @@ def run_inference(model_path: str, input_path: str, output_path: str) -> None:
         np.save(output_path, np.array(flattened))
     except Exception as e:
         print(f"Error running inference: {str(e)}", file=sys.stderr)
+        print(f"Traceback:\n{traceback.format_exc()}", file=sys.stderr)
         sys.exit(1)
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 4:
+        print(
+            "Usage: python onnx_runner.py <model_path> <input_path> <output_path>",
+            file=sys.stderr,
+        )
         sys.exit(1)
     run_inference(sys.argv[1], sys.argv[2], sys.argv[3])
