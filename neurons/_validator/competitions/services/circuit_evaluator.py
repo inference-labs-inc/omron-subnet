@@ -443,6 +443,9 @@ class CircuitEvaluator:
                     f"Running ONNX model: {model_path} with runner: {runner_path}"
                 )
 
+                shutil.copy2(self.onnx_runner, runner_path)
+                bt.logging.info(f"Copied latest runner to: {runner_path}")
+
                 process = subprocess.Popen(
                     [
                         python_path,
@@ -478,7 +481,7 @@ class CircuitEvaluator:
                     with open(log_file, "r") as f:
                         log_contents = f.read()
                         bt.logging.info(f"ONNX Runner Debug Log:\n{log_contents}")
-                    os.unlink(log_file)  # Clean up
+                    os.unlink(log_file)
                 bt.logging.info("ONNX Runner Output END ---")
 
                 if process.returncode != 0:
