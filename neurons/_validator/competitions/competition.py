@@ -291,81 +291,95 @@ class Competition:
                 }
             )
 
-            commitment_map = self.subtensor.substrate.query_map(
-                module="Commitments",
-                storage_function="CommitmentOf",
-                params=[self.metagraph.netuid],
-            )
+            with self.subtensor.substrate.lock:
+                commitment_map = self.subtensor.substrate.query_map(
+                    module="Commitments",
+                    storage_function="CommitmentOf",
+                    params=[self.metagraph.netuid],
+                )
 
-            for acc, info in commitment_map:
-                try:
+                for acc, info in commitment_map:
+                    try:
+                        if not acc or not isinstance(acc, list) or len(acc) < 1:
+                            continue
 
-                    hotkey = decode_account_id(acc[0])
+                        hotkey = decode_account_id(acc[0])
 
-                    if hotkey not in hotkey_to_uid:
-                        continue
+                        if hotkey not in hotkey_to_uid:
+                            continue
 
-                    uid = hotkey_to_uid[hotkey]
+                        uid = hotkey_to_uid[hotkey]
 
-                    if not info or not isinstance(info, dict):
-                        bt.logging.debug(
-                            f"No valid commitment info for {hotkey} (UID {uid})"
-                        )
-                        continue
-
-                    commitment_info = info.get("info", {})
-                    if not commitment_info or not isinstance(commitment_info, dict):
-                        bt.logging.debug(
-                            f"Invalid commitment info structure for {hotkey}"
-                        )
-                        continue
-
-                    fields = commitment_info.get("fields", [])
-                    if not fields or not isinstance(fields, list) or not fields[0]:
-                        bt.logging.debug(f"Invalid fields structure for {hotkey}")
-                        continue
-
-                    commitment = fields[0][0]
-                    if not commitment:
-                        bt.logging.debug(f"Empty commitment for {hotkey}")
-                        continue
-
-                    commitment_type = next(iter(commitment.keys()))
-                    bytes_tuple = commitment[commitment_type][0]
-                    hash = bytes(bytes_tuple).decode()
-
-                    if (
-                        hotkey not in self.miner_states
-                        or self.miner_states[hotkey].hash != hash
-                    ):
-                        if hash in {state.hash for state in self.miner_states.values()}:
-                            bt.logging.warning(
-                                f"Circuit with hash {hash} already exists for another miner"
+                        if not info or not isinstance(info, dict):
+                            bt.logging.debug(
+                                f"No valid commitment info for {hotkey} (UID {uid})"
                             )
                             continue
-                        commitments.append((uid, hotkey, hash))
-                        bt.logging.success(
-                            f"New circuit detected for {hotkey} with hash {hash}"
-                        )
+
+                        commitment_info = info.get("info", {})
+                        if not commitment_info or not isinstance(commitment_info, dict):
+                            bt.logging.debug(
+                                f"Invalid commitment info structure for {hotkey}"
+                            )
+                            continue
+
+                        fields = commitment_info.get("fields", [])
+                        if not fields or not isinstance(fields, list) or not fields[0]:
+                            bt.logging.debug(f"Invalid fields structure for {hotkey}")
+                            continue
+
+                        commitment = fields[0][0]
+                        if not commitment or not isinstance(commitment, dict):
+                            bt.logging.debug(f"Empty commitment for {hotkey}")
+                            continue
+
+                        commitment_type = next(iter(commitment.keys()))
+                        bytes_tuple = commitment[commitment_type][0]
+
+                        if not isinstance(bytes_tuple, (list, tuple)):
+                            bt.logging.debug(f"Invalid bytes tuple for {hotkey}")
+                            continue
+
+                        try:
+                            hash = bytes(bytes_tuple).decode()
+                        except Exception as e:
+                            bt.logging.debug(f"Failed to decode hash for {hotkey}: {e}")
+                            continue
+
+                        if (
+                            hotkey not in self.miner_states
+                            or self.miner_states[hotkey].hash != hash
+                        ):
+                            if hash in {
+                                state.hash for state in self.miner_states.values()
+                            }:
+                                bt.logging.warning(
+                                    f"Circuit with hash {hash} already exists for another miner"
+                                )
+                                continue
+                            commitments.append((uid, hotkey, hash))
+                            bt.logging.success(
+                                f"New circuit detected for {hotkey} with hash {hash}"
+                            )
+                            safe_log(
+                                {
+                                    "competition_status": "new_circuit_detected",
+                                    "miner_hotkey": hotkey,
+                                    "miner_uid": uid,
+                                    "circuit_hash": hash,
+                                }
+                            )
+
+                    except Exception as e:
+                        bt.logging.error(f"Error processing commitment: {e}")
+                        bt.logging.error(f"Stack trace: {traceback.format_exc()}")
                         safe_log(
                             {
-                                "competition_status": "new_circuit_detected",
-                                "miner_hotkey": hotkey,
-                                "miner_uid": uid,
-                                "circuit_hash": hash,
+                                "competition_status": "commitment_error",
+                                "error": str(e),
                             }
                         )
-
-                except Exception as e:
-                    bt.logging.error(f"Error processing commitment: {e}")
-                    bt.logging.error(f"Stack trace: {traceback.format_exc()}")
-                    safe_log(
-                        {
-                            "competition_status": "commitment_error",
-                            "error": str(e),
-                        }
-                    )
-                    continue
+                        continue
 
         except Exception as e:
             bt.logging.error(f"Error fetching commitments: {e}")
