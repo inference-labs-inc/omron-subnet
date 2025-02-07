@@ -2,7 +2,6 @@ import os
 import json
 import bittensor as bt
 from constants import MAX_CIRCUIT_SIZE_GB
-import traceback
 
 
 class CircuitValidator:
@@ -24,55 +23,20 @@ class CircuitValidator:
 
     @classmethod
     def validate_files(cls, circuit_dir: str) -> bool:
-        """
-        Validate that all required files are present and in the correct format.
-        """
         try:
-            bt.logging.debug(f"Validating circuit files in {circuit_dir}")
-
-            # List all files in the directory
-            files = os.listdir(circuit_dir)
-            bt.logging.debug(f"Found files: {files}")
-
-            # Required files
-            required_files = ["circuit.json", "circuit.wasm", "circuit.zkey", "vk.key"]
-
-            # Check for required files
-            for file in required_files:
-                if file not in files:
-                    bt.logging.error(f"Missing required file: {file}")
-                    return False
-                bt.logging.debug(f"Found required file: {file}")
-
-            # Validate file contents
-            try:
-                with open(os.path.join(circuit_dir, "circuit.json"), "r") as f:
-                    circuit_json = json.load(f)
-                    if not isinstance(circuit_json, dict):
-                        bt.logging.error("Invalid circuit.json format")
-                        return False
-                    bt.logging.debug("circuit.json is valid")
-            except json.JSONDecodeError:
-                bt.logging.error("Failed to parse circuit.json")
-                return False
-            except Exception as e:
-                bt.logging.error(f"Error reading circuit.json: {e}")
+            if not cls._validate_size(circuit_dir):
                 return False
 
-            # Check file sizes
-            for file in required_files:
-                size = os.path.getsize(os.path.join(circuit_dir, file))
-                if size == 0:
-                    bt.logging.error(f"File {file} is empty")
-                    return False
-                bt.logging.debug(f"File {file} size: {size} bytes")
+            if not cls._validate_required_files(circuit_dir):
+                return False
 
-            bt.logging.success("All circuit files validated successfully")
+            if not cls._validate_settings(circuit_dir):
+                return False
+
             return True
 
         except Exception as e:
             bt.logging.error(f"Error validating circuit files: {e}")
-            traceback.print_exc()
             return False
 
     @classmethod
