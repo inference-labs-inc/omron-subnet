@@ -92,6 +92,9 @@ class CircuitEvaluator:
     def _calculate_relative_score(
         self, accuracy: float, proof_size: float, response_time: float
     ) -> float:
+        if accuracy == 0:
+            return 0.0
+
         sota_state = self.sota_manager.current_state
 
         try:
