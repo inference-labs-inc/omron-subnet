@@ -16,6 +16,7 @@ from _validator.competitions.services.data_source import (
 )
 from utils.wandb_logger import safe_log
 import shutil
+import traceback
 
 
 class CircuitEvaluator:
@@ -141,7 +142,7 @@ class CircuitEvaluator:
                     "error": "Failed to get input shape",
                 }
             )
-            return 0.0, 0.0, 0.0, False
+            return 0.0, float("inf"), float("inf"), False
 
         try:
             with open(
@@ -229,6 +230,9 @@ class CircuitEvaluator:
                         }
                     )
                     scores.append(0.0)
+                    verification_results.append(False)
+                    proof_sizes.append(float("inf"))
+                    response_times.append(float("inf"))
                     continue
 
                 proof_path, proof_data, response_time = proof_result
@@ -298,6 +302,7 @@ class CircuitEvaluator:
 
             except Exception as e:
                 bt.logging.error(f"Error in evaluation iteration: {str(e)}")
+                bt.logging.error(f"Stack trace: {traceback.format_exc()}")
                 safe_log(
                     {
                         "circuit_eval_status": "iteration_error",
@@ -306,6 +311,9 @@ class CircuitEvaluator:
                     }
                 )
                 scores.append(0.0)
+                verification_results.append(False)
+                proof_sizes.append(float("inf"))
+                response_times.append(float("inf"))
 
         if not all(verification_results):
             bt.logging.error(
