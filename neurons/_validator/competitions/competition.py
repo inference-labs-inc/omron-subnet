@@ -776,7 +776,18 @@ class Competition:
             circuit_dir = os.path.join(self.temp_directory, hash)
             os.makedirs(circuit_dir, exist_ok=True)
 
-            if self.circuit_manager.download_files(axon, hash, circuit_dir):
+            # Create event loop for async operations
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                download_success = loop.run_until_complete(
+                    self.circuit_manager.download_files(axon, hash, circuit_dir)
+                )
+            finally:
+                loop.close()
+
+            if download_success:
+                bt.logging.debug(f"Download completed for {hash[:8]}, validating...")
                 if self.circuit_validator.validate_files(circuit_dir):
                     self.miner_states[hotkey] = NeuronState(
                         hotkey=hotkey,
