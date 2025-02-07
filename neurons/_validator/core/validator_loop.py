@@ -67,8 +67,7 @@ class ValidatorLoop:
             self.competition = Competition(
                 competition_id,
                 self.config.metagraph,
-                self.config.subtensor,
-                self.config.dendrite,
+                self.config.wallet,
             )
             bt.logging.success("Competition module initialized successfully")
         except Exception as e:
