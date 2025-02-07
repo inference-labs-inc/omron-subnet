@@ -434,7 +434,7 @@ class CircuitEvaluator:
                     "onnx_runner.py",
                 )
 
-                bt.logging.debug(
+                bt.logging.info(
                     f"Running ONNX model: {model_path} with runner: {runner_path}"
                 )
                 result = subprocess.run(
@@ -451,7 +451,15 @@ class CircuitEvaluator:
                 if result.returncode != 0:
                     bt.logging.error(f"ONNX runner failed: {result.stderr}")
                     return None
-                return np.load(output_file.name).tolist()
+
+                output = np.load(output_file.name)
+                bt.logging.info(f"Raw ONNX output shape: {output.shape}")
+                bt.logging.info(f"Raw ONNX output: {output}")
+
+                # Flatten and convert to list
+                output_list = output.flatten().tolist()
+                bt.logging.info(f"Flattened ONNX output: {output_list}")
+                return output_list
         except Exception as e:
             bt.logging.error(f"Error running baseline model: {e}")
             return None
