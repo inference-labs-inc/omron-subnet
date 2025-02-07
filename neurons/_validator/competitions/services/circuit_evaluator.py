@@ -63,7 +63,9 @@ class CircuitEvaluator:
         bt.logging.debug(f"ONNX venv Python version: {python_version}")
 
         subprocess.run([pip_path, "install", "--upgrade", "pip"], check=True)
-        subprocess.run([pip_path, "install", "numpy", "onnxruntime"], check=True)
+        subprocess.run(
+            [pip_path, "install", "numpy", "onnxruntime==1.20.1"], check=True
+        )
 
         site_packages = os.path.join(
             self.onnx_venv, "lib", f"python{python_version}", "site-packages"
