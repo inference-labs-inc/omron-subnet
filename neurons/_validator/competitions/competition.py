@@ -797,7 +797,6 @@ class Competition:
             asyncio.set_event_loop(loop)
 
             try:
-
                 download_success = loop.run_until_complete(
                     self.circuit_manager.download_files(axon, hash, circuit_dir)
                 )
@@ -814,6 +813,31 @@ class Competition:
                         bt.logging.debug(
                             f"- {file} ({os.path.getsize(file_path)} bytes)"
                         )
+
+                # Verify required files exist and are readable
+                required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
+                missing_files = []
+                for file in required_files:
+                    file_path = os.path.join(circuit_dir, file)
+                    if not os.path.exists(file_path):
+                        missing_files.append(file)
+                    else:
+                        try:
+                            size = os.path.getsize(file_path)
+                            bt.logging.debug(f"Found {file} ({size} bytes)")
+                            if size == 0:
+                                missing_files.append(f"{file} (empty)")
+                        except Exception as e:
+                            bt.logging.error(f"Error checking {file}: {e}")
+                            missing_files.append(f"{file} (error)")
+
+                if missing_files:
+                    bt.logging.error(
+                        f"Missing or invalid files: {', '.join(missing_files)}"
+                    )
+                    if os.path.exists(circuit_dir):
+                        shutil.rmtree(circuit_dir)
+                    return False
 
                 if self.circuit_validator.validate_files(circuit_dir):
                     self.miner_states[hotkey] = NeuronState(
