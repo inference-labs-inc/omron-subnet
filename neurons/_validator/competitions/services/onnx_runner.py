@@ -6,16 +6,24 @@ import traceback
 
 def run_inference(model_path: str, input_path: str, output_path: str) -> None:
     try:
+        print(f"Loading model from: {model_path}")
         session = ort.InferenceSession(model_path)
         input_name = session.get_inputs()[0].name
+        print(f"Input tensor name: {input_name}")
         input_data = np.load(input_path)
+        print(f"Loaded input data shape: {input_data.shape}")
 
         outputs = session.run(None, {input_name: input_data})
+        print(f"Raw output shapes: {[out.shape for out in outputs]}")
 
         flattened = []
         for out in outputs:
             flattened.extend(out.flatten())
-        np.save(output_path, np.array(flattened))
+        final_output = np.array(flattened)
+        print(f"Final flattened output shape: {final_output.shape}")
+        print(f"Saving output to: {output_path}")
+        np.save(output_path, final_output)
+        print("Inference completed successfully")
     except Exception as e:
         print(f"Error running inference: {str(e)}", file=sys.stderr)
         print(f"Traceback:\n{traceback.format_exc()}", file=sys.stderr)

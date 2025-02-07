@@ -457,12 +457,7 @@ class CircuitEvaluator:
                     return None
 
                 output = np.load(output_file.name)
-                bt.logging.info(f"Raw ONNX output shape: {output.shape}")
-                bt.logging.info(f"Raw ONNX output: {output}")
-
-                # Flatten and convert to list
                 output_list = output.flatten().tolist()
-                bt.logging.info(f"Flattened ONNX output: {output_list}")
                 return output_list
         except Exception as e:
             bt.logging.error(f"Error running baseline model: {e}")
@@ -622,20 +617,13 @@ class CircuitEvaluator:
                 config = json.load(f)
                 output_shapes = config["circuit_settings"]["output_shapes"]
                 total_size = sum(np.prod(shape) for shape in output_shapes.values())
-                bt.logging.info(f"Expected total output size: {total_size}")
-                bt.logging.info(f"Expected output: {expected}")
-                bt.logging.info(f"Raw actual output: {actual}")
 
             if isinstance(actual, dict) and "pretty_public_inputs" in actual:
                 rescaled = actual["pretty_public_inputs"].get("rescaled_outputs", [])
-                bt.logging.info(f"Found rescaled outputs in dict: {rescaled}")
                 actual = [float(x) for sublist in rescaled for x in sublist]
             elif isinstance(actual, list):
                 if len(actual) > 0 and isinstance(actual[0], list):
-                    bt.logging.info(f"Found nested list structure: {actual}")
                     actual = [float(x) for sublist in actual for x in sublist]
-
-            bt.logging.info(f"Processed actual output: {actual}")
 
             if len(actual) != total_size:
                 bt.logging.error(
@@ -644,15 +632,11 @@ class CircuitEvaluator:
                 return 0.0
 
             expected = expected[:total_size]
-            bt.logging.info(f"Using expected values: {expected}")
-
             expected_tensor = torch.tensor(expected)
             actual_tensor = torch.tensor(actual)
 
             mae = torch.nn.functional.l1_loss(actual_tensor, expected_tensor)
             accuracy = torch.exp(-mae).item()
-            bt.logging.info(f"MAE: {mae.item()}, Accuracy: {accuracy}")
-
             return accuracy
         except Exception as e:
             bt.logging.error(f"Error comparing outputs: {e}")
