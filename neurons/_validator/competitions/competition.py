@@ -1,10 +1,11 @@
 import os
 import shutil
-import json
-from typing import Dict, Generator, Tuple, Union
+from typing import Dict, Tuple, Union, List, Optional
 import bittensor as bt
 import torch
 import platform
+import asyncio
+import json
 
 from .models.neuron import NeuronState
 from .services.circuit_validator import CircuitValidator
@@ -19,8 +20,9 @@ from .services.data_source import (
 )
 from .competition_manager import CompetitionManager
 from .utils.cleanup import register_cleanup_handlers
-from constants import TEMP_FOLDER
+from constants import TEMP_FOLDER, MAINNET_TESTNET_UIDS
 from _validator.utils.uid import get_queryable_uids
+from scalecodec.utils.ss58 import ss58_encode
 
 
 class Competition:
@@ -44,8 +46,7 @@ class Competition:
         self.competition_manager = CompetitionManager(self.competition_directory)
         self.baseline_model = self._load_model()
         self.sota_manager = SotaManager(self.sota_directory)
-        self.data_source = self._setup_data_source()
-        self.circuit_manager = CircuitManager(self.temp_directory, self.competition_id)
+        self.circuit_manager = None  # Will be set when dendrite is available
         self.circuit_validator = CircuitValidator()
         self.circuit_evaluator = CircuitEvaluator(
             self.baseline_model, self.competition_directory, self.sota_manager
@@ -54,6 +55,12 @@ class Competition:
         self.metagraph = metagraph
         self.subtensor = subtensor
         self.miner_states: Dict[str, NeuronState] = {}
+
+        self.download_queue: List[Tuple[int, str, str]] = []
+        self.current_download: Optional[Tuple[int, str, str]] = None
+        self.download_complete = asyncio.Event()
+        self.download_task: Optional[asyncio.Task] = None
+        self.download_lock = asyncio.Lock()
 
     def _setup_data_source(self) -> CompetitionDataSource:
         try:
@@ -119,25 +126,7 @@ class Competition:
         else:
             raise ValueError(f"Unsupported model format: {model_path}")
 
-    def sync_and_eval(self):
-        self.competition_manager.update_competition_state()
-
-        if not self.competition_manager.is_competition_active():
-            bt.logging.info("Competition not active, skipping circuit sync")
-            return
-
-        for axon, circuit_dir in self._sync_circuits():
-            try:
-                if self.circuit_validator.validate_files(circuit_dir):
-                    self._evaluate_circuit(axon, circuit_dir)
-                else:
-                    bt.logging.error(f"Circuit validation failed for {axon}")
-                    if os.path.exists(circuit_dir):
-                        shutil.rmtree(circuit_dir)
-            finally:
-                self.circuit_manager.cleanup_temp_files(circuit_dir)
-
-    def _sync_circuits(self) -> Generator[Tuple[bt.axon, str], None, None]:
+    def fetch_commitments(self) -> List[Tuple[int, str, str]]:
         if platform.system() != "Darwin" and platform.machine() != "arm64":
             bt.logging.critical(
                 "Competitions are only supported on macOS arm64 architecture\n"
@@ -145,65 +134,142 @@ class Competition:
                 "While the validator will continue to run, it will not be able to "
                 "correctly evaluate competitions."
             )
-            return
+            return []
 
         hotkeys = self.metagraph.hotkeys
         self.miner_states = {k: v for k, v in self.miner_states.items() if k in hotkeys}
 
+        commitments = []
         queryable_uids = get_queryable_uids(self.metagraph)
-        for uid in queryable_uids:
-            hotkey = self.metagraph.hotkeys[uid]
+        hotkey_to_uid = {self.metagraph.hotkeys[uid]: uid for uid in queryable_uids}
 
+        commitment_map = self.subtensor.substrate.query_map(
+            module="Commitments",
+            storage_function="CommitmentOf",
+            params=[self.metagraph.netuid],
+        )
+
+        for acc, info in commitment_map:
             try:
-                hash = self.subtensor.get_commitment(self.metagraph.netuid, uid)
-                if not hash:
-                    bt.logging.warning(f"No commitment found for {hotkey} (UID {uid})")
+                if self.metagraph.netuid == next(
+                    testnet for mainnet, testnet in MAINNET_TESTNET_UIDS if mainnet == 2
+                ):
+                    acc = ss58_encode(bytes(acc[0]))
+
+                if acc not in hotkey_to_uid:
                     continue
 
-                bt.logging.info(f"Commitment found for {hotkey} (UID {uid}): {hash}")
-
-                if (
-                    hotkey not in self.miner_states
-                    or self.miner_states[hotkey].hash != hash
-                ):
-
-                    bt.logging.success(
-                        f"New circuit detected for {hotkey} with hash {hash}"
+                uid = hotkey_to_uid[acc]
+                if not info or "info" not in info:
+                    bt.logging.warning(
+                        f"No valid commitment found for {acc} (UID {uid})"
                     )
+                    continue
+
+                raw64_field = info["info"]["fields"][0][0].get("Raw64")
+                hash = None
+                if self.metagraph.netuid == next(
+                    testnet for mainnet, testnet in MAINNET_TESTNET_UIDS if mainnet == 2
+                ):
+                    raw64_field = raw64_field[0]
+                    hash = bytes(raw64_field).decode("utf-8")
+                else:
+                    hash = bytes.fromhex(raw64_field[2:]).decode("utf-8")
+                if not raw64_field:
+                    bt.logging.warning(f"Invalid commitment format for {acc}")
+                    continue
+
+                if acc not in self.miner_states or self.miner_states[acc].hash != hash:
                     if hash in {state.hash for state in self.miner_states.values()}:
                         bt.logging.warning(
                             f"Circuit with hash {hash} already exists for another miner"
                         )
                         continue
-                    axon = self.metagraph.axons[uid]
+                    commitments.append((uid, acc, hash))
+                    bt.logging.success(
+                        f"New circuit detected for {acc} with hash {hash}"
+                    )
 
+            except Exception as e:
+                bt.logging.error(f"Error processing commitment for {acc}: {e}")
+
+        return commitments
+
+    async def process_downloads(self) -> None:
+        while True:
+            try:
+                async with self.download_lock:
+                    if not self.download_queue and not self.current_download:
+                        self.download_complete.clear()
+                        await self.download_complete.wait()
+                        continue
+
+                    if not self.current_download and self.download_queue:
+                        self.current_download = self.download_queue.pop(0)
+
+                if self.current_download:
+                    uid, hotkey, hash = self.current_download
+                    axon = self.metagraph.axons[uid]
                     circuit_dir = os.path.join(self.temp_directory, hash)
                     os.makedirs(circuit_dir, exist_ok=True)
 
-                    if self.circuit_manager.download_files(axon, hash, circuit_dir):
-                        self.miner_states[hotkey] = NeuronState(
-                            hotkey=hotkey,
-                            uid=uid,
-                            score=0.0,
-                            proof_size=0,
-                            response_time=0.0,
-                            verification_result=False,
-                            accuracy=0.0,
-                            hash=hash,
-                        )
-                        yield (axon, circuit_dir)
-                    else:
-                        bt.logging.error(
-                            f"Failed to download circuit files for {hotkey}"
-                        )
-                        if os.path.exists(circuit_dir):
-                            shutil.rmtree(circuit_dir)
-                else:
-                    bt.logging.warning(f"Circuit already exists for {hotkey}")
+                    if await self.circuit_manager.download_files(
+                        axon, hash, circuit_dir
+                    ):
+                        if self.circuit_validator.validate_files(circuit_dir):
+                            self.miner_states[hotkey] = NeuronState(
+                                hotkey=hotkey,
+                                uid=uid,
+                                score=0.0,
+                                proof_size=0,
+                                response_time=0.0,
+                                verification_result=False,
+                                accuracy=0.0,
+                                hash=hash,
+                            )
+                            return True
+
+                    if os.path.exists(circuit_dir):
+                        shutil.rmtree(circuit_dir)
+
+                    self.current_download = None
+                    return False
 
             except Exception as e:
-                bt.logging.error(f"Error getting commitment for {hotkey}: {e}")
-                continue
+                bt.logging.error(f"Error in download processing: {e}")
+                if self.current_download:
+                    circuit_dir = os.path.join(
+                        self.temp_directory, self.current_download[2]
+                    )
+                    if os.path.exists(circuit_dir):
+                        shutil.rmtree(circuit_dir)
+                    self.current_download = None
+                return False
+
+    def queue_download(self, uid: int, hotkey: str, hash: str) -> None:
+        self.download_queue.append((uid, hotkey, hash))
+        self.download_complete.set()
+
+    def get_current_download(self) -> Optional[Tuple[int, str, str]]:
+        return self.current_download
+
+    def clear_current_download(self) -> None:
+        if self.current_download:
+            circuit_dir = os.path.join(self.temp_directory, self.current_download[2])
+            if os.path.exists(circuit_dir):
+                shutil.rmtree(circuit_dir)
+            self.current_download = None
+
+    def run_single_evaluation(self) -> bool:
+        if not self.pending_evaluations:
+            return False
+
+        axon, circuit_dir = self.pending_evaluations.pop(0)
+        try:
+            self._evaluate_circuit(axon, circuit_dir)
+            return True
+        finally:
+            self.circuit_manager.cleanup_temp_files(circuit_dir)
 
     def _evaluate_circuit(self, miner_axon: bt.axon, circuit_dir: str) -> float:
         bt.logging.info(f"Evaluating circuit for {miner_axon.hotkey}")
@@ -287,3 +353,8 @@ class Competition:
             "sota_response_time": sota_state.response_time,
         }
         self.competition_manager.log_metrics(metrics)
+
+    def initialize_circuit_manager(self, dendrite: bt.dendrite):
+        self.circuit_manager = CircuitManager(
+            self.temp_directory, self.competition_id, dendrite
+        )

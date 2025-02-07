@@ -36,7 +36,6 @@ from _validator.competitions.competition import Competition
 from _validator.utils.logging import log_responses as console_log_responses
 from constants import (
     LOOP_DELAY_SECONDS,
-    EXCEPTION_DELAY_SECONDS,
     MAX_CONCURRENT_REQUESTS,
     ONE_MINUTE,
     FIVE_MINUTES,
@@ -69,6 +68,7 @@ class ValidatorLoop:
                 self.config.metagraph,
                 self.config.subtensor,
             )
+            self.competition.initialize_circuit_manager(self.config.dendrite)
         except Exception as e:
             bt.logging.warning(
                 f"Failed to initialize competition, continuing without competition support: {e}"
@@ -99,6 +99,7 @@ class ValidatorLoop:
         )
         self.last_competition_sync = 0
         self.is_syncing_competition = False
+        self.competition_commitments = []
 
         self.request_queue = asyncio.Queue()
         self.active_tasks: dict[int, asyncio.Task] = {}
@@ -210,21 +211,13 @@ class ValidatorLoop:
 
         try:
             self.is_syncing_competition = True
-            bt.logging.info("Starting competition sync and evaluation...")
+            bt.logging.info("Starting competition sync...")
 
-            for task in self.active_tasks.values():
-                task.cancel()
-            self.active_tasks.clear()
-
-            while not self.request_queue.empty():
-                try:
-                    self.request_queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    break
-
-            self.competition.sync_and_eval()
-
-            bt.logging.success("Competition sync and evaluation complete")
+            commitments = self.competition.fetch_commitments()
+            if commitments:
+                bt.logging.success(f"Found {len(commitments)} new circuits to evaluate")
+                for uid, hotkey, hash in commitments:
+                    self.competition.queue_download(uid, hotkey, hash)
 
         except Exception as e:
             bt.logging.error(f"Error in competition sync: {e}")
@@ -232,66 +225,60 @@ class ValidatorLoop:
         finally:
             self.is_syncing_competition = False
 
-    async def maintain_request_pool(self):
-        while True:
-            try:
-                if not self.is_syncing_competition:
-                    slots_available = MAX_CONCURRENT_REQUESTS - len(self.active_tasks)
-                    if slots_available > 0:
-                        available_uids = [
-                            uid
-                            for uid in self.queryable_uids
-                            if uid not in self.processed_uids
-                            and uid not in self.active_tasks
-                        ]
+    async def process_competition_downloads(self):
+        if not self.competition:
+            return
 
-                        for uid in available_uids[:slots_available]:
-                            request = self.request_pipeline.prepare_single_request(uid)
-                            if request:
-                                task = asyncio.create_task(
-                                    self._process_single_request(request)
-                                )
-                                self.active_tasks[uid] = task
-                                task.add_done_callback(
-                                    lambda t, uid=uid: self._handle_completed_task(
-                                        t, uid
-                                    )
-                                )
-
-                await asyncio.sleep(0)
-            except Exception as e:
-                bt.logging.error(f"Error maintaining request pool: {e}")
-                traceback.print_exc()
-                await asyncio.sleep(EXCEPTION_DELAY_SECONDS)
-
-    def _handle_completed_task(self, task: asyncio.Task, uid: int):
         try:
-            self.processed_uids.add(uid)
+            if self.competition.get_current_download():
+                # Cancel any ongoing tasks and clear queues before evaluation
+                for task in self.active_tasks.values():
+                    task.cancel()
+                self.active_tasks.clear()
+
+                while not self.request_queue.empty():
+                    try:
+                        self.request_queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
+
+                # Wait for all tasks to actually complete
+                await asyncio.sleep(1)  # Give tasks time to clean up
+
+                if await self.competition.process_downloads():
+                    bt.logging.info("Running competition evaluation...")
+                    self.competition.run_single_evaluation()
+                self.competition.clear_current_download()
+            else:
+                await self.competition.process_downloads()
         except Exception as e:
-            bt.logging.error(f"Error in task for UID {uid}: {e}")
-            traceback.print_exc()
-        finally:
-            if uid in self.active_tasks:
-                del self.active_tasks[uid]
+            bt.logging.error(f"Error processing competition downloads: {e}")
+            if self.competition.get_current_download():
+                self.competition.clear_current_download()
 
     async def run_periodic_tasks(self):
-        while True:
+        while self._should_run:
             try:
-                if not self.is_syncing_competition:
-                    self.check_auto_update()
-                    self.sync_metagraph()
-                    self.sync_scores_uids()
+                # Only run normal tasks if we're not evaluating a circuit
+                if not (self.competition and self.competition.get_current_download()):
                     self.update_weights()
+                    self.sync_scores_uids()
+                    self.sync_metagraph()
+                    self.check_auto_update()
                     self.update_queryable_uids()
-                    self.update_processed_uids()
                     self.log_health()
                     await self.log_responses()
-                await self.sync_competition()
-                await asyncio.sleep(LOOP_DELAY_SECONDS)
+                    await self.sync_competition()
+
+                # Always process downloads, but this will handle pausing other tasks
+                await self.process_competition_downloads()
+            except KeyboardInterrupt:
+                self._handle_keyboard_interrupt()
             except Exception as e:
                 bt.logging.error(f"Error in periodic tasks: {e}")
                 traceback.print_exc()
-                await asyncio.sleep(EXCEPTION_DELAY_SECONDS)
+            finally:
+                await asyncio.sleep(LOOP_DELAY_SECONDS)
 
     async def run(self) -> NoReturn:
         """
@@ -303,7 +290,6 @@ class ValidatorLoop:
 
         try:
             await asyncio.gather(
-                self.maintain_request_pool(),
                 self.run_periodic_tasks(),
             )
         except KeyboardInterrupt:
@@ -401,6 +387,8 @@ class ValidatorLoop:
         """Handle keyboard interrupt by cleaning up and exiting."""
         bt.logging.success("Keyboard interrupt detected. Exiting validator.")
         loop = asyncio.get_event_loop()
+        if self.competition and hasattr(self.competition.circuit_manager, "close"):
+            loop.run_until_complete(self.competition.circuit_manager.close())
         loop.run_until_complete(self.api.stop())
         stop_prometheus_logging()
         clean_temp_files()
