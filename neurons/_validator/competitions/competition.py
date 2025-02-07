@@ -42,11 +42,14 @@ class CompetitionThread(threading.Thread):
         self.task_queue = queue.Queue()
         self.daemon = True
         self.loop = asyncio.new_event_loop()
+        bt.logging.info("Competition thread initialized")
 
     def run(self):
+        bt.logging.info("Competition thread starting...")
         asyncio.set_event_loop(self.loop)
         while self._should_run.is_set():
             try:
+                bt.logging.debug("Competition thread running cycle...")
                 if not self.competition.circuit_manager:
                     bt.logging.warning(
                         "Circuit manager not initialized, reinitializing..."
@@ -55,6 +58,7 @@ class CompetitionThread(threading.Thread):
                         self.competition.dendrite
                     )
 
+                bt.logging.debug("Checking for new commitments...")
                 commitments = self.competition.fetch_commitments()
                 if commitments:
                     bt.logging.success(
@@ -67,7 +71,6 @@ class CompetitionThread(threading.Thread):
                         self.competition.queue_download(uid, hotkey, hash)
 
                 if self.competition.get_current_download():
-
                     self.pause_requests_event.set()
                     bt.logging.info(
                         "Pausing main request loop for circuit evaluation..."
@@ -89,12 +92,15 @@ class CompetitionThread(threading.Thread):
                 bt.logging.error(f"Error in competition thread: {e}")
                 traceback.print_exc()
 
+            bt.logging.debug("Competition thread sleeping for 1 hour...")
             time.sleep(ONE_HOUR)
 
     def stop(self):
+        bt.logging.info("Competition thread stopping...")
         self._should_run.clear()
         self.loop.stop()
         self.loop.close()
+        bt.logging.info("Competition thread stopped")
 
 
 class Competition:
@@ -105,6 +111,7 @@ class Competition:
         subtensor: bt.subtensor,
         dendrite: bt.dendrite,
     ):
+        bt.logging.info(f"Initializing competition module with ID {competition_id}...")
         self.competition_id = competition_id
         self.competition_directory = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), str(competition_id)
@@ -115,13 +122,17 @@ class Competition:
         self.sota_directory = os.path.join(self.competition_directory, "sota")
         self.dendrite = dendrite
 
+        bt.logging.debug("Creating competition directories...")
         os.makedirs(self.temp_directory, exist_ok=True)
         os.makedirs(self.sota_directory, exist_ok=True)
 
         register_cleanup_handlers()
 
+        bt.logging.debug("Initializing competition manager...")
         self.competition_manager = CompetitionManager(self.competition_directory)
+        bt.logging.debug("Loading baseline model...")
         self.baseline_model = self._load_model()
+        bt.logging.debug("Initializing SOTA manager...")
         self.sota_manager = SotaManager(self.sota_directory)
         self.circuit_manager = None
         self.circuit_validator = CircuitValidator()
@@ -139,9 +150,11 @@ class Competition:
         self.download_task: Optional[asyncio.Task] = None
         self.download_lock = asyncio.Lock()
 
+        bt.logging.debug("Starting competition thread...")
         self.pause_requests_event = threading.Event()
         self.competition_thread = CompetitionThread(self, self.pause_requests_event)
         self.competition_thread.start()
+        bt.logging.info("Competition thread started successfully")
 
         safe_log(
             {

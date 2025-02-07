@@ -63,16 +63,19 @@ class ValidatorLoop:
 
         try:
             competition_id = 1
+            bt.logging.info("Initializing competition module...")
             self.competition = Competition(
                 competition_id,
                 self.config.metagraph,
                 self.config.subtensor,
+                self.config.dendrite,
             )
-            self.competition.initialize_circuit_manager(self.config.dendrite)
+            bt.logging.success("Competition module initialized successfully")
         except Exception as e:
             bt.logging.warning(
                 f"Failed to initialize competition, continuing without competition support: {e}"
             )
+            traceback.print_exc()
             self.competition = None
 
         self.score_manager = ScoreManager(
