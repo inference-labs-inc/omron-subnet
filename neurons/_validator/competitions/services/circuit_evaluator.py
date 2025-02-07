@@ -440,7 +440,8 @@ class CircuitEvaluator:
                 bt.logging.info(
                     f"Running ONNX model: {model_path} with runner: {runner_path}"
                 )
-                result = subprocess.run(
+
+                process = subprocess.Popen(
                     [
                         python_path,
                         runner_path,
@@ -448,17 +449,29 @@ class CircuitEvaluator:
                         input_file.name,
                         output_file.name,
                     ],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                     text=True,
+                    bufsize=1,
+                    universal_newlines=True,
                 )
 
-                if result.stdout:
-                    bt.logging.info(f"ONNX Runner Output:\n{result.stdout}")
-                if result.stderr:
-                    bt.logging.error(f"ONNX Runner Errors:\n{result.stderr}")
+                stdout, stderr = process.communicate()
 
-                if result.returncode != 0:
+                bt.logging.info("ONNX Runner Output START ---")
+                if stdout:
+                    for line in stdout.split("\n"):
+                        if line.strip():
+                            bt.logging.info(f"STDOUT: {line}")
+                if stderr:
+                    for line in stderr.split("\n"):
+                        if line.strip():
+                            bt.logging.error(f"STDERR: {line}")
+                bt.logging.info("ONNX Runner Output END ---")
+
+                if process.returncode != 0:
                     bt.logging.error(
-                        f"ONNX runner failed with code {result.returncode}"
+                        f"ONNX runner failed with code {process.returncode}"
                     )
                     return None
 
