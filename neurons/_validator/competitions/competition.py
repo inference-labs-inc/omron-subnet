@@ -287,6 +287,10 @@ class Competition:
 
     async def process_downloads(self) -> bool:
         try:
+            if not self.circuit_manager:
+                bt.logging.error("Circuit manager not initialized")
+                return False
+
             async with self.download_lock:
                 if not self.download_queue and not self.current_download:
                     return False

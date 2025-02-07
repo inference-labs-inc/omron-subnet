@@ -214,6 +214,11 @@ class ValidatorLoop:
         try:
             self.is_syncing_competition = True
             bt.logging.info("Starting competition sync...")
+            bt.logging.debug("Checking competition manager state...")
+
+            if not self.competition.circuit_manager:
+                bt.logging.warning("Circuit manager not initialized, reinitializing...")
+                self.competition.initialize_circuit_manager(self.config.dendrite)
 
             commitments = self.competition.fetch_commitments()
             if commitments:
@@ -235,9 +240,16 @@ class ValidatorLoop:
 
     async def process_competition_downloads(self):
         if not self.competition:
+            bt.logging.debug("Competition module not initialized, skipping downloads")
             return
 
         try:
+            if not self.competition.circuit_manager:
+                bt.logging.warning(
+                    "Circuit manager not initialized during download, reinitializing..."
+                )
+                self.competition.initialize_circuit_manager(self.config.dendrite)
+
             if self.competition.get_current_download():
                 uid, hotkey, hash = self.competition.get_current_download()
                 bt.logging.info(
