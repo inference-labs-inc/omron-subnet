@@ -3,11 +3,11 @@ import shutil
 import json
 import aiohttp
 import bittensor as bt
-from protocol import Competition
-import hashlib
 from urllib.parse import urlparse
 import asyncio
 from contextlib import asynccontextmanager
+import base64
+import traceback
 
 
 class CircuitManager:
@@ -70,83 +70,47 @@ class CircuitManager:
             return False
 
     async def download_files(self, axon: bt.axon, hash: str, circuit_dir: str) -> bool:
+        """Download circuit files from a miner."""
         try:
-            required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
-            file_timeouts = {
-                "vk.key": 60,
-                "pk.key": 300,
-                "settings.json": 30,
-                "model.compiled": 60,
-            }
+            bt.logging.debug(f"Requesting circuit files for hash {hash[:8]}...")
 
-            synapse = Competition(
-                id=self.competition_id, hash=hash, file_name="commitment"
+            request = {"type": "circuit_request", "hash": hash}
+
+            response = await self.dendrite.query(
+                [axon], request, timeout=60, deserialize=True
             )
-            response = await self.dendrite(axon, synapse)
-            response = Competition.model_validate(response)
 
-            if not isinstance(response, Competition):
-                bt.logging.error("Invalid response type from miner")
+            if not response or not response[0]:
+                bt.logging.error(f"No response from axon for hash {hash[:8]}")
                 return False
 
-            if response.error:
-                bt.logging.error(f"Error from miner: {response.error}")
-                return False
+            response = response[0]
+            bt.logging.debug(f"Got response for hash {hash[:8]}, saving files...")
 
-            if not response.commitment:
-                bt.logging.error("No commitment data received from miner")
-                return False
+            expected_files = ["circuit.json", "circuit.wasm", "circuit.zkey", "vk.key"]
 
-            try:
-                commitment = json.loads(response.commitment)
-            except json.JSONDecodeError:
-                bt.logging.error("Invalid JSON in commitment data")
-                return False
-
-            if "signed_urls" not in commitment:
-                bt.logging.error("No signed URLs in commitment data")
-                return False
-
-            signed_urls = commitment["signed_urls"]
-
-            for file_name in required_files:
-
-                if file_name not in signed_urls:
-                    bt.logging.error(f"Missing signed URL for {file_name}")
+            for file in expected_files:
+                if file not in response:
+                    bt.logging.error(f"Missing {file} in response")
                     return False
 
-                url = signed_urls[file_name]
-                if not self._validate_url(url):
-                    bt.logging.error(f"Invalid URL for {file_name}: {url}")
-                    return False
-
-                local_path = os.path.join(circuit_dir, file_name)
+                file_path = os.path.join(circuit_dir, file)
                 try:
-                    async with self._get_session() as session:
-                        async with session.get(
-                            url, timeout=file_timeouts[file_name]
-                        ) as response:
-                            response.raise_for_status()
-                            content = await response.read()
-                            with open(local_path, "wb") as f:
-                                f.write(content)
-                    bt.logging.debug(f"Downloaded {file_name} from signed URL")
-
-                    if file_name == "vk.key":
-                        with open(local_path, "rb") as f:
-                            file_hash = hashlib.sha256(f.read()).hexdigest()
-                        if file_hash != hash:
-                            bt.logging.error(
-                                f"Hash mismatch for vk.key: expected {hash}, got {file_hash}"
-                            )
-                            return False
-
+                    if file.endswith(".json"):
+                        with open(file_path, "w") as f:
+                            json.dump(response[file], f)
+                    else:
+                        with open(file_path, "wb") as f:
+                            f.write(base64.b64decode(response[file]))
+                    bt.logging.debug(f"Saved {file}")
                 except Exception as e:
-                    bt.logging.error(f"Failed to download {file_name}: {e}")
+                    bt.logging.error(f"Failed to save {file}: {e}")
                     return False
 
+            bt.logging.success(f"Successfully downloaded all files for {hash[:8]}")
             return True
 
         except Exception as e:
             bt.logging.error(f"Error downloading circuit files: {e}")
+            traceback.print_exc()
             return False
