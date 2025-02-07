@@ -427,7 +427,7 @@ class Competition:
                 }
             )
 
-            commitment_map = self.subtensor.substrate.query_map(
+            commitment_map = self.competition_thread.subtensor.substrate.query_map(
                 module="Commitments",
                 storage_function="CommitmentOf",
                 params=[self.metagraph.netuid],
