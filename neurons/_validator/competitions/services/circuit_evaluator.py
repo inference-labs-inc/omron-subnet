@@ -621,11 +621,8 @@ class CircuitEvaluator:
                 rescaled = actual["pretty_public_inputs"].get("rescaled_outputs", [])
                 actual = [float(x) for sublist in rescaled for x in sublist]
             elif isinstance(actual, list):
-                if len(actual) == 1 and isinstance(actual[0], list):
-                    actual = actual[0]
-                elif len(actual) == 0:
-                    bt.logging.error("Empty output list")
-                    return 0.0
+                if len(actual) > 0 and isinstance(actual[0], list):
+                    actual = [float(x) for sublist in actual for x in sublist]
 
             bt.logging.debug(f"Processed actual output: {actual}")
 
@@ -635,7 +632,10 @@ class CircuitEvaluator:
                 )
                 return 0.0
 
-            expected_tensor = torch.tensor(expected[:total_size])
+            expected = expected[:total_size]
+            bt.logging.debug(f"Using expected values: {expected}")
+
+            expected_tensor = torch.tensor(expected)
             actual_tensor = torch.tensor(actual)
 
             mae = torch.nn.functional.l1_loss(actual_tensor, expected_tensor)
