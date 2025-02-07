@@ -2,10 +2,15 @@ import sys
 import numpy as np
 import onnxruntime as ort
 import traceback
+import os
+
+os.environ["ONNXRUNTIME_LOGGING_LEVEL"] = "3"
+ort.set_default_logger_severity(3)
 
 
 def run_inference(model_path: str, input_path: str, output_path: str) -> None:
     try:
+        print("\n=== ONNX RUNNER STARTING ===")
         print(f"Loading model from: {model_path}")
         session = ort.InferenceSession(model_path)
         input_name = session.get_inputs()[0].name
@@ -23,7 +28,8 @@ def run_inference(model_path: str, input_path: str, output_path: str) -> None:
         print(f"Final flattened output shape: {final_output.shape}")
         print(f"Saving output to: {output_path}")
         np.save(output_path, final_output)
-        print("Inference completed successfully")
+        print("=== ONNX RUNNER COMPLETED ===\n")
+        sys.stdout.flush()
     except Exception as e:
         print(f"Error running inference: {str(e)}", file=sys.stderr)
         print(f"Traceback:\n{traceback.format_exc()}", file=sys.stderr)
