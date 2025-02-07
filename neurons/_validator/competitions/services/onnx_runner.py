@@ -4,34 +4,38 @@ import onnxruntime as ort
 import traceback
 
 
+def force_print(msg: str):
+    print(msg, flush=True)
+    sys.stdout.flush()
+
+
 def run_inference(model_path: str, input_path: str, output_path: str) -> None:
     try:
-        print("\n=== ONNX RUNNER STARTING ===")
-        print(f"Loading model from: {model_path}")
+        force_print("\n=== ONNX RUNNER STARTING ===")
+        force_print(f"Loading model from: {model_path}")
         session = ort.InferenceSession(model_path)
         input_name = session.get_inputs()[0].name
-        print(f"Input tensor name: {input_name}")
+        force_print(f"Input tensor name: {input_name}")
         input_data = np.load(input_path)
-        print(f"Loaded input data shape: {input_data.shape}")
+        force_print(f"Loaded input data shape: {input_data.shape}")
 
         options = ort.SessionOptions()
         options.log_severity_level = 3
 
         outputs = session.run(None, {input_name: input_data}, options)
-        print(f"Raw output shapes: {[out.shape for out in outputs]}")
+        force_print(f"Raw output shapes: {[out.shape for out in outputs]}")
 
         flattened = []
         for out in outputs:
             flattened.extend(out.flatten())
         final_output = np.array(flattened)
-        print(f"Final flattened output shape: {final_output.shape}")
-        print(f"Saving output to: {output_path}")
+        force_print(f"Final flattened output shape: {final_output.shape}")
+        force_print(f"Saving output to: {output_path}")
         np.save(output_path, final_output)
-        print("=== ONNX RUNNER COMPLETED ===\n")
-        sys.stdout.flush()
+        force_print("=== ONNX RUNNER COMPLETED ===\n")
     except Exception as e:
-        print(f"Error running inference: {str(e)}", file=sys.stderr)
-        print(f"Traceback:\n{traceback.format_exc()}", file=sys.stderr)
+        force_print(f"Error running inference: {str(e)}")
+        force_print(f"Traceback:\n{traceback.format_exc()}")
         sys.exit(1)
 
 
