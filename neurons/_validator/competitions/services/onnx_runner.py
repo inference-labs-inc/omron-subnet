@@ -9,8 +9,7 @@ def run_inference(model_path: str, input_path: str, output_path: str) -> None:
         input_name = session.get_inputs()[0].name
         input_data = np.load(input_path)
 
-        output_names = [output.name for output in session.get_outputs()]
-        outputs = session.run(output_names, {input_name: input_data})
+        outputs = session.run(None, {input_name: input_data})
 
         flattened = []
         for out in outputs:
