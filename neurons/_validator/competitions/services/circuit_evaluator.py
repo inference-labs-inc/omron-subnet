@@ -468,10 +468,17 @@ class CircuitEvaluator:
                 if stderr:
                     for line in stderr.split("\n"):
                         if line.strip():
-                            if line.startswith("###"):
+                            if line.startswith("!!!"):
                                 bt.logging.info(f"ONNX: {line}")
                             else:
                                 bt.logging.debug(f"ONNX Warning: {line}")
+
+                log_file = os.path.join(os.path.dirname(runner_path), "onnx_runner.log")
+                if os.path.exists(log_file):
+                    with open(log_file, "r") as f:
+                        log_contents = f.read()
+                        bt.logging.info(f"ONNX Runner Log:\n{log_contents}")
+                    os.unlink(log_file)  # Clean up the log file
                 bt.logging.info("ONNX Runner Output END ---")
 
                 if process.returncode != 0:
