@@ -139,11 +139,6 @@ class CompetitionThread(threading.Thread):
                             finally:
                                 self.competition.clear_current_download()
 
-                    commitments = self.competition.fetch_commitments(self.subtensor)
-                    if commitments:
-                        for uid, hotkey, hash in commitments:
-                            self.competition.queue_download(uid, hotkey, hash)
-
                     bt.logging.debug("=== Competition Cycle End ===")
                     time.sleep(1)
 
@@ -399,7 +394,7 @@ class Competition:
             bt.logging.error(f"Failed to get commitments: {e}")
             return []
 
-    def fetch_commitments(self, subtensor: bt.subtensor) -> List[Tuple[int, str, str]]:
+    def fetch_commitments(self) -> List[Tuple[int, str, str]]:
         if platform.system() != "Darwin" and platform.machine() != "arm64":
             bt.logging.critical(
                 "Competitions are only supported on macOS arm64 architecture."
@@ -432,7 +427,7 @@ class Competition:
                 }
             )
 
-            commitment_map = subtensor.substrate.query_map(
+            commitment_map = self.subtensor.substrate.query_map(
                 module="Commitments",
                 storage_function="CommitmentOf",
                 params=[self.metagraph.netuid],
