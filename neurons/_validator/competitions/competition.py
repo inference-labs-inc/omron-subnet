@@ -71,17 +71,13 @@ class CompetitionThread(threading.Thread):
                             self.competition.current_download = (
                                 self.competition.download_queue.pop(0)
                             )
-                            bt.logging.info(
-                                f"Processing next download: {self.competition.current_download[2][:8]}..."
-                            )
+                            uid, hotkey, hash = self.competition.current_download
+                            bt.logging.info(f"Processing next download: {hash[:8]}...")
 
                             try:
                                 if self.competition.process_downloads_sync():
                                     bt.logging.success(
                                         "Circuit download successful, starting evaluation..."
-                                    )
-                                    uid, hotkey, hash = (
-                                        self.competition.current_download
                                     )
                                     axon = self.competition.metagraph.axons[uid]
                                     circuit_dir = os.path.join(
@@ -130,8 +126,7 @@ class CompetitionThread(threading.Thread):
                                         )
                                 else:
                                     bt.logging.error(
-                                        "Circuit download or evaluation failed "
-                                        f"for {hash} from {hotkey}"
+                                        f"Circuit download or evaluation failed for {hash[:8]} from {hotkey[:8]}"
                                     )
                             finally:
                                 self.competition.clear_current_download()
