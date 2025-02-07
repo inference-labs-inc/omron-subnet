@@ -41,13 +41,32 @@ class CircuitEvaluator:
         os.makedirs(ONNX_VENV, exist_ok=True)
         subprocess.run(["python", "-m", "venv", ONNX_VENV], check=True)
         pip_path = os.path.join(ONNX_VENV, "bin", "pip")
+        python_path = os.path.join(ONNX_VENV, "bin", "python")
+
+        version_result = subprocess.run(
+            [
+                python_path,
+                "-c",
+                "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        python_version = version_result.stdout.strip()
+        bt.logging.debug(f"ONNX venv Python version: {python_version}")
+
         subprocess.run([pip_path, "install", "--upgrade", "pip"], check=True)
         subprocess.run([pip_path, "install", "numpy", "onnxruntime"], check=True)
 
-        runner_dir = os.path.join(ONNX_VENV, "lib", "python3.12", "site-packages")
-        os.makedirs(runner_dir, exist_ok=True)
-        shutil.copy2(ONNX_RUNNER, os.path.join(runner_dir, "onnx_runner.py"))
-        bt.logging.success(f"ONNX environment set up at {ONNX_VENV}")
+        site_packages = os.path.join(
+            ONNX_VENV, "lib", f"python{python_version}", "site-packages"
+        )
+        os.makedirs(site_packages, exist_ok=True)
+        shutil.copy2(ONNX_RUNNER, os.path.join(site_packages, "onnx_runner.py"))
+        bt.logging.success(
+            f"ONNX environment set up at {ONNX_VENV} with Python {python_version}"
+        )
 
     def _setup_data_source(self) -> CompetitionDataSource:
         try:
@@ -315,15 +334,25 @@ class CircuitEvaluator:
                 "circuit_eval_status": "eval_complete",
                 "final_score": float(final_score),
                 "avg_accuracy": float(avg_accuracy),
-                "avg_proof_size": float(avg_proof_size),
-                "avg_response_time": float(avg_response_time),
+                "avg_proof_size": (
+                    float(avg_proof_size) if avg_proof_size != float("inf") else -1
+                ),
+                "avg_response_time": (
+                    float(avg_response_time)
+                    if avg_response_time != float("inf")
+                    else -1
+                ),
                 "total_iterations": num_iterations,
                 "successful_iterations": len([s for s in scores if s > 0]),
                 "verification_success_rate": sum(verification_results)
                 / max(len(verification_results), 1),
                 "scores_distribution": scores,
-                "proof_sizes_distribution": proof_sizes,
-                "response_times_distribution": response_times,
+                "proof_sizes_distribution": [
+                    float(x) if x != float("inf") else -1 for x in proof_sizes
+                ],
+                "response_times_distribution": [
+                    float(x) if x != float("inf") else -1 for x in response_times
+                ],
             }
         )
 
@@ -363,11 +392,33 @@ class CircuitEvaluator:
                 np.save(input_file.name, test_inputs.numpy())
                 python_path = os.path.join(ONNX_VENV, "bin", "python")
                 model_path = os.path.abspath(self.baseline_model)
-                bt.logging.debug(f"Running ONNX model: {model_path}")
+
+                version_result = subprocess.run(
+                    [
+                        python_path,
+                        "-c",
+                        "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                python_version = version_result.stdout.strip()
+                runner_path = os.path.join(
+                    ONNX_VENV,
+                    "lib",
+                    f"python{python_version}",
+                    "site-packages",
+                    "onnx_runner.py",
+                )
+
+                bt.logging.debug(
+                    f"Running ONNX model: {model_path} with runner: {runner_path}"
+                )
                 result = subprocess.run(
                     [
                         python_path,
-                        "onnx_runner.py",
+                        runner_path,
                         model_path,
                         input_file.name,
                         output_file.name,
