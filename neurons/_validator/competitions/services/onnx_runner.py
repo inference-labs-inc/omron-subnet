@@ -6,12 +6,11 @@ import os
 
 
 def force_print(msg: str):
-    log_file = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "onnx_runner.log"
-    )
+    log_file = "/tmp/onnx_runner_debug.log"
     with open(log_file, "a") as f:
         f.write(f"{msg}\n")
         f.flush()
+        os.fsync(f.fileno())  # Force write to disk
     print(msg, file=sys.stderr, flush=True)
     sys.stderr.flush()
 
