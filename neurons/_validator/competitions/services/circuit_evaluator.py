@@ -614,19 +614,20 @@ class CircuitEvaluator:
                     shape[0] * shape[1] for shape in output_shapes.values()
                 )
                 bt.logging.debug(f"Expected total output size: {total_size}")
-                bt.logging.debug(f"Actual output size: {len(actual)}")
                 bt.logging.debug(f"Expected output: {expected}")
-                bt.logging.debug(f"Actual output: {actual}")
+                bt.logging.debug(f"Raw actual output: {actual}")
 
-            # Extract outputs from proof data
-            if isinstance(actual, dict) and "rescaled_outputs" in actual:
-                actual = actual["rescaled_outputs"][0]
-            elif (
-                isinstance(actual, list)
-                and len(actual) == 1
-                and isinstance(actual[0], list)
-            ):
-                actual = actual[0]
+            if isinstance(actual, dict) and "pretty_public_inputs" in actual:
+                rescaled = actual["pretty_public_inputs"].get("rescaled_outputs", [])
+                actual = [float(x) for sublist in rescaled for x in sublist]
+            elif isinstance(actual, list):
+                if len(actual) == 1 and isinstance(actual[0], list):
+                    actual = actual[0]
+                elif len(actual) == 0:
+                    bt.logging.error("Empty output list")
+                    return 0.0
+
+            bt.logging.debug(f"Processed actual output: {actual}")
 
             if len(actual) != total_size:
                 bt.logging.error(
