@@ -46,10 +46,6 @@ class CompetitionThread(threading.Thread):
     def run(self):
         bt.logging.info("Competition thread starting...")
         try:
-
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
             while self._should_run.is_set():
                 try:
                     bt.logging.debug("Competition thread running cycle...")
@@ -79,9 +75,8 @@ class CompetitionThread(threading.Thread):
                             "Pausing main request loop for circuit evaluation..."
                         )
 
-                        if loop.run_until_complete(
-                            self.competition.process_downloads()
-                        ):
+                        # Process downloads synchronously
+                        if self.competition.process_downloads_sync():
                             bt.logging.info(
                                 "Circuit download successful, starting evaluation..."
                             )
@@ -103,10 +98,6 @@ class CompetitionThread(threading.Thread):
             traceback.print_exc()
         finally:
             bt.logging.info("Competition thread exiting...")
-            try:
-                loop.close()
-            except Exception:
-                pass
 
     def stop(self):
         bt.logging.info("Competition thread stopping...")
@@ -619,3 +610,47 @@ class Competition:
         self.circuit_manager = CircuitManager(
             self.temp_directory, self.competition_id, dendrite
         )
+
+    def process_downloads_sync(self) -> bool:
+        """Process downloads synchronously."""
+        try:
+            current_download = self.get_current_download()
+            if not current_download:
+                return False
+
+            uid, hotkey, hash = current_download
+            bt.logging.info(
+                f"Processing download for circuit {hash[:8]}... from {hotkey[:8]}..."
+            )
+
+            # Download the circuit
+            circuit_proto = self.dendrite.query(
+                [self.circuit_manager.axons[hotkey]],
+                self.circuit_manager.download_request(hash),
+                timeout=60,
+                deserialize=True,
+            )
+
+            if not circuit_proto or not circuit_proto[0]:
+                bt.logging.warning(
+                    f"Failed to download circuit {hash[:8]}... from {hotkey[:8]}..."
+                )
+                return False
+
+            # Save the circuit
+            circuit_path = self.circuit_manager.save_circuit(circuit_proto[0], hash)
+            if not circuit_path:
+                bt.logging.warning(f"Failed to save circuit {hash[:8]}...")
+                return False
+
+            bt.logging.success(
+                f"Successfully downloaded and saved circuit {hash[:8]}..."
+            )
+            return True
+
+        except Exception as e:
+            bt.logging.error(f"Error processing download: {e}")
+            traceback.print_exc()
+            return False
+        finally:
+            self.clear_current_download()
