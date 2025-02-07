@@ -12,7 +12,10 @@ def run_inference(model_path: str, input_path: str, output_path: str) -> None:
         output_names = [output.name for output in session.get_outputs()]
         outputs = session.run(output_names, {input_name: input_data})
 
-        np.save(output_path, outputs)
+        flattened = []
+        for out in outputs:
+            flattened.extend(out.flatten())
+        np.save(output_path, np.array(flattened))
     except Exception as e:
         print(f"Error running inference: {str(e)}", file=sys.stderr)
         sys.exit(1)
