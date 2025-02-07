@@ -129,8 +129,12 @@ class Competition:
     def fetch_commitments(self) -> List[Tuple[int, str, str]]:
         if platform.system() != "Darwin" and platform.machine() != "arm64":
             bt.logging.critical(
-                "Competitions are only supported on macOS arm64 architecture\n"
-                "To remain in consensus, please use a supported platform.\n"
+                "Competitions are only supported on macOS arm64 architecture."
+            )
+            bt.logging.critical(
+                "To remain in consensus, please use a supported platform."
+            )
+            bt.logging.critical(
                 "While the validator will continue to run, it will not be able to "
                 "correctly evaluate competitions."
             )
