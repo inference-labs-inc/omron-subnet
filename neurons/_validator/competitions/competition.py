@@ -41,65 +41,76 @@ class CompetitionThread(threading.Thread):
         self._should_run.set()
         self.task_queue = queue.Queue()
         self.daemon = True
-        self.loop = asyncio.new_event_loop()
         bt.logging.info("Competition thread initialized")
 
     def run(self):
         bt.logging.info("Competition thread starting...")
-        asyncio.set_event_loop(self.loop)
-        while self._should_run.is_set():
+        try:
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            while self._should_run.is_set():
+                try:
+                    bt.logging.debug("Competition thread running cycle...")
+                    if not self.competition.circuit_manager:
+                        bt.logging.warning(
+                            "Circuit manager not initialized, reinitializing..."
+                        )
+                        self.competition.initialize_circuit_manager(
+                            self.competition.dendrite
+                        )
+
+                    bt.logging.debug("Checking for new commitments...")
+                    commitments = self.competition.fetch_commitments()
+                    if commitments:
+                        bt.logging.success(
+                            f"Found {len(commitments)} new circuits to evaluate"
+                        )
+                        for uid, hotkey, hash in commitments:
+                            bt.logging.info(
+                                f"Queueing download for circuit {hash[:8]}... from {hotkey[:8]}..."
+                            )
+                            self.competition.queue_download(uid, hotkey, hash)
+
+                    if self.competition.get_current_download():
+                        self.pause_requests_event.set()
+                        bt.logging.info(
+                            "Pausing main request loop for circuit evaluation..."
+                        )
+
+                        if loop.run_until_complete(
+                            self.competition.process_downloads()
+                        ):
+                            bt.logging.info(
+                                "Circuit download successful, starting evaluation..."
+                            )
+                            self.competition.run_single_evaluation()
+                            bt.logging.info("Circuit evaluation complete")
+
+                        self.pause_requests_event.clear()
+                        bt.logging.info("Resuming main request loop...")
+
+                except Exception as e:
+                    bt.logging.error(f"Error in competition thread cycle: {e}")
+                    traceback.print_exc()
+
+                bt.logging.debug("Competition thread sleeping for 1 hour...")
+                time.sleep(ONE_HOUR)
+
+        except Exception as e:
+            bt.logging.error(f"Fatal error in competition thread: {e}")
+            traceback.print_exc()
+        finally:
+            bt.logging.info("Competition thread exiting...")
             try:
-                bt.logging.debug("Competition thread running cycle...")
-                if not self.competition.circuit_manager:
-                    bt.logging.warning(
-                        "Circuit manager not initialized, reinitializing..."
-                    )
-                    self.competition.initialize_circuit_manager(
-                        self.competition.dendrite
-                    )
-
-                bt.logging.debug("Checking for new commitments...")
-                commitments = self.competition.fetch_commitments()
-                if commitments:
-                    bt.logging.success(
-                        f"Found {len(commitments)} new circuits to evaluate"
-                    )
-                    for uid, hotkey, hash in commitments:
-                        bt.logging.info(
-                            f"Queueing download for circuit {hash[:8]}... from {hotkey[:8]}..."
-                        )
-                        self.competition.queue_download(uid, hotkey, hash)
-
-                if self.competition.get_current_download():
-                    self.pause_requests_event.set()
-                    bt.logging.info(
-                        "Pausing main request loop for circuit evaluation..."
-                    )
-
-                    if self.loop.run_until_complete(
-                        self.competition.process_downloads()
-                    ):
-                        bt.logging.info(
-                            "Circuit download successful, starting evaluation..."
-                        )
-                        self.competition.run_single_evaluation()
-                        bt.logging.info("Circuit evaluation complete")
-
-                    self.pause_requests_event.clear()
-                    bt.logging.info("Resuming main request loop...")
-
-            except Exception as e:
-                bt.logging.error(f"Error in competition thread: {e}")
-                traceback.print_exc()
-
-            bt.logging.debug("Competition thread sleeping for 1 hour...")
-            time.sleep(ONE_HOUR)
+                loop.close()
+            except Exception:
+                pass
 
     def stop(self):
         bt.logging.info("Competition thread stopping...")
         self._should_run.clear()
-        self.loop.stop()
-        self.loop.close()
         bt.logging.info("Competition thread stopped")
 
 
