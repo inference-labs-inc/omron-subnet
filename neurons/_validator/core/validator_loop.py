@@ -340,18 +340,36 @@ class ValidatorLoop:
     async def run_periodic_tasks(self):
         while self._should_run:
             try:
+                # Always update core metrics
+                self.update_weights()
+                self.sync_scores_uids()
+                self.sync_metagraph()
+                self.check_auto_update()
+                self.update_queryable_uids()
+                self.log_health()
+                await self.log_responses()
 
-                if not (self.competition and self.competition.get_current_download()):
-                    self.update_weights()
-                    self.sync_scores_uids()
-                    self.sync_metagraph()
-                    self.check_auto_update()
-                    self.update_queryable_uids()
-                    self.log_health()
-                    await self.log_responses()
-                    await self.sync_competition()
+                # Handle competition tasks
+                if self.competition:
+                    bt.logging.debug("Processing competition tasks...")
 
-                await self.process_competition_downloads()
+                    # First sync competition if no active downloads
+                    if not self.competition.get_current_download():
+                        bt.logging.debug(
+                            "No active downloads, checking for new circuits..."
+                        )
+                        await self.sync_competition()
+
+                    # Then process any pending downloads
+                    bt.logging.debug("Processing any pending competition downloads...")
+                    await self.process_competition_downloads()
+
+                    if self.competition.get_current_download():
+                        bt.logging.info(
+                            "Competition download in progress, skipping other tasks"
+                        )
+                        continue
+
             except KeyboardInterrupt:
                 self._handle_keyboard_interrupt()
             except Exception as e:
