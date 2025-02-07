@@ -44,6 +44,11 @@ class CompetitionThread(threading.Thread):
         self._should_run.set()
         self.task_queue = queue.Queue()
         self.daemon = True
+
+        self.subtensor = bt.subtensor(
+            network=self.competition.config.get("network", "test")
+        )
+
         bt.logging.info("Competition thread initialized with:")
         bt.logging.info(f"- Competition ID: {self.competition.competition_id}")
         bt.logging.info(f"- Competition Dir: {self.competition.competition_directory}")
@@ -133,6 +138,11 @@ class CompetitionThread(threading.Thread):
                             finally:
                                 self.competition.clear_current_download()
 
+                    commitments = self.competition.fetch_commitments(self.subtensor)
+                    if commitments:
+                        for uid, hotkey, hash in commitments:
+                            self.competition.queue_download(uid, hotkey, hash)
+
                     bt.logging.debug("=== Competition Cycle End ===")
                     time.sleep(1)
 
@@ -187,7 +197,9 @@ class Competition:
         )
         with open(config_path) as f:
             self.config = json.load(f)
-        self.subtensor = bt.subtensor(network=self.config.get("network", "test"))
+
+        self.metagraph = metagraph
+        self.wallet = wallet
         self.dendrite = bt.dendrite(wallet=wallet)
 
         bt.logging.info("Initializing competition manager...")
@@ -202,7 +214,6 @@ class Competition:
             self.baseline_model, self.competition_directory, self.sota_manager
         )
 
-        self.metagraph = metagraph
         self.miner_states: Dict[str, NeuronState] = {}
 
         self.download_queue: List[Tuple[int, str, str]] = []
@@ -384,7 +395,7 @@ class Competition:
             bt.logging.error(f"Failed to get commitments: {e}")
             return []
 
-    def fetch_commitments(self) -> List[Tuple[int, str, str]]:
+    def fetch_commitments(self, subtensor: bt.subtensor) -> List[Tuple[int, str, str]]:
         if platform.system() != "Darwin" and platform.machine() != "arm64":
             bt.logging.critical(
                 "Competitions are only supported on macOS arm64 architecture."
@@ -417,7 +428,7 @@ class Competition:
                 }
             )
 
-            commitment_map = self.subtensor.substrate.query_map(
+            commitment_map = subtensor.substrate.query_map(
                 module="Commitments",
                 storage_function="CommitmentOf",
                 params=[self.metagraph.netuid],
