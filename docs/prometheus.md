@@ -68,7 +68,7 @@ Take a look at the [Prometheus documentation](https://prometheus.io/docs/introdu
 4. Start Grafana by running `./bin/grafana-server`.
 5. Open your web browser and go to `http://localhost:3000` to access the Grafana UI.
 
-### Step 4: Add Prometheus Data Source in Grafana
+### Step 5: Add Prometheus Data Source in Grafana
 
 1. Open your Grafana instance in a web browser.
 2. Log in with your credentials. (The default username and password are `admin`.)
@@ -78,7 +78,7 @@ Take a look at the [Prometheus documentation](https://prometheus.io/docs/introdu
 6. In the **HTTP** section, set the URL to `http://localhost:9090`.
 7. Click on the **Save & Test** button to verify the connection.
 
-### Step 5: Create a Dashboard
+### Step 6: Create a Dashboard
 
 1. Click on **Dashboard** in the left sidebar.
 2. Click on **Create Dashboard** and **Add Visualization**.
@@ -87,7 +87,7 @@ Take a look at the [Prometheus documentation](https://prometheus.io/docs/introdu
 5. (Optionally) Add one more query, play with visualization options, and customize the panel as needed.
 6. Click on **Save Dashboard** to save the panel.
 
-### Step 6: Add Panels for Other Metrics
+### Step 7: Add Panels for Other Metrics
 
 1. Repeat the process of adding new panels for each of the following metrics:
 
