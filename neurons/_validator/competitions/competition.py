@@ -124,20 +124,11 @@ class CompetitionThread(threading.Thread):
                                                 circuit_dir,
                                                 self.competition.miner_states[hotkey],
                                             )
-                                    finally:
-                                        if os.path.exists(circuit_dir) and not (
-                                            score > 0
-                                            and self.competition.sota_manager.check_if_sota(
-                                                score,
-                                                self.competition.miner_states[
-                                                    hotkey
-                                                ].proof_size,
-                                                self.competition.miner_states[
-                                                    hotkey
-                                                ].response_time,
+                                        else:
+                                            self.competition.cleanup_circuit_dir(
+                                                circuit_dir
                                             )
-                                        ):
-                                            shutil.rmtree(circuit_dir)
+                                    finally:
                                         self.pause_requests_event.clear()
                                         bt.logging.info("Resuming main request loop...")
                                 else:
@@ -684,11 +675,108 @@ class Competition:
         return self.current_download
 
     def clear_current_download(self) -> None:
-        if self.current_download:
-            circuit_dir = os.path.join(self.temp_directory, self.current_download[2])
-            if os.path.exists(circuit_dir):
-                shutil.rmtree(circuit_dir)
-            self.current_download = None
+        """Clear the current download without cleaning up the directory."""
+        self.current_download = None
+
+    def cleanup_circuit_dir(self, circuit_dir: str) -> None:
+        """Clean up a circuit directory if it exists."""
+        if os.path.exists(circuit_dir):
+            bt.logging.info(f"Cleaning up circuit directory: {circuit_dir}")
+            shutil.rmtree(circuit_dir)
+
+    def process_downloads_sync(self) -> bool:
+        """Process downloads synchronously."""
+        try:
+            current_download = self.get_current_download()
+            if not current_download:
+                return False
+
+            uid, hotkey, hash = current_download
+            bt.logging.info(
+                f"Processing download for circuit {hash[:8]}... from {hotkey[:8]}..."
+            )
+
+            axon = self.metagraph.axons[uid]
+            circuit_dir = os.path.join(self.temp_directory, hash)
+            os.makedirs(circuit_dir, exist_ok=True)
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            try:
+                download_success = loop.run_until_complete(
+                    self.circuit_manager.download_files(axon, hash, circuit_dir)
+                )
+            finally:
+                loop.close()
+                asyncio.set_event_loop(None)
+
+            if download_success:
+                bt.logging.info(f"Download completed for {hash[:8]}, validating...")
+                bt.logging.info("Circuit directory contents:")
+                for root, dirs, files in os.walk(circuit_dir):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        bt.logging.info(
+                            f"- {file} ({os.path.getsize(file_path)} bytes)"
+                        )
+
+                # Verify required files exist and are readable
+                required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
+                missing_files = []
+                for file in required_files:
+                    file_path = os.path.join(circuit_dir, file)
+                    if not os.path.exists(file_path):
+                        missing_files.append(file)
+                    else:
+                        try:
+                            size = os.path.getsize(file_path)
+                            bt.logging.info(f"Found {file} ({size} bytes)")
+                            if size == 0:
+                                missing_files.append(f"{file} (empty)")
+                        except Exception as e:
+                            bt.logging.error(f"Error checking {file}: {e}")
+                            missing_files.append(f"{file} (error)")
+
+                if missing_files:
+                    bt.logging.error(
+                        f"Missing or invalid files: {', '.join(missing_files)}"
+                    )
+                    self.cleanup_circuit_dir(circuit_dir)
+                    return False
+
+                if self.circuit_validator.validate_files(circuit_dir):
+                    self.miner_states[hotkey] = NeuronState(
+                        hotkey=hotkey,
+                        uid=uid,
+                        score=0.0,
+                        proof_size=0,
+                        response_time=0.0,
+                        verification_result=False,
+                        accuracy=0.0,
+                        hash=hash,
+                    )
+                    bt.logging.success(
+                        f"Successfully downloaded and validated circuit {hash[:8]}..."
+                    )
+                    return True
+                else:
+                    bt.logging.warning(f"Circuit validation failed for {hash[:8]}...")
+            else:
+                bt.logging.warning(f"Failed to download circuit {hash[:8]}...")
+
+            self.cleanup_circuit_dir(circuit_dir)
+            return False
+
+        except Exception as e:
+            bt.logging.error(f"Error processing download: {e}")
+            traceback.print_exc()
+            if current_download:
+                circuit_dir = os.path.join(self.temp_directory, current_download[2])
+                self.cleanup_circuit_dir(circuit_dir)
+            return False
+        finally:
+            self.clear_current_download()
 
     def run_single_evaluation(self) -> bool:
         if not self.pending_evaluations:
@@ -784,96 +872,3 @@ class Competition:
         self.circuit_manager = CircuitManager(
             self.temp_directory, self.competition_id, dendrite
         )
-
-    def process_downloads_sync(self) -> bool:
-        """Process downloads synchronously."""
-        try:
-            current_download = self.get_current_download()
-            if not current_download:
-                return False
-
-            uid, hotkey, hash = current_download
-            bt.logging.info(
-                f"Processing download for circuit {hash[:8]}... from {hotkey[:8]}..."
-            )
-
-            axon = self.metagraph.axons[uid]
-            circuit_dir = os.path.join(self.temp_directory, hash)
-            os.makedirs(circuit_dir, exist_ok=True)
-
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-            try:
-                download_success = loop.run_until_complete(
-                    self.circuit_manager.download_files(axon, hash, circuit_dir)
-                )
-            finally:
-                loop.close()
-                asyncio.set_event_loop(None)
-
-            if download_success:
-                bt.logging.info(f"Download completed for {hash[:8]}, validating...")
-                bt.logging.info("Circuit directory contents:")
-                for root, dirs, files in os.walk(circuit_dir):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        bt.logging.info(
-                            f"- {file} ({os.path.getsize(file_path)} bytes)"
-                        )
-
-                # Verify required files exist and are readable
-                required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
-                missing_files = []
-                for file in required_files:
-                    file_path = os.path.join(circuit_dir, file)
-                    if not os.path.exists(file_path):
-                        missing_files.append(file)
-                    else:
-                        try:
-                            size = os.path.getsize(file_path)
-                            bt.logging.info(f"Found {file} ({size} bytes)")
-                            if size == 0:
-                                missing_files.append(f"{file} (empty)")
-                        except Exception as e:
-                            bt.logging.error(f"Error checking {file}: {e}")
-                            missing_files.append(f"{file} (error)")
-
-                if missing_files:
-                    bt.logging.error(
-                        f"Missing or invalid files: {', '.join(missing_files)}"
-                    )
-                    if os.path.exists(circuit_dir):
-                        shutil.rmtree(circuit_dir)
-                    return False
-
-                if self.circuit_validator.validate_files(circuit_dir):
-                    self.miner_states[hotkey] = NeuronState(
-                        hotkey=hotkey,
-                        uid=uid,
-                        score=0.0,
-                        proof_size=0,
-                        response_time=0.0,
-                        verification_result=False,
-                        accuracy=0.0,
-                        hash=hash,
-                    )
-                    bt.logging.success(
-                        f"Successfully downloaded and validated circuit {hash[:8]}..."
-                    )
-                    return True
-                else:
-                    bt.logging.warning(f"Circuit validation failed for {hash[:8]}...")
-            else:
-                bt.logging.warning(f"Failed to download circuit {hash[:8]}...")
-
-            if os.path.exists(circuit_dir):
-                shutil.rmtree(circuit_dir)
-            return False
-
-        except Exception as e:
-            bt.logging.error(f"Error processing download: {e}")
-            traceback.print_exc()
-            return False
-        finally:
-            self.clear_current_download()
