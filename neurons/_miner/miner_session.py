@@ -6,6 +6,7 @@ import traceback
 from typing import Tuple, Union
 from rich.console import Console
 from rich.table import Table
+import threading
 
 import bittensor as bt
 import websocket
@@ -134,10 +135,7 @@ class MinerSession:
                     self.check_register()
 
                 if step % 24 == 0 and self.subnet_uid is not None:
-                    try:
-                        self.metagraph = self.subtensor.metagraph(
-                            cli_parser.config.netuid
-                        )
+                    if self.sync_metagraph():
                         table = Table(title=f"Miner Status (UID: {self.subnet_uid})")
                         table.add_column("Block", justify="center", style="cyan")
                         table.add_column("Stake", justify="center", style="cyan")
@@ -157,10 +155,6 @@ class MinerSession:
                         )
                         console = Console()
                         console.print(table)
-                    except Exception:
-                        bt.logging.warning(
-                            f"Failed to sync metagraph: {traceback.format_exc()}"
-                        )
 
                 time.sleep(1)
 
@@ -186,10 +180,10 @@ class MinerSession:
             self.subnet_uid = subnet_uid
 
     def configure(self):
-        # === Configure Bittensor objects ====
         self.wallet = bt.wallet(config=cli_parser.config)
         self.subtensor = bt.subtensor(config=cli_parser.config)
         self.metagraph = self.subtensor.metagraph(cli_parser.config.netuid)
+        self._metagraph_lock = threading.Lock()
         wandb_logger.safe_init("Miner", self.wallet, self.metagraph, cli_parser.config)
 
         if cli_parser.config.storage:
@@ -223,6 +217,18 @@ class MinerSession:
         except Exception as e:
             bt.logging.error(f"Error initializing circuit manager: {e}")
             self.circuit_manager = None
+
+    def sync_metagraph(self):
+        try:
+            with self._metagraph_lock:
+                temp_subtensor = bt.subtensor(config=cli_parser.config)
+                temp_metagraph = temp_subtensor.metagraph(cli_parser.config.netuid)
+                temp_metagraph.sync(subtensor=temp_subtensor)
+                self.metagraph = temp_metagraph
+                return True
+        except Exception as e:
+            bt.logging.warning(f"Failed to sync metagraph: {e}")
+            return False
 
     def proof_blacklist(self, synapse: QueryZkProof) -> Tuple[bool, str]:
         """
