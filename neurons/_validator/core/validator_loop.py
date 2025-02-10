@@ -326,10 +326,6 @@ class ValidatorLoop:
     async def run_periodic_tasks(self):
         while self._should_run:
             try:
-                if self.competition and self.competition.pause_requests_event.is_set():
-                    bt.logging.debug("Request loop paused for competition evaluation")
-                    await asyncio.sleep(1)
-                    continue
 
                 self.update_weights()
                 self.sync_scores_uids()
@@ -338,12 +334,7 @@ class ValidatorLoop:
                 self.update_queryable_uids()
                 self.log_health()
                 await self.log_responses()
-
-                if (
-                    not self.competition
-                    or not self.competition.pause_requests_event.is_set()
-                ):
-                    await self.sync_competition()
+                await self.sync_competition()
 
             except KeyboardInterrupt:
                 self._handle_keyboard_interrupt()

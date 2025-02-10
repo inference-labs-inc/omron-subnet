@@ -162,7 +162,7 @@ class Competition:
         self.temp_directory = os.path.join(TEMP_FOLDER, str(competition_id))
         self.sota_directory = os.path.join(self.competition_directory, "sota")
 
-        register_cleanup_handlers(self.temp_directory)
+        register_cleanup_handlers()
 
         if not os.path.exists(self.temp_directory):
             os.makedirs(self.temp_directory)
