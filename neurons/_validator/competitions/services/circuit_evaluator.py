@@ -126,9 +126,9 @@ class CircuitEvaluator:
             return RandomDataSource(self.competition_directory)
 
     def _calculate_relative_score(
-        self, accuracy: float, proof_size: float, response_time: float
+        self, raw_accuracy: float, proof_size: float, response_time: float
     ) -> float:
-        if accuracy == 0:
+        if raw_accuracy == 0:
             return 0.0
 
         sota_state = self.sota_manager.current_state
@@ -143,7 +143,7 @@ class CircuitEvaluator:
             bt.logging.error(f"Error loading scoring weights, using defaults: {e}")
             weights = {"accuracy": 0.4, "proof_size": 0.3, "response_time": 0.3}
 
-        accuracy_diff = max(0, sota_state.accuracy - accuracy)
+        accuracy_diff = max(0, sota_state.accuracy - raw_accuracy)
 
         if sota_state.proof_size > 0:
             proof_size_diff = max(
@@ -170,7 +170,12 @@ class CircuitEvaluator:
     def evaluate(
         self, circuit_dir: str, accuracy_weight: float
     ) -> Tuple[float, float, float, bool]:
-        scores, proof_sizes, response_times, verification_results = [], [], [], []
+        raw_accuracy_scores, proof_sizes, response_times, verification_results = (
+            [],
+            [],
+            [],
+            [],
+        )
         input_shape = self._get_input_shape(circuit_dir)
         bt.logging.debug(f"Got input shape: {input_shape}")
 
@@ -230,7 +235,7 @@ class CircuitEvaluator:
                             "error": "Failed to get benchmark data",
                         }
                     )
-                    scores.append(0.0)
+                    raw_accuracy_scores.append(0.0)
                     continue
 
                 bt.logging.debug(f"Got benchmark data with shape: {test_inputs.shape}")
@@ -252,7 +257,7 @@ class CircuitEvaluator:
                             "error": "Baseline model run failed",
                         }
                     )
-                    scores.append(0.0)
+                    raw_accuracy_scores.append(0.0)
                     continue
 
                 bt.logging.debug(
@@ -276,7 +281,7 @@ class CircuitEvaluator:
                             "error": "Proof generation failed",
                         }
                     )
-                    scores.append(0.0)
+                    raw_accuracy_scores.append(0.0)
                     verification_results.append(False)
                     proof_sizes.append(float("inf"))
                     response_times.append(float("inf"))
@@ -321,17 +326,17 @@ class CircuitEvaluator:
                 )
 
                 if verify_result:
-                    accuracy_score = self._compare_outputs(
+                    raw_accuracy = self._compare_outputs(
                         baseline_output, public_signals
                     )
-                    bt.logging.debug(f"Accuracy score: {accuracy_score}")
-                    scores.append(accuracy_score)
+                    bt.logging.debug(f"Raw accuracy: {raw_accuracy}")
+                    raw_accuracy_scores.append(raw_accuracy)
 
                     safe_log(
                         {
                             "circuit_eval_status": "iteration_complete",
                             "iteration": i + 1,
-                            "accuracy_score": float(accuracy_score),
+                            "raw_accuracy": float(raw_accuracy),
                             "proof_size": len(proof),
                             "response_time": response_time,
                             "iteration_duration": time.time() - iteration_start,
@@ -346,7 +351,7 @@ class CircuitEvaluator:
                             "error": "Proof verification failed",
                         }
                     )
-                    scores.append(0.0)
+                    raw_accuracy_scores.append(0.0)
 
             except Exception as e:
                 bt.logging.error(f"Error in evaluation iteration: {str(e)}")
@@ -358,7 +363,7 @@ class CircuitEvaluator:
                         "error": str(e),
                     }
                 )
-                scores.append(0.0)
+                raw_accuracy_scores.append(0.0)
                 verification_results.append(False)
                 proof_sizes.append(float("inf"))
                 response_times.append(float("inf"))
@@ -376,7 +381,11 @@ class CircuitEvaluator:
             )
             return 0.0, float("inf"), float("inf"), False
 
-        avg_accuracy = sum(scores) / len(scores) if scores else 0
+        avg_raw_accuracy = (
+            sum(raw_accuracy_scores) / len(raw_accuracy_scores)
+            if raw_accuracy_scores
+            else 0
+        )
         avg_proof_size = (
             sum(proof_sizes) / len(proof_sizes) if proof_sizes else float("inf")
         )
@@ -386,15 +395,15 @@ class CircuitEvaluator:
             else float("inf")
         )
 
-        final_score = self._calculate_relative_score(
-            avg_accuracy, avg_proof_size, avg_response_time
+        sota_relative_score = self._calculate_relative_score(
+            avg_raw_accuracy, avg_proof_size, avg_response_time
         )
 
         safe_log(
             {
                 "circuit_eval_status": "eval_complete",
-                "final_score": float(final_score),
-                "avg_accuracy": float(avg_accuracy),
+                "sota_relative_score": float(sota_relative_score),
+                "avg_raw_accuracy": float(avg_raw_accuracy),
                 "avg_proof_size": (
                     float(avg_proof_size) if avg_proof_size != float("inf") else -1
                 ),
@@ -404,10 +413,10 @@ class CircuitEvaluator:
                     else -1
                 ),
                 "total_iterations": num_iterations,
-                "successful_iterations": len([s for s in scores if s > 0]),
+                "successful_iterations": len([s for s in raw_accuracy_scores if s > 0]),
                 "verification_success_rate": sum(verification_results)
                 / max(len(verification_results), 1),
-                "scores_distribution": scores,
+                "raw_accuracy_distribution": raw_accuracy_scores,
                 "proof_sizes_distribution": [
                     float(x) if x != float("inf") else -1 for x in proof_sizes
                 ],
@@ -418,10 +427,12 @@ class CircuitEvaluator:
         )
 
         bt.logging.info(
-            f"Circuit evaluation complete - Score: {final_score:.4f}, Accuracy: {avg_accuracy:.4f}, "
+            f"Circuit evaluation complete - SOTA Score: {sota_relative_score:.4f}, "
+            f"Raw Accuracy: {avg_raw_accuracy:.4f}, "
             f"Proof Size: {avg_proof_size:.0f}, Response Time: {avg_response_time:.2f}s"
         )
-        return final_score, avg_proof_size, avg_response_time, True
+
+        return sota_relative_score, avg_proof_size, avg_response_time, True
 
     def _get_input_shape(self, circuit_dir: str) -> Tuple[int, int] | None:
         try:
@@ -698,8 +709,8 @@ class CircuitEvaluator:
             actual_tensor = torch.tensor(actual)
 
             mae = torch.nn.functional.l1_loss(actual_tensor, expected_tensor)
-            accuracy = torch.exp(-mae).item()
-            return accuracy
+            raw_accuracy = torch.exp(-mae).item()
+            return raw_accuracy
         except Exception as e:
             bt.logging.error(f"Error comparing outputs: {e}")
             bt.logging.error(f"Stack trace: {traceback.format_exc()}")

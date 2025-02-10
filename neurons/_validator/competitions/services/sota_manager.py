@@ -39,19 +39,20 @@ class SotaManager:
             shutil.copytree(circuit_dir, sota_circuit_dir)
 
             self.sota_state = SotaState(
-                score=neuron_state.score,
+                sota_relative_score=neuron_state.sota_relative_score,
                 hash=neuron_state.hash,
                 hotkey=neuron_state.hotkey,
                 proof_size=neuron_state.proof_size,
                 response_time=neuron_state.response_time,
                 timestamp=int(time.time()),
-                accuracy=neuron_state.accuracy,
+                raw_accuracy=neuron_state.raw_accuracy,
             )
             self._save_state()
 
             bt.logging.success(
                 f"New SOTA achieved by {neuron_state.hotkey}! "
-                f"Score: {self.sota_state.score:.4f}, "
+                f"Score: {self.sota_state.sota_relative_score:.4f}, "
+                f"Raw Accuracy: {self.sota_state.raw_accuracy:.4f}, "
                 f"Proof Size: {self.sota_state.proof_size:.2f} bytes, "
                 f"Response Time: {self.sota_state.response_time:.4f}s"
             )
@@ -59,11 +60,11 @@ class SotaManager:
             bt.logging.error(f"Error preserving SOTA circuit: {e}")
 
     def check_if_sota(
-        self, score: float, proof_size: float, response_time: float
+        self, sota_relative_score: float, proof_size: float, response_time: float
     ) -> bool:
         EPSILON = 1e-6
 
-        if score < self.sota_state.score - EPSILON:
+        if sota_relative_score < self.sota_state.sota_relative_score - EPSILON:
             return False
         if proof_size > self.sota_state.proof_size + EPSILON:
             return False
@@ -71,7 +72,7 @@ class SotaManager:
             return False
 
         metrics_equal = (
-            abs(score - self.sota_state.score) < EPSILON
+            abs(sota_relative_score - self.sota_state.sota_relative_score) < EPSILON
             and abs(proof_size - self.sota_state.proof_size) < EPSILON
             and abs(response_time - self.sota_state.response_time) < EPSILON
         )

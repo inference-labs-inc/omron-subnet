@@ -639,8 +639,8 @@ class Competition:
         accuracy_weight: float,
     ) -> float:
         try:
-            score, proof_size, response_time, success = self.circuit_evaluator.evaluate(
-                circuit_dir, accuracy_weight
+            sota_relative_score, proof_size, response_time, success = (
+                self.circuit_evaluator.evaluate(circuit_dir, accuracy_weight)
             )
 
             if not success:
@@ -651,7 +651,7 @@ class Competition:
                     "circuit_eval_status": "eval_success",
                     "circuit_uid": circuit_uid,
                     "circuit_owner": circuit_owner,
-                    "score": float(score),
+                    "sota_relative_score": float(sota_relative_score),
                     "proof_size": -1 if proof_size == float("inf") else int(proof_size),
                     "response_time": (
                         -1 if response_time == float("inf") else float(response_time)
@@ -659,7 +659,7 @@ class Competition:
                 }
             )
 
-            return score
+            return sota_relative_score
         except Exception as e:
             bt.logging.error(f"Error in competition thread cycle: {str(e)}")
             bt.logging.error(f"Stack trace: {traceback.format_exc()}")
@@ -672,7 +672,7 @@ class Competition:
             [
                 k
                 for k, v in self.miner_states.items()
-                if v.verification_result and v.score > 0
+                if v.verification_result and v.sota_relative_score > 0
             ]
         )
         self.competition_manager.update_active_participants(active_participants)
@@ -680,14 +680,14 @@ class Competition:
         active_miners = [
             v
             for v in self.miner_states.values()
-            if v.verification_result and v.score > 0
+            if v.verification_result and v.sota_relative_score > 0
         ]
         sota_state = self.sota_manager.current_state
 
         metrics = {
             "active_participants": active_participants,
-            "avg_accuracy": (
-                sum(m.accuracy for m in active_miners) / len(active_miners)
+            "avg_raw_accuracy": (
+                sum(m.raw_accuracy for m in active_miners) / len(active_miners)
                 if active_miners
                 else 0
             ),
@@ -701,7 +701,7 @@ class Competition:
                 if active_miners
                 else 0
             ),
-            "sota_score": sota_state.score,
+            "sota_relative_score": sota_state.sota_relative_score,
             "sota_hotkey": sota_state.hotkey,
             "sota_proof_size": sota_state.proof_size,
             "sota_response_time": sota_state.response_time,
