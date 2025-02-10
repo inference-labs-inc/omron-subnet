@@ -175,7 +175,15 @@ class ValidatorLoop:
         log_queue_metrics(queue_size, est_latency)
 
     def update_processed_uids(self):
-        if len(self.processed_uids) >= len(self.queryable_uids):
+        total_processed = len(self.processed_uids) + len(self.active_tasks)
+        bt.logging.info(
+            f"Total processed/active UIDs: {total_processed} out of {len(self.queryable_uids)}"
+        )
+
+        if total_processed >= len(self.queryable_uids):
+            bt.logging.info(
+                "All queryable UIDs are either processed or active, clearing processed list"
+            )
             self.processed_uids.clear()
 
     @with_rate_limit(period=ONE_MINUTE)
