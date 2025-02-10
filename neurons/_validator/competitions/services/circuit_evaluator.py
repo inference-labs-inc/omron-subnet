@@ -310,7 +310,6 @@ class CircuitEvaluator:
                     )
                     for x in sublist
                 ]
-                bt.logging.info(f"Extracted public signals: {public_signals}")
                 proof_sizes.append(len(proof))
 
                 verify_result = self._verify_proof(circuit_dir, proof_path)

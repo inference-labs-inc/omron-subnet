@@ -648,6 +648,14 @@ class Competition:
             if not success:
                 return 0.0
 
+            if circuit_owner in self.miner_states:
+                self.miner_states[circuit_owner].sota_relative_score = (
+                    sota_relative_score
+                )
+                self.miner_states[circuit_owner].proof_size = proof_size
+                self.miner_states[circuit_owner].response_time = response_time
+                self.miner_states[circuit_owner].verification_result = True
+
             safe_log(
                 {
                     "circuit_eval_status": "eval_success",
@@ -661,13 +669,15 @@ class Competition:
                 }
             )
 
+            self._update_competition_metrics()
+
             return sota_relative_score
         except Exception as e:
             bt.logging.error(f"Error in competition thread cycle: {str(e)}")
             bt.logging.error(f"Stack trace: {traceback.format_exc()}")
             return 0.0
 
-    def _update_competition_metrics(self, hotkey: str):
+    def _update_competition_metrics(self):
         self.competition_manager.increment_circuits_evaluated()
 
         active_miners = [
