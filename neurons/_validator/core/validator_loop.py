@@ -266,6 +266,17 @@ class ValidatorLoop:
 
                 slots_available = MAX_CONCURRENT_REQUESTS - len(self.active_tasks)
                 if slots_available > 0:
+                    completed_uids = {
+                        uid for uid, task in self.active_tasks.items() if task.done()
+                    }
+                    self.processed_uids.update(completed_uids)
+
+                    self.active_tasks = {
+                        uid: task
+                        for uid, task in self.active_tasks.items()
+                        if not task.done()
+                    }
+
                     available_uids = [
                         uid
                         for uid in self.queryable_uids
@@ -301,6 +312,7 @@ class ValidatorLoop:
                 del self.active_tasks[uid]
 
     async def run_periodic_tasks(self):
+        last_competition_sync = 0
         while self._should_run:
             try:
                 if self.competition and self.competition.pause_requests_event.is_set():
@@ -316,11 +328,15 @@ class ValidatorLoop:
                 self.log_health()
                 await self.log_responses()
 
-                if (
-                    not self.competition
-                    or not self.competition.pause_requests_event.is_set()
-                ):
-                    await self.sync_competition()
+                # Only sync competition every hour
+                current_time = time.time()
+                if current_time - last_competition_sync >= ONE_HOUR:
+                    if (
+                        not self.competition
+                        or not self.competition.pause_requests_event.is_set()
+                    ):
+                        await self.sync_competition()
+                        last_competition_sync = current_time
 
             except KeyboardInterrupt:
                 self._handle_keyboard_interrupt()
