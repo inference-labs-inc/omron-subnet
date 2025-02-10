@@ -252,6 +252,18 @@ class ValidatorLoop:
     async def maintain_request_pool(self):
         while self._should_run:
             try:
+                if self.competition and self.competition.pause_requests_event.is_set():
+                    if self.active_tasks:
+                        bt.logging.debug(
+                            f"Waiting for {len(self.active_tasks)} active tasks to complete before evaluation..."
+                        )
+                        await asyncio.gather(*self.active_tasks.values())
+                        bt.logging.debug(
+                            "All active tasks completed, proceeding with evaluation"
+                        )
+                    await asyncio.sleep(0.1)
+                    continue
+
                 if not (self.competition and self.competition.get_current_download()):
                     slots_available = MAX_CONCURRENT_REQUESTS - len(self.active_tasks)
                     if slots_available > 0:
@@ -306,7 +318,12 @@ class ValidatorLoop:
                 self.update_queryable_uids()
                 self.log_health()
                 await self.log_responses()
-                await self.sync_competition()
+
+                if (
+                    not self.competition
+                    or not self.competition.pause_requests_event.is_set()
+                ):
+                    await self.sync_competition()
 
             except KeyboardInterrupt:
                 self._handle_keyboard_interrupt()
