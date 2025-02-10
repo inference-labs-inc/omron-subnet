@@ -114,10 +114,14 @@ class CompetitionThread(threading.Thread):
                             self.competition.sota_manager.preserve_circuit(
                                 circuit_dir, self.competition.miner_states[hotkey]
                             )
-                        else:
-                            self.competition.cleanup_circuit_dir(circuit_dir)
+                    except Exception as e:
+                        bt.logging.error(f"Error during circuit evaluation: {str(e)}")
+                        bt.logging.error(f"Stack trace: {traceback.format_exc()}")
+
+                        raise
                     finally:
                         self.pause_requests_event.clear()
+                        self.competition.cleanup_circuit_dir(circuit_dir)
                         bt.logging.info("Resuming main request loop...")
                 else:
                     bt.logging.error(
