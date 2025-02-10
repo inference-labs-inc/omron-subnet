@@ -63,7 +63,12 @@ class ValidatorLoop:
         self.config.check_register()
         self.auto_update = AutoUpdate()
 
-        self.message_queue = MPQueue()
+        self.incoming_message_queue = (
+            MPQueue()
+        )  # Messages from competition to validator
+        self.outgoing_message_queue = (
+            MPQueue()
+        )  # Messages from validator to competition
         self.current_concurrency = MAX_CONCURRENT_REQUESTS
 
         try:
@@ -75,7 +80,9 @@ class ValidatorLoop:
                 self.config.wallet,
                 self.config.bt_config,
             )
-            self.competition.set_validator_message_queue(self.message_queue)
+            self.competition.set_validator_message_queues(
+                self.incoming_message_queue, self.outgoing_message_queue
+            )
             bt.logging.success("Competition module initialized successfully")
         except Exception as e:
             bt.logging.warning(
@@ -253,7 +260,10 @@ class ValidatorLoop:
         while self._should_run:
             try:
                 try:
-                    message = self.message_queue.get_nowait()
+                    message = await asyncio.get_event_loop().run_in_executor(
+                        self.thread_pool,
+                        lambda: self.incoming_message_queue.get(timeout=0.1),
+                    )
                     if message == ValidatorMessage.WINDDOWN:
                         bt.logging.info(
                             "Received winddown message, reducing concurrency to zero"
@@ -321,7 +331,7 @@ class ValidatorLoop:
                     bt.logging.info(
                         "All tasks completed during winddown, sending winddown complete message"
                     )
-                    self.message_queue.put(ValidatorMessage.WINDDOWN_COMPLETE)
+                    self.outgoing_message_queue.put(ValidatorMessage.WINDDOWN_COMPLETE)
 
     async def run_periodic_tasks(self):
         while self._should_run:
@@ -333,7 +343,7 @@ class ValidatorLoop:
                 self.update_queryable_uids()
                 self.log_health()
                 await self.log_responses()
-                if self.current_concurrency != 0:
+                if self.current_concurrency:
                     await self.sync_competition()
 
             except KeyboardInterrupt:

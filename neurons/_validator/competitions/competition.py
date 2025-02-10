@@ -40,7 +40,8 @@ class CompetitionThread(threading.Thread):
         self._should_run.set()
         self.task_queue = MPQueue()
         self.daemon = True
-        self.validator_message_queue = None
+        self.incoming_message_queue = None  # Messages from validator to competition
+        self.outgoing_message_queue = None  # Messages from competition to validator
 
         self.subtensor = bt.subtensor(config=config)
 
@@ -50,8 +51,11 @@ class CompetitionThread(threading.Thread):
         bt.logging.info(f"- Thread Daemon: {self.daemon}")
         bt.logging.info("=== Competition Thread Constructor End ===")
 
-    def set_validator_message_queue(self, message_queue: MPQueue):
-        self.validator_message_queue = message_queue
+    def set_validator_message_queues(
+        self, incoming_queue: MPQueue, outgoing_queue: MPQueue
+    ):
+        self.incoming_message_queue = incoming_queue
+        self.outgoing_message_queue = outgoing_queue
 
     def wait_for_message(
         self,
@@ -61,11 +65,11 @@ class CompetitionThread(threading.Thread):
         start_time = time.time()
         while time.time() - start_time < timeout:
             try:
-                message = self.validator_message_queue.get_nowait()
+                message = self.incoming_message_queue.get(timeout=0.1)
                 if message == expected_message:
                     return True
             except Empty:
-                time.sleep(0.1)
+                continue
         bt.logging.error(f"Timeout waiting for {expected_message} message")
         return False
 
@@ -91,8 +95,8 @@ class CompetitionThread(threading.Thread):
                         )
                     ):
                         bt.logging.info("Pausing request processing for evaluation...")
-                        if self.validator_message_queue:
-                            self.validator_message_queue.put(ValidatorMessage.WINDDOWN)
+                        if self.outgoing_message_queue:
+                            self.outgoing_message_queue.put(ValidatorMessage.WINDDOWN)
                             bt.logging.info(
                                 "Waiting for validator winddown to complete..."
                             )
@@ -115,8 +119,8 @@ class CompetitionThread(threading.Thread):
                         finally:
                             self.competition.cleanup_circuit_dir(circuit_dir)
                             bt.logging.info("Resuming request processing...")
-                            if self.validator_message_queue:
-                                self.validator_message_queue.put(
+                            if self.outgoing_message_queue:
+                                self.outgoing_message_queue.put(
                                     ValidatorMessage.COMPETITION_COMPLETE
                                 )
                     else:
@@ -773,5 +777,9 @@ class Competition:
 
             self.competition_manager.log_metrics(metrics)
 
-    def set_validator_message_queue(self, message_queue: MPQueue):
-        self.competition_thread.set_validator_message_queue(message_queue)
+    def set_validator_message_queues(
+        self, incoming_queue: MPQueue, outgoing_queue: MPQueue
+    ):
+        self.competition_thread.set_validator_message_queues(
+            incoming_queue, outgoing_queue
+        )
