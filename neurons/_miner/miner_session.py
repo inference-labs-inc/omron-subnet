@@ -381,6 +381,7 @@ class MinerSession:
 
         except Exception as e:
             bt.logging.error(f"Error handling competition request: {str(e)}")
+            traceback.print_exc()
             return Competition(
                 id=synapse.id,
                 hash=synapse.hash,
