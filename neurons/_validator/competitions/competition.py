@@ -555,37 +555,6 @@ class Competition:
 
             if download_success:
                 bt.logging.info(f"Download completed for {hash[:8]}, validating...")
-                bt.logging.info("Circuit directory contents:")
-                for root, dirs, files in os.walk(circuit_dir):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        bt.logging.info(
-                            f"- {file} ({os.path.getsize(file_path)} bytes)"
-                        )
-
-                # Verify required files exist and are readable
-                required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
-                missing_files = []
-                for file in required_files:
-                    file_path = os.path.join(circuit_dir, file)
-                    if not os.path.exists(file_path):
-                        missing_files.append(file)
-                    else:
-                        try:
-                            size = os.path.getsize(file_path)
-                            bt.logging.info(f"Found {file} ({size} bytes)")
-                            if size == 0:
-                                missing_files.append(f"{file} (empty)")
-                        except Exception as e:
-                            bt.logging.error(f"Error checking {file}: {e}")
-                            missing_files.append(f"{file} (error)")
-
-                if missing_files:
-                    bt.logging.error(
-                        f"Missing or invalid files: {', '.join(missing_files)}"
-                    )
-                    self.cleanup_circuit_dir(circuit_dir)
-                    return False
 
                 if self.circuit_validator.validate_files(circuit_dir):
                     self.miner_states[hotkey] = NeuronState(
