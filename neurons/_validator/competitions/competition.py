@@ -7,7 +7,7 @@ import asyncio
 import json
 import traceback
 import threading
-import queue
+from multiprocessing import Queue as MPQueue
 import time
 from async_substrate_interface.types import ScaleObj
 from substrateinterface.utils.ss58 import ss58_encode
@@ -37,7 +37,7 @@ class CompetitionThread(threading.Thread):
         self.competition = competition
         self._should_run = threading.Event()
         self._should_run.set()
-        self.task_queue = queue.Queue()
+        self.task_queue = MPQueue()
         self.daemon = True
         self.validator_message_queue = None
 
@@ -49,7 +49,7 @@ class CompetitionThread(threading.Thread):
         bt.logging.info(f"- Thread Daemon: {self.daemon}")
         bt.logging.info("=== Competition Thread Constructor End ===")
 
-    def set_validator_message_queue(self, message_queue: queue.Queue):
+    def set_validator_message_queue(self, message_queue: MPQueue):
         self.validator_message_queue = message_queue
 
     def wait_for_message(
@@ -63,7 +63,7 @@ class CompetitionThread(threading.Thread):
                 message = self.validator_message_queue.get_nowait()
                 if message == expected_message:
                     return True
-            except queue.Empty:
+            except MPQueue.Empty:
                 time.sleep(0.1)
         bt.logging.error(f"Timeout waiting for {expected_message} message")
         return False
@@ -772,5 +772,5 @@ class Competition:
 
             self.competition_manager.log_metrics(metrics)
 
-    def set_validator_message_queue(self, message_queue: queue.Queue):
+    def set_validator_message_queue(self, message_queue: MPQueue):
         self.competition_thread.set_validator_message_queue(message_queue)

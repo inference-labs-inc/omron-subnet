@@ -6,7 +6,7 @@ import traceback
 import time
 from typing import NoReturn
 import concurrent.futures
-import queue
+from multiprocessing import Queue as MPQueue
 
 import bittensor as bt
 
@@ -62,7 +62,7 @@ class ValidatorLoop:
         self.config.check_register()
         self.auto_update = AutoUpdate()
 
-        self.message_queue = queue.Queue()
+        self.message_queue = MPQueue()
         self.current_concurrency = MAX_CONCURRENT_REQUESTS
 
         try:
@@ -264,7 +264,7 @@ class ValidatorLoop:
                             "Received competition complete message, restoring concurrency"
                         )
                         self.current_concurrency = MAX_CONCURRENT_REQUESTS
-                except queue.Empty:
+                except MPQueue.Empty:
                     pass
 
                 slots_available = self.current_concurrency - len(self.active_tasks)
