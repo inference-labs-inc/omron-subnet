@@ -1,12 +1,13 @@
-from pydantic import BaseModel
+from dataclasses import dataclass
 
 
-class NeuronState(BaseModel):
+@dataclass
+class NeuronState:
     hotkey: str
     uid: int
-    score: float
-    proof_size: int
+    sota_relative_score: float
+    proof_size: float
     response_time: float
     verification_result: bool
-    accuracy: float
+    raw_accuracy: float
     hash: str

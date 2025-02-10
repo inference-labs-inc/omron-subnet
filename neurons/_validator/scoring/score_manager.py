@@ -215,7 +215,9 @@ class ScoreManager:
 
         competition_score = None
         if self.competition and hotkey in self.competition.miner_states:
-            competition_score = self.competition.miner_states[hotkey].score
+            competition_score = self.competition.miner_states[
+                hotkey
+            ].sota_relative_score
 
         evaluation_data = CircuitEvaluationItem(
             circuit_id=circuit.id,

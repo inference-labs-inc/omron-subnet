@@ -1,0 +1,91 @@
+{
+    "run_args": {
+        "tolerance": {
+            "val": 0.0,
+            "scale": 1.0
+        },
+        "input_scale": 17,
+        "param_scale": 17,
+        "scale_rebase_multiplier": 1,
+        "lookup_range": [
+            -137280,
+            337848
+        ],
+        "logrows": 19,
+        "num_inner_cols": 2,
+        "variables": [
+            [
+                "batch_size",
+                1
+            ]
+        ],
+        "input_visibility": "Private",
+        "output_visibility": "Public",
+        "param_visibility": "Private",
+        "rebase_frac_zero_constants": false,
+        "check_mode": "UNSAFE",
+        "commitment": "KZG",
+        "decomp_base": 16384,
+        "decomp_legs": 3,
+        "bounded_log_lookup": false,
+        "ignore_range_check_inputs_outputs": false
+    },
+    "num_rows": 303031,
+    "total_assignments": 606063,
+    "total_const_size": 5,
+    "total_dynamic_col_size": 0,
+    "max_dynamic_input_len": 0,
+    "num_dynamic_lookups": 0,
+    "num_shuffles": 0,
+    "total_shuffle_col_size": 0,
+    "model_instance_shapes": [
+        [
+            1,
+            1
+        ]
+    ],
+    "model_output_scales": [
+        17
+    ],
+    "model_input_scales": [
+        17
+    ],
+    "model_input_types": [
+        "F32"
+    ],
+    "module_sizes": {
+        "polycommit": [],
+        "poseidon": [
+            0,
+            [
+                0
+            ]
+        ]
+    },
+    "required_lookups": [
+        {
+            "Sigmoid": {
+                "scale": 131072.0
+            }
+        },
+        {
+            "Tanh": {
+                "scale": 131072.0
+            }
+        }
+    ],
+    "required_range_checks": [
+        [
+            0,
+            16383
+        ],
+        [
+            -1,
+            1
+        ]
+    ],
+    "check_mode": "UNSAFE",
+    "version": "19.0.7",
+    "num_blinding_factors": null,
+    "timestamp": 1738863387485
+}

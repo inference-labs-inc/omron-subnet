@@ -1,12 +1,13 @@
 from __future__ import annotations
 import time
-from typing import Optional
+from typing import Optional, Dict, Any
 import bittensor as bt
 from pydantic import BaseModel
 from datetime import datetime
 import json
 import os
 import enum
+import cli_parser
 from utils.gc_logging import gc_log_competition_metrics
 
 
@@ -36,6 +37,16 @@ class CompetitionMetrics(BaseModel):
     timestamp: int
 
 
+class DataSourceConfig(BaseModel):
+    type: str = "random"
+    url: Optional[str] = None
+    format: str = "npz"  # npz, zip, tar
+    input_key: str = "inputs"  # For npz, or subdir name for zip/tar
+    input_pattern: Optional[str] = None  # For matching files in zip/tar
+    input_transform: Optional[str] = None  # resize, normalize, etc
+    transform_params: Dict[str, Any] = {}
+
+
 class CompetitionConfig(BaseModel):
     """Configuration for a competition"""
 
@@ -47,6 +58,8 @@ class CompetitionConfig(BaseModel):
     baseline_model_path: str
     max_accuracy_weight: float = 1.0
     min_accuracy_weight: float = 0.0
+    data_source: Optional[DataSourceConfig] = None
+    circuit_settings: Dict[str, Any] = {}
 
 
 class CompetitionState(BaseModel):
@@ -69,6 +82,7 @@ class CompetitionManager:
         self.config_file = os.path.join(config_dir, "competition_config.json")
         self.current_competition: Optional[CompetitionConfig] = None
         self.state = CompetitionState()
+        self.wallet = bt.wallet(config=cli_parser.config)
 
         self._load_state()
         self._load_config()
@@ -188,7 +202,7 @@ class CompetitionManager:
                 **metrics,
             }
 
-            gc_log_competition_metrics(comp_metrics)
+            gc_log_competition_metrics(comp_metrics, self.wallet.hotkey)
         except Exception as e:
             bt.logging.error(f"Error logging metrics: {e}")
 

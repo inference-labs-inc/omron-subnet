@@ -1,19 +1,44 @@
 import os
 import shutil
 import json
-import requests
-import asyncio
+import aiohttp
 import bittensor as bt
-from protocol import Competition
-import hashlib
 from urllib.parse import urlparse
+import asyncio
+from contextlib import asynccontextmanager
+import traceback
+from protocol import Competition
 
 
 class CircuitManager:
-    def __init__(self, temp_dir: str, competition_id: int):
+    def __init__(self, temp_dir: str, competition_id: int, dendrite: bt.dendrite):
         self.temp_dir = temp_dir
         self.competition_id = competition_id
+        self.dendrite = dendrite
         os.makedirs(temp_dir, exist_ok=True)
+        self._session = None
+        self._session_lock = asyncio.Lock()
+
+    @asynccontextmanager
+    async def _get_session(self):
+        async with self._session_lock:
+            if self._session is None or self._session.closed:
+                self._session = aiohttp.ClientSession(
+                    connector=aiohttp.TCPConnector(force_close=True)
+                )
+            try:
+                yield self._session
+            except Exception as e:
+                if self._session and not self._session.closed:
+                    await self._session.close()
+                self._session = None
+                raise e
+
+    async def close(self):
+        async with self._session_lock:
+            if self._session and not self._session.closed:
+                await self._session.close()
+            self._session = None
 
     def cleanup_temp_files(self, circuit_dir: str):
         try:
@@ -44,68 +69,105 @@ class CircuitManager:
         except Exception:
             return False
 
-    def download_files(self, axon: bt.axon, hash: str, circuit_dir: str) -> bool:
+    async def download_files(self, axon: bt.axon, hash: str, circuit_dir: str) -> bool:
+        """Download circuit files from a miner."""
         try:
-            dendrite = bt.dendrite()
-            required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
+            bt.logging.debug(f"Requesting circuit files for hash {hash[:8]}...")
+            bt.logging.debug(f"Circuit directory: {circuit_dir}")
+
+            if not self.dendrite:
+                bt.logging.error("Dendrite not initialized")
+                return False
 
             synapse = Competition(
-                id=self.competition_id, hash=hash, file_name="commitment"
+                id=self.competition_id,
+                hash=hash,
+                file_name="commitment",
             )
-            response = asyncio.run(dendrite.call(target_axon=axon, synapse=synapse))
-            response = Competition.model_validate(response)
 
-            if not isinstance(response, Competition):
-                bt.logging.error("Invalid response type from miner")
+            bt.logging.debug(f"Sending request to axon: {axon.ip}:{axon.port}")
+            response = await self.dendrite.forward(
+                axons=[axon],
+                synapse=synapse,
+                timeout=60,
+                deserialize=True,
+            )
+
+            if not response or not response[0]:
+                bt.logging.error("No response from axon")
                 return False
 
-            if response.error:
-                bt.logging.error(f"Error from miner: {response.error}")
+            response_data = response[0]
+            if isinstance(response_data, dict):
+                response_synapse = Competition(**response_data)
+            else:
+                response_synapse = response_data
+
+            if not response_synapse.commitment:
+                bt.logging.warning("No commitment data in response")
                 return False
 
-            if not response.commitment:
-                bt.logging.error("No commitment data received from miner")
+            try:
+                commitment = json.loads(response_synapse.commitment)
+                bt.logging.debug(f"Received commitment data: {commitment}")
+            except json.JSONDecodeError:
+                bt.logging.error("Invalid commitment data")
                 return False
 
-            commitment = json.loads(response.commitment)
             if "signed_urls" not in commitment:
                 bt.logging.error("No signed URLs in commitment data")
                 return False
 
             signed_urls = commitment["signed_urls"]
+            required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
+            all_files_downloaded = True
 
-            for file_name in required_files:
-                if file_name not in signed_urls:
-                    bt.logging.error(f"Missing signed URL for {file_name}")
-                    return False
+            async with self._get_session() as session:
+                for file_name in required_files:
+                    if file_name not in signed_urls:
+                        bt.logging.error(f"Missing signed URL for {file_name}")
+                        all_files_downloaded = False
+                        break
 
-                url = signed_urls[file_name]
-                if not self._validate_url(url):
-                    bt.logging.error(f"Invalid URL for {file_name}: {url}")
-                    return False
+                    url = signed_urls[file_name]
+                    if not self._validate_url(url):
+                        bt.logging.error(f"Invalid URL for {file_name}: {url}")
+                        all_files_downloaded = False
+                        break
 
-                local_path = os.path.join(circuit_dir, file_name)
-                try:
-                    response = requests.get(url)
-                    response.raise_for_status()
-                    with open(local_path, "wb") as f:
-                        f.write(response.content)
-                    bt.logging.debug(f"Downloaded {file_name} from signed URL")
-
-                    if file_name == "vk.key":
-                        with open(local_path, "rb") as f:
-                            file_hash = hashlib.sha256(f.read()).hexdigest()
-                        if file_hash != hash:
-                            bt.logging.error(
-                                f"Hash mismatch for vk.key: expected {hash}, got {file_hash}"
+                    file_path = os.path.join(circuit_dir, file_name)
+                    try:
+                        bt.logging.debug(f"Downloading {file_name} from {url}")
+                        async with session.get(url, timeout=60) as response:
+                            response.raise_for_status()
+                            content = await response.read()
+                            bt.logging.debug(
+                                f"Downloaded {len(content)} bytes for {file_name}"
                             )
-                            return False
+                            with open(file_path, "wb") as f:
+                                f.write(content)
+                            bt.logging.debug(f"Saved {file_name} to {file_path}")
+                    except Exception as e:
+                        bt.logging.error(f"Failed to download {file_name}: {e}")
+                        bt.logging.error(f"Stack trace: {traceback.format_exc()}")
+                        all_files_downloaded = False
+                        break
 
-                except Exception as e:
-                    bt.logging.error(f"Failed to download {file_name}: {e}")
-                    return False
+            if all_files_downloaded:
+                bt.logging.success(f"Successfully downloaded all files for {hash[:8]}")
+                bt.logging.debug("Final circuit directory contents:")
+                for root, dirs, files in os.walk(circuit_dir):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        bt.logging.debug(
+                            f"- {file} ({os.path.getsize(file_path)} bytes)"
+                        )
+                return True
+            else:
+                bt.logging.error(f"Failed to download all files for {hash[:8]}")
+                return False
 
-            return True
         except Exception as e:
             bt.logging.error(f"Error downloading circuit files: {e}")
+            bt.logging.error(f"Stack trace: {traceback.format_exc()}")
             return False
