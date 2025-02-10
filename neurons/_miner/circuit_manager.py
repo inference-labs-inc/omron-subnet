@@ -283,7 +283,7 @@ class CircuitManager:
 
             except Exception as e:
                 bt.logging.error(f"Error in circuit monitor: {str(e)}")
-                bt.logging.debug(traceback.format_exc())
+                bt.logging.error(traceback.format_exc())
             time.sleep(self.check_interval)
 
     def get_current_commitment(self) -> Optional[CircuitCommitment]:
