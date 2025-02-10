@@ -1,8 +1,7 @@
 import os
 import shutil
-from typing import Dict, Tuple, Union, List, Optional
+from typing import Dict, Tuple, List, Optional
 import bittensor as bt
-import torch
 import platform
 import asyncio
 import json
@@ -188,8 +187,9 @@ class Competition:
             self.temp_directory, self.competition_id, self.dendrite
         )
         self.circuit_validator = CircuitValidator()
+
         self.circuit_evaluator = CircuitEvaluator(
-            self.baseline_model, self.competition_directory, self.sota_manager
+            self.config, self.competition_directory, self.sota_manager
         )
 
         self.miner_states: Dict[str, NeuronState] = {}
@@ -216,24 +216,6 @@ class Competition:
             }
         )
         bt.logging.info("=== Competition Module Initialization Complete ===")
-
-    def _load_model(self) -> Union[torch.nn.Module, str, None]:
-        if not self.competition_manager.current_competition:
-            bt.logging.info("No competition currently configured")
-            return None
-
-        model_path = self.competition_manager.current_competition.baseline_model_path
-        model_path = os.path.join(
-            self.competition_directory, os.path.basename(model_path)
-        )
-        bt.logging.info(f"Loading model from: {model_path}")
-
-        if model_path.endswith(".pt"):
-            return torch.load(model_path)
-        elif model_path.endswith(".onnx"):
-            return model_path
-        else:
-            raise ValueError(f"Unsupported model format: {model_path}")
 
     def fetch_commitments(self) -> List[Tuple[int, str, str]]:
         if platform.system() != "Darwin" and platform.machine() != "arm64":

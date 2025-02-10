@@ -6,7 +6,7 @@ import subprocess
 import torch
 import numpy as np
 import bittensor as bt
-from typing import Tuple, Union, List, Optional
+from typing import Tuple, List, Optional
 from constants import LOCAL_EZKL_PATH, TEMP_FOLDER
 from _validator.competitions.services.sota_manager import SotaManager
 from _validator.competitions.services.data_source import (
@@ -29,14 +29,15 @@ os.environ["ONNXRUNTIME_LOGGING_LEVEL"] = "3"
 class CircuitEvaluator:
     def __init__(
         self,
-        baseline_model: Union[torch.nn.Module, str],
+        config: dict,
         competition_directory: str,
         sota_manager: SotaManager,
     ):
-        self.baseline_model = baseline_model
+
+        self.baseline_model = config["baseline_model_path"]
         self.competition_directory = competition_directory
         self.sota_manager = sota_manager
-        self.is_onnx = not isinstance(baseline_model, torch.nn.Module)
+        self.is_onnx = not isinstance(self.baseline_model, torch.nn.Module)
 
         self.onnx_venv = os.path.abspath(
             os.path.join(competition_directory, "onnx_venv")
