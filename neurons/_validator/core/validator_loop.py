@@ -211,7 +211,7 @@ class ValidatorLoop:
             self.last_response_time = time.time()
             self.recent_responses = []
 
-    @with_rate_limit(period=ONE_MINUTE)
+    @with_rate_limit(period=ONE_HOUR)
     async def sync_competition(self):
         if not self.competition:
             bt.logging.debug("Competition module not initialized, skipping sync")
