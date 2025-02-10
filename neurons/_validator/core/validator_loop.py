@@ -262,17 +262,7 @@ class ValidatorLoop:
 
                 slots_available = MAX_CONCURRENT_REQUESTS - len(self.active_tasks)
                 if slots_available > 0:
-                    completed_uids = {
-                        uid for uid, task in self.active_tasks.items() if task.done()
-                    }
-                    self.processed_uids.update(completed_uids)
-
-                    self.active_tasks = {
-                        uid: task
-                        for uid, task in self.active_tasks.items()
-                        if not task.done()
-                    }
-
+                    self.update_processed_uids()
                     available_uids = [
                         uid
                         for uid in self.queryable_uids
