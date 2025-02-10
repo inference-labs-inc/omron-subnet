@@ -463,6 +463,15 @@ class CircuitEvaluator:
                 python_path = os.path.join(self.onnx_venv, "bin", "python")
                 model_path = os.path.abspath(self.baseline_model)
 
+                bt.logging.debug(f"ONNX model path: {model_path}")
+                bt.logging.debug(f"Input shape: {test_inputs.shape}")
+                bt.logging.debug(f"Input file: {input_file.name}")
+                bt.logging.debug(f"Output file: {output_file.name}")
+
+                if not os.path.exists(model_path):
+                    bt.logging.error(f"ONNX model not found at {model_path}")
+                    return None
+
                 version_result = subprocess.run(
                     [
                         python_path,
@@ -482,7 +491,14 @@ class CircuitEvaluator:
                     "onnx_runner.py",
                 )
 
+                if not os.path.exists(runner_path):
+                    bt.logging.error(f"ONNX runner not found at {runner_path}")
+                    return None
+
                 shutil.copy2(self.onnx_runner, runner_path)
+
+                bt.logging.debug(f"Running ONNX inference with Python {python_version}")
+                bt.logging.debug(f"Runner path: {runner_path}")
 
                 process = subprocess.Popen(
                     [
@@ -505,6 +521,8 @@ class CircuitEvaluator:
                     bt.logging.error(
                         f"ONNX runner failed with code {process.returncode}"
                     )
+                    bt.logging.error(f"STDOUT: {stdout}")
+                    bt.logging.error(f"STDERR: {stderr}")
                     return None
 
                 output = np.load(output_file.name)
@@ -512,6 +530,7 @@ class CircuitEvaluator:
                 return output_list
         except Exception as e:
             bt.logging.error(f"Error running baseline model: {e}")
+            bt.logging.error(f"Stack trace: {traceback.format_exc()}")
             return None
 
     def _generate_proof(
