@@ -117,8 +117,6 @@ class CompetitionThread(threading.Thread):
                     except Exception as e:
                         bt.logging.error(f"Error during circuit evaluation: {str(e)}")
                         bt.logging.error(f"Stack trace: {traceback.format_exc()}")
-
-                        raise
                     finally:
                         self.pause_requests_event.clear()
                         self.competition.cleanup_circuit_dir(circuit_dir)
