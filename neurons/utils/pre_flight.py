@@ -178,24 +178,27 @@ def sync_model_files(role: Optional[Roles] = None):
     SYNC_LOG_PREFIX = "  SYNC  | "
 
     loop = asyncio.get_event_loop()
-    for logrows in range(1, 26):
-        if os.path.exists(
-            os.path.join(os.path.expanduser("~"), ".ezkl", "srs", f"kzg{logrows}.srs")
-        ):
-            bt.logging.info(
-                f"{SYNC_LOG_PREFIX}SRS for logrows={logrows} already exists, skipping..."
-            )
-            continue
+    if role == Roles.VALIDATOR:
+        for logrows in range(1, 26):
+            if os.path.exists(
+                os.path.join(
+                    os.path.expanduser("~"), ".ezkl", "srs", f"kzg{logrows}.srs"
+                )
+            ):
+                bt.logging.info(
+                    f"{SYNC_LOG_PREFIX}SRS for logrows={logrows} already exists, skipping..."
+                )
+                continue
 
-        try:
-            loop.run_until_complete(download_srs(logrows))
-            bt.logging.info(
-                f"{SYNC_LOG_PREFIX}Successfully downloaded SRS for logrows={logrows}"
-            )
-        except Exception as e:
-            bt.logging.error(
-                f"{SYNC_LOG_PREFIX}Failed to download SRS for logrows={logrows}: {e}"
-            )
+            try:
+                loop.run_until_complete(download_srs(logrows))
+                bt.logging.info(
+                    f"{SYNC_LOG_PREFIX}Successfully downloaded SRS for logrows={logrows}"
+                )
+            except Exception as e:
+                bt.logging.error(
+                    f"{SYNC_LOG_PREFIX}Failed to download SRS for logrows={logrows}: {e}"
+                )
 
     for model_hash in os.listdir(MODEL_DIR):
         if not model_hash.startswith("model_"):
