@@ -335,7 +335,11 @@ class ValidatorLoop:
                 self.update_queryable_uids()
                 self.log_health()
                 await self.log_responses()
-                await self.sync_competition()
+                if not self.message_queue.get_nowait() in [
+                    ValidatorMessage.WINDDOWN,
+                    ValidatorMessage.WINDDOWN_COMPLETE,
+                ]:
+                    await self.sync_competition()
 
             except KeyboardInterrupt:
                 self._handle_keyboard_interrupt()
