@@ -264,28 +264,25 @@ class ValidatorLoop:
                     await asyncio.sleep(0.1)
                     continue
 
-                if not (self.competition and self.competition.get_current_download()):
-                    slots_available = MAX_CONCURRENT_REQUESTS - len(self.active_tasks)
-                    if slots_available > 0:
-                        available_uids = [
-                            uid
-                            for uid in self.queryable_uids
-                            if uid not in self.processed_uids
-                            and uid not in self.active_tasks
-                        ]
+                slots_available = MAX_CONCURRENT_REQUESTS - len(self.active_tasks)
+                if slots_available > 0:
+                    available_uids = [
+                        uid
+                        for uid in self.queryable_uids
+                        if uid not in self.processed_uids
+                        and uid not in self.active_tasks
+                    ]
 
-                        for uid in available_uids[:slots_available]:
-                            request = self.request_pipeline.prepare_single_request(uid)
-                            if request:
-                                task = asyncio.create_task(
-                                    self._process_single_request(request)
-                                )
-                                self.active_tasks[uid] = task
-                                task.add_done_callback(
-                                    lambda t, uid=uid: self._handle_completed_task(
-                                        t, uid
-                                    )
-                                )
+                    for uid in available_uids[:slots_available]:
+                        request = self.request_pipeline.prepare_single_request(uid)
+                        if request:
+                            task = asyncio.create_task(
+                                self._process_single_request(request)
+                            )
+                            self.active_tasks[uid] = task
+                            task.add_done_callback(
+                                lambda t, uid=uid: self._handle_completed_task(t, uid)
+                            )
 
                 await asyncio.sleep(0.1)
             except Exception as e:

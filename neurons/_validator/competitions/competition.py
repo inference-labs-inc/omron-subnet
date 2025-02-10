@@ -118,9 +118,9 @@ class CompetitionThread(threading.Thread):
                         bt.logging.error(f"Error during circuit evaluation: {str(e)}")
                         bt.logging.error(f"Stack trace: {traceback.format_exc()}")
                     finally:
-                        self.pause_requests_event.clear()
                         self.competition.cleanup_circuit_dir(circuit_dir)
                         bt.logging.info("Resuming main request loop...")
+                        self.pause_requests_event.clear()
                 else:
                     bt.logging.error(
                         f"Circuit download or evaluation failed for {hash[:8]} from {hotkey[:8]}"
