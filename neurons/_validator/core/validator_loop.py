@@ -63,12 +63,8 @@ class ValidatorLoop:
         self.config.check_register()
         self.auto_update = AutoUpdate()
 
-        self.incoming_message_queue = (
-            MPQueue()
-        )  # Messages from competition to validator
-        self.outgoing_message_queue = (
-            MPQueue()
-        )  # Messages from validator to competition
+        self.validator_to_competition_queue = MPQueue()  # Messages TO competition
+        self.competition_to_validator_queue = MPQueue()  # Messages FROM competition
         self.current_concurrency = MAX_CONCURRENT_REQUESTS
 
         try:
@@ -81,7 +77,7 @@ class ValidatorLoop:
                 self.config.bt_config,
             )
             self.competition.set_validator_message_queues(
-                self.incoming_message_queue, self.outgoing_message_queue
+                self.validator_to_competition_queue, self.competition_to_validator_queue
             )
             bt.logging.success("Competition module initialized successfully")
         except Exception as e:
@@ -262,7 +258,7 @@ class ValidatorLoop:
                 try:
                     message = await asyncio.get_event_loop().run_in_executor(
                         self.thread_pool,
-                        lambda: self.incoming_message_queue.get(timeout=0.1),
+                        lambda: self.competition_to_validator_queue.get(timeout=0.1),
                     )
                     if message == ValidatorMessage.WINDDOWN:
                         bt.logging.info(
@@ -331,7 +327,9 @@ class ValidatorLoop:
                     bt.logging.info(
                         "All tasks completed during winddown, sending winddown complete message"
                     )
-                    self.outgoing_message_queue.put(ValidatorMessage.WINDDOWN_COMPLETE)
+                    self.validator_to_competition_queue.put(
+                        ValidatorMessage.WINDDOWN_COMPLETE
+                    )
 
     async def run_periodic_tasks(self):
         while self._should_run:
