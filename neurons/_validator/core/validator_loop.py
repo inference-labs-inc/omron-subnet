@@ -204,7 +204,7 @@ class ValidatorLoop:
             self.last_response_time = time.time()
             self.recent_responses = []
 
-    @with_rate_limit(period=FIVE_MINUTES)
+    @with_rate_limit(period=1)
     async def sync_competition(self):
         if not self.competition:
             bt.logging.debug("Competition module not initialized, skipping sync")
@@ -307,7 +307,6 @@ class ValidatorLoop:
                 del self.active_tasks[uid]
 
     async def run_periodic_tasks(self):
-        last_competition_sync = 0
         while self._should_run:
             try:
                 if self.competition and self.competition.pause_requests_event.is_set():
@@ -323,14 +322,11 @@ class ValidatorLoop:
                 self.log_health()
                 await self.log_responses()
 
-                current_time = time.time()
-                if current_time - last_competition_sync >= ONE_MINUTE:
-                    if (
-                        not self.competition
-                        or not self.competition.pause_requests_event.is_set()
-                    ):
-                        await self.sync_competition()
-                        last_competition_sync = current_time
+                if (
+                    not self.competition
+                    or not self.competition.pause_requests_event.is_set()
+                ):
+                    await self.sync_competition()
 
             except KeyboardInterrupt:
                 self._handle_keyboard_interrupt()
@@ -362,12 +358,13 @@ class ValidatorLoop:
 
     async def _process_single_request(self, request: Request) -> Request:
         try:
-            response = await asyncio.get_event_loop().run_in_executor(
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
                 self.thread_pool,
                 lambda: query_single_axon(self.config.dendrite, request),
             )
             response = await response
-            processed_response = await asyncio.get_event_loop().run_in_executor(
+            processed_response = await loop.run_in_executor(
                 self.response_thread_pool,
                 self.response_processor.process_single_response,
                 response,
