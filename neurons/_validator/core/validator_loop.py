@@ -175,7 +175,8 @@ class ValidatorLoop:
         log_queue_metrics(queue_size, est_latency)
 
     def update_processed_uids(self):
-        if len(self.processed_uids) >= len(self.queryable_uids):
+        total_processed = len(self.processed_uids) + len(self.active_tasks)
+        if total_processed >= len(self.queryable_uids):
             self.processed_uids.clear()
 
     @with_rate_limit(period=ONE_MINUTE)
@@ -274,6 +275,7 @@ class ValidatorLoop:
                     pass
 
                 slots_available = self.current_concurrency - len(self.active_tasks)
+
                 if slots_available > 0:
                     self.update_processed_uids()
                     available_uids = [
