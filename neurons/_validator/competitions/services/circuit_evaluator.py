@@ -168,9 +168,7 @@ class CircuitEvaluator:
 
         return torch.exp(-total_diff).item()
 
-    def evaluate(
-        self, circuit_dir: str, accuracy_weight: float
-    ) -> Tuple[float, float, float, bool]:
+    def evaluate(self, circuit_dir: str) -> Tuple[float, float, float, bool]:
         raw_accuracy_scores, proof_sizes, response_times, verification_results = (
             [],
             [],

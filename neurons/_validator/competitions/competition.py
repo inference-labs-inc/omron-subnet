@@ -20,7 +20,7 @@ from .services.circuit_evaluator import CircuitEvaluator
 from .services.sota_manager import SotaManager
 
 from .utils.cleanup import register_cleanup_handlers
-from constants import TEMP_FOLDER
+from constants import TEMP_FOLDER, VALIDATOR_REQUEST_TIMEOUT_SECONDS
 from _validator.utils.uid import get_queryable_uids
 from utils.wandb_logger import safe_log
 from _validator.models.request_type import ValidatorMessage
@@ -53,7 +53,9 @@ class CompetitionThread(threading.Thread):
         self.validator_message_queue = message_queue
 
     def wait_for_message(
-        self, expected_message: ValidatorMessage, timeout: float = 60.0
+        self,
+        expected_message: ValidatorMessage,
+        timeout: float = VALIDATOR_REQUEST_TIMEOUT_SECONDS,
     ) -> bool:
         start_time = time.time()
         while time.time() - start_time < timeout:
@@ -103,9 +105,7 @@ class CompetitionThread(threading.Thread):
 
                         bt.logging.info("Starting circuit evaluation...")
                         try:
-                            self.competition.circuit_evaluator.evaluate_circuit(
-                                circuit_dir, hash, hotkey
-                            )
+                            self.competition.circuit_evaluator.evaluate(circuit_dir)
                         except Exception as e:
                             bt.logging.error(
                                 f"Error during circuit evaluation: {str(e)}"
