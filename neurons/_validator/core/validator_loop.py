@@ -109,7 +109,6 @@ class ValidatorLoop:
         self.last_competition_sync = 0
         self.is_syncing_competition = False
         self.competition_commitments = []
-
         self.request_queue = asyncio.Queue()
         self.active_tasks: dict[int, asyncio.Task] = {}
         self.processed_uids: set[int] = set()
@@ -327,7 +326,6 @@ class ValidatorLoop:
     async def run_periodic_tasks(self):
         while self._should_run:
             try:
-
                 self.update_weights()
                 self.sync_scores_uids()
                 self.sync_metagraph()
@@ -335,10 +333,7 @@ class ValidatorLoop:
                 self.update_queryable_uids()
                 self.log_health()
                 await self.log_responses()
-                if not self.message_queue.get_nowait() in [
-                    ValidatorMessage.WINDDOWN,
-                    ValidatorMessage.WINDDOWN_COMPLETE,
-                ]:
+                if self.current_concurrency != 0:
                     await self.sync_competition()
 
             except KeyboardInterrupt:
