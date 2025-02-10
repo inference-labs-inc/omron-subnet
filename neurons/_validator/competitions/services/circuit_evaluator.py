@@ -477,38 +477,12 @@ class CircuitEvaluator:
                     bt.logging.error(f"ONNX model not found at {model_path}")
                     return None
 
-                version_result = subprocess.run(
-                    [
-                        python_path,
-                        "-c",
-                        "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')",
-                    ],
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
-                python_version = version_result.stdout.strip()
-                runner_path = os.path.join(
-                    self.onnx_venv,
-                    "lib",
-                    f"python{python_version}",
-                    "site-packages",
-                    "onnx_runner.py",
-                )
-
-                if not os.path.exists(runner_path):
-                    bt.logging.error(f"ONNX runner not found at {runner_path}")
-                    return None
-
-                shutil.copy2(self.onnx_runner, runner_path)
-
-                bt.logging.debug(f"Running ONNX inference with Python {python_version}")
-                bt.logging.debug(f"Runner path: {runner_path}")
+                bt.logging.debug(f"Runner path: {self.onnx_runner}")
 
                 process = subprocess.Popen(
                     [
                         python_path,
-                        runner_path,
+                        self.onnx_runner,
                         model_path,
                         input_file.name,
                         output_file.name,
