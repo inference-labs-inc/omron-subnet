@@ -449,11 +449,11 @@ class Competition:
                         self.miner_states[hotkey] = NeuronState(
                             hotkey=hotkey,
                             uid=uid,
-                            score=0.0,
+                            sota_relative_score=0.0,
                             proof_size=0,
                             response_time=0.0,
                             verification_result=False,
-                            accuracy=0.0,
+                            raw_accuracy=0.0,
                             hash=hash,
                         )
                         safe_log(
@@ -589,11 +589,11 @@ class Competition:
                     self.miner_states[hotkey] = NeuronState(
                         hotkey=hotkey,
                         uid=uid,
-                        score=0.0,
+                        sota_relative_score=0.0,
                         proof_size=0,
                         response_time=0.0,
                         verification_result=False,
-                        accuracy=0.0,
+                        raw_accuracy=0.0,
                         hash=hash,
                     )
                     bt.logging.success(
