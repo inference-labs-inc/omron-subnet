@@ -260,62 +260,25 @@ class ValidatorLoop:
                     await asyncio.sleep(0.1)
                     continue
 
-                current_time = time.time()
-                for uid, task in list(self.active_tasks.items()):
-                    if not hasattr(task, "start_time"):
-                        task.start_time = current_time
-                    elif current_time - task.start_time > 120:  # 2 minute timeout
-                        bt.logging.warning(
-                            f"Task for UID {uid} timed out, forcing completion"
-                        )
-                        if not task.done():
-                            task.set_result(None)
-                        self.processed_uids.add(uid)
-                        del self.active_tasks[uid]
-
                 slots_available = MAX_CONCURRENT_REQUESTS - len(self.active_tasks)
-                bt.logging.debug(
-                    f"Current active tasks: {len(self.active_tasks)}, Slots available: {slots_available}"
-                )
-                bt.logging.debug(f"Active task UIDs: {list(self.active_tasks.keys())}")
-                bt.logging.debug(
-                    f"Task states: {[(uid, task._state) for uid, task in self.active_tasks.items()]}"
-                )
-
                 if slots_available > 0:
                     self.update_processed_uids()
-                    bt.logging.debug(
-                        f"Processed UIDs count: {len(self.processed_uids)}"
-                    )
-                    bt.logging.debug(
-                        f"Queryable UIDs count: {len(self.queryable_uids)}"
-                    )
-
                     available_uids = [
                         uid
                         for uid in self.queryable_uids
                         if uid not in self.processed_uids
                         and uid not in self.active_tasks
                     ]
-                    bt.logging.debug(
-                        f"Available UIDs for new tasks: {available_uids[:10]}..."
-                    )
 
                     for uid in available_uids[:slots_available]:
-                        bt.logging.debug(f"Preparing request for UID {uid}")
                         request = self.request_pipeline.prepare_single_request(uid)
                         if request:
-                            bt.logging.debug(f"Creating task for UID {uid}")
                             task = asyncio.create_task(
                                 self._process_single_request(request)
                             )
-                            task.start_time = time.time()  # Add start time tracking
                             self.active_tasks[uid] = task
                             task.add_done_callback(
                                 lambda t, uid=uid: self._handle_completed_task(t, uid)
-                            )
-                            bt.logging.debug(
-                                f"Task created and callback set for UID {uid}"
                             )
 
                 await asyncio.sleep(0.1)
@@ -326,12 +289,7 @@ class ValidatorLoop:
 
     def _handle_completed_task(self, task: asyncio.Task, uid: int):
         try:
-            bt.logging.debug(f"Handling completed task for UID {uid}")
-            bt.logging.debug(f"Task state: {task._state}")
-
-            if task.cancelled():
-                bt.logging.warning(f"Task for UID {uid} was cancelled")
-            elif task.exception():
+            if task.exception():
                 bt.logging.error(
                     f"Task for UID {uid} failed with exception: {task.exception()}"
                 )
@@ -340,25 +298,12 @@ class ValidatorLoop:
                     task.exception(),
                     task.exception().__traceback__,
                 )
-            else:
-                bt.logging.debug(f"Task for UID {uid} completed successfully")
-
-            # Always add to processed_uids regardless of success/failure
             self.processed_uids.add(uid)
-
-            # Clear processed UIDs if we've processed all queryable ones
-            if len(self.processed_uids) >= len(self.queryable_uids):
-                bt.logging.debug(
-                    "Clearing processed UIDs as all queryable UIDs have been processed"
-                )
-                self.processed_uids.clear()
-
         except Exception as e:
             bt.logging.error(f"Error in task completion handler for UID {uid}: {e}")
             traceback.print_exc()
         finally:
             if uid in self.active_tasks:
-                bt.logging.debug(f"Removing UID {uid} from active tasks")
                 del self.active_tasks[uid]
 
     async def run_periodic_tasks(self):
@@ -417,38 +362,22 @@ class ValidatorLoop:
 
     async def _process_single_request(self, request: Request) -> Request:
         try:
-            bt.logging.debug(f"Starting request processing for UID {request.uid}")
             response = await asyncio.get_event_loop().run_in_executor(
                 self.thread_pool,
                 lambda: query_single_axon(self.config.dendrite, request),
             )
-            bt.logging.debug(f"Got initial response for UID {request.uid}")
             response = await response
-            bt.logging.debug(f"Awaited response for UID {request.uid}")
             processed_response = await asyncio.get_event_loop().run_in_executor(
                 self.response_thread_pool,
                 self.response_processor.process_single_response,
                 response,
             )
-            bt.logging.debug(f"Processed response for UID {request.uid}")
             if processed_response:
                 await self._handle_response(processed_response)
-                bt.logging.debug(f"Handled response for UID {request.uid}")
-        except asyncio.CancelledError:
-            bt.logging.warning(f"Request processing cancelled for UID {request.uid}")
-            raise
         except Exception as e:
             bt.logging.error(f"Error processing request for UID {request.uid}: {e}")
             traceback.print_exc()
             log_error("request_processing", "axon_query", str(e))
-            # Force task completion on error
-            if request.uid in self.active_tasks:
-                self.active_tasks[request.uid].set_result(None)
-        finally:
-            # Ensure task gets marked as done even if there's an error
-            if request.uid in self.active_tasks:
-                if not self.active_tasks[request.uid].done():
-                    self.active_tasks[request.uid].set_result(None)
         return request
 
     async def _handle_response(self, response: MinerResponse) -> None:
