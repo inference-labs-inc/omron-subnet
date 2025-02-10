@@ -56,11 +56,6 @@ class CompetitionThread(threading.Thread):
 
         while self._should_run.is_set():
             try:
-                if not self.competition.circuit_manager:
-                    bt.logging.error("Fatal error: Circuit manager is not initialized")
-                    time.sleep(5)
-                    continue
-
                 if (
                     not self.competition.download_queue
                     and not self.competition.current_download
@@ -81,7 +76,6 @@ class CompetitionThread(threading.Thread):
         if not self.competition.current_download and self.competition.download_queue:
             self.competition.current_download = self.competition.download_queue.pop(0)
             uid, hotkey, hash = self.competition.current_download
-            bt.logging.info(f"Processing next download: {hash[:8]}...")
 
             try:
                 if self.competition.process_downloads_sync():
@@ -188,7 +182,9 @@ class Competition:
         self.baseline_model = self._load_model()
         bt.logging.info("Initializing SOTA manager...")
         self.sota_manager = SotaManager(self.sota_directory)
-        self.circuit_manager = None
+        self.circuit_manager = CircuitManager(
+            self.temp_directory, self.competition_id, self.dendrite
+        )
         self.circuit_validator = CircuitValidator()
         self.circuit_evaluator = CircuitEvaluator(
             self.baseline_model, self.competition_directory, self.sota_manager
@@ -420,9 +416,6 @@ class Competition:
 
     async def process_downloads(self) -> bool:
         try:
-            if not self.circuit_manager:
-                bt.logging.error("Circuit manager not initialized")
-                return False
 
             async with self.download_lock:
                 if not self.download_queue and not self.current_download:
@@ -770,8 +763,3 @@ class Competition:
             )
 
             self.competition_manager.log_metrics(metrics)
-
-    def initialize_circuit_manager(self, dendrite: bt.dendrite):
-        self.circuit_manager = CircuitManager(
-            self.temp_directory, self.competition_id, dendrite
-        )

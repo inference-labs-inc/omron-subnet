@@ -104,7 +104,7 @@ class CircuitManager:
                 response_synapse = response_data
 
             if not response_synapse.commitment:
-                bt.logging.error("No commitment data in response")
+                bt.logging.warning("No commitment data in response")
                 return False
 
             try:

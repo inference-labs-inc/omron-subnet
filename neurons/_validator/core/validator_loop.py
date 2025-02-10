@@ -218,10 +218,6 @@ class ValidatorLoop:
             self.is_syncing_competition = True
             bt.logging.info("Starting competition sync...")
 
-            if not self.competition.circuit_manager:
-                bt.logging.warning("Circuit manager not initialized, reinitializing...")
-                self.competition.initialize_circuit_manager(self.competition.dendrite)
-
             bt.logging.debug("Fetching commitments...")
             commitments = self.competition.fetch_commitments()
             bt.logging.debug(f"Found {len(commitments)} commitments")
