@@ -6,7 +6,7 @@ import subprocess
 import torch
 import numpy as np
 import bittensor as bt
-from typing import Tuple, Union, List
+from typing import Tuple, Union, List, Optional
 from constants import LOCAL_EZKL_PATH, TEMP_FOLDER
 from _validator.competitions.services.sota_manager import SotaManager
 from _validator.competitions.services.data_source import (
@@ -20,6 +20,10 @@ import traceback
 from _validator.competitions.services.data_source import (
     CompetitionDataProcessor,
 )
+import logging
+
+logging.getLogger("onnxruntime").setLevel(logging.ERROR)
+os.environ["ONNXRUNTIME_LOGGING_LEVEL"] = "3"
 
 
 class CircuitEvaluator:
@@ -52,20 +56,16 @@ class CircuitEvaluator:
         pip_path = os.path.join(self.onnx_venv, "bin", "pip")
         python_path = os.path.join(self.onnx_venv, "bin", "python")
 
-        version_result = subprocess.run(
-            [
-                python_path,
-                "-c",
-                "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
+        python_version = (
+            subprocess.run(
+                [python_path, "--version"],
+                capture_output=True,
+                text=True,
+            )
+            .stdout.strip()
+            .split()[1][:3]
         )
-        python_version = version_result.stdout.strip()
-        bt.logging.debug(f"ONNX venv Python version: {python_version}")
 
-        subprocess.run([pip_path, "install", "--upgrade", "pip"], check=True)
         subprocess.run(
             [pip_path, "install", "numpy", "onnxruntime==1.20.1"], check=True
         )
@@ -73,7 +73,7 @@ class CircuitEvaluator:
         site_packages = os.path.join(
             self.onnx_venv, "lib", f"python{python_version}", "site-packages"
         )
-        os.makedirs(site_packages, exist_ok=True)
+
         shutil.copy2(self.onnx_runner, os.path.join(site_packages, "onnx_runner.py"))
         bt.logging.success(
             f"ONNX environment set up at {self.onnx_venv} with Python {python_version}"
@@ -715,3 +715,44 @@ class CircuitEvaluator:
             bt.logging.error(f"Error comparing outputs: {e}")
             bt.logging.error(f"Stack trace: {traceback.format_exc()}")
             return 0.0
+
+    def _run_onnx_model(
+        self, model_path: str, inputs: np.ndarray, output_path: str
+    ) -> Optional[np.ndarray]:
+        try:
+            python_path = os.path.join(self.onnx_venv, "bin", "python")
+            runner_path = os.path.join(
+                self.onnx_venv,
+                "lib",
+                "python3.10",
+                "site-packages",
+                "onnx_runner.py",
+            )
+
+            shutil.copy2(self.onnx_runner, runner_path)
+
+            input_path = output_path + ".input.npy"
+            np.save(input_path, inputs)
+
+            process = subprocess.Popen(
+                [python_path, runner_path, model_path, input_path, output_path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+            stdout, stderr = process.communicate()
+
+            if process.returncode != 0:
+                bt.logging.error(f"ONNX runner failed with code {process.returncode}")
+                return None
+
+            try:
+                return np.load(output_path)
+            except Exception as e:
+                bt.logging.error(f"Failed to load ONNX output: {e}")
+                return None
+
+        except Exception as e:
+            bt.logging.error(f"Error running ONNX model: {e}")
+            return None
