@@ -8,6 +8,7 @@ import json
 import traceback
 import threading
 from multiprocessing import Queue as MPQueue
+from queue import Empty
 import time
 from async_substrate_interface.types import ScaleObj
 from substrateinterface.utils.ss58 import ss58_encode
@@ -63,7 +64,7 @@ class CompetitionThread(threading.Thread):
                 message = self.validator_message_queue.get_nowait()
                 if message == expected_message:
                     return True
-            except MPQueue.Empty:
+            except Empty:
                 time.sleep(0.1)
         bt.logging.error(f"Timeout waiting for {expected_message} message")
         return False
