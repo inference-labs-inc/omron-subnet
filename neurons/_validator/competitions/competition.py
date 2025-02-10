@@ -246,177 +246,126 @@ class Competition:
             bt.logging.critical(
                 "Competitions are only supported on macOS arm64 architecture."
             )
-            bt.logging.critical(
-                "To remain in consensus, please use a supported platform."
-            )
-            bt.logging.critical(
-                "While the validator will continue to run, it will not be able to "
-                "correctly evaluate competitions."
-            )
+            return []
 
-        hotkeys = self.metagraph.hotkeys
-        self.miner_states = {k: v for k, v in self.miner_states.items() if k in hotkeys}
-
-        commitments = []
         queryable_uids = list(get_queryable_uids(self.metagraph))
         hotkey_to_uid = {self.metagraph.hotkeys[uid]: uid for uid in queryable_uids}
+        self.miner_states = {
+            k: v for k, v in self.miner_states.items() if k in self.metagraph.hotkeys
+        }
+        commitments = []
 
         try:
-            bt.logging.debug(
-                f"Fetching commitments for {len(queryable_uids)} queryable UIDs"
-            )
-            bt.logging.debug(f"Using netuid: {self.metagraph.netuid}")
-            safe_log(
-                {
-                    "competition_status": "fetching_commitments",
-                    "queryable_uids_count": len(queryable_uids),
-                    "netuid": self.metagraph.netuid,
-                }
-            )
-
             commitment_map = self.competition_thread.subtensor.substrate.query_map(
                 module="Commitments",
                 storage_function="CommitmentOf",
                 params=[self.metagraph.netuid],
             )
-
-            if not commitment_map:
-                bt.logging.debug("No commitments found in query result")
+            if not commitment_map or not hasattr(commitment_map, "__iter__"):
                 return []
 
-            if not hasattr(commitment_map, "__iter__"):
-                bt.logging.warning("Query result is not iterable")
-                return []
-
-            result_count = 0
             for result in commitment_map:
-                result_count += 1
+                if not result or len(result) != 2:
+                    continue
+
+                acc, info = result
+                if not acc:
+                    continue
+
                 try:
-                    if not result or len(result) != 2:
-                        continue
-
-                    acc, info = result
-                    if not acc:
-                        continue
-
-                    if isinstance(acc, (list, tuple)) and len(acc) > 0:
-                        if isinstance(acc[0], (list, tuple)):
-                            acc_bytes = bytes(acc[0])
-                        else:
-                            acc_bytes = bytes(acc)
+                    if self.competition_thread.subtensor.network == "finney":
+                        hotkey = str(acc)
                     else:
-                        continue
-
-                    try:
-                        ss58_address = ss58_encode(acc_bytes)
-                        hotkey = decode_account_id(acc_bytes)
-                        if ss58_address != hotkey:
-                            bt.logging.warning(f"SS58 address mismatch for {hotkey}")
+                        if not isinstance(acc, (list, tuple)) or not acc:
                             continue
-                    except Exception as e:
-                        bt.logging.debug(f"Failed to decode account ID: {e}")
-                        continue
+                        acc_bytes = bytes(
+                            acc[0] if isinstance(acc[0], (list, tuple)) else acc
+                        )
+                        hotkey = decode_account_id(acc_bytes)
+                        if ss58_encode(acc_bytes) != hotkey:
+                            continue
 
                     if hotkey not in hotkey_to_uid:
                         continue
 
                     uid = hotkey_to_uid[hotkey]
+                    hash = self._extract_hash(info)
 
-                    if not isinstance(info, (dict, ScaleObj)):
-                        bt.logging.debug(
-                            f"No valid commitment info for {hotkey} (UID {uid})"
-                        )
+                    if not hash:
                         continue
 
-                    if isinstance(info, ScaleObj):
-                        info = info.value
-
-                    commitment_info = info.get("info", {})
-                    if not commitment_info or not isinstance(commitment_info, dict):
-                        bt.logging.debug(
-                            f"Invalid commitment info structure for {hotkey}"
-                        )
-                        continue
-
-                    fields = commitment_info.get("fields", [])
-                    if (
-                        not fields
-                        or not isinstance(fields, (list, tuple))
-                        or not fields[0]
-                    ):
-                        bt.logging.debug(f"Invalid fields structure for {hotkey}")
-                        continue
-
-                    commitment = fields[0][0]
-                    if not commitment or not isinstance(commitment, dict):
-                        bt.logging.debug(f"Empty commitment for {hotkey}")
-                        continue
-
-                    commitment_type = next(iter(commitment.keys()))
-                    bytes_tuple = commitment[commitment_type][0]
-
-                    if not isinstance(bytes_tuple, (list, tuple)):
-                        bt.logging.debug(f"Invalid bytes tuple for {hotkey}")
-                        continue
-
-                    try:
-                        hash = bytes(bytes_tuple).decode()
-                    except Exception as e:
-                        bt.logging.debug(f"Failed to decode hash for {hotkey}: {e}")
-                        continue
-
-                    if (
-                        hotkey not in self.miner_states
-                        or self.miner_states[hotkey].hash != hash
-                    ):
-                        if hash in {state.hash for state in self.miner_states.values()}:
-                            bt.logging.warning(
-                                f"Circuit with hash {hash} already exists for another miner"
-                            )
-                            continue
+                    if self._is_new_valid_circuit(hotkey, hash):
                         commitments.append((uid, hotkey, hash))
                         bt.logging.success(
                             f"New circuit detected for {hotkey} with hash {hash}"
                         )
-                        safe_log(
-                            {
-                                "competition_status": "new_circuit_detected",
-                                "miner_hotkey": hotkey,
-                                "miner_uid": uid,
-                                "circuit_hash": hash,
-                            }
-                        )
 
                 except Exception as e:
-                    bt.logging.error(f"Error processing commitment: {e}")
-                    bt.logging.error(f"Stack trace: {traceback.format_exc()}")
-                    safe_log(
-                        {
-                            "competition_status": "commitment_error",
-                            "error": str(e),
-                        }
-                    )
+                    bt.logging.debug(f"Failed to process commitment: {str(e)}")
                     continue
 
-            bt.logging.debug(f"Processed {result_count} commitment results")
-
         except Exception as e:
-            bt.logging.error(f"Error fetching commitments: {e}")
-            bt.logging.error(f"Stack trace: {traceback.format_exc()}")
-            safe_log(
-                {
-                    "competition_status": "fetch_error",
-                    "error": str(e),
-                }
-            )
+            bt.logging.error(f"Error fetching commitments: {str(e)}")
+            bt.logging.debug(traceback.format_exc())
 
-        safe_log(
-            {
-                "competition_status": "fetch_complete",
-                "total_commitments": len(commitments),
-            }
-        )
         return commitments
+
+    def _extract_hash(self, info) -> Optional[str]:
+        """Extract hash from commitment info based on network type."""
+        try:
+            if self.competition_thread.subtensor.network == "finney":
+                commitment_info = (
+                    info.get("info", {})
+                    if isinstance(info, dict)
+                    else getattr(info, "value", {}).get("info", {})
+                )
+                if not commitment_info:
+                    return None
+
+                fields = commitment_info.get("fields", [])
+                if not fields or not isinstance(fields[0], dict):
+                    return None
+
+                hex_data = fields[0].get("Raw64")
+                if not hex_data or not hex_data.startswith("0x"):
+                    return None
+
+                return bytes.fromhex(hex_data[2:]).decode()
+            else:
+                if not isinstance(info, (dict, ScaleObj)):
+                    return None
+
+                info_val = info.value if isinstance(info, ScaleObj) else info
+                fields = info_val.get("info", {}).get("fields", [])
+
+                if not fields or not fields[0]:
+                    return None
+
+                commitment = fields[0][0]
+                if not commitment or not isinstance(commitment, dict):
+                    return None
+
+                commitment_type = next(iter(commitment.keys()))
+                bytes_tuple = commitment[commitment_type][0]
+
+                if not isinstance(bytes_tuple, (list, tuple)):
+                    return None
+
+                return bytes(bytes_tuple).decode()
+
+        except Exception:
+            return None
+
+    def _is_new_valid_circuit(self, hotkey: str, hash: str) -> bool:
+        """Check if circuit is new and valid."""
+        if hotkey not in self.miner_states or self.miner_states[hotkey].hash != hash:
+            if hash in {state.hash for state in self.miner_states.values()}:
+                bt.logging.warning(
+                    f"Circuit with hash {hash} already exists for another miner"
+                )
+                return False
+            return True
+        return False
 
     async def process_downloads(self) -> bool:
         try:
