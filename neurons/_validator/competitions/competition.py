@@ -31,19 +31,16 @@ class CompetitionThread(threading.Thread):
     def __init__(
         self,
         competition: "Competition",
-        pause_requests_event: threading.Event,
         config: bt.config,
     ):
         super().__init__()
         bt.logging.info("=== Competition Thread Constructor Start ===")
         self.competition = competition
-        self.pause_requests_event = pause_requests_event
         self._should_run = threading.Event()
         self._should_run.set()
         self.task_queue = queue.Queue()
         self.daemon = True
         self.validator_message_queue = None
-        self.winddown_complete = threading.Event()
 
         self.subtensor = bt.subtensor(config=config)
 
@@ -56,12 +53,66 @@ class CompetitionThread(threading.Thread):
     def set_validator_message_queue(self, message_queue: queue.Queue):
         self.validator_message_queue = message_queue
 
-    def wait_for_winddown(self, timeout: float = 60.0) -> bool:
-        try:
-            return self.winddown_complete.wait(timeout)
-        except Exception as e:
-            bt.logging.error(f"Error waiting for winddown: {e}")
-            return False
+    def wait_for_message(
+        self, expected_message: ValidatorMessage, timeout: float = 60.0
+    ) -> bool:
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            try:
+                message = self.validator_message_queue.get_nowait()
+                if message == expected_message:
+                    return True
+            except queue.Empty:
+                time.sleep(0.1)
+        bt.logging.error(f"Timeout waiting for {expected_message} message")
+        return False
+
+    def _process_next_download(self):
+        if not self.competition.current_download and self.competition.download_queue:
+            uid, hotkey, hash = self.competition.download_queue.pop(0)
+            self.competition.current_download = (uid, hotkey, hash)
+            bt.logging.info(
+                f"Processing download for circuit {hash[:8]} from {hotkey[:8]}"
+            )
+
+            try:
+                circuit_dir = self.competition.circuit_manager.download_circuit(
+                    uid, hotkey, hash
+                )
+                if circuit_dir:
+                    bt.logging.info("Pausing request processing for evaluation...")
+                    if self.validator_message_queue:
+                        self.validator_message_queue.put(ValidatorMessage.WINDDOWN)
+                        bt.logging.info("Waiting for validator winddown to complete...")
+
+                        if not self.wait_for_message(
+                            ValidatorMessage.WINDDOWN_COMPLETE
+                        ):
+                            bt.logging.error(
+                                "Failed to wait for validator winddown, proceeding anyway"
+                            )
+
+                    bt.logging.info("Starting circuit evaluation...")
+                    try:
+                        self.competition.circuit_evaluator.evaluate_circuit(
+                            circuit_dir, hash, hotkey
+                        )
+                    except Exception as e:
+                        bt.logging.error(f"Error during circuit evaluation: {str(e)}")
+                        bt.logging.error(f"Stack trace: {traceback.format_exc()}")
+                    finally:
+                        self.competition.cleanup_circuit_dir(circuit_dir)
+                        bt.logging.info("Resuming request processing...")
+                        if self.validator_message_queue:
+                            self.validator_message_queue.put(
+                                ValidatorMessage.COMPETITION_COMPLETE
+                            )
+                else:
+                    bt.logging.error(
+                        f"Circuit download or evaluation failed for {hash[:8]} from {hotkey[:8]}"
+                    )
+            finally:
+                self.competition.clear_current_download()
 
     def run(self):
         bt.logging.info("Competition thread starting...")
@@ -83,54 +134,6 @@ class CompetitionThread(threading.Thread):
                 time.sleep(5)
 
         bt.logging.info("Competition thread stopped")
-
-    def _process_next_download(self):
-        if not self.competition.current_download and self.competition.download_queue:
-            uid, hotkey, hash = self.competition.download_queue.pop(0)
-            self.competition.current_download = (uid, hotkey, hash)
-            bt.logging.info(
-                f"Processing download for circuit {hash[:8]} from {hotkey[:8]}"
-            )
-
-            try:
-                circuit_dir = self.competition.circuit_manager.download_circuit(
-                    uid, hotkey, hash
-                )
-                if circuit_dir:
-                    bt.logging.info("Pausing main request loop for evaluation...")
-                    self.pause_requests_event.set()
-                    if self.validator_message_queue:
-                        self.winddown_complete.clear()
-                        self.validator_message_queue.put(ValidatorMessage.WINDDOWN)
-                        bt.logging.info("Waiting for validator winddown to complete...")
-
-                        if not self.wait_for_winddown():
-                            bt.logging.error(
-                                "Failed to wait for validator winddown, proceeding anyway"
-                            )
-
-                    bt.logging.info("Starting circuit evaluation...")
-                    try:
-                        self.competition.circuit_evaluator.evaluate_circuit(
-                            circuit_dir, hash, hotkey
-                        )
-                    except Exception as e:
-                        bt.logging.error(f"Error during circuit evaluation: {str(e)}")
-                        bt.logging.error(f"Stack trace: {traceback.format_exc()}")
-                    finally:
-                        self.competition.cleanup_circuit_dir(circuit_dir)
-                        bt.logging.info("Resuming main request loop...")
-                        if self.validator_message_queue:
-                            self.validator_message_queue.put(
-                                ValidatorMessage.COMPETITION_COMPLETE
-                            )
-                        self.pause_requests_event.clear()
-                else:
-                    bt.logging.error(
-                        f"Circuit download or evaluation failed for {hash[:8]} from {hotkey[:8]}"
-                    )
-            finally:
-                self.competition.clear_current_download()
 
     def stop(self):
         bt.logging.info("=== Competition Thread Stop Start ===")
@@ -198,11 +201,7 @@ class Competition:
         self.download_lock = asyncio.Lock()
 
         bt.logging.info("=== Starting Competition Thread ===")
-        self.pause_requests_event = threading.Event()
-        bt.logging.info("Created pause_requests_event")
-        self.competition_thread = CompetitionThread(
-            self, self.pause_requests_event, config
-        )
+        self.competition_thread = CompetitionThread(self, config)
         bt.logging.info("Competition thread instance created")
         self.competition_thread.start()
         bt.logging.info("Competition thread started")

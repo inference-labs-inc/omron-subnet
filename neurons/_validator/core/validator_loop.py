@@ -252,18 +252,6 @@ class ValidatorLoop:
     async def maintain_request_pool(self):
         while self._should_run:
             try:
-                if self.competition and self.competition.pause_requests_event.is_set():
-                    if self.active_tasks:
-                        bt.logging.debug(
-                            f"Waiting for {len(self.active_tasks)} active tasks to complete before evaluation..."
-                        )
-                        await asyncio.gather(*self.active_tasks.values())
-                        bt.logging.debug(
-                            "All active tasks completed, proceeding with evaluation"
-                        )
-                    await asyncio.sleep(0.1)
-                    continue
-
                 try:
                     message = self.message_queue.get_nowait()
                     if message == ValidatorMessage.WINDDOWN:
@@ -299,15 +287,6 @@ class ValidatorLoop:
                             task.add_done_callback(
                                 lambda t, uid=uid: self._handle_completed_task(t, uid)
                             )
-                elif (
-                    slots_available == 0
-                    and len(self.active_tasks) == 0
-                    and self.current_concurrency == 0
-                ):
-                    bt.logging.info(
-                        "No active tasks and concurrency is zero, signaling winddown complete"
-                    )
-                    self.competition.competition_thread.winddown_complete.set()
 
                 await asyncio.sleep(0.1)
             except Exception as e:
@@ -333,6 +312,16 @@ class ValidatorLoop:
         finally:
             if uid in self.active_tasks:
                 del self.active_tasks[uid]
+                # If we're winding down and this was the last task, signal completion via message
+                if (
+                    self.current_concurrency == 0
+                    and not self.active_tasks
+                    and self.competition
+                ):
+                    bt.logging.info(
+                        "All tasks completed during winddown, sending winddown complete message"
+                    )
+                    self.message_queue.put(ValidatorMessage.WINDDOWN_COMPLETE)
 
     async def run_periodic_tasks(self):
         while self._should_run:
