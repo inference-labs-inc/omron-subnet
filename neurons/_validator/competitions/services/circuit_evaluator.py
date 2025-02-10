@@ -483,12 +483,7 @@ class CircuitEvaluator:
                     "onnx_runner.py",
                 )
 
-                bt.logging.info(
-                    f"Running ONNX model: {model_path} with runner: {runner_path}"
-                )
-
                 shutil.copy2(self.onnx_runner, runner_path)
-                bt.logging.info(f"Copied latest runner to: {runner_path}")
 
                 process = subprocess.Popen(
                     [
@@ -545,21 +540,10 @@ class CircuitEvaluator:
                 temp_proof_path = temp_proof.name
 
             model_path = os.path.join(circuit_dir, "model.compiled")
-            bt.logging.info(f"Checking model path: {model_path}")
             if not os.path.exists(model_path):
                 bt.logging.error(f"model.compiled not found at {model_path}")
-                bt.logging.info("Circuit directory contents:")
-                for root, dirs, files in os.walk(circuit_dir):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        bt.logging.info(
-                            f"- {file} ({os.path.getsize(file_path)} bytes)"
-                        )
                 return None
 
-            bt.logging.info(
-                f"Running witness generation with input shape: {test_inputs.shape}"
-            )
             bt.logging.debug(f"Input data: {json.dumps(input_data, indent=2)}")
             witness_result = subprocess.run(
                 [
