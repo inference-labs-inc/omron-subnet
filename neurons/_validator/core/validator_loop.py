@@ -6,6 +6,7 @@ import traceback
 import time
 from typing import NoReturn
 import concurrent.futures
+import queue
 
 import bittensor as bt
 
@@ -27,7 +28,7 @@ from _validator.models.miner_response import MinerResponse
 from _validator.scoring.score_manager import ScoreManager
 from _validator.scoring.weights import WeightsManager
 from _validator.utils.axon import query_single_axon
-from _validator.models.request_type import RequestType
+from _validator.models.request_type import RequestType, ValidatorMessage
 from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
 from utils import AutoUpdate, clean_temp_files, with_rate_limit
@@ -61,6 +62,9 @@ class ValidatorLoop:
         self.config.check_register()
         self.auto_update = AutoUpdate()
 
+        self.message_queue = queue.Queue()
+        self.current_concurrency = MAX_CONCURRENT_REQUESTS
+
         try:
             competition_id = 1
             bt.logging.info("Initializing competition module...")
@@ -70,6 +74,7 @@ class ValidatorLoop:
                 self.config.wallet,
                 self.config.bt_config,
             )
+            self.competition.set_validator_message_queue(self.message_queue)
             bt.logging.success("Competition module initialized successfully")
         except Exception as e:
             bt.logging.warning(
@@ -111,7 +116,6 @@ class ValidatorLoop:
         self.last_response_time = time.time()
 
         self._should_run = True
-
         self.thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=16)
         self.response_thread_pool = concurrent.futures.ThreadPoolExecutor(
             max_workers=16
@@ -260,7 +264,22 @@ class ValidatorLoop:
                     await asyncio.sleep(0.1)
                     continue
 
-                slots_available = MAX_CONCURRENT_REQUESTS - len(self.active_tasks)
+                try:
+                    message = self.message_queue.get_nowait()
+                    if message == ValidatorMessage.WINDDOWN:
+                        bt.logging.info(
+                            "Received winddown message, reducing concurrency to zero"
+                        )
+                        self.current_concurrency = 0
+                    elif message == ValidatorMessage.COMPETITION_COMPLETE:
+                        bt.logging.info(
+                            "Received competition complete message, restoring concurrency"
+                        )
+                        self.current_concurrency = MAX_CONCURRENT_REQUESTS
+                except queue.Empty:
+                    pass
+
+                slots_available = self.current_concurrency - len(self.active_tasks)
                 if slots_available > 0:
                     self.update_processed_uids()
                     available_uids = [
@@ -280,6 +299,15 @@ class ValidatorLoop:
                             task.add_done_callback(
                                 lambda t, uid=uid: self._handle_completed_task(t, uid)
                             )
+                elif (
+                    slots_available == 0
+                    and len(self.active_tasks) == 0
+                    and self.current_concurrency == 0
+                ):
+                    bt.logging.info(
+                        "No active tasks and concurrency is zero, signaling winddown complete"
+                    )
+                    self.competition.competition_thread.winddown_complete.set()
 
                 await asyncio.sleep(0.1)
             except Exception as e:

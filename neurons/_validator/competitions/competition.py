@@ -20,11 +20,11 @@ from bittensor.core.chain_data import decode_account_id
 from .services.circuit_evaluator import CircuitEvaluator
 from .services.sota_manager import SotaManager
 
-from .competition_manager import CompetitionManager
 from .utils.cleanup import register_cleanup_handlers
 from constants import TEMP_FOLDER
 from _validator.utils.uid import get_queryable_uids
 from utils.wandb_logger import safe_log
+from _validator.models.request_type import ValidatorMessage
 
 
 class CompetitionThread(threading.Thread):
@@ -42,6 +42,8 @@ class CompetitionThread(threading.Thread):
         self._should_run.set()
         self.task_queue = queue.Queue()
         self.daemon = True
+        self.validator_message_queue = None
+        self.winddown_complete = threading.Event()
 
         self.subtensor = bt.subtensor(config=config)
 
@@ -50,6 +52,16 @@ class CompetitionThread(threading.Thread):
         bt.logging.info(f"- Competition Dir: {self.competition.competition_directory}")
         bt.logging.info(f"- Thread Daemon: {self.daemon}")
         bt.logging.info("=== Competition Thread Constructor End ===")
+
+    def set_validator_message_queue(self, message_queue: queue.Queue):
+        self.validator_message_queue = message_queue
+
+    def wait_for_winddown(self, timeout: float = 60.0) -> bool:
+        try:
+            return self.winddown_complete.wait(timeout)
+        except Exception as e:
+            bt.logging.error(f"Error waiting for winddown: {e}")
+            return False
 
     def run(self):
         bt.logging.info("Competition thread starting...")
@@ -74,48 +86,44 @@ class CompetitionThread(threading.Thread):
 
     def _process_next_download(self):
         if not self.competition.current_download and self.competition.download_queue:
-            self.competition.current_download = self.competition.download_queue.pop(0)
-            uid, hotkey, hash = self.competition.current_download
+            uid, hotkey, hash = self.competition.download_queue.pop(0)
+            self.competition.current_download = (uid, hotkey, hash)
+            bt.logging.info(
+                f"Processing download for circuit {hash[:8]} from {hotkey[:8]}"
+            )
 
             try:
-                if self.competition.process_downloads_sync():
-                    bt.logging.success(
-                        "Circuit download successful, starting evaluation..."
-                    )
-                    circuit_dir = os.path.join(self.competition.temp_directory, hash)
-
+                circuit_dir = self.competition.circuit_manager.download_circuit(
+                    uid, hotkey, hash
+                )
+                if circuit_dir:
+                    bt.logging.info("Pausing main request loop for evaluation...")
                     self.pause_requests_event.set()
-                    bt.logging.debug(
-                        "Pausing main request loop for circuit evaluation..."
-                    )
+                    if self.validator_message_queue:
+                        self.winddown_complete.clear()
+                        self.validator_message_queue.put(ValidatorMessage.WINDDOWN)
+                        bt.logging.info("Waiting for validator winddown to complete...")
 
+                        if not self.wait_for_winddown():
+                            bt.logging.error(
+                                "Failed to wait for validator winddown, proceeding anyway"
+                            )
+
+                    bt.logging.info("Starting circuit evaluation...")
                     try:
-                        score = self.competition._evaluate_circuit(
-                            circuit_dir, hash, hotkey, self.competition.accuracy_weight
+                        self.competition.circuit_evaluator.evaluate_circuit(
+                            circuit_dir, hash, hotkey
                         )
-                        bt.logging.info(
-                            f"Circuit evaluation complete with score {score}"
-                        )
-
-                        if score > 0 and self.competition.sota_manager.check_if_sota(
-                            score,
-                            self.competition.miner_states[hotkey].proof_size,
-                            self.competition.miner_states[hotkey].response_time,
-                        ):
-                            bt.logging.success(
-                                "New SOTA circuit detected, preserving..."
-                            )
-                            self.competition.sota_manager.preserve_circuit(
-                                circuit_dir,
-                                self.competition.miner_states[hotkey],
-                                self.competition.miner_states,
-                            )
                     except Exception as e:
                         bt.logging.error(f"Error during circuit evaluation: {str(e)}")
                         bt.logging.error(f"Stack trace: {traceback.format_exc()}")
                     finally:
                         self.competition.cleanup_circuit_dir(circuit_dir)
                         bt.logging.info("Resuming main request loop...")
+                        if self.validator_message_queue:
+                            self.validator_message_queue.put(
+                                ValidatorMessage.COMPETITION_COMPLETE
+                            )
                         self.pause_requests_event.clear()
                 else:
                     bt.logging.error(
@@ -142,22 +150,22 @@ class Competition:
         bt.logging.info("=== Competition Module Initialization Start ===")
         bt.logging.info(f"Initializing competition module with ID {competition_id}...")
         self.competition_id = competition_id
+        self.metagraph = metagraph
+        self.wallet = wallet
+        self.dendrite = bt.dendrite(wallet=wallet)
         self.competition_directory = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), str(competition_id)
+            os.path.dirname(__file__), str(competition_id)
         )
-        self.temp_directory = os.path.join(
-            TEMP_FOLDER, f"competition_{str(competition_id)}"
-        )
+        self.temp_directory = os.path.join(TEMP_FOLDER, str(competition_id))
         self.sota_directory = os.path.join(self.competition_directory, "sota")
 
-        bt.logging.info("Creating competition directories...")
-        os.makedirs(self.temp_directory, exist_ok=True)
-        os.makedirs(self.sota_directory, exist_ok=True)
-        bt.logging.info(
-            f"Directories created: {self.temp_directory}, {self.sota_directory}"
-        )
+        register_cleanup_handlers(self.temp_directory)
 
-        register_cleanup_handlers()
+        if not os.path.exists(self.temp_directory):
+            os.makedirs(self.temp_directory)
+
+        if not os.path.exists(self.sota_directory):
+            os.makedirs(self.sota_directory)
 
         bt.logging.info("Loading config and initializing subtensor...")
         config_path = os.path.join(
@@ -172,15 +180,6 @@ class Competition:
             )
             bt.logging.debug(f"Loaded accuracy weight: {self.accuracy_weight}")
 
-        self.metagraph = metagraph
-        self.wallet = wallet
-        self.dendrite = bt.dendrite(wallet=wallet)
-
-        bt.logging.info("Initializing competition manager...")
-        self.competition_manager = CompetitionManager(self.competition_directory)
-        bt.logging.info("Loading baseline model...")
-        self.baseline_model = self._load_model()
-        bt.logging.info("Initializing SOTA manager...")
         self.sota_manager = SotaManager(self.sota_directory)
         self.circuit_manager = CircuitManager(
             self.temp_directory, self.competition_id, self.dendrite
@@ -776,3 +775,6 @@ class Competition:
             )
 
             self.competition_manager.log_metrics(metrics)
+
+    def set_validator_message_queue(self, message_queue: queue.Queue):
+        self.competition_thread.set_validator_message_queue(message_queue)
