@@ -6,6 +6,7 @@ import traceback
 from typing import Tuple, Union
 from rich.console import Console
 from rich.table import Table
+from utils.rate_limiter import with_rate_limit
 
 import bittensor as bt
 import websocket
@@ -17,6 +18,7 @@ from constants import (
     STEAK,
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
     VALIDATOR_STAKE_THRESHOLD,
+    ONE_HOUR,
 )
 from deployment_layer.circuit_store import circuit_store
 from execution_layer.generic_input import GenericInput
@@ -134,33 +136,26 @@ class MinerSession:
                     self.check_register()
 
                 if step % 24 == 0 and self.subnet_uid is not None:
-                    try:
-                        self.metagraph = self.subtensor.metagraph(
-                            cli_parser.config.netuid
-                        )
-                        table = Table(title=f"Miner Status (UID: {self.subnet_uid})")
-                        table.add_column("Block", justify="center", style="cyan")
-                        table.add_column("Stake", justify="center", style="cyan")
-                        table.add_column("Rank", justify="center", style="cyan")
-                        table.add_column("Trust", justify="center", style="cyan")
-                        table.add_column("Consensus", justify="center", style="cyan")
-                        table.add_column("Incentive", justify="center", style="cyan")
-                        table.add_column("Emission", justify="center", style="cyan")
-                        table.add_row(
-                            str(self.metagraph.block.item()),
-                            str(self.metagraph.S[self.subnet_uid]),
-                            str(self.metagraph.R[self.subnet_uid]),
-                            str(self.metagraph.T[self.subnet_uid]),
-                            str(self.metagraph.C[self.subnet_uid]),
-                            str(self.metagraph.I[self.subnet_uid]),
-                            str(self.metagraph.E[self.subnet_uid]),
-                        )
-                        console = Console()
-                        console.print(table)
-                    except Exception:
-                        bt.logging.warning(
-                            f"Failed to sync metagraph: {traceback.format_exc()}"
-                        )
+                    table = Table(title=f"Miner Status (UID: {self.subnet_uid})")
+                    table.add_column("Block", justify="center", style="cyan")
+                    table.add_column("Stake", justify="center", style="cyan")
+                    table.add_column("Rank", justify="center", style="cyan")
+                    table.add_column("Trust", justify="center", style="cyan")
+                    table.add_column("Consensus", justify="center", style="cyan")
+                    table.add_column("Incentive", justify="center", style="cyan")
+                    table.add_column("Emission", justify="center", style="cyan")
+                    table.add_row(
+                        str(self.metagraph.block.item()),
+                        str(self.metagraph.S[self.subnet_uid]),
+                        str(self.metagraph.R[self.subnet_uid]),
+                        str(self.metagraph.T[self.subnet_uid]),
+                        str(self.metagraph.C[self.subnet_uid]),
+                        str(self.metagraph.I[self.subnet_uid]),
+                        str(self.metagraph.E[self.subnet_uid]),
+                    )
+                    console = Console()
+                    console.print(table)
+                self.sync_metagraph()
 
                 time.sleep(1)
 
@@ -186,7 +181,6 @@ class MinerSession:
             self.subnet_uid = subnet_uid
 
     def configure(self):
-        # === Configure Bittensor objects ====
         self.wallet = bt.wallet(config=cli_parser.config)
         self.subtensor = bt.subtensor(config=cli_parser.config)
         self.metagraph = self.subtensor.metagraph(cli_parser.config.netuid)
@@ -215,7 +209,6 @@ class MinerSession:
 
             self.circuit_manager = CircuitManager(
                 wallet=self.wallet,
-                subtensor=self.subtensor,
                 netuid=cli_parser.config.netuid,
                 circuit_dir=COMPETITION_DIR,
                 storage_config=storage_config,
@@ -225,9 +218,14 @@ class MinerSession:
             bt.logging.error(f"Error initializing circuit manager: {e}")
             self.circuit_manager = None
 
-    def __del__(self):
-        if hasattr(self, "circuit_manager"):
-            self.circuit_manager.stop()
+    @with_rate_limit(period=ONE_HOUR)
+    def sync_metagraph(self):
+        try:
+            self.metagraph.sync(subtensor=self.subtensor)
+            return True
+        except Exception as e:
+            bt.logging.warning(f"Failed to sync metagraph: {e}")
+            return False
 
     def proof_blacklist(self, synapse: QueryZkProof) -> Tuple[bool, str]:
         """
@@ -383,6 +381,7 @@ class MinerSession:
 
         except Exception as e:
             bt.logging.error(f"Error handling competition request: {str(e)}")
+            traceback.print_exc()
             return Competition(
                 id=synapse.id,
                 hash=synapse.hash,

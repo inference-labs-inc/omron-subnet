@@ -40,7 +40,11 @@ class ValidatorConfig:
         self.wallet = bt.wallet(config=self.bt_config)
         self.dendrite = bt.dendrite(wallet=self.wallet)
         self.subtensor = bt.subtensor(config=self.bt_config)
-        self.metagraph = self.subtensor.metagraph(self.subnet_uid)
+        try:
+            self.metagraph = self.subtensor.metagraph(self.subnet_uid)
+        except Exception as e:
+            bt.logging.error(f"Error getting metagraph: {e}")
+            self.metagraph = None
         self.user_uid = int(
             self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
         )

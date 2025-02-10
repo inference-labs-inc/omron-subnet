@@ -6,10 +6,35 @@ import bittensor as bt
 import psutil
 import torch
 import wandb
+import threading
+from queue import Queue
+from typing import Dict, Any
 
 ENTITY_NAME = "inferencelabs"
 PROJECT_NAME = "omron"
 WANDB_ENABLED = False
+_log_queue = Queue()
+_log_thread = None
+
+
+def _log_worker():
+    while True:
+        try:
+            data = _log_queue.get()
+            if data is None:
+                break
+            wandb.log(data)
+        except Exception as e:
+            bt.logging.debug(f"Failed to log to WandB in worker thread: {e}")
+        finally:
+            _log_queue.task_done()
+
+
+def _ensure_log_thread():
+    global _log_thread
+    if _log_thread is None or not _log_thread.is_alive():
+        _log_thread = threading.Thread(target=_log_worker, daemon=True)
+        _log_thread.start()
 
 
 def safe_login(api_key):
@@ -24,7 +49,7 @@ def safe_login(api_key):
         bt.logging.error("Failed to login to WandB. Your run will not be logged.")
 
 
-def safe_init(name=None, wallet=None, metagraph=None, config=None, project=None):
+def safe_init(name=None, wallet=None, metagraph=None, config=None):
     """
     Attempts to initialize WandB, and logs if unsuccessful
     """
@@ -62,19 +87,21 @@ def safe_init(name=None, wallet=None, metagraph=None, config=None, project=None)
 
         wandb.init(
             entity=ENTITY_NAME,
-            project=project or PROJECT_NAME,
+            project=PROJECT_NAME
+            + ("-testnet" if config.subtensor.network == "test" else ""),
             name=name,
             config=config_dict,
             reinit=True,
         )
         WANDB_ENABLED = True
+        _ensure_log_thread()
     except Exception as e:
         bt.logging.error(e)
         bt.logging.error("Failed to initialize WandB. Your run will not be logged.")
         WANDB_ENABLED = False
 
 
-def safe_log(data):
+def safe_log(data: Dict[str, Any]):
     """
     Safely log data to WandB
     - Ignores request to log if WandB isn't configured
@@ -87,7 +114,7 @@ def safe_log(data):
 
     try:
         bt.logging.debug("Attempting to log data to WandB")
-        wandb.log(data)
+        _log_queue.put(data)
     except Exception as e:
-        bt.logging.debug("Failed to log to WandB.")
+        bt.logging.debug("Failed to queue WandB log.")
         bt.logging.debug(e)
