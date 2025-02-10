@@ -19,12 +19,7 @@ from .services.circuit_manager import CircuitManager
 from bittensor.core.chain_data import decode_account_id
 from .services.circuit_evaluator import CircuitEvaluator
 from .services.sota_manager import SotaManager
-from .services.data_source import (
-    CompetitionDataSource,
-    RandomDataSource,
-    RemoteDataSource,
-    CompetitionDataProcessor,
-)
+
 from .competition_manager import CompetitionManager
 from .utils.cleanup import register_cleanup_handlers
 from constants import TEMP_FOLDER
@@ -223,53 +218,6 @@ class Competition:
             }
         )
         bt.logging.info("=== Competition Module Initialization Complete ===")
-
-    def _setup_data_source(self) -> CompetitionDataSource:
-        try:
-            config_path = os.path.join(
-                self.competition_directory, "competition_config.json"
-            )
-            with open(config_path) as f:
-                config = json.load(f)
-                data_config = config.get("data_source", {})
-
-                processor = None
-                processor_path = os.path.join(
-                    self.competition_directory, "data_processor.py"
-                )
-                if os.path.exists(processor_path):
-                    import importlib.util
-
-                    spec = importlib.util.spec_from_file_location(
-                        "data_processor", processor_path
-                    )
-                    module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(module)
-
-                    for attr_name in dir(module):
-                        attr = getattr(module, attr_name)
-                        if (
-                            isinstance(attr, type)
-                            and issubclass(attr, CompetitionDataProcessor)
-                            and attr != CompetitionDataProcessor
-                        ):
-                            processor = attr()
-                            break
-
-                if data_config.get("type") == "remote":
-                    data_source = RemoteDataSource(
-                        self.competition_directory, processor
-                    )
-                    if not data_source.sync_data():
-                        bt.logging.error("Failed to sync remote data source")
-                        return RandomDataSource(self.competition_directory, processor)
-                    return data_source
-                return RandomDataSource(self.competition_directory, processor)
-
-        except Exception as e:
-            bt.logging.error(f"Error setting up data source: {e}")
-            traceback.print_exc()
-            return RandomDataSource(self.competition_directory)
 
     def _load_model(self) -> Union[torch.nn.Module, str, None]:
         if not self.competition_manager.current_competition:

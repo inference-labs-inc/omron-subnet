@@ -17,6 +17,9 @@ from _validator.competitions.services.data_source import (
 from utils.wandb_logger import safe_log
 import shutil
 import traceback
+from _validator.competitions.services.data_source import (
+    CompetitionDataProcessor,
+)
 
 
 class CircuitEvaluator:
@@ -84,12 +87,43 @@ class CircuitEvaluator:
             with open(config_path) as f:
                 config = json.load(f)
                 data_config = config.get("data_source", {})
+
+                processor = None
+                processor_path = os.path.join(
+                    self.competition_directory, "data_processor.py"
+                )
+                if os.path.exists(processor_path):
+                    import importlib.util
+
+                    spec = importlib.util.spec_from_file_location(
+                        "data_processor", processor_path
+                    )
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+
+                    for attr_name in dir(module):
+                        attr = getattr(module, attr_name)
+                        if (
+                            isinstance(attr, type)
+                            and issubclass(attr, CompetitionDataProcessor)
+                            and attr != CompetitionDataProcessor
+                        ):
+                            processor = attr()
+                            break
+
                 if data_config.get("type") == "remote":
-                    return RemoteDataSource(self.competition_directory)
+                    data_source = RemoteDataSource(
+                        self.competition_directory, processor
+                    )
+                    if not data_source.sync_data():
+                        bt.logging.error("Failed to sync remote data source")
+                        return RandomDataSource(self.competition_directory, processor)
+                    return data_source
+                return RandomDataSource(self.competition_directory, processor)
         except Exception as e:
             bt.logging.error(f"Error setting up data source: {e}")
-
-        return RandomDataSource(self.competition_directory)
+            traceback.print_exc()
+            return RandomDataSource(self.competition_directory)
 
     def _calculate_relative_score(
         self, accuracy: float, proof_size: float, response_time: float
