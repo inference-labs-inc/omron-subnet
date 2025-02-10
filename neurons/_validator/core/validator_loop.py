@@ -176,14 +176,7 @@ class ValidatorLoop:
 
     def update_processed_uids(self):
         total_processed = len(self.processed_uids) + len(self.active_tasks)
-        bt.logging.info(
-            f"Total processed/active UIDs: {total_processed} out of {len(self.queryable_uids)}"
-        )
-
         if total_processed >= len(self.queryable_uids):
-            bt.logging.info(
-                "All queryable UIDs are either processed or active, clearing processed list"
-            )
             self.processed_uids.clear()
 
     @with_rate_limit(period=ONE_MINUTE)
@@ -282,13 +275,6 @@ class ValidatorLoop:
                     pass
 
                 slots_available = self.current_concurrency - len(self.active_tasks)
-                bt.logging.info("Request Pool Metrics:")
-                bt.logging.info(f"- Current Concurrency: {self.current_concurrency}")
-                bt.logging.info(f"- Active Tasks: {len(self.active_tasks)}")
-                bt.logging.info(f"- Slots Available: {slots_available}")
-                bt.logging.info(f"- Active Task UIDs: {list(self.active_tasks.keys())}")
-                bt.logging.info(f"- Processed UIDs Count: {len(self.processed_uids)}")
-                bt.logging.info(f"- Queryable UIDs Count: {len(self.queryable_uids)}")
 
                 if slots_available > 0:
                     self.update_processed_uids()
@@ -298,14 +284,10 @@ class ValidatorLoop:
                         if uid not in self.processed_uids
                         and uid not in self.active_tasks
                     ]
-                    bt.logging.info(
-                        f"- Available UIDs for new tasks: {len(available_uids)}"
-                    )
 
                     for uid in available_uids[:slots_available]:
                         request = self.request_pipeline.prepare_single_request(uid)
                         if request:
-                            bt.logging.info(f"Creating new task for UID {uid}")
                             task = asyncio.create_task(
                                 self._process_single_request(request)
                             )
@@ -313,8 +295,6 @@ class ValidatorLoop:
                             task.add_done_callback(
                                 lambda t, uid=uid: self._handle_completed_task(t, uid)
                             )
-                        else:
-                            bt.logging.info(f"Failed to prepare request for UID {uid}")
 
                 await asyncio.sleep(0.1)
             except Exception as e:
@@ -324,7 +304,6 @@ class ValidatorLoop:
 
     def _handle_completed_task(self, task: asyncio.Task, uid: int):
         try:
-            bt.logging.info(f"Task completed for UID {uid}")
             if task.exception():
                 bt.logging.error(
                     f"Task for UID {uid} failed with exception: {task.exception()}"
@@ -335,18 +314,12 @@ class ValidatorLoop:
                     task.exception().__traceback__,
                 )
             self.processed_uids.add(uid)
-            bt.logging.info(
-                f"Added UID {uid} to processed_uids (total: {len(self.processed_uids)})"
-            )
         except Exception as e:
             bt.logging.error(f"Error in task completion handler for UID {uid}: {e}")
             traceback.print_exc()
         finally:
             if uid in self.active_tasks:
                 del self.active_tasks[uid]
-                bt.logging.info(
-                    f"Removed UID {uid} from active_tasks (remaining: {len(self.active_tasks)})"
-                )
                 # If we're winding down and this was the last task, signal completion via message
                 if (
                     self.current_concurrency == 0
