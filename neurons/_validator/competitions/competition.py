@@ -112,7 +112,9 @@ class CompetitionThread(threading.Thread):
                                 "New SOTA circuit detected, preserving..."
                             )
                             self.competition.sota_manager.preserve_circuit(
-                                circuit_dir, self.competition.miner_states[hotkey]
+                                circuit_dir,
+                                self.competition.miner_states[hotkey],
+                                self.competition.miner_states,
                             )
                     except Exception as e:
                         bt.logging.error(f"Error during circuit evaluation: {str(e)}")
