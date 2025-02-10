@@ -57,100 +57,79 @@ class CompetitionThread(threading.Thread):
         bt.logging.info("=== Competition Thread Constructor End ===")
 
     def run(self):
-        bt.logging.debug("=== Competition Thread Run Start ===")
-        try:
-            bt.logging.debug("Competition thread main loop starting...")
-            while self._should_run.is_set():
-                try:
-                    bt.logging.debug("=== Competition Cycle Start ===")
-                    if not self.competition.circuit_manager:
-                        bt.logging.warning(
-                            "Circuit manager not initialized, reinitializing..."
-                        )
-                        self.competition.initialize_circuit_manager(
-                            self.competition.dendrite
-                        )
-                        bt.logging.debug("Circuit manager reinitialized")
+        bt.logging.info("Competition thread starting...")
 
-                    if self.competition.download_queue:
-                        if not self.competition.current_download:
-                            self.competition.current_download = (
-                                self.competition.download_queue.pop(0)
-                            )
-                            uid, hotkey, hash = self.competition.current_download
-                            bt.logging.info(f"Processing next download: {hash[:8]}...")
-
-                            try:
-                                if self.competition.process_downloads_sync():
-                                    bt.logging.success(
-                                        "Circuit download successful, starting evaluation..."
-                                    )
-                                    circuit_dir = os.path.join(
-                                        self.competition.temp_directory, hash
-                                    )
-
-                                    self.pause_requests_event.set()
-                                    bt.logging.debug(
-                                        "Pausing main request loop for circuit evaluation..."
-                                    )
-
-                                    try:
-                                        score = self.competition._evaluate_circuit(
-                                            circuit_dir,
-                                            hash,
-                                            hotkey,
-                                            self.competition.accuracy_weight,
-                                        )
-                                        bt.logging.info(
-                                            f"Circuit evaluation complete with score {score}"
-                                        )
-
-                                        if (
-                                            score > 0
-                                            and self.competition.sota_manager.check_if_sota(
-                                                score,
-                                                self.competition.miner_states[
-                                                    hotkey
-                                                ].proof_size,
-                                                self.competition.miner_states[
-                                                    hotkey
-                                                ].response_time,
-                                            )
-                                        ):
-                                            bt.logging.success(
-                                                "New SOTA circuit detected, preserving..."
-                                            )
-                                            self.competition.sota_manager.preserve_circuit(
-                                                circuit_dir,
-                                                self.competition.miner_states[hotkey],
-                                            )
-                                        else:
-                                            self.competition.cleanup_circuit_dir(
-                                                circuit_dir
-                                            )
-                                    finally:
-                                        self.pause_requests_event.clear()
-                                        bt.logging.info("Resuming main request loop...")
-                                else:
-                                    bt.logging.error(
-                                        f"Circuit download or evaluation failed for {hash[:8]} from {hotkey[:8]}"
-                                    )
-                            finally:
-                                self.competition.clear_current_download()
-
-                    bt.logging.debug("=== Competition Cycle End ===")
-                    time.sleep(1)
-
-                except Exception as e:
-                    bt.logging.error(f"Error in competition thread cycle: {e}")
-                    bt.logging.error(f"Stack trace: {traceback.format_exc()}")
+        while self._should_run.is_set():
+            try:
+                if not self.competition.circuit_manager:
+                    bt.logging.error("Fatal error: Circuit manager is not initialized")
                     time.sleep(5)
+                    continue
 
-        except Exception as e:
-            bt.logging.error(f"Fatal error in competition thread: {e}")
-            bt.logging.error(f"Stack trace: {traceback.format_exc()}")
-        finally:
-            bt.logging.debug("=== Competition Thread Run End ===")
+                if (
+                    not self.competition.download_queue
+                    and not self.competition.current_download
+                ):
+                    time.sleep(1)
+                    continue
+
+                self._process_next_download()
+
+            except Exception as e:
+                bt.logging.error(f"Error in competition thread cycle: {str(e)}")
+                bt.logging.error(f"Stack trace: {traceback.format_exc()}")
+                time.sleep(5)
+
+        bt.logging.info("Competition thread stopped")
+
+    def _process_next_download(self):
+        if not self.competition.current_download and self.competition.download_queue:
+            self.competition.current_download = self.competition.download_queue.pop(0)
+            uid, hotkey, hash = self.competition.current_download
+            bt.logging.info(f"Processing next download: {hash[:8]}...")
+
+            try:
+                if self.competition.process_downloads_sync():
+                    bt.logging.success(
+                        "Circuit download successful, starting evaluation..."
+                    )
+                    circuit_dir = os.path.join(self.competition.temp_directory, hash)
+
+                    self.pause_requests_event.set()
+                    bt.logging.debug(
+                        "Pausing main request loop for circuit evaluation..."
+                    )
+
+                    try:
+                        score = self.competition._evaluate_circuit(
+                            circuit_dir, hash, hotkey, self.competition.accuracy_weight
+                        )
+                        bt.logging.info(
+                            f"Circuit evaluation complete with score {score}"
+                        )
+
+                        if score > 0 and self.competition.sota_manager.check_if_sota(
+                            score,
+                            self.competition.miner_states[hotkey].proof_size,
+                            self.competition.miner_states[hotkey].response_time,
+                        ):
+                            bt.logging.success(
+                                "New SOTA circuit detected, preserving..."
+                            )
+                            self.competition.sota_manager.preserve_circuit(
+                                circuit_dir, self.competition.miner_states[hotkey]
+                            )
+                        else:
+                            self.competition.cleanup_circuit_dir(circuit_dir)
+                    finally:
+                        self.pause_requests_event.clear()
+                        bt.logging.info("Resuming main request loop...")
+                else:
+                    bt.logging.error(
+                        f"Circuit download or evaluation failed for {hash[:8]} from {hotkey[:8]}"
+                    )
+            finally:
+                self.competition.clear_current_download()
 
     def stop(self):
         bt.logging.info("=== Competition Thread Stop Start ===")
