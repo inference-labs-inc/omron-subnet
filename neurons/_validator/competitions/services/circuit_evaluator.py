@@ -34,9 +34,14 @@ class CircuitEvaluator:
         sota_manager: SotaManager,
     ):
 
-        self.baseline_model = config["baseline_model_path"]
         self.competition_directory = competition_directory
         self.sota_manager = sota_manager
+
+        self.baseline_model = os.path.join(
+            self.competition_directory, config["baseline_model_path"]
+        )
+        bt.logging.debug(f"Using baseline model at: {self.baseline_model}")
+
         self.is_onnx = not isinstance(self.baseline_model, torch.nn.Module)
 
         self.onnx_venv = os.path.abspath(
