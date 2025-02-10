@@ -75,41 +75,56 @@ class CompetitionThread(threading.Thread):
             )
 
             try:
-                circuit_dir = self.competition.circuit_manager.download_circuit(
-                    uid, hotkey, hash
-                )
-                if circuit_dir:
-                    bt.logging.info("Pausing request processing for evaluation...")
-                    if self.validator_message_queue:
-                        self.validator_message_queue.put(ValidatorMessage.WINDDOWN)
-                        bt.logging.info("Waiting for validator winddown to complete...")
+                circuit_dir = os.path.join(self.competition.temp_directory, hash)
+                os.makedirs(circuit_dir, exist_ok=True)
 
-                        if not self.wait_for_message(
-                            ValidatorMessage.WINDDOWN_COMPLETE
-                        ):
-                            bt.logging.error(
-                                "Failed to wait for validator winddown, proceeding anyway"
-                            )
-
-                    bt.logging.info("Starting circuit evaluation...")
-                    try:
-                        self.competition.circuit_evaluator.evaluate_circuit(
-                            circuit_dir, hash, hotkey
+                axon = self.competition.metagraph.axons[uid]
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    if loop.run_until_complete(
+                        self.competition.circuit_manager.download_files(
+                            axon, hash, circuit_dir
                         )
-                    except Exception as e:
-                        bt.logging.error(f"Error during circuit evaluation: {str(e)}")
-                        bt.logging.error(f"Stack trace: {traceback.format_exc()}")
-                    finally:
-                        self.competition.cleanup_circuit_dir(circuit_dir)
-                        bt.logging.info("Resuming request processing...")
+                    ):
+                        bt.logging.info("Pausing request processing for evaluation...")
                         if self.validator_message_queue:
-                            self.validator_message_queue.put(
-                                ValidatorMessage.COMPETITION_COMPLETE
+                            self.validator_message_queue.put(ValidatorMessage.WINDDOWN)
+                            bt.logging.info(
+                                "Waiting for validator winddown to complete..."
                             )
-                else:
-                    bt.logging.error(
-                        f"Circuit download or evaluation failed for {hash[:8]} from {hotkey[:8]}"
-                    )
+
+                            if not self.wait_for_message(
+                                ValidatorMessage.WINDDOWN_COMPLETE
+                            ):
+                                bt.logging.error(
+                                    "Failed to wait for validator winddown, proceeding anyway"
+                                )
+
+                        bt.logging.info("Starting circuit evaluation...")
+                        try:
+                            self.competition.circuit_evaluator.evaluate_circuit(
+                                circuit_dir, hash, hotkey
+                            )
+                        except Exception as e:
+                            bt.logging.error(
+                                f"Error during circuit evaluation: {str(e)}"
+                            )
+                            bt.logging.error(f"Stack trace: {traceback.format_exc()}")
+                        finally:
+                            self.competition.cleanup_circuit_dir(circuit_dir)
+                            bt.logging.info("Resuming request processing...")
+                            if self.validator_message_queue:
+                                self.validator_message_queue.put(
+                                    ValidatorMessage.COMPETITION_COMPLETE
+                                )
+                    else:
+                        bt.logging.error(
+                            f"Circuit download or evaluation failed for {hash[:8]} from {hotkey[:8]}"
+                        )
+                finally:
+                    loop.close()
+                    asyncio.set_event_loop(None)
             finally:
                 self.competition.clear_current_download()
 
