@@ -508,21 +508,6 @@ class CircuitEvaluator:
 
                 stdout, stderr = process.communicate()
 
-                bt.logging.info("ONNX Runner Output START ---")
-                if stdout:
-                    for line in stdout.split("\n"):
-                        if line.strip():
-                            bt.logging.info(f"STDOUT: {line}")
-                if stderr:
-                    for line in stderr.split("\n"):
-                        if line.strip():
-                            if "ONNX RUNNER" in line:
-                                bt.logging.info(f"ONNX: {line}")
-                            else:
-                                bt.logging.debug(f"ONNX Warning: {line}")
-
-                bt.logging.info("ONNX Runner Output END ---")
-
                 if process.returncode != 0:
                     bt.logging.error(
                         f"ONNX runner failed with code {process.returncode}"

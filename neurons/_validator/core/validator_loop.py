@@ -328,9 +328,8 @@ class ValidatorLoop:
                 self.log_health()
                 await self.log_responses()
 
-                # Only sync competition every hour
                 current_time = time.time()
-                if current_time - last_competition_sync >= ONE_HOUR:
+                if current_time - last_competition_sync >= ONE_MINUTE:
                     if (
                         not self.competition
                         or not self.competition.pause_requests_event.is_set()
