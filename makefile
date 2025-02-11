@@ -106,6 +106,20 @@ test-validator:
 		--subtensor.network test \
 		$(ARGS)
 
+local-miner:
+	@echo "Starting local miner on staging"
+	cd neurons; \
+	../.venv/bin/python miner.py \
+	--localnet \
+	--no-auto-update
+
+local-validator:
+	@echo "Starting local validator on staging"
+	cd neurons; \
+	../.venv/bin/python validator.py \
+	--localnet \
+	--no-auto-update
+
 pm2-setup:
 	./setup.sh
 
