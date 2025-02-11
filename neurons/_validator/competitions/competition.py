@@ -487,30 +487,21 @@ class Competition:
             circuit_dir = os.path.join(self.temp_directory, hash)
             os.makedirs(circuit_dir, exist_ok=True)
 
-            bt.logging.debug("Creating new event loop for download")
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            bt.logging.debug(f"New event loop created and set: {loop}")
+            loop = None
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
 
             try:
-                bt.logging.debug("Starting circuit download")
                 download_success = loop.run_until_complete(
                     self.circuit_manager.download_files(axon, hash, circuit_dir)
                 )
-                bt.logging.debug(f"Download completed with success={download_success}")
             except Exception as e:
                 bt.logging.error(f"Error during download: {str(e)}")
                 bt.logging.error(f"Stack trace: {traceback.format_exc()}")
                 return False
-            finally:
-                bt.logging.debug("Cleaning up event loop")
-                try:
-                    loop.close()
-                    bt.logging.debug("Event loop closed successfully")
-                except Exception as e:
-                    bt.logging.error(f"Error closing event loop: {str(e)}")
-                asyncio.set_event_loop(None)
-                bt.logging.debug("Event loop reference cleared")
 
             if download_success:
                 bt.logging.info(f"Download completed for {hash[:8]}, validating...")
