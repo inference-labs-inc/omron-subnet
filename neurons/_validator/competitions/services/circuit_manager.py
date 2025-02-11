@@ -4,8 +4,6 @@ import json
 import aiohttp
 import bittensor as bt
 from urllib.parse import urlparse
-import asyncio
-from contextlib import asynccontextmanager
 import traceback
 from protocol import Competition
 
@@ -16,29 +14,6 @@ class CircuitManager:
         self.competition_id = competition_id
         self.dendrite = dendrite
         os.makedirs(temp_dir, exist_ok=True)
-        self._session = None
-        self._session_lock = asyncio.Lock()
-
-    @asynccontextmanager
-    async def _get_session(self):
-        async with self._session_lock:
-            if self._session is None or self._session.closed:
-                self._session = aiohttp.ClientSession(
-                    connector=aiohttp.TCPConnector(force_close=True)
-                )
-            try:
-                yield self._session
-            except Exception as e:
-                if self._session and not self._session.closed:
-                    await self._session.close()
-                self._session = None
-                raise e
-
-    async def close(self):
-        async with self._session_lock:
-            if self._session and not self._session.closed:
-                await self._session.close()
-            self._session = None
 
     def cleanup_temp_files(self, circuit_dir: str):
         try:
@@ -122,7 +97,10 @@ class CircuitManager:
             required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
             all_files_downloaded = True
 
-            async with self._get_session() as session:
+            # Create a new session for each download
+            async with aiohttp.ClientSession(
+                connector=aiohttp.TCPConnector(force_close=True)
+            ) as session:
                 for file_name in required_files:
                     if file_name not in signed_urls:
                         bt.logging.error(f"Missing signed URL for {file_name}")

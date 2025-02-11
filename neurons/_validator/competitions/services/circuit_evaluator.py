@@ -7,7 +7,7 @@ import torch
 import numpy as np
 import bittensor as bt
 from typing import Tuple, List, Optional
-from constants import LOCAL_EZKL_PATH, TEMP_FOLDER
+from constants import LOCAL_EZKL_PATH
 from _validator.competitions.services.sota_manager import SotaManager
 from _validator.competitions.services.data_source import (
     CompetitionDataSource,
@@ -21,6 +21,7 @@ from _validator.competitions.services.data_source import (
     CompetitionDataProcessor,
 )
 import logging
+from utils.system import get_temp_folder
 
 logging.getLogger("onnxruntime").setLevel(logging.ERROR)
 os.environ["ONNXRUNTIME_LOGGING_LEVEL"] = "3"
@@ -521,18 +522,18 @@ class CircuitEvaluator:
             }
 
             with tempfile.NamedTemporaryFile(
-                mode="w+", suffix=".json", dir=TEMP_FOLDER, delete=False
+                mode="w+", suffix=".json", dir=get_temp_folder(), delete=False
             ) as temp_input:
                 json.dump(input_data, temp_input, indent=2)
                 temp_input_path = temp_input.name
 
             with tempfile.NamedTemporaryFile(
-                mode="w+", suffix=".json", dir=TEMP_FOLDER, delete=False
+                mode="w+", suffix=".json", dir=get_temp_folder(), delete=False
             ) as temp_witness:
                 witness_path = temp_witness.name
 
             with tempfile.NamedTemporaryFile(
-                mode="w+", suffix=".json", dir=TEMP_FOLDER, delete=False
+                mode="w+", suffix=".json", dir=get_temp_folder(), delete=False
             ) as temp_proof:
                 temp_proof_path = temp_proof.name
 

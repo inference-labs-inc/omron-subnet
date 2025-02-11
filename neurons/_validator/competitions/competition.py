@@ -21,10 +21,11 @@ from .services.circuit_evaluator import CircuitEvaluator
 from .services.sota_manager import SotaManager
 
 from .utils.cleanup import register_cleanup_handlers
-from constants import TEMP_FOLDER, VALIDATOR_REQUEST_TIMEOUT_SECONDS
+from constants import VALIDATOR_REQUEST_TIMEOUT_SECONDS
 from _validator.utils.uid import get_queryable_uids
 from utils.wandb_logger import safe_log
 from _validator.models.request_type import ValidatorMessage
+from utils.system import get_temp_folder
 
 
 class CompetitionThread(threading.Thread):
@@ -193,7 +194,7 @@ class Competition:
         self.competition_directory = os.path.join(
             os.path.dirname(__file__), str(competition_id)
         )
-        self.temp_directory = os.path.join(TEMP_FOLDER, str(competition_id))
+        self.temp_directory = os.path.join(get_temp_folder(), str(competition_id))
         self.sota_directory = os.path.join(self.competition_directory, "sota")
 
         register_cleanup_handlers()
