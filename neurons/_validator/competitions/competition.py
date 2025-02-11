@@ -20,7 +20,7 @@ from bittensor.core.chain_data import decode_account_id
 from .services.circuit_evaluator import CircuitEvaluator
 from .services.sota_manager import SotaManager
 
-from .utils.cleanup import register_cleanup_handlers
+from .utils.cleanup import register_cleanup_handlers, cleanup_temp_dir
 from constants import VALIDATOR_REQUEST_TIMEOUT_SECONDS
 from _validator.utils.uid import get_queryable_uids
 from utils.wandb_logger import safe_log
@@ -128,11 +128,11 @@ class CompetitionThread(threading.Thread):
                     bt.logging.info("Starting circuit evaluation...")
                     try:
                         self.competition.circuit_evaluator.evaluate(circuit_dir)
+                        self.competition.cleanup_circuit_dir(circuit_dir)
                     except Exception as e:
                         bt.logging.error(f"Error during circuit evaluation: {str(e)}")
                         bt.logging.error(f"Stack trace: {traceback.format_exc()}")
                     finally:
-                        self.competition.cleanup_circuit_dir(circuit_dir)
                         bt.logging.info("Resuming request processing...")
                         if self.competition_to_validator_queue:
                             self.competition_to_validator_queue.put(
@@ -482,7 +482,8 @@ class Competition:
         """Clean up a circuit directory if it exists."""
         if os.path.exists(circuit_dir):
             bt.logging.info(f"Cleaning up circuit directory: {circuit_dir}")
-            shutil.rmtree(circuit_dir)
+            specific_dir = os.path.basename(circuit_dir)
+            cleanup_temp_dir(specific_dir=specific_dir)
 
     def _evaluate_circuit(
         self,
