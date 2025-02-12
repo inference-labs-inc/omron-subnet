@@ -10,7 +10,11 @@ import threading
 from multiprocessing import Queue as MPQueue
 from queue import Empty
 import time
-from async_substrate_interface.types import ScaleObj
+
+try:
+    from async_substrate_interface.types import ScaleObj
+except ImportError:
+    ScaleObj = None
 from substrateinterface.utils.ss58 import ss58_encode
 
 from .models.neuron import NeuronState
