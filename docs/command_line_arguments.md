@@ -49,7 +49,7 @@ Arguments that are built into bittensor packages, and can be provided to change 
 
 Bittensor wallet configuration options.
 
-[View in code →](https://github.com/opentensor/bittensor/blob/master/bittensor/wallet.py#L134)
+[View in code →](https://github.com/opentensor/btwallet/blob/main/src/wallet.rs#L70)
 
 | Argument          | Required | Default                 | Accepted Values | Description                                                                                               |
 | ----------------- | :------: | ----------------------- | --------------- | --------------------------------------------------------------------------------------------------------- |
@@ -62,7 +62,7 @@ Bittensor wallet configuration options.
 
 Bittensor subtensor configuration options.
 
-[View in code →](https://github.com/opentensor/bittensor/blob/master/bittensor/subtensor.py#L170)
+[View in code →](https://github.com/opentensor/bittensor/blob/master/bittensor/core/subtensor.py#L364)
 
 | Argument                     | Required | Default            | Accepted Values                      | Description                                                                                                                |
 | ---------------------------- | :------: | ------------------ | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
@@ -74,7 +74,7 @@ Bittensor subtensor configuration options.
 
 Bittensor Axon configuration options.
 
-[View in code →](https://github.com/opentensor/bittensor/blob/master/bittensor/axon.py#L600)
+[View in code →](https://github.com/opentensor/bittensor/blob/master/bittensor/core/axon.py#L608)
 
 | Argument               | Required | Default | Accepted Values | Description                                                                               |
 | ---------------------- | :------: | ------- | --------------- | ----------------------------------------------------------------------------------------- |
@@ -88,7 +88,7 @@ Bittensor Axon configuration options.
 
 Bittensor logging configuration options.
 
-[View in code →](https://github.com/opentensor/bittensor/blob/master/bittensor/btlogging/loggingmachine.py#L334)
+[View in code →](https://github.com/opentensor/bittensor/blob/master/bittensor/utils/btlogging/loggingmachine.py#L592)
 
 | Argument                | Required | Default              | Accepted Values | Description                                |
 | ----------------------- | :------: | -------------------- | --------------- | ------------------------------------------ |
