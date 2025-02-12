@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 
 
@@ -9,16 +10,13 @@ class Roles:
 
 # The model ID for a batched proof of weights model
 BATCHED_PROOF_OF_WEIGHTS_MODEL_ID = (
-    "e84b2e5f223621fa20078eb9f920d8d4d3a4ff95fa6e2357646fdbb43a2557c9"
+    "1e6fcdaea58741e7248b631718dda90398a17b294480beb12ce8232e27ca3bff"
 )
 # The model ID for a single proof of weights model
 SINGLE_PROOF_OF_WEIGHTS_MODEL_ID = (
-    "a849500803abdbb86a9460e18684a6411dc7ae0b75f1f6330e3028081a497dea"
+    "fa0d509d52abe2d1e809124f8aba46258a02f7253582f7b7f5a22e1e0bca0dfb"
 )
-# The model ID for a single proof of weights model, using the Jolt proof system
-SINGLE_PROOF_OF_WEIGHTS_MODEL_ID_JOLT = (
-    "37320fc74fec80805eedc8e92baf3c58842a2cb2a4ae127ad6e930f0c8441c7a"
-)
+
 IGNORED_MODEL_HASHES = [
     "0",
     "0a92bc32ea02abe54159da70aeb541d52c3cba27c8708669eda634e096a86f8b",
@@ -28,6 +26,13 @@ IGNORED_MODEL_HASHES = [
     "ed8ba401d709ee31f6b9272163c71451da171c7d71800313fe5db58d0f6c483a",
     "1d60d545b7c5123fd60524dcbaf57081ca7dc4a9ec36c892927a3153328d17c0",
     "37320fc74fec80805eedc8e92baf3c58842a2cb2a4ae127ad6e930f0c8441c7a",
+    "1d60d545b7c5123fd60524dcbaf57081ca7dc4a9ec36c892927a3153328d17c0",
+    "33b92394b18412622adad75733a6fc659b4e202b01ee8a5465958a6bad8ded62",
+    "37320fc74fec80805eedc8e92baf3c58842a2cb2a4ae127ad6e930f0c8441c7a",
+    "8dcff627a782525ea86196941a694ffbead179905f0cd4550ddc3df9e2b90924",
+    "a4bcecaf699fd9212600a1f2fcaa40c444e1aeaab409ea240a38c33ed356f4e2",
+    "e84b2e5f223621fa20078eb9f920d8d4d3a4ff95fa6e2357646fdbb43a2557c9",
+    "a849500803abdbb86a9460e18684a6411dc7ae0b75f1f6330e3028081a497dea",
 ]
 
 # The maximum timespan allowed for miners to respond to a query
@@ -70,6 +75,10 @@ PROOF_OF_WEIGHTS_INTERVAL = 1000
 MAX_PROOFS_TO_LOG = 0
 # Era period for proof of weights (mortality of the pow log)
 PROOF_OF_WEIGHTS_LIFESPAN = 2
+# Active competition
+ACTIVE_COMPETITION = 0
+# Frequency in terms of seconds at which the competition is synced and evaluated
+COMPETITION_SYNC_INTERVAL = 60 * 60 * 24
 # Maximum signature lifespan for WebSocket requests
 MAX_SIGNATURE_LIFESPAN = 300
 # Whitelisted public keys (ss58 addresses) we accept external requests from by default
@@ -126,6 +135,8 @@ MAINNET_TESTNET_UIDS = [
     (57, 237),  # gaia
     (59, 249),  # agent-arena
 ]
+# EZKL path
+LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")
 # GitHub repository URL
 REPO_URL = "https://github.com/inference-labs-inc/omron-subnet"
 # Various time constants in seconds
@@ -141,3 +152,6 @@ TEMP_FOLDER = "/tmp/omron"
 # Queue size limits
 MAX_POW_QUEUE_SIZE = 1024
 MAX_EVALUATION_ITEMS = 1024
+
+# Maximum circuit size in GB for competitions
+MAX_CIRCUIT_SIZE_GB = 50

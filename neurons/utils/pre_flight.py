@@ -1,13 +1,11 @@
 import asyncio
 import json
 import os
-import shutil
 import subprocess
 import time
 import traceback
-from functools import partial
 from typing import Optional
-from constants import FIVE_MINUTES
+from constants import FIVE_MINUTES, Roles
 
 # trunk-ignore(pylint/E0611)
 import bittensor as bt
@@ -16,7 +14,9 @@ import requests
 
 import cli_parser
 from constants import IGNORED_MODEL_HASHES
-from execution_layer.circuit import ProofSystem
+
+from functools import partial
+from collections import OrderedDict
 
 LOCAL_SNARKJS_INSTALL_DIR = os.path.join(os.path.expanduser("~"), ".snarkjs")
 LOCAL_SNARKJS_PATH = os.path.join(
@@ -26,12 +26,20 @@ LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")
 TOOLCHAIN = "nightly-2024-09-30"
 JOLT_VERSION = "dd9e5c4bcf36ffeb75a576351807f8d86c33ec66"
 
+MINER_EXTERNAL_FILES = [
+    "circuit.zkey",
+    "pk.key",
+]
+VALIDATOR_EXTERNAL_FILES = [
+    "circuit.zkey",
+]
+
 
 async def download_srs(logrows):
     await ezkl.get_srs(logrows=logrows, commitment=ezkl.PyCommitments.KZG)
 
 
-def run_shared_preflight_checks(role: Optional[str] = None):
+def run_shared_preflight_checks(role: Optional[Roles] = None):
     """
     This function executes a series of checks to ensure the environment is properly
     set up for both validator and miner operations.
@@ -47,22 +55,23 @@ def run_shared_preflight_checks(role: Optional[str] = None):
         Exception: If any of the pre-flight checks fail.
     """
 
-    preflight_checks = [
-        ("Resolve legacy folders", partial(resolve_legacy_folders, role=role)),
-        ("Syncing model files", sync_model_files),
-        ("Ensuring Node.js version", ensure_nodejs_version),
-        ("Checking SnarkJS installation", ensure_snarkjs_installed),
-        ("Checking EZKL installation", ensure_ezkl_installed),
-    ]
+    preflight_checks = OrderedDict(
+        {
+            "Syncing model files": partial(sync_model_files, role=role),
+            "Ensuring Node.js version": ensure_nodejs_version,
+            "Checking SnarkJS installation": ensure_snarkjs_installed,
+            "Checking EZKL installation": ensure_ezkl_installed,
+        }
+    )
 
     bt.logging.info(" PreFlight | Running pre-flight checks")
 
     # Skip sync_model_files during docker build
     if os.getenv("OMRON_DOCKER_BUILD", False):
         bt.logging.info(" PreFlight | Skipping model file sync")
-        preflight_checks.remove(("Syncing model files", sync_model_files))
+        _ = preflight_checks.pop("Syncing model files")
 
-    for check_name, check_function in preflight_checks:
+    for check_name, check_function in preflight_checks.items():
         bt.logging.info(f" PreFlight | {check_name}")
         try:
             check_function()
@@ -161,12 +170,35 @@ def ensure_snarkjs_installed():
             ) from e
 
 
-def sync_model_files():
+def sync_model_files(role: Optional[Roles] = None):
     """
     Sync external model files
     """
     MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "deployment_layer")
     SYNC_LOG_PREFIX = "  SYNC  | "
+
+    loop = asyncio.get_event_loop()
+    if role == Roles.VALIDATOR:
+        for logrows in range(1, 26):
+            if os.path.exists(
+                os.path.join(
+                    os.path.expanduser("~"), ".ezkl", "srs", f"kzg{logrows}.srs"
+                )
+            ):
+                bt.logging.info(
+                    f"{SYNC_LOG_PREFIX}SRS for logrows={logrows} already exists, skipping..."
+                )
+                continue
+
+            try:
+                loop.run_until_complete(download_srs(logrows))
+                bt.logging.info(
+                    f"{SYNC_LOG_PREFIX}Successfully downloaded SRS for logrows={logrows}"
+                )
+            except Exception as e:
+                bt.logging.error(
+                    f"{SYNC_LOG_PREFIX}Failed to download SRS for logrows={logrows}: {e}"
+                )
 
     for model_hash in os.listdir(MODEL_DIR):
         if not model_hash.startswith("model_"):
@@ -195,32 +227,17 @@ def sync_model_files():
                 SYNC_LOG_PREFIX + f"Failed to parse JSON from {metadata_file}"
             )
             continue
-        # If it's an EZKL model, we'll try to download the SRS files
-        if metadata.get("proof_system") == ProofSystem.EZKL:
-            ezkl_settings_file = os.path.join(MODEL_DIR, model_hash, "settings.json")
-            if not os.path.isfile(ezkl_settings_file):
-                bt.logging.error(
-                    f"{SYNC_LOG_PREFIX}Settings file not found at {ezkl_settings_file} for {model_hash}. Skipping sync."
-                )
-                continue
-
-            try:
-                with open(ezkl_settings_file, "r", encoding="utf-8") as f:
-                    logrows = json.load(f).get("run_args", {}).get("logrows")
-                    if logrows:
-                        loop = asyncio.get_event_loop()
-                        loop.run_until_complete(download_srs(logrows))
-                        bt.logging.info(
-                            f"{SYNC_LOG_PREFIX}Successfully downloaded SRS for logrows={logrows}"
-                        )
-            except (json.JSONDecodeError, subprocess.CalledProcessError) as e:
-                bt.logging.error(
-                    f"{SYNC_LOG_PREFIX}Failed to process settings or download SRS: {e}"
-                )
-                continue
 
         external_files = metadata.get("external_files", {})
         for key, url in external_files.items():
+            if (role == Roles.VALIDATOR and key not in VALIDATOR_EXTERNAL_FILES) or (
+                role == Roles.MINER and key not in MINER_EXTERNAL_FILES
+            ):
+                bt.logging.info(
+                    SYNC_LOG_PREFIX
+                    + f"Skipping {key} for {model_hash} as it is not required for the {role}."
+                )
+                continue
             file_path = os.path.join(
                 cli_parser.config.full_path_models, model_hash, key
             )
@@ -552,58 +569,3 @@ def safe_extract(tar, path):
         if not is_safe_path(path, member_path):
             continue
         tar.extract(member, path)
-
-
-def resolve_legacy_folders(role: str):
-    """
-    Move files from legacy folders to the new locations.
-    This step gonna be removed in the future.
-    """
-
-    if not role:
-        # dry run - no actions needed
-        return
-
-    if cli_parser.config.external_model_dir:
-        # user have specified a custom location for storing models data
-        # that means we don't need to move files from the legacy folders
-        return
-
-    legacy_full_path = os.path.expanduser(
-        "{}/{}/{}/netuid{}".format(
-            cli_parser.config.logging.logging_dir,  # type: ignore
-            cli_parser.config.wallet.name,  # type: ignore
-            cli_parser.config.wallet.hotkey,  # type: ignore
-            cli_parser.config.netuid,
-        )
-    )
-
-    _move_files(
-        os.path.join(legacy_full_path, role),
-        cli_parser.config.full_path,
-    )
-
-    _move_files(
-        os.path.join(legacy_full_path, "deployment_layer"),
-        cli_parser.config.full_path_models,
-    )
-
-
-def _move_files(src: str, dst: str):
-    """
-    Move files recursively from source to destination.
-    """
-    if not os.path.exists(src) or not any(os.scandir(src)) or any(os.scandir(dst)):
-        # if source does not exist or is empty, or destination is not empty -> skip
-        return
-
-    try:
-        for item in os.listdir(src):
-            s = os.path.join(src, item)
-            d = os.path.join(dst, item)
-            shutil.move(s, d)
-
-        os.rmdir(src)
-        bt.logging.info(f"Moved files from {src} to {dst}")
-    except Exception as e:
-        bt.logging.error(f"Oops. Failed to move files from {src} to {dst}: {e}")

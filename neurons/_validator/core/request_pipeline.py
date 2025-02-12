@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import traceback
 import random
 
 import bittensor as bt
@@ -21,6 +22,7 @@ from execution_layer.circuit import Circuit, CircuitType
 from execution_layer.generic_input import GenericInput
 from protocol import ProofOfWeightsSynapse, QueryZkProof
 from utils.wandb_logger import safe_log
+from execution_layer.base_input import BaseInput
 
 
 class RequestPipeline:
@@ -61,12 +63,12 @@ class RequestPipeline:
         save: bool = False,
     ) -> Request | None:
         """Check hash and create request if valid."""
-        if isinstance(synapse, ProofOfWeightsSynapse):
-            input_data = synapse.inputs
-        else:
-            input_data = synapse.query_input["public_inputs"]
-
         try:
+            if isinstance(synapse, ProofOfWeightsSynapse):
+                input_data = synapse.inputs
+            else:
+                input_data = synapse.query_input["public_inputs"]
+
             self.hash_guard.check_hash(input_data)
         except Exception as e:
             bt.logging.error(f"Hash already exists: {e}")
@@ -93,19 +95,28 @@ class RequestPipeline:
         requests = []
 
         for uid in filtered_uids:
-            synapse, save = self.get_synapse_request(
-                RequestType.RWR, external_request.circuit, external_request
-            )
-            request = self._check_and_create_request(
-                uid=uid,
-                synapse=synapse,
-                circuit=external_request.circuit,
-                request_type=RequestType.RWR,
-                request_hash=external_request.hash,
-                save=save,
-            )
-            if request:
-                requests.append(request)
+            try:
+                synapse, save = self.get_synapse_request(
+                    RequestType.RWR, external_request.circuit, external_request
+                )
+                request = self._check_and_create_request(
+                    uid=uid,
+                    synapse=synapse,
+                    circuit=external_request.circuit,
+                    request_type=RequestType.RWR,
+                    request_hash=external_request.hash,
+                    save=save,
+                )
+                if request:
+                    requests.append(request)
+            except Exception as e:
+                bt.logging.error(f"Error preparing request for UID {uid}: {e}")
+                traceback.print_exc()
+                self.api.set_request_result(
+                    external_request.hash,
+                    {"success": False, "error": "Error preparing request"},
+                )
+                continue
         return requests
 
     def _prepare_benchmark_requests(self, filtered_uids: list[int]) -> list[Request]:
@@ -143,8 +154,10 @@ class RequestPipeline:
         )[0]
 
     def format_for_query(
-        self, inputs: dict[str, object], circuit: Circuit
+        self, inputs: dict[str, object] | BaseInput, circuit: Circuit
     ) -> dict[str, object]:
+        if hasattr(inputs, "to_json"):
+            inputs = inputs.to_json()
         return {"public_inputs": inputs, "model_id": circuit.id}
 
     def get_synapse_request(
@@ -198,7 +211,7 @@ class RequestPipeline:
             return (
                 QueryZkProof(
                     model_id=circuit.id,
-                    query_input=self.format_for_query(inputs.to_json(), circuit),
+                    query_input=self.format_for_query(inputs, circuit),
                     query_output="",
                 ),
                 False,

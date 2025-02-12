@@ -42,7 +42,7 @@ class ResponseProcessor:
                 if not verification_result:
                     bt.logging.warning(
                         f"Miner at UID: {miner_response.uid} provided a proof"
-                        f"for {str(miner_response.circuit)} "
+                        f" for {str(miner_response.circuit)}"
                         ", but verification failed."
                     )
             except Exception as e:

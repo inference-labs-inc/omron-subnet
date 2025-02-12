@@ -1,6 +1,7 @@
 from _validator.models.base_rpc_request import RealWorldRequest
 from pydantic import Field
 from deployment_layer.circuit_store import circuit_store
+from execution_layer.circuit import CircuitType
 
 
 class ProofOfComputationRPCRequest(RealWorldRequest):
@@ -8,22 +9,26 @@ class ProofOfComputationRPCRequest(RealWorldRequest):
     Request for the Proof of Computation RPC method.
     """
 
-    circuit_name: str = Field(..., description="The name of the circuit to use")
-    circuit_version: int | None = Field(
-        ..., description="The version of the circuit to use"
-    )
+    circuit_id: str = Field(..., description="The ID of the circuit to use")
 
-    def __init__(
-        self, circuit_name: str, circuit_version: int | None, inputs: dict[str, any]
-    ):
-        if circuit_version is None:
-            circuit = circuit_store.get_latest_circuit_by_name(circuit_name)
-        else:
-            circuit = circuit_store.get_circuit_by_name_and_version(
-                circuit_name=circuit_name, circuit_version=circuit_version
-            )
+    class Config:
+        arbitrary_types_allowed = True
+        extra = "allow"
+
+    def __init__(self, **data):
+        circuit_id = data.get("circuit_id")
+        if not circuit_id:
+            raise ValueError("circuit_id is required")
+
+        circuit = circuit_store.get_circuit(circuit_id)
         if circuit is None:
+            raise ValueError(f"No circuit found for ID {circuit_id}")
+
+        if circuit.metadata.type != CircuitType.PROOF_OF_COMPUTATION:
             raise ValueError(
-                f"No circuit found for name {circuit_name} and version {circuit_version}"
+                f"Circuit {circuit_id} is not a proof of computation circuit"
             )
-        super().__init__(circuit=circuit, inputs=inputs)
+
+        super().__init__(
+            circuit=circuit, inputs=data.get("inputs"), circuit_id=circuit_id
+        )
