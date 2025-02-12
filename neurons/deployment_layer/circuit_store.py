@@ -7,7 +7,6 @@ from typing import Optional
 import bittensor as bt
 from packaging import version
 
-import cli_parser
 from constants import IGNORED_MODEL_HASHES
 from execution_layer.circuit import Circuit
 
@@ -45,9 +44,7 @@ class CircuitStore:
         attempts to create Circuit objects from these directories, and stores them
         in the circuits dictionary.
         """
-        deployment_layer_path = (
-            deployment_layer_path or cli_parser.config.full_path_models
-        )
+        deployment_layer_path = os.path.dirname(__file__)
         bt.logging.info(f"Loading circuits from {deployment_layer_path}")
 
         for folder_name in os.listdir(deployment_layer_path):
