@@ -100,8 +100,7 @@ class AutoUpdate:
             )
             subprocess.check_call(
                 [
-                    python_executable,
-                    "-m",
+                    "uv",
                     "pip",
                     "install",
                     "-r",
