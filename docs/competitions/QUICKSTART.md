@@ -94,6 +94,22 @@ The miner will automatically:
 - View metrics: https://wandb.ai/inferencelabs/omron
 - View leaderboard: https://accelerator.omron.ai
 
+### 🏆 EZKL Performance Evaluation
+
+Upon completion of the Subnet 2 competition phase, [EZKL](https://ezkl.xyz) will conduct an independent evaluation of all submitted circuits through their automated CI/CD pipeline. Your implementation will be assessed across three critical dimensions:
+
+- ⚡ **Performance** - Circuit proving time optimization
+- 📊 **Resource Efficiency** - Memory utilization and management
+- 🎯 **Accuracy** - Age recognition precision and reliability
+
+#### Submission Process
+
+1. Submit your implementation via PR to https://github.com/zkonduit/ezkl
+2. Include the tag `omron-subnet-competition-1`
+3. Await automated evaluation results
+
+High-performing circuits that demonstrate excellence across these metrics will be eligible for additional grant funding. EZKL's evaluation criteria are designed to identify implementations that achieve an optimal balance of performance, efficiency, and accuracy.
+
 ## Troubleshooting
 
 **Circuit Upload Fails**
