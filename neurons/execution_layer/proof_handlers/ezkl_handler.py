@@ -123,8 +123,12 @@ class EZKLHandler(ProofSystemHandler):
                 check=True,
                 capture_output=True,
                 text=True,
+                timeout=60,
             )
             return "verified: true" in result.stdout
+        except subprocess.TimeoutExpired:
+            bt.logging.error("Verification process timed out after 60 seconds")
+            return False
         except subprocess.CalledProcessError:
             return False
 

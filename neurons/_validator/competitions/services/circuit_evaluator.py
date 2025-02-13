@@ -184,21 +184,8 @@ class CircuitEvaluator:
         input_shape = self._get_input_shape(circuit_dir)
         bt.logging.debug(f"Got input shape: {input_shape}")
 
-        safe_log(
-            {
-                "circuit_eval_status": "started",
-                "input_shape": input_shape if input_shape else None,
-            }
-        )
-
         if not input_shape:
             bt.logging.error("Failed to get input shape")
-            safe_log(
-                {
-                    "circuit_eval_status": "failed",
-                    "error": "Failed to get input shape",
-                }
-            )
             return 0.0, float("inf"), float("inf"), False
 
         try:
@@ -210,82 +197,33 @@ class CircuitEvaluator:
         except Exception as e:
             bt.logging.error(f"Error loading num_iterations, using default: {e}")
             num_iterations = 10
-            safe_log(
-                {
-                    "circuit_eval_status": "config_error",
-                    "error": str(e),
-                    "using_default_iterations": num_iterations,
-                }
-            )
 
         for i in range(num_iterations):
-            iteration_start = time.time()
             bt.logging.debug(f"Running evaluation {i + 1}/{num_iterations}")
-            safe_log(
-                {
-                    "circuit_eval_status": "iteration_started",
-                    "iteration": i + 1,
-                    "total_iterations": num_iterations,
-                }
-            )
 
             try:
                 test_inputs = self.data_source.get_benchmark_data()
                 if test_inputs is None:
                     bt.logging.error("Failed to get benchmark data")
-                    safe_log(
-                        {
-                            "circuit_eval_status": "iteration_error",
-                            "iteration": i + 1,
-                            "error": "Failed to get benchmark data",
-                        }
-                    )
                     raw_accuracy_scores.append(0.0)
                     continue
 
                 bt.logging.debug(f"Got benchmark data with shape: {test_inputs.shape}")
-                safe_log(
-                    {
-                        "circuit_eval_status": "got_benchmark_data",
-                        "iteration": i + 1,
-                        "input_shape": list(test_inputs.shape),
-                    }
-                )
 
                 baseline_output = self._run_baseline_model(test_inputs)
                 if baseline_output is None:
                     bt.logging.error("Baseline model run failed")
-                    safe_log(
-                        {
-                            "circuit_eval_status": "iteration_error",
-                            "iteration": i + 1,
-                            "error": "Baseline model run failed",
-                        }
-                    )
                     raw_accuracy_scores.append(0.0)
                     continue
 
                 bt.logging.debug(
                     f"Got baseline output with shape: {np.array(baseline_output).shape}"
                 )
-                safe_log(
-                    {
-                        "circuit_eval_status": "baseline_complete",
-                        "iteration": i + 1,
-                        "output_shape": list(np.array(baseline_output).shape),
-                    }
-                )
 
                 proof_result = self._generate_proof(circuit_dir, test_inputs)
                 if not proof_result:
                     bt.logging.error("Proof generation failed")
-                    safe_log(
-                        {
-                            "circuit_eval_status": "iteration_error",
-                            "iteration": i + 1,
-                            "error": "Proof generation failed",
-                        }
-                    )
+
                     raw_accuracy_scores.append(0.0)
                     verification_results.append(False)
                     proof_sizes.append(float("inf"))
@@ -297,15 +235,6 @@ class CircuitEvaluator:
                     f"Generated proof with size: {len(proof_data['proof'])}"
                 )
                 response_times.append(response_time)
-
-                safe_log(
-                    {
-                        "circuit_eval_status": "proof_generated",
-                        "iteration": i + 1,
-                        "proof_size": len(proof_data["proof"]),
-                        "response_time": response_time,
-                    }
-                )
 
                 proof = proof_data.get("proof", [])
                 public_signals = [
@@ -321,14 +250,6 @@ class CircuitEvaluator:
                 bt.logging.debug(f"Proof verification result: {verify_result}")
                 verification_results.append(verify_result)
 
-                safe_log(
-                    {
-                        "circuit_eval_status": "proof_verified",
-                        "iteration": i + 1,
-                        "verification_success": verify_result,
-                    }
-                )
-
                 if verify_result:
                     raw_accuracy = self._compare_outputs(
                         baseline_output, public_signals
@@ -336,37 +257,14 @@ class CircuitEvaluator:
                     bt.logging.debug(f"Raw accuracy: {raw_accuracy}")
                     raw_accuracy_scores.append(raw_accuracy)
 
-                    safe_log(
-                        {
-                            "circuit_eval_status": "iteration_complete",
-                            "iteration": i + 1,
-                            "raw_accuracy": float(raw_accuracy),
-                            "proof_size": len(proof),
-                            "response_time": response_time,
-                            "iteration_duration": time.time() - iteration_start,
-                        }
-                    )
                 else:
                     bt.logging.error("Proof verification failed")
-                    safe_log(
-                        {
-                            "circuit_eval_status": "iteration_error",
-                            "iteration": i + 1,
-                            "error": "Proof verification failed",
-                        }
-                    )
                     raw_accuracy_scores.append(0.0)
 
             except Exception as e:
                 bt.logging.error(f"Error in evaluation iteration: {str(e)}")
                 bt.logging.error(f"Stack trace: {traceback.format_exc()}")
-                safe_log(
-                    {
-                        "circuit_eval_status": "iteration_error",
-                        "iteration": i + 1,
-                        "error": str(e),
-                    }
-                )
+
                 raw_accuracy_scores.append(0.0)
                 verification_results.append(False)
                 proof_sizes.append(float("inf"))
@@ -375,13 +273,6 @@ class CircuitEvaluator:
         if not all(verification_results):
             bt.logging.error(
                 "One or more verifications failed - setting all scores to 0"
-            )
-            safe_log(
-                {
-                    "circuit_eval_status": "eval_failed",
-                    "error": "One or more verifications failed",
-                    "verification_results": verification_results,
-                }
             )
             return 0.0, float("inf"), float("inf"), False
 
@@ -405,7 +296,6 @@ class CircuitEvaluator:
 
         safe_log(
             {
-                "circuit_eval_status": "eval_complete",
                 "sota_relative_score": float(sota_relative_score),
                 "avg_raw_accuracy": float(avg_raw_accuracy),
                 "avg_proof_size": (
@@ -565,14 +455,6 @@ class CircuitEvaluator:
                 )
                 bt.logging.error(f"STDOUT: {witness_result.stdout}")
                 bt.logging.error(f"STDERR: {witness_result.stderr}")
-                safe_log(
-                    {
-                        "circuit_eval_status": "witness_gen_failed",
-                        "error_code": witness_result.returncode,
-                        "stdout": witness_result.stdout,
-                        "stderr": witness_result.stderr,
-                    }
-                )
                 return None
 
             bt.logging.debug("Witness generation successful, starting proof generation")
@@ -605,14 +487,6 @@ class CircuitEvaluator:
                 )
                 bt.logging.error(f"STDOUT: {prove_result.stdout}")
                 bt.logging.error(f"STDERR: {prove_result.stderr}")
-                safe_log(
-                    {
-                        "circuit_eval_status": "proof_gen_failed",
-                        "error_code": prove_result.returncode,
-                        "stdout": prove_result.stdout,
-                        "stderr": prove_result.stderr,
-                    }
-                )
                 return None
 
             with open(temp_proof_path) as f:

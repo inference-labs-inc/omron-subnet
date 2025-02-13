@@ -27,9 +27,9 @@ from .services.sota_manager import SotaManager
 from .utils.cleanup import register_cleanup_handlers, cleanup_temp_dir
 from constants import VALIDATOR_REQUEST_TIMEOUT_SECONDS
 from _validator.utils.uid import get_queryable_uids
-from utils.wandb_logger import safe_log
 from _validator.models.request_type import ValidatorMessage
 from utils.system import get_temp_folder
+from utils.wandb_logger import safe_log
 
 
 class CompetitionThread(threading.Thread):
@@ -244,18 +244,7 @@ class Competition:
         self.competition_thread = CompetitionThread(self, config)
         bt.logging.info("Competition thread instance created")
         self.competition_thread.start()
-        bt.logging.info("Competition thread started")
         bt.logging.info("=== Competition Thread Started ===")
-
-        safe_log(
-            {
-                "competition_id": competition_id,
-                "competition_status": "initialized",
-                "competition_directory": str(self.competition_directory),
-                "sota_directory": str(self.sota_directory),
-            }
-        )
-        bt.logging.info("=== Competition Module Initialization Complete ===")
 
     def fetch_commitments(self) -> List[Tuple[int, str, str]]:
         if platform.system() != "Darwin" and platform.machine() != "arm64":
@@ -395,14 +384,6 @@ class Competition:
 
             if self.current_download:
                 uid, hotkey, hash = self.current_download
-                safe_log(
-                    {
-                        "competition_status": "downloading_circuit",
-                        "miner_hotkey": hotkey,
-                        "miner_uid": uid,
-                        "circuit_hash": hash,
-                    }
-                )
 
                 axon = self.metagraph.axons[uid]
                 circuit_dir = os.path.join(self.temp_directory, hash)
@@ -420,32 +401,7 @@ class Competition:
                             raw_accuracy=0.0,
                             hash=hash,
                         )
-                        safe_log(
-                            {
-                                "competition_status": "download_success",
-                                "miner_hotkey": hotkey,
-                                "circuit_hash": hash,
-                            }
-                        )
                         return True
-                    else:
-                        safe_log(
-                            {
-                                "competition_status": "validation_failed",
-                                "miner_hotkey": hotkey,
-                                "circuit_hash": hash,
-                            }
-                        )
-
-                else:
-                    safe_log(
-                        {
-                            "competition_status": "download_failed",
-                            "miner_hotkey": hotkey,
-                            "circuit_hash": hash,
-                        }
-                    )
-
                 if os.path.exists(circuit_dir):
                     shutil.rmtree(circuit_dir)
 
@@ -457,14 +413,6 @@ class Competition:
             traceback.print_exc()
             if self.current_download:
                 uid, hotkey, hash = self.current_download
-                safe_log(
-                    {
-                        "competition_status": "download_error",
-                        "miner_hotkey": hotkey,
-                        "circuit_hash": hash,
-                        "error": str(e),
-                    }
-                )
                 circuit_dir = os.path.join(self.temp_directory, hash)
                 if os.path.exists(circuit_dir):
                     shutil.rmtree(circuit_dir)
@@ -511,19 +459,6 @@ class Competition:
                 self.miner_states[circuit_owner].proof_size = proof_size
                 self.miner_states[circuit_owner].response_time = response_time
                 self.miner_states[circuit_owner].verification_result = True
-
-            safe_log(
-                {
-                    "circuit_eval_status": "eval_success",
-                    "circuit_uid": circuit_uid,
-                    "circuit_owner": circuit_owner,
-                    "sota_relative_score": float(sota_relative_score),
-                    "proof_size": -1 if proof_size == float("inf") else int(proof_size),
-                    "response_time": (
-                        -1 if response_time == float("inf") else float(response_time)
-                    ),
-                }
-            )
 
             self._update_competition_metrics()
 
@@ -655,6 +590,8 @@ class Competition:
                     "sota_response_time": sota_state.response_time,
                 }
             )
+
+            safe_log(metrics)
 
             self.competition_manager.log_metrics(metrics)
 
