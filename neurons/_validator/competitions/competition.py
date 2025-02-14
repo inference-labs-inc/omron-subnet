@@ -276,17 +276,14 @@ class Competition:
                     continue
 
                 try:
-                    if self.competition_thread.subtensor.network == "finney":
-                        hotkey = str(acc)
-                    else:
-                        if not isinstance(acc, (list, tuple)) or not acc:
-                            continue
-                        acc_bytes = bytes(
-                            acc[0] if isinstance(acc[0], (list, tuple)) else acc
-                        )
-                        hotkey = decode_account_id(acc_bytes)
-                        if ss58_encode(acc_bytes) != hotkey:
-                            continue
+                    if not isinstance(acc, (list, tuple)) or not acc:
+                        continue
+                    acc_bytes = bytes(
+                        acc[0] if isinstance(acc[0], (list, tuple)) else acc
+                    )
+                    hotkey = decode_account_id(acc_bytes)
+                    if ss58_encode(acc_bytes) != hotkey:
+                        continue
 
                     if hotkey not in hotkey_to_uid:
                         continue
@@ -316,45 +313,26 @@ class Competition:
     def _extract_hash(self, info) -> Optional[str]:
         """Extract hash from commitment info based on network type."""
         try:
-            if self.competition_thread.subtensor.network == "finney":
-                commitment_info = (
-                    info.get("info", {})
-                    if isinstance(info, dict)
-                    else getattr(info, "value", {}).get("info", {})
-                )
-                if not commitment_info:
-                    return None
+            if not isinstance(info, (dict, ScaleObj)):
+                return None
 
-                fields = commitment_info.get("fields", [])
-                if not fields or not isinstance(fields[0], dict):
-                    return None
+            info_val = info.value if isinstance(info, ScaleObj) else info
+            fields = info_val.get("info", {}).get("fields", [])
 
-                hex_data = fields[0].get("Raw64")
-                if not hex_data or not hex_data.startswith("0x"):
-                    return None
+            if not fields or not fields[0]:
+                return None
 
-                return bytes.fromhex(hex_data[2:]).decode()
-            else:
-                if not isinstance(info, (dict, ScaleObj)):
-                    return None
+            commitment = fields[0][0]
+            if not commitment or not isinstance(commitment, dict):
+                return None
 
-                info_val = info.value if isinstance(info, ScaleObj) else info
-                fields = info_val.get("info", {}).get("fields", [])
+            commitment_type = next(iter(commitment.keys()))
+            bytes_tuple = commitment[commitment_type][0]
 
-                if not fields or not fields[0]:
-                    return None
+            if not isinstance(bytes_tuple, (list, tuple)):
+                return None
 
-                commitment = fields[0][0]
-                if not commitment or not isinstance(commitment, dict):
-                    return None
-
-                commitment_type = next(iter(commitment.keys()))
-                bytes_tuple = commitment[commitment_type][0]
-
-                if not isinstance(bytes_tuple, (list, tuple)):
-                    return None
-
-                return bytes(bytes_tuple).decode()
+            return bytes(bytes_tuple).decode()
 
         except Exception:
             return None
