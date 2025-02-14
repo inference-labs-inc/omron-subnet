@@ -24,7 +24,7 @@ from bittensor.core.chain_data import decode_account_id
 from .services.circuit_evaluator import CircuitEvaluator
 from .services.sota_manager import SotaManager
 
-from .utils.cleanup import register_cleanup_handlers, cleanup_temp_dir
+from .utils.cleanup import cleanup_temp_dir
 from constants import VALIDATOR_REQUEST_TIMEOUT_SECONDS
 from _validator.utils.uid import get_queryable_uids
 from _validator.models.request_type import ValidatorMessage
@@ -200,8 +200,6 @@ class Competition:
         )
         self.temp_directory = os.path.join(get_temp_folder(), str(competition_id))
         self.sota_directory = os.path.join(self.competition_directory, "sota")
-
-        register_cleanup_handlers()
 
         if not os.path.exists(self.temp_directory):
             os.makedirs(self.temp_directory)

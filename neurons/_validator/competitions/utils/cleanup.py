@@ -1,7 +1,5 @@
 import os
 import shutil
-import atexit
-import signal
 from utils.system import get_temp_folder
 import bittensor as bt
 
@@ -23,9 +21,3 @@ def cleanup_temp_dir(signum=None, frame=None, specific_dir=None):
                 bt.logging.error(f"Error cleaning up directory {dir_path}: {e}")
     else:
         bt.logging.debug("No specific directory provided for cleanup, skipping...")
-
-
-def register_cleanup_handlers():
-    atexit.register(cleanup_temp_dir)
-    signal.signal(signal.SIGTERM, cleanup_temp_dir)
-    signal.signal(signal.SIGINT, cleanup_temp_dir)
