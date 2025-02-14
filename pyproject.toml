@@ -30,6 +30,7 @@ dependencies = [
   "tqdm>=4.67.1",
   "uvicorn==0.34.0",
   "wandb==0.18.7",
+  "websocket-client>=1.8.0",
 ]
 
 [dependency-groups]
