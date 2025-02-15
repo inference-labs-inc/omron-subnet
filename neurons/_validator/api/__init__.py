@@ -22,6 +22,7 @@ import hashlib
 from constants import (
     MAX_SIGNATURE_LIFESPAN,
     MAINNET_TESTNET_UIDS,
+    VALIDATOR_REQUEST_TIMEOUT_SECONDS,
     EXTERNAL_REQUEST_QUEUE_TIME_SECONDS,
 )
 from _validator.config import ValidatorConfig
@@ -140,7 +141,7 @@ class ValidatorAPI:
                 try:
                     await asyncio.wait_for(
                         self.pending_requests[external_request.hash].wait(),
-                        timeout=external_request.circuit.timeout
+                        timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS
                         + EXTERNAL_REQUEST_QUEUE_TIME_SECONDS,
                     )
                     result = self.request_results.pop(external_request.hash, None)
@@ -200,7 +201,7 @@ class ValidatorAPI:
                 try:
                     await asyncio.wait_for(
                         self.pending_requests[external_request.hash].wait(),
-                        timeout=external_request.circuit.timeout
+                        timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS
                         + EXTERNAL_REQUEST_QUEUE_TIME_SECONDS,
                     )
                     result = self.request_results.pop(external_request.hash, None)

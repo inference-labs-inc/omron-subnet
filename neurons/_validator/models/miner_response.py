@@ -7,6 +7,7 @@ import json
 from constants import (
     DEFAULT_PROOF_SIZE,
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
+    VALIDATOR_REQUEST_TIMEOUT_SECONDS,
 )
 from deployment_layer.circuit_store import circuit_store
 from _validator.core.request import Request
@@ -140,7 +141,7 @@ class MinerResponse:
         return cls(
             uid=uid,
             verification_result=False,
-            response_time=circuit.timeout,
+            response_time=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
             verification_time=None,
             proof_size=DEFAULT_PROOF_SIZE,
             circuit=circuit,
