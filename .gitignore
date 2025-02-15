@@ -190,4 +190,6 @@ docs/notebooks/settings.json
 docs/notebooks/*.key
 **/witness.json
 **/input.json
+
+# intellij files
 .idea/
