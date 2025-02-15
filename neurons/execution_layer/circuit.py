@@ -5,6 +5,7 @@ import torch
 import os
 import json
 import cli_parser
+from deployment_layer.circuit_store import CircuitStore
 from execution_layer.input_registry import InputRegistry
 
 # trunk-ignore(pylint/E0611)
@@ -13,7 +14,7 @@ from constants import (
     MAX_EVALUATION_ITEMS,
     DEFAULT_PROOF_SIZE,
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-    MAXIMUM_SCORE_MEDIAN_SAMPLE,
+    MAXIMUM_SCORE_MEDIAN_SAMPLE, CRICUIT_TIMEOUT_SECONDS,
 )
 
 
@@ -141,6 +142,7 @@ class CircuitMetadata:
     external_files: dict[str, str]
     netuid: int | None = None
     weights_version: int | None = None
+    timeout: int | None = None
     benchmark_choice_weight: float | None = None
 
     @classmethod
@@ -168,11 +170,18 @@ class CircuitEvaluationItem:
     circuit_id: str = field(default="")
     uid: int = field(default=0)
     minimum_response_time: float = field(default=0.0)
-    maximum_response_time: float = field(default=VALIDATOR_REQUEST_TIMEOUT_SECONDS)
+    maximum_response_time: float = field(init=False) # Field will be set in __post_init__
     proof_size: int = field(default=DEFAULT_PROOF_SIZE)
     response_time: float = field(default=0.0)
     score: float = field(default=0.0)
     verification_result: bool = field(default=False)
+
+    def __post_init__(self):
+        circuit_store = CircuitStore()
+        circuit = circuit_store.get_circuit(circuit_id=self.circuit_id)
+        if circuit is None:
+            self.maximum_response_time = CRICUIT_TIMEOUT_SECONDS
+        self.maximum_response_time = circuit.timeout
 
     def to_dict(self) -> dict:
         """Convert the evaluation item to a dictionary for JSON serialization."""
@@ -193,8 +202,8 @@ class CircuitEvaluationData:
     Data collected from the evaluation of the circuit.
     """
 
-    def __init__(self, model_id: str, evaluation_store_path: str):
-        self.model_id = model_id
+    def __init__(self, circuit: Circuit, evaluation_store_path: str):
+        self.circuit = circuit
         self.store_path = evaluation_store_path
         self.data: list[CircuitEvaluationItem] = []
 
@@ -207,7 +216,7 @@ class CircuitEvaluationData:
                     self.data = [CircuitEvaluationItem(**item) for item in data]
         except Exception as e:
             logging.error(
-                f"Failed to load evaluation data for model {model_id}, starting fresh: {e}"
+                f"Failed to load evaluation data for model {self.circuit.id}, starting fresh: {e}"
             )
             self.data = []
 
@@ -262,7 +271,7 @@ class CircuitEvaluationData:
         return torch.clamp(
             torch.min(torch.tensor(response_times)),
             0,
-            VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+            self.circuit.timeout,
         ).item()
 
     @property
@@ -271,14 +280,14 @@ class CircuitEvaluationData:
 
         response_times = self.get_successful_response_times()
         if not response_times or len(response_times) in [0, 1]:
-            return VALIDATOR_REQUEST_TIMEOUT_SECONDS
+            return CRICUIT_TIMEOUT_SECONDS
 
         sample_size = max(int(len(response_times) * MAXIMUM_SCORE_MEDIAN_SAMPLE), 1)
 
         return torch.clamp(
             torch.median(torch.tensor(response_times[-sample_size:])),
             0,
-            VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+            self.circuit.timeout,
         ).item()
 
 
@@ -287,21 +296,27 @@ class Circuit:
     A class representing a circuit.
     """
 
-    def __init__(self, model_id: str):
+    def __init__(self, circuit_id: str):
         """
         Initialize a Model instance.
 
         Args:
-            model_id (str): Unique identifier for the model.
+            circuit_id (str): Unique identifier for the model.
         """
-        self.paths = CircuitPaths(model_id)
+        self.paths = CircuitPaths(circuit_id)
         self.metadata = CircuitMetadata.from_file(self.paths.metadata)
-        self.id = model_id
+        self.id = circuit_id
         self.proof_system = ProofSystem[self.metadata.proof_system]
         self.paths.set_proof_system_paths(self.proof_system)
         self.settings = {}
         self.evaluation_data = CircuitEvaluationData(
-            model_id, self.paths.evaluation_data
+            self, self.paths.evaluation_data
+        )
+        # if timeout attribute exists and is not None, else default
+        self.timeout = (
+            self.metadata.timeout
+            if hasattr(self.metadata, 'timeout') and self.metadata.timeout is not None
+            else CRICUIT_TIMEOUT_SECONDS
         )
         try:
             with open(self.paths.settings, "r", encoding="utf-8") as f:
