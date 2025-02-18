@@ -46,6 +46,14 @@ def local_chain(request):
     # Compile commands to send to process
     cmds = shlex.split(f"{script_path} {args}")
 
+    # Create the logs directory if it doesn't exist
+    logs_dir = os.path.join(os.path.dirname(__file__), "logs")
+    os.makedirs(logs_dir, exist_ok=True)
+
+    # Open the log file for writing
+    log_file_path = os.path.join(logs_dir, "local_chain.log")
+    log_file = open(log_file_path, "w", buffering=1)  # Line-buffered mode
+
     # Start new node process
     process = subprocess.Popen(
         cmds,
@@ -67,6 +75,9 @@ def local_chain(request):
                 break
 
             print(line.strip())
+            log_file.write(line)
+            log_file.flush()
+
             # 10 min as timeout
             if int(time.time()) - timestamp > 10 * 60:
                 print("Subtensor not started in time")
@@ -82,24 +93,24 @@ def local_chain(request):
                 line = process.stdout.readline()
                 if not line:
                     break
+                # Log both to console and log file
+                # print(line.strip())
+                log_file.write(line)
+                log_file.flush()
 
         reader_thread = threading.Thread(target=read_output, daemon=True)
         reader_thread.start()
 
     wait_for_node_start(process, pattern)
 
-    # Run the test, passing in substrate interface
-    yield SubstrateInterface(url="ws://127.0.0.1:9945")
-
-    # Terminate the process group (includes all child processes)
-    os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-
-    # Give some time for the process to terminate
-    time.sleep(1)
-
-    # If the process is not terminated, send SIGKILL
-    if process.poll() is None:
-        os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-
-    # Ensure the process has terminated
-    process.wait()
+    try:
+        # Pass the SubstrateInterface to the test
+        yield SubstrateInterface(url="ws://127.0.0.1:9945")
+    finally:
+        # Terminate the process
+        os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+        time.sleep(1)
+        if process.poll() is None:
+            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+        process.wait()
+        log_file.close()  # Close the log file
