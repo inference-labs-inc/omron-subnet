@@ -3,43 +3,54 @@ import os
 import sys
 import atexit
 
-import bittensor
 import pytest
 from bittensor import Subtensor
 from bittensor.utils import networking
 
-from tests.e2e_tests.tools.chain_interactions import register_subnet
+from tests.e2e_tests.tools.chain_interactions import register_subnet, wait_interval
 from tests.e2e_tests.tools.e2e_test_utils import setup_wallet
-
-
-
 
 # Track the miner process globally for cleanup
 miner_process = None
 
-async def start_miner(wallet, netuid):
-    """Starts the miner process and tracks it globally for cleanup."""
-    global miner_process
 
-    cmd = [
-        sys.executable,
-        "/Users/danielivanov/Repos/omron-subnet/neurons/miner.py",
-        "--netuid", str(netuid),
-        "--subtensor.network", "local",
-        "--subtensor.chain_endpoint", "ws://localhost:9945",
-        "--wallet.path", wallet.path,
-        "--wallet.name", wallet.name,
-        "--wallet.hotkey", "default"
-    ]
+def _build_command(wallet, netuid):
+    """Helper to construct the command for starting the miner."""
+    script_path = os.path.join(os.path.dirname(__file__), "..", "..", "neurons", "miner.py")  # Relative path
+    script_path = os.path.abspath(script_path)  # Convert to an absolute path for safety
+    options = {
+        "--netuid": str(netuid),
+        "--subtensor.network": "local",
+        "--subtensor.chain_endpoint": "ws://localhost:9945",
+        "--wallet.path": wallet.path,
+        "--wallet.name": wallet.name,
+        "--wallet.hotkey": "default",
+        # "--disable-wandb": None,  # TODO: why does this break the test?
+    }
+    return [sys.executable, script_path] + [str(arg) for pair in options.items() for arg in pair]
+
+
+async def start_miner(wallet, netuid):
+    """
+    Starts the miner process and assigns it to a global variable for cleanup.
+
+    Args:
+        wallet: The wallet instance containing mining wallet configuration.
+        netuid: The network UID for registering the miner.
+
+    Returns:
+        A subprocess process instance representing the running miner.
+    """
+    global miner_process
+    command = _build_command(wallet, netuid)  # Construct the command dynamically
 
     process = await asyncio.create_subprocess_exec(
-        *cmd,
+        *command,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
-        env=os.environ,
+        env=os.environ,  # Preserved environment variables
     )
-
-    miner_process = process
+    miner_process = process  # Global assignment remains for cleanup handling
     return process
 
 def cleanup_miner():
@@ -73,13 +84,13 @@ async def test_miner(local_chain):
 
     print("Testing test_axon")
 
-    netuid = 1
+    netuid = 2
     # Register root as Alice - the subnet owner
     alice_keypair, wallet = setup_wallet("//Alice")
 
     subtensor = Subtensor(network="ws://localhost:9945")
 
-    # Register a subnet, netuid 1
+    # # Register a subnet, netuid 1 --> dont need this as this automatically happens
     assert register_subnet(local_chain, wallet), "Subnet wasn't created"
 
     # Verify subnet <netuid 1> created successfully
@@ -87,15 +98,10 @@ async def test_miner(local_chain):
         "SubtensorModule", "NetworksAdded", [netuid]
     ).serialize(), "Subnet wasn't created successfully"
 
-    # Register Alice to the network
-    assert subtensor.burned_register(
-        wallet, netuid
-    ), f"Neuron wasn't registered to subnet {netuid}"
-
     metagraph = subtensor.metagraph(netuid=netuid)
 
     # Validate current metagraph stats
-    old_axon = metagraph.axons[1]
+    old_axon = metagraph.axons[0]
     # assert len(metagraph.axons) == 1, f"Expected 1 axon, but got {len(metagraph.axons)}"
     assert old_axon.hotkey == alice_keypair.ss58_address, "Hotkey mismatch for the axon"
     assert (
@@ -105,7 +111,7 @@ async def test_miner(local_chain):
     assert old_axon.port == 0, f"Expected port 0, but got {old_axon.port}"
     assert old_axon.ip_type == 0, f"Expected IP type 0, but got {old_axon.ip_type}"
 
-    log_file_path = "miner.log"
+    log_file_path = os.path.join(os.path.dirname(__file__), "logs", "test_miner.log")
 
     # Open the log file in append mode
     log_file = open(log_file_path, "w")
@@ -130,26 +136,24 @@ async def test_miner(local_chain):
 
     print("Miner process started in the background")
 
-    # Continue with other test steps
-    await asyncio.sleep(15)
+    # wait full epoch for miner to settle in
+    await wait_interval(360, subtensor, netuid)
 
-    print("Neuron Alice is now mining")
-
-    # Refresh the metagraph
+    # Refresh the metagraph - the netuid has changed
     metagraph = subtensor.metagraph(netuid=netuid)
-    updated_axon = metagraph.axons[1]
+    updated_axon = metagraph.axons[0]
     external_ip = networking.get_external_ip()
 
     # Assert updated attributes
-    # assert (
-    #     len(metagraph.axons) == 1
-    # ), f"Expected 1 axon, but got {len(metagraph.axons)} after mining"
+    assert (
+        len(metagraph.axons) == 1
+    ), f"Expected 1 axon, but got {len(metagraph.axons)} after mining"
 
-    # assert (
-    #     len(metagraph.neurons) == 1
-    # ), f"Expected 1 neuron, but got {len(metagraph.neurons)}"
+    assert (
+        len(metagraph.neurons) == 1
+    ), f"Expected 1 neuron, but got {len(metagraph.neurons)}"
 
-    print(f"Metagraph updated axon IP: {updated_axon.ip}, Expected: {external_ip}")
+    # print(f"Metagraph updated axon IP: {updated_axon.ip}, Expected: {external_ip}")
     assert (
             updated_axon.ip == external_ip
     ), f"Expected IP {external_ip}, but got {updated_axon.ip}"

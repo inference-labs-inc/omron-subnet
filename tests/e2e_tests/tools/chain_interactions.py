@@ -130,16 +130,10 @@ async def wait_epoch(subtensor: "Subtensor", netuid: int = 1):
     Raises:
         Exception: If the tempo cannot be determined from the chain.
     """
-    # q_tempo = [
-    #     v.value
-    #     for [k, v] in subtensor.query_map_subtensor("Tempo")
-    #     if k.value == netuid
-    # ]
-    # if len(q_tempo) == 0:
-    #     raise Exception("could not determine tempo")
-    # tempo = q_tempo[0]
+
     tempo = subtensor.tempo(netuid)
-    logging.info(f"tempo = {tempo}")
+    assert tempo > 0, "Tempo value is incorrect or not fetched properly."
+    logging.info(f"Tempo value fetched for netuid {netuid}: {tempo}")
     await wait_interval(tempo, subtensor, netuid)
 
 
@@ -172,7 +166,9 @@ async def wait_interval(
     the current block number until the next tempo interval starts.
     """
     current_block = subtensor.get_current_block()
+    logging.info(f"Current block: {current_block}")
     next_tempo_block_start = next_tempo(current_block, tempo, netuid)
+
     last_reported = None
 
     while current_block < next_tempo_block_start:

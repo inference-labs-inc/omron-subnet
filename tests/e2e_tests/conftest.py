@@ -2,6 +2,7 @@ import os
 import re
 import shlex
 import signal
+import socket
 import subprocess
 import time
 import threading
@@ -23,6 +24,21 @@ def local_chain(request):
         # Skip the test if the localhost.sh path is not set
         logging.warning("LOCALNET_SH_PATH env variable is not set, e2e test skipped.")
         pytest.skip("LOCALNET_SH_PATH environment variable is not set.")
+
+    # Check if there is already a process listening on the port (127.0.0.1:9945)
+    def is_port_in_use(host, port):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.connect((host, port))
+                return True
+            except (ConnectionRefusedError, OSError):
+                return False
+
+    port = 9945
+    if is_port_in_use('127.0.0.1', port):
+        print(f"A process is already running on port {port}. Skipping start.")
+        yield SubstrateInterface(url=f"ws://127.0.0.1:{port}")
+        return
 
     # Check if param is None, and handle it accordingly
     args = "" if param is None else f"{param}"
