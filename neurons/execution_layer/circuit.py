@@ -5,7 +5,6 @@ import torch
 import os
 import json
 import cli_parser
-from deployment_layer.circuit_store import CircuitStore
 from execution_layer.input_registry import InputRegistry
 
 # trunk-ignore(pylint/E0611)
@@ -167,7 +166,7 @@ class CircuitEvaluationItem:
     Data collected from the evaluation of the circuit.
     """
 
-    circuit_id: str = field(default="")
+    circuit: Circuit  # Pass the Circuit object directly
     uid: int = field(default=0)
     minimum_response_time: float = field(default=0.0)
     maximum_response_time: float = field(init=False) # Field will be set in __post_init__
@@ -176,17 +175,21 @@ class CircuitEvaluationItem:
     score: float = field(default=0.0)
     verification_result: bool = field(default=False)
 
+    def __init__(self, *args, circuit: Circuit, **kwargs):
+        # Ignore 'circuit_id' if it's passed in kwargs
+        kwargs.pop("circuit_id", None)
+        super().__init__(circuit=circuit, **kwargs)
+
     def __post_init__(self):
-        circuit_store = CircuitStore()
-        circuit = circuit_store.get_circuit(circuit_id=self.circuit_id)
-        if circuit is None:
+        if hasattr(self.circuit, 'timeout') and self.circuit.timeout:
+            self.maximum_response_time = self.circuit.timeout
+        else:
             self.maximum_response_time = CRICUIT_TIMEOUT_SECONDS
-        self.maximum_response_time = circuit.timeout
 
     def to_dict(self) -> dict:
         """Convert the evaluation item to a dictionary for JSON serialization."""
         return {
-            "circuit_id": str(self.circuit_id),
+            "circuit_id": str(self.circuit.id),
             "uid": int(self.uid),
             "minimum_response_time": float(self.minimum_response_time),
             "maximum_response_time": float(self.maximum_response_time),
@@ -213,7 +216,7 @@ class CircuitEvaluationData:
             if os.path.exists(evaluation_store_path):
                 with open(evaluation_store_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    self.data = [CircuitEvaluationItem(**item) for item in data]
+                    self.data = [CircuitEvaluationItem(circuit=self.circuit, **item) for item in data]
         except Exception as e:
             logging.error(
                 f"Failed to load evaluation data for model {self.circuit.id}, starting fresh: {e}"
