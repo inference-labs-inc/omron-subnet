@@ -268,7 +268,7 @@ class ValidatorAPI:
         """Start the uvicorn server in a separate thread"""
         self.server_thread = threading.Thread(
             target=uvicorn.run,
-            args=(self.app,),
+            args=(app,),
             kwargs={
                 "host": "0.0.0.0",
                 "port": self.config.api.port,
