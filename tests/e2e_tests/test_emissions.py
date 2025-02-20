@@ -29,7 +29,7 @@ def _build_command(wallet, netuid, process_type="miner"):
         "--wallet.path": wallet.path,
         "--wallet.name": wallet.name,
         "--wallet.hotkey": "default",
-        # "--disable-wandb": None,  # TODO: why does this break the test?
+        # "--disable-wandb": None,
     }
     return [sys.executable, script_path] + [str(arg) for pair in options.items() for arg in pair]
 
@@ -145,13 +145,13 @@ async def test_emissions(local_chain):
     subtensor.add_stake(bob_wallet, bob_keypair.ss58_address, netuid, Balance.from_tao(100_000), True, True)
 
     # miner output log
-    log_file_path = os.path.join(os.path.dirname(__file__), "logs", "test_miner_emissions.log")
+    miner_log_file_path = os.path.join(os.path.dirname(__file__), "logs", "test_miner_emissions.log")
 
     # Open the log file in append mode
-    log_file = open(log_file_path, "w")
+    miner_log_file = open(miner_log_file_path, "w")
 
     # Start the miner
-    process = await start_miner(bob_wallet, netuid)
+    miner_subprocess = await start_miner(bob_wallet, netuid)
 
     # Function to read and log output
     async def log_output(stream, log_prefix):
@@ -161,26 +161,26 @@ async def test_emissions(local_chain):
                 break
             decoded_line = line.decode().strip()
             print(f"{log_prefix}{decoded_line}")  # Print to console
-            log_file.write(f"{log_prefix}{decoded_line}\n")  # Write to file
-            log_file.flush()
+            miner_log_file.write(f"{log_prefix}{decoded_line}\n")  # Write to file
+            miner_log_file.flush()
 
     # Start logging both stdout and stderr in the background
-    asyncio.create_task(log_output(process.stdout, "[STDOUT] "))
-    asyncio.create_task(log_output(process.stderr, "[STDERR] "))
+    asyncio.create_task(log_output(miner_subprocess.stdout, "[STDOUT] "))
+    asyncio.create_task(log_output(miner_subprocess.stderr, "[STDERR] "))
 
     print("Miner process started in the background")
 
-    # # wait for miner to settle in TODO: DO I need to wait?
-    # await wait_interval(100, subtensor, netuid)
+    # # wait for miner to settle in
+    await wait_interval(100, subtensor, netuid)
 
     # Validator log path
-    log_file_path = os.path.join(os.path.dirname(__file__), "logs", "test_validator_emissions.log")
+    validator_log_file_path = os.path.join(os.path.dirname(__file__), "logs", "test_validator_emissions.log")
 
     # Open the log file in append mode
-    log_file = open(log_file_path, "w")
+    validator_log_file = open(validator_log_file_path, "w")
 
     # Start the validator
-    process = await start_validator(alice_wallet, netuid)
+    validator_subprocess = await start_validator(alice_wallet, netuid)
 
     # Function to read and log output
     async def log_output(stream, log_prefix):
@@ -190,12 +190,12 @@ async def test_emissions(local_chain):
                 break
             decoded_line = line.decode().strip()
             print(f"{log_prefix}{decoded_line}")  # Print to console
-            log_file.write(f"{log_prefix}{decoded_line}\n")  # Write to file
-            log_file.flush()
+            validator_log_file.write(f"{log_prefix}{decoded_line}\n")  # Write to file
+            validator_log_file.flush()
 
     # Start logging both stdout and stderr in the background
-    asyncio.create_task(log_output(process.stdout, "[STDOUT] "))
-    asyncio.create_task(log_output(process.stderr, "[STDERR] "))
+    asyncio.create_task(log_output(validator_subprocess.stdout, "[STDOUT] "))
+    asyncio.create_task(log_output(validator_subprocess.stderr, "[STDERR] "))
 
     print("validator process started in the background")
 
@@ -234,7 +234,6 @@ async def test_emissions(local_chain):
     assert alice_neuron.dividends == 1
     assert alice_neuron.stake.tao == 10_000.0
     assert alice_neuron.validator_trust == 1
-
 
     print("✅ Passed test_incentive")
     cleanup_miner()
