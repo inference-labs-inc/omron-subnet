@@ -7,6 +7,7 @@ import json
 from constants import (
     DEFAULT_PROOF_SIZE,
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
+    CRICUIT_TIMEOUT_SECONDS,
 )
 from deployment_layer.circuit_store import circuit_store
 from _validator.core.request import Request
@@ -137,10 +138,11 @@ class MinerResponse:
         """
         if circuit is None:
             circuit = circuit_store.get_circuit(SINGLE_PROOF_OF_WEIGHTS_MODEL_ID)
+        timeout = circuit.timeout if circuit and circuit.timeout else CRICUIT_TIMEOUT_SECONDS
         return cls(
             uid=uid,
             verification_result=False,
-            response_time=circuit.timeout,
+            response_time=timeout,
             verification_time=None,
             proof_size=DEFAULT_PROOF_SIZE,
             circuit=circuit,
