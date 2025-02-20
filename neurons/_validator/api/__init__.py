@@ -88,7 +88,6 @@ class ValidatorAPI:
             )
             self.commit_cert_hash()
 
-        self.setup_rpc_methods()
         self.start_server()
         bt.logging.success("Ready to serve external requests")
 
