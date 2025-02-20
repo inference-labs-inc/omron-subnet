@@ -170,7 +170,7 @@ class CircuitStore:
                     "description": circuit.metadata.description,
                     "author": circuit.metadata.author,
                     "version": circuit.metadata.version,
-                    "type": circuit.metadata.type.value,
+                    "type": circuit.metadata.type,
                     "proof_system": circuit.metadata.proof_system,
                     "netuid": circuit.metadata.netuid,
                     "weights_version": circuit.metadata.weights_version,
