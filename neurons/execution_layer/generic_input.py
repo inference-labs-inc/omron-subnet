@@ -5,10 +5,13 @@ from pydantic import BaseModel
 
 
 class GenericInput(BaseInput):
+
+    schema = BaseModel
+
     def __init__(
         self, request_type: RequestType, data: dict[str, object] | None = None
     ):
-        super().__init__(BaseModel, request_type, data)
+        super().__init__(request_type, data)
 
     @staticmethod
     def generate() -> dict[str, object]:

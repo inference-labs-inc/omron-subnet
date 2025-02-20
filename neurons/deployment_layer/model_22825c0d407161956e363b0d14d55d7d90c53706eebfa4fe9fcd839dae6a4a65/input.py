@@ -28,10 +28,13 @@ class CircuitInputSchema(BaseModel):
     "22825c0d407161956e363b0d14d55d7d90c53706eebfa4fe9fcd839dae6a4a65"
 )
 class CircuitInput(BaseInput):
+
+    schema = CircuitInputSchema
+
     def __init__(
         self, request_type: RequestType, data: dict[str, object] | None = None
     ):
-        super().__init__(CircuitInputSchema, request_type, data)
+        super().__init__(request_type, data)
 
     @staticmethod
     def generate() -> dict[str, object]:

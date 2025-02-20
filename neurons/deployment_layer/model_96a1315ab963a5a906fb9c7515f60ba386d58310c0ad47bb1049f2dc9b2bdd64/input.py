@@ -16,10 +16,13 @@ class CircuitInputSchema(BaseModel):
     "96a1315ab963a5a906fb9c7515f60ba386d58310c0ad47bb1049f2dc9b2bdd64"
 )
 class CircuitInput(BaseInput):
+
+    schema = CircuitInputSchema
+
     def __init__(
         self, request_type: RequestType, data: dict[str, object] | None = None
     ):
-        super().__init__(CircuitInputSchema, request_type, data)
+        super().__init__(request_type, data)
 
     @staticmethod
     def generate() -> dict[str, object]:

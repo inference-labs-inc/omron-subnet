@@ -46,12 +46,15 @@ class CircuitInputSchema(BaseModel):
     "fa0d509d52abe2d1e809124f8aba46258a02f7253582f7b7f5a22e1e0bca0dfb"
 )
 class CircuitInput(BaseInput):
+
+    schema = CircuitInputSchema
+
     def __init__(
         self, request_type: RequestType, data: dict[str, object] | None = None
     ):
         if request_type == RequestType.RWR and data is not None:
             data = self._add_missing_constants(data)
-        super().__init__(CircuitInputSchema, request_type, data)
+        super().__init__(request_type, data)
 
     @staticmethod
     def generate() -> dict[str, object]:

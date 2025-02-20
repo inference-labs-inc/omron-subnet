@@ -10,6 +10,8 @@ class BaseInput(ABC):
     for manipulating circuit input data.
     """
 
+    schema: type[BaseModel]
+
     def __init__(
         self,
         schema: BaseModel,
