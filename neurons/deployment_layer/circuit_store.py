@@ -175,9 +175,9 @@ class CircuitStore:
                     "netuid": circuit.metadata.netuid,
                     "testnet_netuids": (
                         [
-                            uid[0]
+                            uid[1]
                             for uid in MAINNET_TESTNET_UIDS
-                            if uid[1] == int(circuit.metadata.netuid)
+                            if uid[0] == int(circuit.metadata.netuid)
                         ]
                         if circuit.metadata.netuid
                         else None
