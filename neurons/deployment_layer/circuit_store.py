@@ -7,7 +7,7 @@ from typing import Optional
 import bittensor as bt
 from packaging import version
 
-from constants import IGNORED_MODEL_HASHES
+from constants import IGNORED_MODEL_HASHES, MAINNET_TESTNET_UIDS
 from execution_layer.circuit import Circuit
 
 
@@ -173,6 +173,15 @@ class CircuitStore:
                     "type": circuit.metadata.type,
                     "proof_system": circuit.metadata.proof_system,
                     "netuid": circuit.metadata.netuid,
+                    "testnet_netuids": (
+                        [
+                            uid[0]
+                            for uid in MAINNET_TESTNET_UIDS
+                            if uid[1] == int(circuit.metadata.netuid)
+                        ]
+                        if circuit.metadata.netuid
+                        else None
+                    ),
                     "weights_version": circuit.metadata.weights_version,
                     "input_schema": circuit.input_handler.schema.model_json_schema(),
                 }
