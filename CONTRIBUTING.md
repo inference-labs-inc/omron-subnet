@@ -22,7 +22,7 @@ uv export -o requirements.txt
 3. Sync dependencies:
 
 ```sh
-uv sync --locked
+uv sync
 ```
 
 ## Updating Dependencies
