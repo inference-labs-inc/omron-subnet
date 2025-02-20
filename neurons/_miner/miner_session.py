@@ -1,24 +1,23 @@
 # from __future__ import annotations
 import json
-import time
 import os
+import time
 import traceback
 from typing import Tuple, Union
-from rich.console import Console
-from rich.table import Table
-from utils.rate_limiter import with_rate_limit
 
 import bittensor as bt
 import websocket
+from rich.console import Console
+from rich.table import Table
 
 import cli_parser
 from _validator.models.request_type import RequestType
 from constants import (
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
     STEAK,
-    VALIDATOR_REQUEST_TIMEOUT_SECONDS,
     VALIDATOR_STAKE_THRESHOLD,
     ONE_HOUR,
+    CRICUIT_TIMEOUT_SECONDS
 )
 from deployment_layer.circuit_store import circuit_store
 from execution_layer.generic_input import GenericInput
@@ -30,6 +29,7 @@ from protocol import (
     Competition,
 )
 from utils import AutoUpdate, clean_temp_files, wandb_logger
+from utils.rate_limiter import with_rate_limit
 from .circuit_manager import CircuitManager
 
 COMPETITION_DIR = os.path.join(
@@ -407,12 +407,14 @@ class MinerSession:
         model_id = synapse.query_input.get("model_id", SINGLE_PROOF_OF_WEIGHTS_MODEL_ID)
         public_inputs = synapse.query_input["public_inputs"]
 
+        circuit_timeout = CRICUIT_TIMEOUT_SECONDS
         try:
             circuit = circuit_store.get_circuit(str(model_id))
             if not circuit:
                 raise ValueError(
                     f"Circuit {model_id} not found. This indicates a missing deployment layer folder or invalid request"
                 )
+            circuit_timeout = circuit.timeout
             bt.logging.info(f"Running proof generation for {circuit}")
             model_session = VerifiedModelSession(
                 GenericInput(RequestType.RWR, public_inputs), circuit
@@ -456,10 +458,10 @@ class MinerSession:
             }
         )
 
-        if delta_t > VALIDATOR_REQUEST_TIMEOUT_SECONDS:
+        if delta_t > circuit_timeout:
             bt.logging.error(
-                "Response time is greater than validator timeout. "
-                "This indicates your hardware is not processing validator's requests in time."
+                "Response time is greater than circuit timeout. "
+                "This indicates your hardware is not processing the requests in time."
             )
         return synapse
 
@@ -477,14 +479,15 @@ class MinerSession:
             bt.logging.error("Received empty input for proof of weights")
             return synapse
 
+        circuit_timeout = CRICUIT_TIMEOUT_SECONDS
         try:
             circuit = circuit_store.get_circuit(str(synapse.verification_key_hash))
-
             if not circuit:
                 raise ValueError(
                     f"Circuit {synapse.verification_key_hash} not found. "
                     "This indicates a missing deployment layer folder or invalid request"
                 )
+            circuit_timeout = circuit.timeout
             bt.logging.info(f"Running proof generation for {circuit}")
             model_session = VerifiedModelSession(
                 GenericInput(RequestType.RWR, synapse.inputs), circuit
@@ -520,10 +523,10 @@ class MinerSession:
             }
         )
 
-        if delta_t > VALIDATOR_REQUEST_TIMEOUT_SECONDS:
+        if delta_t > circuit_timeout:
             bt.logging.error(
-                "Response time is greater than validator timeout. "
-                "This indicates your hardware is not processing validator's requests in time."
+                "Response time is greater than circuit timeout. "
+                "This indicates your hardware is not processing the requests in time."
             )
         return synapse
 

@@ -220,10 +220,9 @@ class ScoreManager:
             ].sota_relative_score
 
         evaluation_data = CircuitEvaluationItem(
-            circuit_id=circuit.id,
+            circuit=circuit,
             uid=response.uid,
             minimum_response_time=circuit.evaluation_data.minimum_response_time,
-            maximum_response_time=circuit.evaluation_data.maximum_response_time,
             proof_size=response.proof_size,
             response_time=response.response_time,
             score=self.scores[response.uid],

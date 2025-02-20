@@ -1,16 +1,12 @@
 import traceback
 import bittensor as bt
 from aiohttp.client_exceptions import InvalidUrlClientError
-
-from constants import (
-    VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-)
 from _validator.core.request import Request
 
 
 async def query_single_axon(dendrite: bt.dendrite, request: Request) -> Request | None:
     """
-    Query a single axon with a request.
+    Query a single axon with a request. Per Circuit query.
 
     Args:
         dendrite (bt.dendrite): The dendrite to use for querying.
@@ -24,7 +20,7 @@ async def query_single_axon(dendrite: bt.dendrite, request: Request) -> Request 
         result = await dendrite.call(
             target_axon=request.axon,
             synapse=request.synapse,
-            timeout=VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+            timeout=request.circuit.timeout,
             deserialize=False,
         )
 
@@ -34,7 +30,7 @@ async def query_single_axon(dendrite: bt.dendrite, request: Request) -> Request 
         request.response_time = (
             result.dendrite.process_time
             if result.dendrite.process_time is not None
-            else VALIDATOR_REQUEST_TIMEOUT_SECONDS
+            else request.circuit.timeout
         )
 
         request.deserialized = result.deserialize()
