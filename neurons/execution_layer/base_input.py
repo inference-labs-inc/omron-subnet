@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from _validator.models.request_type import RequestType
+from pydantic import BaseModel
 
 
 class BaseInput(ABC):
@@ -10,9 +11,13 @@ class BaseInput(ABC):
     """
 
     def __init__(
-        self, request_type: RequestType, data: dict[str, object] | None = None
+        self,
+        schema: BaseModel,
+        request_type: RequestType,
+        data: dict[str, object] | None = None,
     ):
         self.request_type = request_type
+        self.schema = schema
         if request_type == RequestType.BENCHMARK:
             self.data = self.generate()
         else:

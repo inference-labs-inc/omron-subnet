@@ -51,7 +51,7 @@ class CircuitInput(BaseInput):
     ):
         if request_type == RequestType.RWR and data is not None:
             data = self._add_missing_constants(data)
-        super().__init__(request_type, data)
+        super().__init__(CircuitInputSchema, request_type, data)
 
     @staticmethod
     def generate() -> dict[str, object]:

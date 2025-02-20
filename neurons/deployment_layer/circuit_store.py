@@ -157,6 +157,28 @@ class CircuitStore:
         bt.logging.debug(f"Listed {len(circuit_list)} circuits")
         return circuit_list
 
+    def list_circuit_metadata(self) -> list[dict]:
+        """
+        JSON safe circuit metadata for use in API serving.
+        """
+        data: list[dict] = []
+        for circuit in self.circuits.values():
+            data.append(
+                {
+                    "id": circuit.id,
+                    "name": circuit.metadata.name,
+                    "description": circuit.metadata.description,
+                    "author": circuit.metadata.author,
+                    "version": circuit.metadata.version,
+                    "type": circuit.metadata.type.value,
+                    "proof_system": circuit.metadata.proof_system,
+                    "netuid": circuit.metadata.netuid,
+                    "weights_version": circuit.metadata.weights_version,
+                    "input_schema": circuit.input_handler.schema.model_json_schema(),
+                }
+            )
+        return data
+
 
 circuit_store = CircuitStore()
 bt.logging.info("CircuitStore initialized")

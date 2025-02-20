@@ -33,7 +33,7 @@ class ValidatorConfig:
         for key, value in vars(config).items():
             setattr(self, key, value)
 
-        self.bt_config = config
+        self.bt_config: bt.Config = config
         self.subnet_uid = int(
             self.bt_config.netuid if self.bt_config.netuid else DEFAULT_NETUID
         )
