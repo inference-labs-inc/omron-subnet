@@ -48,6 +48,7 @@ class SotaManager:
                 sota_relative_score=neuron_state.sota_relative_score,
                 hash=neuron_state.hash,
                 hotkey=neuron_state.hotkey,
+                uid=neuron_state.uid,
                 proof_size=neuron_state.proof_size,
                 response_time=neuron_state.response_time,
                 timestamp=int(time.time()),
