@@ -43,6 +43,9 @@ class CircuitInputSchema(BaseModel):
     "c3d88b7b81ada251385f1fdc3c40ab7ec1673737fefda0ab21b19c8b19b28d10"
 )
 class CircuitInput(BaseInput):
+
+    schema = CircuitInputSchema
+
     def __init__(
         self, request_type: RequestType, data: dict[str, object] | None = None
     ):
