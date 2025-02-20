@@ -46,6 +46,26 @@ from deployment_layer.circuit_store import circuit_store
 
 app = FastAPI()
 
+recent_requests: dict[str, int] = {}
+
+
+@app.middleware("http")
+async def rate_limiter(request: Request, call_next):
+    if request.url.path == "/rpc":
+        return await call_next(request)
+
+    ip = request.client.host
+    if _should_rate_limit(ip):
+        return Response(status_code=429)
+    return await call_next(request)
+
+
+def _should_rate_limit(ip: str):
+    if ip in recent_requests.keys():
+        return max(0, time.time() - recent_requests[ip]) < 1
+    recent_requests[ip] = time.time()
+    return False
+
 
 class ValidatorAPI:
     def __init__(self, config: ValidatorConfig):
@@ -58,22 +78,8 @@ class ValidatorAPI:
         self.validator_keys_cache = ValidatorKeysCache(config)
         self.server_thread: threading.Thread | None = None
         self.pending_requests: dict[str, asyncio.Event] = {}
-        self.request_results: dict[str, dict[str, any]] = {}
         self.is_testnet = config.bt_config.subtensor.network == "test"
         self._setup_api()
-
-    @app.middleware("http")
-    async def rate_limiter(self, request: Request, call_next):
-        ip = request.client.host
-        if self._should_rate_limit(ip):
-            return Response(status_code=429)
-        return call_next(request)
-
-    def _should_rate_limit(self, ip: str):
-        if ip in self.recent_requests.keys():
-            return max(0, time.time() - self.recent_requests[ip]) < 1
-        self.recent_requests[ip] = time.time()
-        return False
 
     def _setup_api(self) -> None:
         if not self.config.api.enabled:
