@@ -14,12 +14,10 @@ class BaseInput(ABC):
 
     def __init__(
         self,
-        schema: BaseModel,
         request_type: RequestType,
         data: dict[str, object] | None = None,
     ):
         self.request_type = request_type
-        self.schema = schema
         if request_type == RequestType.BENCHMARK:
             self.data = self.generate()
         else:
