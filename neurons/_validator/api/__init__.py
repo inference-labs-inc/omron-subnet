@@ -81,6 +81,10 @@ class ValidatorAPI:
             return
 
         bt.logging.debug("Starting WebSocket API server...")
+
+        for route in self._get_routes():
+            app.routes.append(route)
+
         if self.config.api.certificate_path:
             cert_manager = CertificateManager(self.config.api.certificate_path)
             cert_manager.ensure_valid_certificate(
