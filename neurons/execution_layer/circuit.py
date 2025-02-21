@@ -205,6 +205,7 @@ class CircuitEvaluationItem:
         # Set any remaining extra attributes from kwargs
         for key, value in kwargs.items():
             setattr(self, key, value)
+
     def to_dict(self) -> dict:
         """Convert the evaluation item to a dictionary for JSON serialization."""
         return {
