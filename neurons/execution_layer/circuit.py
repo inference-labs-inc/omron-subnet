@@ -167,25 +167,43 @@ class CircuitEvaluationItem:
     """
 
     circuit: Circuit  # Pass the Circuit object directly
-    uid: int = field(default=0)
-    minimum_response_time: float = field(default=0.0)
-    maximum_response_time: float = field(init=False) # Field will be set in __post_init__
-    proof_size: int = field(default=DEFAULT_PROOF_SIZE)
-    response_time: float = field(default=0.0)
-    score: float = field(default=0.0)
-    verification_result: bool = field(default=False)
+    maximum_response_time: float  # Will be initialized in  __init__
+    minimum_response_time: float = 0.0
+    uid: int = 0
+    proof_size: int = DEFAULT_PROOF_SIZE
+    response_time: float = 0.0
+    score: float = 0.0
+    verification_result: bool = False
 
     def __init__(self, *args, circuit: Circuit, **kwargs):
-        # Ignore 'circuit_id' if it's passed in kwargs
-        kwargs.pop("circuit_id", None)
-        super().__init__(circuit=circuit, **kwargs)
+        """
+        Custom `__init__` to handle legacy cases where `circuit_id` is passed,
+        and to set default and derived values manually.
+        """
+        # Remove `circuit_id` gracefully if present in kwargs (legacy code might pass it)
+        if "circuit_id" in kwargs:
+            logging.warning("Ignoring legacy `circuit_id` in CircuitEvaluationItem initialization.")
+            kwargs.pop("circuit_id")
 
-    def __post_init__(self):
-        if hasattr(self.circuit, 'timeout') and self.circuit.timeout:
-            self.maximum_response_time = self.circuit.timeout
-        else:
-            self.maximum_response_time = CRICUIT_TIMEOUT_SECONDS
+        # Manually set required attributes
+        self.circuit = circuit
+        self.uid = kwargs.pop("uid", 0)
+        self.minimum_response_time = kwargs.pop("minimum_response_time", 0.0)
+        self.proof_size = kwargs.pop("proof_size", DEFAULT_PROOF_SIZE)
+        self.response_time = kwargs.pop("response_time", 0.0)
+        self.score = kwargs.pop("score", 0.0)
+        self.verification_result = kwargs.pop("verification_result", False)
 
+        # Initialize derived/validated field
+        self.maximum_response_time = (
+            self.circuit.timeout
+            if hasattr(self.circuit, 'timeout') and self.circuit.timeout
+            else CRICUIT_TIMEOUT_SECONDS  # Replace or define this constant
+        )
+
+        # Set any remaining extra attributes from kwargs
+        for key, value in kwargs.items():
+            setattr(self, key, value)
     def to_dict(self) -> dict:
         """Convert the evaluation item to a dictionary for JSON serialization."""
         return {
