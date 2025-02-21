@@ -37,6 +37,8 @@ IGNORED_MODEL_HASHES = [
 
 # The maximum timespan allowed for miners to respond to a query
 VALIDATOR_REQUEST_TIMEOUT_SECONDS = 120
+# The maximum timespan allowed for miners to process through a circuit
+CRICUIT_TIMEOUT_SECONDS = 60
 # An additional queueing time for external requests
 EXTERNAL_REQUEST_QUEUE_TIME_SECONDS = 10
 # Maximum number of concurrent requests that the validator will handle
