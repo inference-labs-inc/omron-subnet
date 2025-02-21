@@ -77,6 +77,24 @@ def gc_log_competition_metrics(
     """
     try:
         metrics["validator_key"] = hotkey.ss58_address
+
+        # some metrics are nested under the hotkey, so we need to move them to the competitors list
+        # for example `hotkey.0x374672364.historical.improvement_rate` isn't really good for BigQuery
+        # so preparing miners data to go to a separate table
+        metrics["competitors"] = {}
+        for key in metrics.keys():
+            if not key.startswith("hotkey."):
+                continue
+            hotkey = key.split(".")[1]
+            if metrics["competitors"].get(hotkey) is None:
+                metrics["competitors"][hotkey] = {
+                    "hotkey": hotkey,
+                }
+            # something like `hotkey.{miner_hotkey}.historical.improvement_rate` turns into
+            # `historical_improvement_rate` in the competitors dict
+            metrics["competitors"][hotkey]["_".join(key.split(".")[2:])] = metrics.pop(key)
+        metrics["competitors"] = list(metrics["competitors"].values())
+
         input_bytes = json.dumps(metrics).encode("utf-8")
         # sign the inputs with your hotkey
         signature = hotkey.sign(input_bytes)

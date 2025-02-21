@@ -452,6 +452,7 @@ class Competition:
             for k, v in self.miner_states.items()
             if v.verification_result and v.sota_relative_score > 0
         ]
+        # TODO: log verification rate - avg, sota and for each miner (we have them on front-end)
         active_participants = len(active_miners)
         self.competition_manager.update_active_participants(active_participants)
 
@@ -499,6 +500,7 @@ class Competition:
 
                 metrics.update(
                     {
+                        f"hotkey.{miner_hotkey}.uid": miner_state.uid,
                         f"hotkey.{miner_hotkey}.sota_score": miner_state.sota_relative_score,
                         f"hotkey.{miner_hotkey}.raw_accuracy": miner_state.raw_accuracy,
                         f"hotkey.{miner_hotkey}.proof_size": miner_state.proof_size,
@@ -564,6 +566,9 @@ class Competition:
                     "sota_hotkey": sota_state.hotkey,
                     "sota_proof_size": sota_state.proof_size,
                     "sota_response_time": sota_state.response_time,
+                    "sota_timestamp": sota_state.timestamp,
+                    "sota_raw_accuracy": sota_state.raw_accuracy,
+                    "sota_uid": sota_state.uid,
                 }
             )
 
