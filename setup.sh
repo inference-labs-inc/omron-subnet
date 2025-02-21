@@ -98,7 +98,7 @@ cd "${INSTALL_PATH}" || {
     exit 1
 }
 
-"$HOME/.local/bin/uv" sync --locked --no-dev
+"$HOME/.local/bin/uv" sync --frozen --no-dev
 
 echo "
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@

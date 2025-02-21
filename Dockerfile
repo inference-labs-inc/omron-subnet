@@ -16,6 +16,7 @@ RUN apt update && \
     llvm \
     libudev-dev \
     protobuf-compiler \
+    ffmpeg \
     gosu \
     && apt clean && rm -rf /var/lib/apt/lists/*
 
@@ -63,7 +64,7 @@ COPY --chown=ubuntu:ubuntu --chmod=775 pyproject.toml /opt/omron/pyproject.toml
 COPY --chown=ubuntu:ubuntu --chmod=775 uv.lock /opt/omron/uv.lock
 RUN pipx install uv && \
     cd /opt/omron && \
-    ~/.local/bin/uv sync --locked --no-dev --compile-bytecode --prerelease=allow && \
+    ~/.local/bin/uv sync --frozen --no-dev --compile-bytecode && \
     ~/.local/bin/uv cache clean && \
     echo "source /opt/omron/.venv/bin/activate" >> ~/.bashrc && \
     chmod -R 775 /opt/omron/.venv

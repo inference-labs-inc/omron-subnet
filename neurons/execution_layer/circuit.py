@@ -6,6 +6,7 @@ import os
 import json
 import cli_parser
 from execution_layer.input_registry import InputRegistry
+from execution_layer.base_input import BaseInput
 
 # trunk-ignore(pylint/E0611)
 from bittensor import logging
@@ -346,7 +347,7 @@ class Circuit:
             logging.warning(
                 f"Failed to load settings for model {self.id}. Using default settings."
             )
-        self.input_handler = InputRegistry.get_handler(self.id)
+        self.input_handler: BaseInput = InputRegistry.get_handler(self.id)
 
     def __str__(self):
         return (
