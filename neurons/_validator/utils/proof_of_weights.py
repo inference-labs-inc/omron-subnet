@@ -72,6 +72,28 @@ class ProofOfWeightsItem:
         self.miner_uid = to_tensor(self.miner_uid, torch.int64)
 
     @staticmethod
+    def for_competition(
+        uid: int,
+        maximum_score: float,
+        competition_score: float,
+        block_number: int,
+        validator_uid: int,
+    ):
+        return ProofOfWeightsItem(
+            maximum_score=maximum_score,
+            previous_score=0,
+            verified=torch.tensor(True),
+            proof_size=torch.tensor(1),
+            response_time=torch.tensor(1),
+            competition=torch.tensor(competition_score),
+            maximum_response_time=torch.tensor(1),
+            minimum_response_time=torch.tensor(0),
+            block_number=torch.tensor(block_number),
+            validator_uid=torch.tensor(validator_uid),
+            miner_uid=torch.tensor(uid, dtype=torch.int64),
+        )
+
+    @staticmethod
     def from_miner_response(
         response: MinerResponse,
         maximum_score,

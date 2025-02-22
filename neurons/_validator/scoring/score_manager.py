@@ -144,12 +144,6 @@ class ScoreManager:
             f"Proof of weights scores: {scores} for miner UIDs: {miner_uids}, existing scores: {self.scores}"
         )
 
-        for uid, score in zip(miner_uids, scores):
-            if uid < 0 or uid >= len(self.scores):
-                continue
-            self.scores[uid] = float(score)
-            bt.logging.debug(f"Updated score for UID {uid}: {score}")
-
         log_scores(self.scores)
         self._try_store_scores()
 
@@ -194,8 +188,58 @@ class ScoreManager:
         """Clear the proof of weights queue."""
         self.proof_of_weights_queue = []
 
+    def process_non_queryable_scores(self, queryable_uids: set[int], max_score: float):
+        """
+        Decay scores for non-queryable UIDs.
+        """
+        for uid in range(len(self.scores)):
+            if uid not in queryable_uids:
+                hotkey = self.metagraph.hotkeys[uid]
+                if not (self.competition and hotkey in self.competition.miner_states):
+                    self.scores[uid] = 0
+                elif self.competition and hotkey in self.competition.miner_states:
+                    pow_item = ProofOfWeightsItem.for_competition(
+                        uid=uid,
+                        maximum_score=max_score,
+                        competition_score=self.competition.miner_states[
+                            hotkey
+                        ].sota_relative_score,
+                        block_number=self.metagraph.block.item(),
+                        validator_uid=self.user_uid,
+                    )
+                    self._update_pow_queue([pow_item])
+
+    def sync_competition_scores(self):
+        """
+        Sync competition scores into the PoW queue for all miners in competitions,
+        including non-queryable ones.
+        """
+        if not self.competition:
+            return
+
+        for hotkey, state in self.competition.miner_states.items():
+            try:
+                uid = self.metagraph.hotkeys.index(hotkey)
+                max_score = 1 / len(self.scores)
+                pow_item = ProofOfWeightsItem(
+                    uid=uid,
+                    max_score=max_score,
+                    current_score=self.scores[uid],
+                    response_time=0,  # Not applicable for competition-only scores
+                    max_response_time=1,  # Not applicable for competition-only scores
+                    min_response_time=0,  # Not applicable for competition-only scores
+                    block=self.metagraph.block.item(),
+                    validator_uid=self.user_uid,
+                    competition_score=state.sota_relative_score,
+                )
+                self._update_pow_queue([pow_item])
+            except ValueError:
+                continue  # Skip if hotkey not found in metagraph
+
     def update_single_score(
-        self, response: MinerResponse, queryable_uids: set[int] | None = None
+        self,
+        response: MinerResponse,
+        queryable_uids: set[int] | None = None,
     ) -> None:
         """
         Update the score for a single miner based on their response.
@@ -206,9 +250,6 @@ class ScoreManager:
         """
         if queryable_uids is None:
             queryable_uids = set(get_queryable_uids(self.metagraph))
-
-        if response.uid not in queryable_uids or response.uid >= len(self.scores):
-            return
 
         circuit = response.circuit
         hotkey = self.metagraph.hotkeys[response.uid]
@@ -231,6 +272,8 @@ class ScoreManager:
         circuit.evaluation_data.update(evaluation_data)
 
         max_score = 1 / len(self.scores)
+        self.process_non_queryable_scores(queryable_uids, max_score)
+
         pow_item = ProofOfWeightsItem.from_miner_response(
             response,
             max_score,

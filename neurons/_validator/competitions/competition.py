@@ -26,7 +26,6 @@ from .services.sota_manager import SotaManager
 
 from .utils.cleanup import cleanup_temp_dir
 from constants import VALIDATOR_REQUEST_TIMEOUT_SECONDS
-from _validator.utils.uid import get_queryable_uids
 from _validator.models.request_type import ValidatorMessage
 from utils.system import get_temp_folder
 from utils.wandb_logger import safe_log
@@ -251,7 +250,7 @@ class Competition:
             )
             return []
 
-        queryable_uids = list(get_queryable_uids(self.metagraph))
+        queryable_uids = self.metagraph.uids
         hotkey_to_uid = {self.metagraph.hotkeys[uid]: uid for uid in queryable_uids}
         self.miner_states = {
             k: v for k, v in self.miner_states.items() if k in self.metagraph.hotkeys
