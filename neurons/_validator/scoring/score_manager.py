@@ -144,6 +144,12 @@ class ScoreManager:
             f"Proof of weights scores: {scores} for miner UIDs: {miner_uids}, existing scores: {self.scores}"
         )
 
+        for uid, score in zip(miner_uids, scores):
+            if uid < 0 or uid >= len(self.scores):
+                continue
+            self.scores[uid] = float(score)
+            bt.logging.debug(f"Updated score for UID {uid}: {score}")
+
         log_scores(self.scores)
         self._try_store_scores()
 
@@ -209,33 +215,6 @@ class ScoreManager:
                         validator_uid=self.user_uid,
                     )
                     self._update_pow_queue([pow_item])
-
-    def sync_competition_scores(self):
-        """
-        Sync competition scores into the PoW queue for all miners in competitions,
-        including non-queryable ones.
-        """
-        if not self.competition:
-            return
-
-        for hotkey, state in self.competition.miner_states.items():
-            try:
-                uid = self.metagraph.hotkeys.index(hotkey)
-                max_score = 1 / len(self.scores)
-                pow_item = ProofOfWeightsItem(
-                    uid=uid,
-                    max_score=max_score,
-                    current_score=self.scores[uid],
-                    response_time=0,  # Not applicable for competition-only scores
-                    max_response_time=1,  # Not applicable for competition-only scores
-                    min_response_time=0,  # Not applicable for competition-only scores
-                    block=self.metagraph.block.item(),
-                    validator_uid=self.user_uid,
-                    competition_score=state.sota_relative_score,
-                )
-                self._update_pow_queue([pow_item])
-            except ValueError:
-                continue  # Skip if hotkey not found in metagraph
 
     def update_single_score(
         self,
