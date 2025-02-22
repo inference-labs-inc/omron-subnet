@@ -188,6 +188,7 @@ class ScoreManager:
         """Clear the proof of weights queue."""
         self.proof_of_weights_queue = []
 
+    @with_rate_limit(period=ONE_MINUTE * 5)
     def process_non_queryable_scores(self, queryable_uids: set[int], max_score: float):
         """
         Decay scores for non-queryable UIDs.
