@@ -38,6 +38,9 @@ STORAGE_REGION="auto"
 
 ### Start the Miner
 
+> [!IMPORTANT]
+> **Port `8091` must be open** for your circuit to function properly. This requires configuration on your local machine and router, or, if you're using a cloud provider, adjustments to your network settings. Validators cannot query your circuit if port `8091` remains closed.
+
 ```bash
 pm2 start neurons/miner.py --name omron_miner -- --netuid 2 --wallet.name your_wallet --logging.debug
 ```
