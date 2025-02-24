@@ -116,7 +116,7 @@ class CircuitManager:
                     file_path = os.path.join(circuit_dir, file_name)
                     try:
                         bt.logging.debug(f"Downloading {file_name} from {url}")
-                        async with session.get(url, timeout=60) as response:
+                        async with session.get(url, timeout=600) as response:
                             response.raise_for_status()
                             content = await response.read()
                             bt.logging.debug(
