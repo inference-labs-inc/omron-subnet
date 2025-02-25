@@ -52,39 +52,197 @@ class CircuitEvaluator:
             os.path.dirname(os.path.abspath(__file__)), "onnx_runner.py"
         )
 
-        if self.is_onnx and not os.path.exists(self.onnx_venv):
-            self._setup_onnx_env()
+        if self.is_onnx:
+            if not os.path.exists(self.onnx_venv):
+                if not self._setup_onnx_env():
+                    raise RuntimeError("Failed to set up ONNX environment")
+            else:
+                bt.logging.debug(f"Using existing ONNX environment at {self.onnx_venv}")
 
         self.data_source = self._setup_data_source()
 
-    def _setup_onnx_env(self):
-        os.makedirs(self.onnx_venv, exist_ok=True)
-        subprocess.run(["python", "-m", "venv", self.onnx_venv], check=True)
-        pip_path = os.path.join(self.onnx_venv, "bin", "pip")
+    def _get_python_path(self):
         python_path = os.path.join(self.onnx_venv, "bin", "python")
+        if os.path.exists(python_path):
+            return python_path
 
-        python_version = (
-            subprocess.run(
+        python_path = os.path.join(self.onnx_venv, "bin", "python3")
+        if os.path.exists(python_path):
+            return python_path
+
+        for root, dirs, files in os.walk(self.onnx_venv):
+            for file in files:
+                if file == "python" or file == "python3":
+                    return os.path.join(root, file)
+
+        return None
+
+    def _get_pip_path(self):
+        pip_path = os.path.join(self.onnx_venv, "bin", "pip")
+        if os.path.exists(pip_path):
+            return pip_path
+
+        pip_path = os.path.join(self.onnx_venv, "bin", "pip3")
+        if os.path.exists(pip_path):
+            return pip_path
+
+        for root, dirs, files in os.walk(self.onnx_venv):
+            for file in files:
+                if file == "pip" or file == "pip3":
+                    return os.path.join(root, file)
+
+        return None
+
+    def _find_site_packages(self):
+        site_packages = None
+        for root, dirs, files in os.walk(self.onnx_venv):
+            if os.path.basename(root) == "site-packages":
+                site_packages = root
+                break
+
+        if not site_packages:
+            python_path = self._get_python_path()
+            if python_path:
+                try:
+                    python_version_result = subprocess.run(
+                        [python_path, "--version"],
+                        capture_output=True,
+                        text=True,
+                    )
+                    python_version_output = python_version_result.stdout.strip()
+                    if not python_version_output:
+                        python_version_output = python_version_result.stderr.strip()
+                    python_version = python_version_output.split()[1][:3]
+                    site_packages = os.path.join(
+                        self.onnx_venv,
+                        "lib",
+                        f"python{python_version}",
+                        "site-packages",
+                    )
+                except Exception:
+                    site_packages = os.path.join(
+                        self.onnx_venv, "lib", "python3.10", "site-packages"
+                    )
+            else:
+                site_packages = os.path.join(
+                    self.onnx_venv, "lib", "python3.10", "site-packages"
+                )
+
+        if not os.path.exists(site_packages):
+            os.makedirs(site_packages, exist_ok=True)
+
+        return site_packages
+
+    def _get_runner_path(self):
+        runner_path = None
+        for root, dirs, files in os.walk(self.onnx_venv):
+            if "onnx_runner.py" in files:
+                runner_path = os.path.join(root, "onnx_runner.py")
+                break
+
+        if not runner_path or not os.path.exists(runner_path):
+            site_packages = self._find_site_packages()
+            runner_path = os.path.join(site_packages, "onnx_runner.py")
+            if not os.path.exists(runner_path):
+                shutil.copy2(self.onnx_runner, runner_path)
+
+        if not os.path.exists(runner_path):
+            runner_path = self.onnx_runner
+
+        return runner_path
+
+    def _setup_onnx_env(self):
+        try:
+            parent_dir = os.path.dirname(self.onnx_venv)
+            if not os.path.exists(parent_dir):
+                bt.logging.error(f"Parent directory {parent_dir} does not exist")
+                return False
+
+            if not os.access(parent_dir, os.W_OK):
+                bt.logging.error(f"No write permission for directory {parent_dir}")
+                return False
+
+            os.makedirs(self.onnx_venv, exist_ok=True)
+            bt.logging.debug(f"Creating ONNX venv at {self.onnx_venv}")
+
+            result = subprocess.run(
+                ["python", "-m", "venv", self.onnx_venv], capture_output=True, text=True
+            )
+
+            if result.returncode != 0:
+                bt.logging.error(f"Failed to create venv: {result.stderr}")
+
+                result = subprocess.run(
+                    ["python3", "-m", "venv", self.onnx_venv],
+                    capture_output=True,
+                    text=True,
+                )
+                if result.returncode != 0:
+                    bt.logging.error(
+                        f"Failed to create venv with python3: {result.stderr}"
+                    )
+                    return False
+
+            python_path = self._get_python_path()
+            if not python_path:
+                bt.logging.error(
+                    f"Python not found in venv at {self.onnx_venv} after creation"
+                )
+                return False
+
+            bt.logging.debug(f"Found Python at {python_path}")
+
+            python_version_result = subprocess.run(
                 [python_path, "--version"],
                 capture_output=True,
                 text=True,
             )
-            .stdout.strip()
-            .split()[1][:3]
-        )
 
-        subprocess.run(
-            [pip_path, "install", "numpy", "onnxruntime==1.20.1"], check=True
-        )
+            if python_version_result.returncode != 0:
+                bt.logging.error(
+                    f"Failed to get Python version: {python_version_result.stderr}"
+                )
+                return False
 
-        site_packages = os.path.join(
-            self.onnx_venv, "lib", f"python{python_version}", "site-packages"
-        )
+            python_version_output = python_version_result.stdout.strip()
+            if not python_version_output:
+                python_version_output = python_version_result.stderr.strip()
 
-        shutil.copy2(self.onnx_runner, os.path.join(site_packages, "onnx_runner.py"))
-        bt.logging.success(
-            f"ONNX environment set up at {self.onnx_venv} with Python {python_version}"
-        )
+            python_version = python_version_output.split()[1][:3]
+            bt.logging.debug(f"Python version: {python_version}")
+
+            pip_path = self._get_pip_path()
+            if not pip_path:
+                bt.logging.error(f"Pip not found in venv at {self.onnx_venv}")
+                return False
+
+            bt.logging.debug(f"Found pip at {pip_path}")
+
+            pip_result = subprocess.run(
+                [pip_path, "install", "numpy", "onnxruntime==1.20.1"],
+                capture_output=True,
+                text=True,
+            )
+
+            if pip_result.returncode != 0:
+                bt.logging.error(f"Failed to install dependencies: {pip_result.stderr}")
+                return False
+
+            site_packages = self._find_site_packages()
+            bt.logging.debug(f"Using site-packages at {site_packages}")
+
+            runner_path = os.path.join(site_packages, "onnx_runner.py")
+            shutil.copy2(self.onnx_runner, runner_path)
+            bt.logging.debug(f"Copied onnx_runner.py to {runner_path}")
+
+            bt.logging.success(
+                f"ONNX environment set up at {self.onnx_venv} with Python {python_version}"
+            )
+            return True
+        except Exception as e:
+            bt.logging.error(f"Error setting up ONNX environment: {str(e)}")
+            bt.logging.error(f"Stack trace: {traceback.format_exc()}")
+            return False
 
     def _setup_data_source(self) -> CompetitionDataSource:
         try:
@@ -351,29 +509,46 @@ class CircuitEvaluator:
             if not self.is_onnx:
                 return self.baseline_model(test_inputs).tolist()
 
+            python_path = self._get_python_path()
+            if not python_path:
+                bt.logging.warning(
+                    f"Python not found in ONNX venv at {self.onnx_venv}, attempting to recreate"
+                )
+                if not self._setup_onnx_env():
+                    bt.logging.error("Failed to recreate ONNX environment")
+                    return None
+
+                python_path = self._get_python_path()
+                if not python_path:
+                    bt.logging.error(
+                        "Still couldn't find Python after recreating environment"
+                    )
+                    return None
+
             with (
                 tempfile.NamedTemporaryFile(suffix=".npy") as input_file,
                 tempfile.NamedTemporaryFile(suffix=".npy") as output_file,
             ):
                 np.save(input_file.name, test_inputs.numpy())
-                python_path = os.path.join(self.onnx_venv, "bin", "python")
                 model_path = os.path.abspath(self.baseline_model)
 
                 bt.logging.debug(f"ONNX model path: {model_path}")
                 bt.logging.debug(f"Input shape: {test_inputs.shape}")
                 bt.logging.debug(f"Input file: {input_file.name}")
                 bt.logging.debug(f"Output file: {output_file.name}")
+                bt.logging.debug(f"Using Python at: {python_path}")
 
                 if not os.path.exists(model_path):
                     bt.logging.error(f"ONNX model not found at {model_path}")
                     return None
 
-                bt.logging.debug(f"Runner path: {self.onnx_runner}")
+                runner_path = self._get_runner_path()
+                bt.logging.debug(f"Using runner at: {runner_path}")
 
                 process = subprocess.Popen(
                     [
                         python_path,
-                        self.onnx_runner,
+                        runner_path,
                         model_path,
                         input_file.name,
                         output_file.name,
@@ -560,19 +735,20 @@ class CircuitEvaluator:
         self, model_path: str, inputs: np.ndarray, output_path: str
     ) -> Optional[np.ndarray]:
         try:
-            python_path = os.path.join(self.onnx_venv, "bin", "python")
-            runner_path = os.path.join(
-                self.onnx_venv,
-                "lib",
-                "python3.10",
-                "site-packages",
-                "onnx_runner.py",
-            )
+            python_path = self._get_python_path()
+            if not python_path:
+                bt.logging.error(f"Python not found in ONNX venv at {self.onnx_venv}")
+                return None
 
-            shutil.copy2(self.onnx_runner, runner_path)
-
+            runner_path = self._get_runner_path()
             input_path = output_path + ".input.npy"
             np.save(input_path, inputs)
+
+            bt.logging.debug(f"Running ONNX model with Python at: {python_path}")
+            bt.logging.debug(f"Using runner at: {runner_path}")
+            bt.logging.debug(f"Model path: {model_path}")
+            bt.logging.debug(f"Input path: {input_path}")
+            bt.logging.debug(f"Output path: {output_path}")
 
             process = subprocess.Popen(
                 [python_path, runner_path, model_path, input_path, output_path],
@@ -585,6 +761,8 @@ class CircuitEvaluator:
 
             if process.returncode != 0:
                 bt.logging.error(f"ONNX runner failed with code {process.returncode}")
+                bt.logging.error(f"STDOUT: {stdout}")
+                bt.logging.error(f"STDERR: {stderr}")
                 return None
 
             try:
@@ -595,4 +773,5 @@ class CircuitEvaluator:
 
         except Exception as e:
             bt.logging.error(f"Error running ONNX model: {e}")
+            bt.logging.error(f"Stack trace: {traceback.format_exc()}")
             return None
