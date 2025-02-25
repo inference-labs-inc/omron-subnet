@@ -70,13 +70,9 @@ class CircuitEvaluator:
         if os.path.exists(python_path):
             return python_path
 
-        python_path = os.path.join(self.onnx_venv, "Scripts", "python.exe")
-        if os.path.exists(python_path):
-            return python_path
-
         for root, dirs, files in os.walk(self.onnx_venv):
             for file in files:
-                if file == "python" or file == "python3" or file == "python.exe":
+                if file == "python" or file == "python3":
                     return os.path.join(root, file)
 
         return None
@@ -90,13 +86,9 @@ class CircuitEvaluator:
         if os.path.exists(pip_path):
             return pip_path
 
-        pip_path = os.path.join(self.onnx_venv, "Scripts", "pip.exe")
-        if os.path.exists(pip_path):
-            return pip_path
-
         for root, dirs, files in os.walk(self.onnx_venv):
             for file in files:
-                if file == "pip" or file == "pip3" or file == "pip.exe":
+                if file == "pip" or file == "pip3":
                     return os.path.join(root, file)
 
         return None
