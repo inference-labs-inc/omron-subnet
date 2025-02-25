@@ -47,6 +47,9 @@ class CircuitManager:
     async def download_files(self, axon: bt.axon, hash: str, circuit_dir: str) -> bool:
         """Download circuit files from a miner."""
         try:
+            bt.logging.info(
+                f"Starting download of circuit files from miner {axon.ip}:{axon.port}"
+            )
             bt.logging.debug(f"Requesting circuit files for hash {hash[:8]}...")
             bt.logging.debug(f"Circuit directory: {circuit_dir}")
 
@@ -60,7 +63,9 @@ class CircuitManager:
                 file_name="commitment",
             )
 
-            bt.logging.debug(f"Sending request to axon: {axon.ip}:{axon.port}")
+            bt.logging.info(
+                f"Requesting commitment data from axon {axon.ip}:{axon.port}"
+            )
             response = await self.dendrite.forward(
                 axons=[axon],
                 synapse=synapse,
@@ -84,6 +89,7 @@ class CircuitManager:
 
             try:
                 commitment = json.loads(response_synapse.commitment)
+                bt.logging.info("Successfully parsed commitment data from response")
                 bt.logging.debug(f"Received commitment data: {commitment}")
             except json.JSONDecodeError:
                 bt.logging.error("Invalid commitment data")
@@ -96,6 +102,8 @@ class CircuitManager:
             signed_urls = commitment["signed_urls"]
             required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
             all_files_downloaded = True
+
+            bt.logging.info(f"Starting download of {len(required_files)} circuit files")
 
             # Create a new session for each download
             async with aiohttp.ClientSession(
@@ -115,12 +123,12 @@ class CircuitManager:
 
                     file_path = os.path.join(circuit_dir, file_name)
                     try:
-                        bt.logging.debug(f"Downloading {file_name} from {url}")
+                        bt.logging.info(f"Downloading {file_name}")
                         async with session.get(url, timeout=600) as response:
                             response.raise_for_status()
                             content = await response.read()
-                            bt.logging.debug(
-                                f"Downloaded {len(content)} bytes for {file_name}"
+                            bt.logging.info(
+                                f"Successfully downloaded {file_name} ({len(content)} bytes)"
                             )
                             with open(file_path, "wb") as f:
                                 f.write(content)
@@ -133,12 +141,12 @@ class CircuitManager:
 
             if all_files_downloaded:
                 bt.logging.success(f"Successfully downloaded all files for {hash[:8]}")
-                bt.logging.debug("Final circuit directory contents:")
+                bt.logging.info("Verifying downloaded files...")
                 for root, dirs, files in os.walk(circuit_dir):
                     for file in files:
                         file_path = os.path.join(root, file)
-                        bt.logging.debug(
-                            f"- {file} ({os.path.getsize(file_path)} bytes)"
+                        bt.logging.info(
+                            f"Verified {file} ({os.path.getsize(file_path)} bytes)"
                         )
                 return True
             else:
