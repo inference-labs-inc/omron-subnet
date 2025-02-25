@@ -219,6 +219,12 @@ def _miner_config():
         default=os.getenv("STORAGE_REGION", "us-east-1"),
     )
 
+    parser.add_argument(
+        "--competition-only",
+        action="store_true",
+        help="Whether to only run the competition. Disables regular mining when set.",
+    )
+
     bt.subtensor.add_args(parser)
     bt.logging.add_args(parser)
     bt.wallet.add_args(parser)

@@ -17,7 +17,7 @@ from constants import (
     STEAK,
     VALIDATOR_STAKE_THRESHOLD,
     ONE_HOUR,
-    CRICUIT_TIMEOUT_SECONDS
+    CRICUIT_TIMEOUT_SECONDS,
 )
 from deployment_layer.circuit_store import circuit_store
 from execution_layer.generic_input import GenericInput
@@ -314,6 +314,9 @@ class MinerSession:
         3. URLs are signed and time-limited
         4. All operations are thread-safe
         """
+        bt.logging.info(
+            f"Handling competition request for id={synapse.id} hash={synapse.hash}"
+        )
         try:
             if not self.circuit_manager:
                 bt.logging.critical(
@@ -326,6 +329,7 @@ class MinerSession:
                     error="Circuit manager not initialized",
                 )
 
+            bt.logging.info("Getting current commitment from circuit manager")
             commitment = self.circuit_manager.get_current_commitment()
             if not commitment:
                 bt.logging.critical(
@@ -338,6 +342,7 @@ class MinerSession:
                     error="No valid circuit commitment available",
                 )
 
+            bt.logging.info("Getting chain commitment from subtensor")
             chain_commitment = self.subtensor.get_commitment(
                 cli_parser.config.netuid,
                 self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address),
@@ -354,6 +359,7 @@ class MinerSession:
                     error="Hash mismatch between local and chain commitment",
                 )
 
+            bt.logging.info("Generating signed URLs for required files")
             required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
             object_keys = {}
             for file_name in required_files:
@@ -368,6 +374,7 @@ class MinerSession:
                     error="Failed to get signed URLs",
                 )
 
+            bt.logging.info("Preparing commitment data response")
             commitment_data = commitment.model_dump()
             commitment_data["signed_urls"] = signed_urls
 
@@ -377,6 +384,7 @@ class MinerSession:
                 file_name=synapse.file_name,
                 commitment=json.dumps(commitment_data),
             )
+            bt.logging.info("Successfully prepared competition response")
             return response
 
         except Exception as e:
@@ -393,6 +401,11 @@ class MinerSession:
         """
         This function run proof generation of the model (with its output as well)
         """
+        if cli_parser.config.competition_only:
+            bt.logging.info("Competition only mode enabled. Skipping proof generation.")
+            synapse.query_output = "Competition only mode enabled"
+            return synapse
+
         time_in = time.time()
         bt.logging.debug("Received request from validator")
         bt.logging.debug(f"Input data: {synapse.query_input} \n")
@@ -471,6 +484,11 @@ class MinerSession:
         """
         Handles a proof of weights request
         """
+        if cli_parser.config.competition_only:
+            bt.logging.info("Competition only mode enabled. Skipping proof generation.")
+            synapse.query_output = "Competition only mode enabled"
+            return synapse
+
         time_in = time.time()
         bt.logging.debug("Received proof of weights request from validator")
         bt.logging.debug(f"Input data: {synapse.inputs} \n")

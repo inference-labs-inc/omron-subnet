@@ -5,6 +5,7 @@ import boto3
 import traceback
 import threading
 from typing import Optional, Dict
+from substrateinterface import Keypair
 from pathlib import Path
 from botocore.config import Config
 import bittensor as bt
@@ -53,7 +54,7 @@ class CircuitManager:
 
     def __init__(
         self,
-        wallet: bt.wallet,
+        wallet: Keypair,
         netuid: int,
         circuit_dir: str,
         storage_config: dict,
