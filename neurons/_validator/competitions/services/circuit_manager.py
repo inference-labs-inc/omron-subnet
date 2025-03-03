@@ -5,6 +5,7 @@ import aiohttp
 import bittensor as bt
 from urllib.parse import urlparse
 import traceback
+from constants import ONE_HOUR
 from protocol import Competition
 
 
@@ -105,9 +106,8 @@ class CircuitManager:
 
             bt.logging.info(f"Starting download of {len(required_files)} circuit files")
 
-            # Create a new session for each download
             async with aiohttp.ClientSession(
-                connector=aiohttp.TCPConnector(force_close=True)
+                connector=aiohttp.TCPConnector(force_close=False)
             ) as session:
                 for file_name in required_files:
                     if file_name not in signed_urls:
@@ -124,7 +124,7 @@ class CircuitManager:
                     file_path = os.path.join(circuit_dir, file_name)
                     try:
                         bt.logging.debug(f"Downloading {file_name} from {url}")
-                        async with session.get(url, timeout=1200) as response:
+                        async with session.get(url, timeout=ONE_HOUR) as response:
                             response.raise_for_status()
                             content = await response.read()
                             bt.logging.info(
