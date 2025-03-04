@@ -123,24 +123,46 @@ class SotaManager:
             bt.logging.error(f"Error recalculating miner scores: {e}")
 
     def check_if_sota(
-        self, sota_relative_score: float, proof_size: float, response_time: float
+        self,
+        sota_relative_score: float,
+        proof_size: float,
+        response_time: float,
+        improvements: dict = None,
     ) -> bool:
         EPSILON = 1e-6
+        MAX_DEGRADATION = 0.1
 
-        if sota_relative_score < self.sota_state.sota_relative_score - EPSILON:
-            return False
-        if proof_size > self.sota_state.proof_size + EPSILON:
-            return False
-        if response_time > self.sota_state.response_time + EPSILON:
+        if self.sota_state.sota_relative_score == 0:
+            return True
+
+        if sota_relative_score < self.sota_state.sota_relative_score - MAX_DEGRADATION:
             return False
 
-        is_better = (
-            sota_relative_score > self.sota_state.sota_relative_score + EPSILON
-            or proof_size < self.sota_state.proof_size - EPSILON
-            or response_time < self.sota_state.response_time - EPSILON
-        )
+        if improvements and "raw" in improvements and "weighted" in improvements:
+            if (
+                improvements["raw"]["accuracy"] > MAX_DEGRADATION
+                or improvements["raw"]["proof_size"] > MAX_DEGRADATION
+                or improvements["raw"]["response_time"] > MAX_DEGRADATION
+            ):
+                return False
 
-        return is_better or self.sota_state.sota_relative_score == 0
+            weighted_improvement = sum(-v for v in improvements["weighted"].values())
+            return weighted_improvement > EPSILON
+
+        proof_size_degradation = (
+            proof_size - self.sota_state.proof_size
+        ) / self.sota_state.proof_size
+        response_time_degradation = (
+            response_time - self.sota_state.response_time
+        ) / self.sota_state.response_time
+
+        if (
+            proof_size_degradation > MAX_DEGRADATION
+            or response_time_degradation > MAX_DEGRADATION
+        ):
+            return False
+
+        return False
 
     @property
     def current_state(self) -> SotaState:
