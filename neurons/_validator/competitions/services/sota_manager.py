@@ -134,15 +134,13 @@ class SotaManager:
         if response_time > self.sota_state.response_time + EPSILON:
             return False
 
-        metrics_equal = (
-            abs(sota_relative_score - self.sota_state.sota_relative_score) < EPSILON
-            and abs(proof_size - self.sota_state.proof_size) < EPSILON
-            and abs(response_time - self.sota_state.response_time) < EPSILON
+        is_better = (
+            sota_relative_score > self.sota_state.sota_relative_score + EPSILON
+            or proof_size < self.sota_state.proof_size - EPSILON
+            or response_time < self.sota_state.response_time - EPSILON
         )
-        if metrics_equal:
-            return False
 
-        return True
+        return is_better or self.sota_state.sota_relative_score == 0
 
     @property
     def current_state(self) -> SotaState:

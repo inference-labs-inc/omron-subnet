@@ -130,7 +130,12 @@ class CompetitionThread(threading.Thread):
 
                     bt.logging.info("Starting circuit evaluation...")
                     try:
-                        self.competition.circuit_evaluator.evaluate(circuit_dir)
+                        uid, hotkey, hash = self.competition.current_download
+                        self.competition._evaluate_circuit(
+                            circuit_dir=circuit_dir,
+                            circuit_uid=str(uid),
+                            circuit_owner=hotkey,
+                        )
                         self.competition.cleanup_circuit_dir(circuit_dir)
                     except Exception as e:
                         bt.logging.error(f"Error during circuit evaluation: {str(e)}")
@@ -417,23 +422,39 @@ class Competition:
         circuit_dir: str,
         circuit_uid: str,
         circuit_owner: str,
-        accuracy_weight: float,
     ) -> float:
         try:
             sota_relative_score, proof_size, response_time, success = (
-                self.circuit_evaluator.evaluate(circuit_dir, accuracy_weight)
+                self.circuit_evaluator.evaluate(circuit_dir)
             )
 
             if not success:
                 return 0.0
 
-            if circuit_owner in self.miner_states:
-                self.miner_states[circuit_owner].sota_relative_score = (
-                    sota_relative_score
+            if circuit_owner not in self.miner_states:
+                self.miner_states[circuit_owner] = NeuronState(
+                    hotkey=circuit_owner,
+                    uid=int(circuit_uid),
+                    sota_relative_score=0.0,
+                    proof_size=0,
+                    response_time=0.0,
+                    verification_result=False,
+                    raw_accuracy=0.0,
+                    hash=os.path.basename(circuit_dir),
                 )
-                self.miner_states[circuit_owner].proof_size = proof_size
-                self.miner_states[circuit_owner].response_time = response_time
-                self.miner_states[circuit_owner].verification_result = True
+
+            neuron_state = self.miner_states[circuit_owner]
+            neuron_state.sota_relative_score = sota_relative_score
+            neuron_state.proof_size = proof_size
+            neuron_state.response_time = response_time
+            neuron_state.verification_result = True
+
+            if self.sota_manager.check_if_sota(
+                sota_relative_score, proof_size, response_time
+            ):
+                self.sota_manager.preserve_circuit(
+                    circuit_dir, neuron_state, self.miner_states
+                )
 
             self._update_competition_metrics()
 
@@ -444,136 +465,140 @@ class Competition:
             return 0.0
 
     def _update_competition_metrics(self):
-        self.competition_manager.increment_circuits_evaluated()
+        try:
+            active_miners = [
+                (k, v)
+                for k, v in self.miner_states.items()
+                if v.verification_result and v.sota_relative_score > 0
+            ]
+            active_participants = len(active_miners)
 
-        active_miners = [
-            (k, v)
-            for k, v in self.miner_states.items()
-            if v.verification_result and v.sota_relative_score > 0
-        ]
-        # TODO: log verification rate - avg, sota and for each miner (we have them on front-end)
-        active_participants = len(active_miners)
-        self.competition_manager.update_active_participants(active_participants)
+            sota_state = self.sota_manager.current_state
 
-        sota_state = self.sota_manager.current_state
-
-        if active_miners:
-            sorted_by_accuracy = sorted(
-                active_miners, key=lambda x: x[1].raw_accuracy, reverse=True
-            )
-            sorted_by_proof_size = sorted(active_miners, key=lambda x: x[1].proof_size)
-            sorted_by_response_time = sorted(
-                active_miners, key=lambda x: x[1].response_time
-            )
-
-            metrics = {}
-
-            for miner_hotkey, miner_state in active_miners:
-                accuracy_rank = (
-                    next(
-                        i
-                        for i, (h, _) in enumerate(sorted_by_accuracy)
-                        if h == miner_hotkey
-                    )
-                    + 1
+            if active_miners:
+                sorted_by_accuracy = sorted(
+                    active_miners, key=lambda x: x[1].raw_accuracy, reverse=True
                 )
-                proof_size_rank = (
-                    next(
-                        i
-                        for i, (h, _) in enumerate(sorted_by_proof_size)
-                        if h == miner_hotkey
-                    )
-                    + 1
+                sorted_by_proof_size = sorted(
+                    active_miners, key=lambda x: x[1].proof_size
                 )
-                response_time_rank = (
-                    next(
-                        i
-                        for i, (h, _) in enumerate(sorted_by_response_time)
-                        if h == miner_hotkey
-                    )
-                    + 1
-                )
-                overall_rank = (
-                    accuracy_rank + proof_size_rank + response_time_rank
-                ) / 3
-
-                metrics.update(
-                    {
-                        f"hotkey.{miner_hotkey}.uid": miner_state.uid,
-                        f"hotkey.{miner_hotkey}.sota_score": miner_state.sota_relative_score,
-                        f"hotkey.{miner_hotkey}.raw_accuracy": miner_state.raw_accuracy,
-                        f"hotkey.{miner_hotkey}.proof_size": miner_state.proof_size,
-                        f"hotkey.{miner_hotkey}.response_time": miner_state.response_time,
-                        f"hotkey.{miner_hotkey}.relative_to_sota.accuracy": (
-                            miner_state.raw_accuracy / sota_state.raw_accuracy
-                            if sota_state.raw_accuracy > 0
-                            else 0
-                        ),
-                        f"hotkey.{miner_hotkey}.relative_to_sota.proof_size": (
-                            sota_state.proof_size / miner_state.proof_size
-                            if miner_state.proof_size > 0
-                            else 0
-                        ),
-                        f"hotkey.{miner_hotkey}.relative_to_sota.response_time": (
-                            sota_state.response_time / miner_state.response_time
-                            if miner_state.response_time > 0
-                            else 0
-                        ),
-                        f"hotkey.{miner_hotkey}.rank.overall": overall_rank,
-                        f"hotkey.{miner_hotkey}.rank.accuracy": accuracy_rank,
-                        f"hotkey.{miner_hotkey}.rank.proof_size": proof_size_rank,
-                        f"hotkey.{miner_hotkey}.rank.response_time": response_time_rank,
-                    }
+                sorted_by_response_time = sorted(
+                    active_miners, key=lambda x: x[1].response_time
                 )
 
-                if hasattr(miner_state, "last_score"):
-                    time_delta = (
-                        time.time() - miner_state.last_score_time
-                        if hasattr(miner_state, "last_score_time")
-                        else 1
+                metrics = {}
+
+                for miner_hotkey, miner_state in active_miners:
+                    accuracy_rank = (
+                        next(
+                            i
+                            for i, (h, _) in enumerate(sorted_by_accuracy)
+                            if h == miner_hotkey
+                        )
+                        + 1
                     )
-                    improvement_rate = (
-                        miner_state.sota_relative_score - miner_state.last_score
-                    ) / time_delta
+                    proof_size_rank = (
+                        next(
+                            i
+                            for i, (h, _) in enumerate(sorted_by_proof_size)
+                            if h == miner_hotkey
+                        )
+                        + 1
+                    )
+                    response_time_rank = (
+                        next(
+                            i
+                            for i, (h, _) in enumerate(sorted_by_response_time)
+                            if h == miner_hotkey
+                        )
+                        + 1
+                    )
+                    overall_rank = (
+                        accuracy_rank + proof_size_rank + response_time_rank
+                    ) / 3
+
                     metrics.update(
                         {
-                            f"hotkey.{miner_hotkey}.historical.improvement_rate": improvement_rate,
-                            f"hotkey.{miner_hotkey}.historical.best_sota_score": max(
-                                miner_state.sota_relative_score,
-                                getattr(miner_state, "best_sota_score", 0),
+                            f"hotkey.{miner_hotkey}.uid": miner_state.uid,
+                            f"hotkey.{miner_hotkey}.sota_score": miner_state.sota_relative_score,
+                            f"hotkey.{miner_hotkey}.raw_accuracy": miner_state.raw_accuracy,
+                            f"hotkey.{miner_hotkey}.proof_size": miner_state.proof_size,
+                            f"hotkey.{miner_hotkey}.response_time": miner_state.response_time,
+                            f"hotkey.{miner_hotkey}.relative_to_sota.accuracy": (
+                                miner_state.raw_accuracy / sota_state.raw_accuracy
+                                if sota_state.raw_accuracy > 0
+                                else 0
                             ),
+                            f"hotkey.{miner_hotkey}.relative_to_sota.proof_size": (
+                                sota_state.proof_size / miner_state.proof_size
+                                if miner_state.proof_size > 0
+                                else 0
+                            ),
+                            f"hotkey.{miner_hotkey}.relative_to_sota.response_time": (
+                                sota_state.response_time / miner_state.response_time
+                                if miner_state.response_time > 0
+                                else 0
+                            ),
+                            f"hotkey.{miner_hotkey}.rank.overall": overall_rank,
+                            f"hotkey.{miner_hotkey}.rank.accuracy": accuracy_rank,
+                            f"hotkey.{miner_hotkey}.rank.proof_size": proof_size_rank,
+                            f"hotkey.{miner_hotkey}.rank.response_time": response_time_rank,
                         }
                     )
 
-                miner_state.last_score = miner_state.sota_relative_score
-                miner_state.last_score_time = time.time()
-                miner_state.best_sota_score = max(
-                    miner_state.sota_relative_score,
-                    getattr(miner_state, "best_sota_score", 0),
+                    if hasattr(miner_state, "last_score"):
+                        time_delta = (
+                            time.time() - miner_state.last_score_time
+                            if hasattr(miner_state, "last_score_time")
+                            else 1
+                        )
+                        improvement_rate = (
+                            miner_state.sota_relative_score - miner_state.last_score
+                        ) / time_delta
+                        metrics.update(
+                            {
+                                f"hotkey.{miner_hotkey}.historical.improvement_rate": improvement_rate,
+                                f"hotkey.{miner_hotkey}.historical.best_sota_score": max(
+                                    miner_state.sota_relative_score,
+                                    getattr(miner_state, "best_sota_score", 0),
+                                ),
+                            }
+                        )
+
+                    miner_state.last_score = miner_state.sota_relative_score
+                    miner_state.last_score_time = time.time()
+                    miner_state.best_sota_score = max(
+                        miner_state.sota_relative_score,
+                        getattr(miner_state, "best_sota_score", 0),
+                    )
+
+                metrics.update(
+                    {
+                        "active_participants": active_participants,
+                        "avg_raw_accuracy": sum(
+                            m[1].raw_accuracy for m in active_miners
+                        )
+                        / active_participants,
+                        "avg_proof_size": sum(m[1].proof_size for m in active_miners)
+                        / active_participants,
+                        "avg_response_time": sum(
+                            m[1].response_time for m in active_miners
+                        )
+                        / active_participants,
+                        "sota_relative_score": sota_state.sota_relative_score,
+                        "sota_hotkey": sota_state.hotkey,
+                        "sota_proof_size": sota_state.proof_size,
+                        "sota_response_time": sota_state.response_time,
+                        "sota_timestamp": sota_state.timestamp,
+                        "sota_raw_accuracy": sota_state.raw_accuracy,
+                        "sota_uid": sota_state.uid,
+                    }
                 )
 
-            metrics.update(
-                {
-                    "active_participants": active_participants,
-                    "avg_raw_accuracy": sum(m[1].raw_accuracy for m in active_miners)
-                    / active_participants,
-                    "avg_proof_size": sum(m[1].proof_size for m in active_miners)
-                    / active_participants,
-                    "avg_response_time": sum(m[1].response_time for m in active_miners)
-                    / active_participants,
-                    "sota_relative_score": sota_state.sota_relative_score,
-                    "sota_hotkey": sota_state.hotkey,
-                    "sota_proof_size": sota_state.proof_size,
-                    "sota_response_time": sota_state.response_time,
-                    "sota_timestamp": sota_state.timestamp,
-                    "sota_raw_accuracy": sota_state.raw_accuracy,
-                    "sota_uid": sota_state.uid,
-                }
-            )
-
-            safe_log(metrics)
-
-            self.competition_manager.log_metrics(metrics)
+                safe_log(metrics)
+        except Exception as e:
+            bt.logging.warning(f"Error updating competition metrics: {e}")
+            bt.logging.debug(f"Stack trace: {traceback.format_exc()}")
 
     def set_validator_message_queues(
         self,
