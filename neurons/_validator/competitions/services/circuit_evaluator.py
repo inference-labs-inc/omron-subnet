@@ -337,6 +337,12 @@ class CircuitEvaluator:
     ) -> dict:
         sota_state = self.sota_manager.current_state
 
+        if sota_state.sota_relative_score == 0:
+            return {
+                "raw": {"accuracy": 0, "proof_size": 0, "response_time": 0},
+                "weighted": {"accuracy": 0, "proof_size": 0, "response_time": 0},
+            }
+
         try:
             with open(
                 os.path.join(self.competition_directory, "competition_config.json")
