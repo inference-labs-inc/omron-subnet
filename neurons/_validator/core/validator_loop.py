@@ -97,6 +97,7 @@ class ValidatorLoop:
             self.config.metagraph,
             self.score_manager,
             self.config.user_uid,
+            self.config.wallet.hotkey,
         )
         self.weights_manager = WeightsManager(
             self.config.subtensor,

@@ -12,7 +12,7 @@ from urllib3.util.retry import Retry
 from _validator.models.miner_response import MinerResponse
 
 LOGGING_URL = os.getenv(
-    "LOGGING_URL",
+    "OMRON_LOGGING_URL",
     "https://api.omron.ai/statistics/log/",
 )
 

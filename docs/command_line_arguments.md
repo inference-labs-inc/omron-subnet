@@ -1,8 +1,25 @@
-# Command Line Arguments
+# Command Line Arguments and Environment Variables
 
-These are options configurable via command line arguments, when running miner or validator software.
+These are options configurable via command line arguments or environment variables, when running miner or validator software.
 
-## Custom Arguments
+## General Environment Variables
+
+| Variable Name              | Required | Default               | Accepted Values | Description                                                |
+| -------------------------- | :------: | --------------------- | --------------- | ---------------------------------------------------------- |
+| `OMRON_EXTERNAL_MODEL_DIR` |    No    | `~/.bittensor/omron/` | String          | The directory used to store large circuit files.           |
+| `OMRON_NO_AUTO_UPDATE`     |    No    | `False`               | `True`, `False` | Whether to disable automatic updates.                      |
+| `OMRON_DOCKER_BUILD`       |    No    | `False`               | `True`, `False` | Whether we are running within a docker build / CI process. |
+
+## Validator specific environment variables
+
+These variables are specific to validator software and have no effect on miner software.
+
+| Variable Name       | Required | Default                                | Accepted Values | Description                               |
+| ------------------- | :------: | -------------------------------------- | --------------- | ----------------------------------------- |
+| `OMRON_LOGGING_URL` |    No    | `https://api.omron.ai/statistics/log/` | String          | The URL for metrics logging.              |
+| `OMRON_PPS_URL`     |    No    | `https://pps.omron.ai`                 | String          | The URL for the proof publishing service. |
+
+## General Arguments
 
 Arguments that are present within the Omron miner and validator software. The below arguments apply to both miner and validator software.
 

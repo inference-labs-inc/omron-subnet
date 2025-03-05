@@ -137,6 +137,8 @@ MAINNET_TESTNET_UIDS = [
     (57, 237),  # gaia
     (59, 249),  # agent-arena
 ]
+# Proof publishing service URL
+PPS_URL = os.getenv("OMRON_PPS_URL", "https://pps.omron.ai")
 # EZKL path
 LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")
 # GitHub repository URL

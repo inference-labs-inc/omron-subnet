@@ -12,10 +12,17 @@ from execution_layer.verified_model_session import VerifiedModelSession
 
 
 class ResponseProcessor:
-    def __init__(self, metagraph, score_manager: ScoreManager, user_uid):
+    def __init__(
+        self,
+        metagraph,
+        score_manager: ScoreManager,
+        user_uid,
+        hotkey: substrateinterface.Keypair,
+    ):
         self.metagraph = metagraph
         self.score_manager = score_manager
         self.user_uid = user_uid
+        self.hotkey = hotkey
         self.proof_batches_queue = []
         self.completed_proof_of_weights_queue: list[CompletedProofOfWeightsItem] = []
 
