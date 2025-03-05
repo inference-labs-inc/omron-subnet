@@ -8,14 +8,13 @@ from constants import (
     PROOF_OF_WEIGHTS_INTERVAL,
     TEMP_FOLDER,
     Roles,
+    COMPETITION_SYNC_INTERVAL,
 )
 
 SHOW_HELP = False
 
-### A dirty hack to show help message when running the script with --help or -h ###
-# Bittensor is the culprit of this ugly piece of code.
-# It intercepts the --help and -h flags, shows its own help message and exits the script.
-# So this should be executed before the Bittensor is first time imported.
+# Intercept --help/-h flags before importing bittensor since it overrides help behavior
+# This allows showing our custom help message instead of bittensor's default one
 if "--help" in sys.argv:
     SHOW_HELP = True
     sys.argv.remove("--help")
@@ -23,9 +22,8 @@ elif "-h" in sys.argv:
     SHOW_HELP = True
     sys.argv.remove("-h")
 
+# flake8: noqa
 import bittensor as bt
-
-###################################################################################
 
 parser: Optional[argparse.ArgumentParser]
 config: Optional[bt.config]
@@ -98,7 +96,6 @@ def init_config(role: Optional[str] = None):
         default=None,
         help="Custom location for storing models data (optional)",
     )
-
     if role == Roles.VALIDATOR:
         # CLI arguments specific to the validator
         _validator_config()
@@ -131,10 +128,9 @@ def init_config(role: Optional[str] = None):
         )
         config.disable_wandb = True
         config.verbose = config.verbose if config.verbose is None else True
-        config.max_workers = config.max_workers or 1
 
     config.full_path = os.path.expanduser("~/.bittensor/omron")  # type: ignore
-    config.full_path_score = os.path.join(config.full_path, "scores")
+    config.full_path_score = os.path.join(config.full_path, "scores", "scores.pt")
     if not config.certificate_path:
         config.certificate_path = os.path.join(config.full_path, "cert")
 
@@ -149,10 +145,9 @@ def init_config(role: Optional[str] = None):
         config.whitelisted_public_keys = config.whitelisted_public_keys.split(",")
 
     os.makedirs(config.full_path, exist_ok=True)
-    os.makedirs(config.full_path_score, exist_ok=True)
     os.makedirs(config.full_path_models, exist_ok=True)
     os.makedirs(config.certificate_path, exist_ok=True)
-
+    os.makedirs(os.path.dirname(config.full_path_score), exist_ok=True)
     bt.logging(config=config, logging_dir=config.logging.logging_dir)
     bt.logging.enable_info()
 
@@ -176,9 +171,58 @@ def _miner_config():
 
     parser.add_argument(
         "--disable-blacklist",
-        default=False,
+        default=None,
         action="store_true",
         help="Disables request filtering and allows all incoming requests.",
+    )
+
+    parser.add_argument(
+        "--storage.provider",
+        type=str,
+        choices=["r2", "s3"],
+        help="Storage provider (r2 or s3)",
+        default=os.getenv("STORAGE_PROVIDER", "r2"),
+    )
+
+    parser.add_argument(
+        "--storage.bucket",
+        type=str,
+        help="Storage bucket name for competition files",
+        default=os.getenv("STORAGE_BUCKET") or os.getenv("R2_BUCKET"),
+    )
+
+    parser.add_argument(
+        "--storage.account_id",
+        type=str,
+        help="Storage account ID (required for R2)",
+        default=os.getenv("STORAGE_ACCOUNT_ID") or os.getenv("R2_ACCOUNT_ID"),
+    )
+
+    parser.add_argument(
+        "--storage.access_key",
+        type=str,
+        help="Storage access key ID",
+        default=os.getenv("STORAGE_ACCESS_KEY") or os.getenv("R2_ACCESS_KEY"),
+    )
+
+    parser.add_argument(
+        "--storage.secret_key",
+        type=str,
+        help="Storage secret key",
+        default=os.getenv("STORAGE_SECRET_KEY") or os.getenv("R2_SECRET_KEY"),
+    )
+
+    parser.add_argument(
+        "--storage.region",
+        type=str,
+        help="Storage region (required for S3)",
+        default=os.getenv("STORAGE_REGION", "us-east-1"),
+    )
+
+    parser.add_argument(
+        "--competition-only",
+        action="store_true",
+        help="Whether to only run the competition. Disables regular mining when set.",
     )
 
     bt.subtensor.add_args(parser)
@@ -244,6 +288,13 @@ def _validator_config():
     )
 
     parser.add_argument(
+        "--competition-sync-interval",
+        type=int,
+        default=COMPETITION_SYNC_INTERVAL,
+        help="The interval for syncing the competition in seconds. Defaults to 86400 (1 day).",
+    )
+
+    parser.add_argument(
         "--external-api-host",
         type=str,
         default="0.0.0.0",
@@ -253,7 +304,7 @@ def _validator_config():
     parser.add_argument(
         "--external-api-port",
         type=int,
-        default=8000,
+        default=8443,
         help="The port for the external API.",
     )
 
@@ -262,6 +313,13 @@ def _validator_config():
         type=int,
         default=1,
         help="The number of workers for the external API.",
+    )
+
+    parser.add_argument(
+        "--serve-axon",
+        type=bool,
+        default=False,
+        help="Whether to serve the axon displaying your API information.",
     )
 
     parser.add_argument(
@@ -317,5 +375,6 @@ def _validator_config():
         if config.wallet.name == "default":
             config.wallet.name = "validator"
         config.external_api_workers = config.external_api_workers or 1
-        config.external_api_port = config.external_api_port or 8000
+        config.external_api_port = config.external_api_port or 8443
         config.do_not_verify_external_signatures = True
+        config.disable_statistic_logging = True

@@ -7,6 +7,7 @@ on:
       - testnet
   release:
     types: [created]
+  workflow_dispatch: null
 
 env:
   REGISTRY: ghcr.io
@@ -39,7 +40,6 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
       - name: Build and push Docker image for testnet branch
-        if: github.ref == 'refs/heads/testnet'
         id: push-testnet
         uses: docker/build-push-action@v5
         with:
@@ -52,7 +52,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Generate artifact attestation for testnet
-        if: github.ref == 'refs/heads/testnet'
         id: attest-testnet
         uses: actions/attest-build-provenance@v1
         with:

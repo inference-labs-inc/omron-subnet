@@ -4,7 +4,8 @@ import torch
 from rich.console import Console, JustifyMethod
 from rich.table import Table
 
-import utils.wandb_logger as wandb_logger
+from deployment_layer.circuit_store import circuit_store
+from utils import wandb_logger
 from _validator.models.miner_response import MinerResponse
 
 
@@ -111,28 +112,30 @@ def log_responses(responses: list[MinerResponse]):
 
     sorted_responses = sorted(responses, key=lambda x: x.uid)
 
-    circuit = sorted_responses[0].circuit if len(sorted_responses) > 0 else None
-    circuit_name = circuit.metadata.name if circuit is not None else "Unknown"
-    proof_system = circuit.metadata.proof_system if circuit is not None else "Unknown"
-
-    rows = [
-        [
-            str(response.uid),
-            str(response.verification_result),
-            str(response.response_time),
-            str(response.proof_size),
-            circuit_name,
-            proof_system,
-        ]
-        for response in sorted_responses
-    ]
+    rows = []
+    for response in sorted_responses:
+        circuit = circuit_store.get_circuit(response.circuit.id)
+        rows.append(
+            [
+                str(response.uid),
+                str(response.verification_result),
+                str(response.response_time),
+                str(response.proof_size),
+                (
+                    circuit.metadata.name
+                    if circuit is not None
+                    else str(response.circuit.id)
+                ),
+                (circuit.metadata.proof_system if circuit is not None else "Unknown"),
+            ]
+        )
     create_and_print_table("Responses", columns, rows)
 
     wandb_log = {"responses": {}}
     for response in sorted_responses:
         if response.uid not in wandb_log["responses"]:
             wandb_log["responses"][response.uid] = {}
-        wandb_log["responses"][response.uid][circuit_name] = {
+        wandb_log["responses"][response.uid][str(circuit)] = {
             "verification_result": int(response.verification_result),
             "response_time": response.response_time,
             "proof_size": response.proof_size,

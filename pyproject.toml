@@ -9,30 +9,53 @@ description = ""
 readme = "README.md"
 requires-python = "==3.12.*"
 dependencies = [
-	"attrs==24.3.0",
-	"bittensor==8.5.2",
-	"ezkl==16.2.3",
-	"fastapi==0.110.3",
-	"jsonrpcserver>=5.0.9",
-	"numpy==2.0.2",
-	"packaging==24.2",
-	"prometheus_client==0.21.1",
-	"psutil==6.1.1",
-	"pydantic==2.10.6",
-	"pyopenssl>=25.0.0",
-	"requests==2.32.3",
-	"rich==13.8.1",
-	"torch==2.4.1",
-	"uvicorn==0.34.0",
-	"wandb==0.18.7",
+  "attrs==24.3.0",
+  "bittensor==9.0.0",
+  "boto3>=1.36.13",
+  "ezkl==19.0.7",
+  "fastapi==0.110.3",
+  "jsonrpcserver>=5.0.9",
+  "numpy==2.0.2",
+  "opencv-contrib-python-headless>=4.11.0.86",
+  "opencv-python>=4.11.0.86",
+  "packaging==24.2",
+  "pillow>=11.1.0",
+  "prometheus_client==0.21.1",
+  "psutil==6.1.1",
+  "pydantic==2.10.6",
+  "pyopenssl>=25.0.0",
+  "requests==2.32.3",
+  "rich==13.8.1",
+  "substrate-interface>=1.7.11",
+  "torch==2.4.1",
+  "torchvision>=0.19.1",
+  "tqdm>=4.67.1",
+  "uvicorn==0.34.0",
+  "wandb==0.18.7",
+  "websocket-client>=1.8.0",
+]
+
+[dependency-groups]
+dev = [
+  "black>=24.10.0",
+  "pytest>=8.0.0",
+  "snoop>=0.6.0",
 ]
 
 [tool.setuptools]
-packages = ["omron"]
 package-dir = { "omron" = "neurons" }
+packages = ["omron"]
 
 [tool.setuptools.dynamic]
-version = {attr = "omron.__version__"}
+version = { attr = "omron.__version__" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+pythonpath = [".", "neurons"]
 
 [tool.uv.sources]
 torch = { index = "pytorch" }
@@ -41,8 +64,3 @@ torch = { index = "pytorch" }
 name = "pytorch"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
-
-[dependency-groups]
-dev = [
-    "black>=24.10.0",
-]

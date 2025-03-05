@@ -34,7 +34,12 @@ miner-logs:
 validator-logs:
 	docker logs -f omron-validator
 
-miner:
+check-extra-args:
+	@if [ -n "$(ARGS)" ]; then \
+		echo "Extra arguments: $(ARGS)"; \
+	fi
+
+miner: check-extra-args
 	@echo "Using wallet path: $(WALLET_PATH)"
 	@echo "Setting PUID to $(PUID)"
 	docker stop omron-miner || true
@@ -48,9 +53,10 @@ miner:
 		omron miner.py \
 		--wallet.name $(WALLET_NAME) \
 		--wallet.hotkey $(WALLET_HOTKEY) \
-		--netuid $(NETUID)
+		--netuid $(NETUID) \
+		$(ARGS)
 
-validator:
+validator: check-extra-args
 	@echo "Using wallet path: $(WALLET_PATH)"
 	@echo "Setting PUID to $(PUID)"
 	docker stop omron-validator || true
@@ -64,9 +70,10 @@ validator:
 		omron validator.py \
 		--wallet.name $(WALLET_NAME) \
 		--wallet.hotkey $(WALLET_HOTKEY) \
-		--netuid $(NETUID)
+		--netuid $(NETUID) \
+		$(ARGS)
 
-test-miner:
+test-miner: check-extra-args
 	@echo "Using wallet path: $(WALLET_PATH)"
 	@echo "Setting PUID to $(PUID)"
 	docker stop omron-miner || true
@@ -82,9 +89,10 @@ test-miner:
 		--wallet.hotkey $(WALLET_HOTKEY) \
 		--netuid 118 \
 		--subtensor.network test \
-		--disable-blacklist
+		--disable-blacklist \
+		$(ARGS)
 
-test-validator:
+test-validator: check-extra-args
 	@echo "Using wallet path: $(WALLET_PATH)"
 	@echo "Setting PUID to $(PUID)"
 	docker stop omron-validator || true
@@ -99,4 +107,71 @@ test-validator:
 		--wallet.name $(WALLET_NAME) \
 		--wallet.hotkey $(WALLET_HOTKEY) \
 		--netuid 118 \
-		--subtensor.network test
+		--subtensor.network test \
+		$(ARGS)
+
+local-miner: check-extra-args
+	@echo "Starting local miner on staging"
+	cd neurons; \
+	../.venv/bin/python miner.py \
+	--localnet \
+	--no-auto-update \
+	$(ARGS)
+
+local-validator: check-extra-args
+	@echo "Starting local validator on staging"
+	cd neurons; \
+	../.venv/bin/python validator.py \
+	--localnet \
+	--no-auto-update \
+	$(ARGS)
+
+pm2-setup:
+	./setup.sh
+
+pm2-stop:
+	pm2 stop omron-miner || true
+	pm2 stop omron-validator || true
+
+pm2-miner: check-extra-args
+	uv sync --frozen --no-dev
+	cd neurons; \
+	pm2 start miner.py --name omron-miner --interpreter ../.venv/bin/python --kill-timeout 3000 -- \
+	--wallet.path $(WALLET_PATH)/wallets \
+	--wallet.name $(WALLET_NAME) \
+	--wallet.hotkey $(WALLET_HOTKEY) \
+	--netuid $(NETUID) \
+	$(ARGS)
+
+pm2-validator: check-extra-args
+	uv sync --frozen --no-dev
+	cd neurons; \
+	pm2 start validator.py --name omron-validator --interpreter ../.venv/bin/python --kill-timeout 3000 -- \
+	--wallet.path $(WALLET_PATH)/wallets \
+	--wallet.name $(WALLET_NAME) \
+	--wallet.hotkey $(WALLET_HOTKEY) \
+	--netuid $(NETUID) \
+	$(ARGS)
+
+pm2-test-miner: check-extra-args
+	uv sync --frozen --no-dev
+	cd neurons; \
+	pm2 start miner.py --name omron-miner --interpreter ../.venv/bin/python --kill-timeout 3000 -- \
+	--wallet.path $(WALLET_PATH)/wallets \
+	--wallet.name $(WALLET_NAME) \
+	--wallet.hotkey $(WALLET_HOTKEY) \
+	--netuid 118 \
+	--subtensor.network test \
+	--disable-blacklist \
+	$(ARGS)
+
+pm2-test-validator: check-extra-args
+	uv sync --frozen --no-dev
+	cd neurons; \
+	pm2 start validator.py --name omron-validator --interpreter ../.venv/bin/python --kill-timeout 3000 -- \
+	--wallet.path $(WALLET_PATH)/wallets \
+	--wallet.name $(WALLET_NAME) \
+	--wallet.hotkey $(WALLET_HOTKEY) \
+	--netuid 118 \
+	--subtensor.network test \
+	$(ARGS)

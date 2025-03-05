@@ -1,13 +1,21 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
+import torch
 import os
 import json
 import cli_parser
 from execution_layer.input_registry import InputRegistry
+from execution_layer.base_input import BaseInput
 
 # trunk-ignore(pylint/E0611)
 from bittensor import logging
+from constants import (
+    MAX_EVALUATION_ITEMS,
+    DEFAULT_PROOF_SIZE,
+    MAXIMUM_SCORE_MEDIAN_SAMPLE,
+    CRICUIT_TIMEOUT_SECONDS,
+)
 
 
 class CircuitType(str, Enum):
@@ -73,10 +81,19 @@ class CircuitPaths:
             "deployment_layer",
             f"model_{self.model_id}",
         )
-        self.external_base_path = os.path.join(
-            cli_parser.config.full_path_models,
-            f"model_{self.model_id}",
-        )
+        if hasattr(cli_parser, "config") and cli_parser.config.full_path_models:
+            self.external_base_path = os.path.join(
+                cli_parser.config.full_path_models,
+                f"model_{self.model_id}",
+            )
+        else:
+            self.external_base_path = os.path.join(
+                os.path.expanduser("~"),
+                ".bittensor",
+                "omron",
+                "models",
+                f"model_{self.model_id}",
+            )
         self.input = os.path.join(self.base_path, "input.json")
         self.metadata = os.path.join(self.base_path, "metadata.json")
         self.compiled_model = os.path.join(self.base_path, "model.compiled")
@@ -86,6 +103,9 @@ class CircuitPaths:
         self.witness_executable = os.path.join(self.base_path, "witness.js")
         self.pk = os.path.join(self.external_base_path, "circuit.zkey")
         self.vk = os.path.join(self.base_path, "verification_key.json")
+        self.evaluation_data = os.path.join(
+            self.external_base_path, "evaluation_data.json"
+        )
 
     def set_proof_system_paths(self, proof_system: ProofSystem):
         """
@@ -122,6 +142,7 @@ class CircuitMetadata:
     external_files: dict[str, str]
     netuid: int | None = None
     weights_version: int | None = None
+    timeout: int | None = None
     benchmark_choice_weight: float | None = None
 
     @classmethod
@@ -140,24 +161,186 @@ class CircuitMetadata:
         return cls(**metadata)
 
 
+@dataclass
+class CircuitEvaluationItem:
+    """
+    Data collected from the evaluation of the circuit.
+    """
+
+    circuit: Circuit  # Pass the Circuit object directly
+    maximum_response_time: float  # Will be initialized in  __init__
+    minimum_response_time: float = 0.0
+    uid: int = 0
+    proof_size: int = DEFAULT_PROOF_SIZE
+    response_time: float = 0.0
+    score: float = 0.0
+    verification_result: bool = False
+
+    def __init__(self, *args, circuit: Circuit, **kwargs):
+        """
+        Custom `__init__` to handle legacy cases where `circuit_id` is passed,
+        and to set default and derived values manually.
+        """
+        # Remove `circuit_id` gracefully if present in kwargs (legacy code might pass it)
+        if "circuit_id" in kwargs:
+            logging.warning("Ignoring legacy `circuit_id` in CircuitEvaluationItem initialization.")
+            kwargs.pop("circuit_id")
+
+        # Manually set required attributes
+        self.circuit = circuit
+        self.uid = kwargs.pop("uid", 0)
+        self.minimum_response_time = kwargs.pop("minimum_response_time", 0.0)
+        self.proof_size = kwargs.pop("proof_size", DEFAULT_PROOF_SIZE)
+        self.response_time = kwargs.pop("response_time", 0.0)
+        self.score = kwargs.pop("score", 0.0)
+        self.verification_result = kwargs.pop("verification_result", False)
+
+        # Initialize derived/validated field
+        self.maximum_response_time = (
+            self.circuit.timeout
+            if hasattr(self.circuit, 'timeout') and self.circuit.timeout
+            else CRICUIT_TIMEOUT_SECONDS  # Replace or define this constant
+        )
+
+        # Set any remaining extra attributes from kwargs
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    def to_dict(self) -> dict:
+        """Convert the evaluation item to a dictionary for JSON serialization."""
+        return {
+            "circuit_id": str(self.circuit.id),
+            "uid": int(self.uid),
+            "minimum_response_time": float(self.minimum_response_time),
+            "maximum_response_time": float(self.maximum_response_time),
+            "proof_size": int(self.proof_size),
+            "response_time": float(self.response_time),
+            "score": float(self.score),
+            "verification_result": bool(self.verification_result),
+        }
+
+
+class CircuitEvaluationData:
+    """
+    Data collected from the evaluation of the circuit.
+    """
+
+    def __init__(self, circuit: Circuit, evaluation_store_path: str):
+        self.circuit = circuit
+        self.store_path = evaluation_store_path
+        self.data: list[CircuitEvaluationItem] = []
+
+        os.makedirs(os.path.dirname(evaluation_store_path), exist_ok=True)
+
+        try:
+            if os.path.exists(evaluation_store_path):
+                with open(evaluation_store_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    self.data = [CircuitEvaluationItem(circuit=self.circuit, **item) for item in data]
+        except Exception as e:
+            logging.error(
+                f"Failed to load evaluation data for model {self.circuit.id}, starting fresh: {e}"
+            )
+            self.data = []
+
+        if not self.data:
+            with open(evaluation_store_path, "w", encoding="utf-8") as f:
+                json.dump([], f)
+
+    def update(self, item: CircuitEvaluationItem):
+        """Update evaluation data, maintaining size limit."""
+        for i, existing_item in enumerate(self.data):
+            if existing_item.uid == item.uid:
+                self.data[i] = item
+                break
+        else:
+            self.data.append(item)
+
+        if len(self.data) > MAX_EVALUATION_ITEMS:
+            self.data = self.data[-MAX_EVALUATION_ITEMS:]
+
+        try:
+            with open(self.store_path, "w", encoding="utf-8") as f:
+                json.dump([item.to_dict() for item in self.data], f)
+        except Exception as e:
+            logging.error(f"Failed to save evaluation data: {e}")
+
+    @property
+    def verification_ratio(self) -> float:
+        """Get the ratio of successful verifications from recent evaluation data."""
+        if not self.data:
+            return 0.0
+
+        successful = sum(1 for item in self.data if item.verification_result)
+        return successful / len(self.data)
+
+    def get_successful_response_times(self) -> list[float]:
+        if not self.data:
+            return []
+
+        return sorted(
+            r.response_time
+            for r in self.data
+            if r.verification_result and r.response_time > 0
+        )
+
+    @property
+    def minimum_response_time(self) -> float:
+        response_times = self.get_successful_response_times()
+
+        if not response_times or len(response_times) in [0, 1]:
+            return 0.0
+
+        return torch.clamp(
+            torch.min(torch.tensor(response_times)),
+            0,
+            self.circuit.timeout,
+        ).item()
+
+    @property
+    def maximum_response_time(self) -> float:
+        """Get maximum response time from evaluation data."""
+
+        response_times = self.get_successful_response_times()
+        if not response_times or len(response_times) in [0, 1]:
+            return CRICUIT_TIMEOUT_SECONDS
+
+        sample_size = max(int(len(response_times) * MAXIMUM_SCORE_MEDIAN_SAMPLE), 1)
+
+        return torch.clamp(
+            torch.median(torch.tensor(response_times[-sample_size:])),
+            0,
+            self.circuit.timeout,
+        ).item()
+
+
 class Circuit:
     """
     A class representing a circuit.
     """
 
-    def __init__(self, model_id: str):
+    def __init__(self, circuit_id: str):
         """
         Initialize a Model instance.
 
         Args:
-            model_id (str): Unique identifier for the model.
+            circuit_id (str): Unique identifier for the model.
         """
-        self.paths = CircuitPaths(model_id)
+        self.paths = CircuitPaths(circuit_id)
         self.metadata = CircuitMetadata.from_file(self.paths.metadata)
-        self.id = model_id
+        self.id = circuit_id
         self.proof_system = ProofSystem[self.metadata.proof_system]
         self.paths.set_proof_system_paths(self.proof_system)
         self.settings = {}
+        self.evaluation_data = CircuitEvaluationData(
+            self, self.paths.evaluation_data
+        )
+        # if timeout attribute exists and is not None, else default
+        self.timeout = (
+            self.metadata.timeout
+            if hasattr(self.metadata, 'timeout') and self.metadata.timeout is not None
+            else CRICUIT_TIMEOUT_SECONDS
+        )
         try:
             with open(self.paths.settings, "r", encoding="utf-8") as f:
                 self.settings = json.load(f)
@@ -165,7 +348,7 @@ class Circuit:
             logging.warning(
                 f"Failed to load settings for model {self.id}. Using default settings."
             )
-        self.input_handler = InputRegistry.get_handler(self.id)
+        self.input_handler: BaseInput = InputRegistry.get_handler(self.id)
 
     def __str__(self):
         return (

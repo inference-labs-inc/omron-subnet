@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import torch
 import bittensor as bt
-from constants import WEIGHT_RATE_LIMIT, WEIGHTS_VERSION
+from constants import WEIGHT_RATE_LIMIT, WEIGHTS_VERSION, ONE_MINUTE
 from _validator.utils.logging import log_weights
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
 
@@ -46,7 +46,7 @@ class WeightsManager:
         )
         if blocks_since_last_update < WEIGHT_RATE_LIMIT:
             blocks_until_update = WEIGHT_RATE_LIMIT - blocks_since_last_update
-            minutes_until_update = round((blocks_until_update * 12) / 60, 1)
+            minutes_until_update = round((blocks_until_update * 12) / ONE_MINUTE, 1)
             return (
                 False,
                 f"Next weight update in {blocks_until_update} blocks "

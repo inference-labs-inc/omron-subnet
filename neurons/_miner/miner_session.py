@@ -1,25 +1,40 @@
 # from __future__ import annotations
 import json
+import os
 import time
 import traceback
 from typing import Tuple, Union
 
 import bittensor as bt
 import websocket
+from rich.console import Console
+from rich.table import Table
 
 import cli_parser
 from _validator.models.request_type import RequestType
 from constants import (
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
     STEAK,
-    VALIDATOR_REQUEST_TIMEOUT_SECONDS,
     VALIDATOR_STAKE_THRESHOLD,
+    ONE_HOUR,
+    CRICUIT_TIMEOUT_SECONDS,
 )
 from deployment_layer.circuit_store import circuit_store
 from execution_layer.generic_input import GenericInput
 from execution_layer.verified_model_session import VerifiedModelSession
-from protocol import ProofOfWeightsSynapse, QueryForProofAggregation, QueryZkProof
+from protocol import (
+    QueryForProofAggregation,
+    QueryZkProof,
+    ProofOfWeightsSynapse,
+    Competition,
+)
 from utils import AutoUpdate, clean_temp_files, wandb_logger
+from utils.rate_limiter import with_rate_limit
+from .circuit_manager import CircuitManager
+
+COMPETITION_DIR = os.path.join(
+    os.path.dirname(__file__), "..", "..", "competition_circuit"
+)
 
 
 class MinerSession:
@@ -47,29 +62,42 @@ class MinerSession:
         axon = bt.axon(wallet=self.wallet, config=cli_parser.config)
         bt.logging.info(f"Axon created: {axon.info()}")
 
-        # Attach determines which functions are called when a request is received.
         bt.logging.info("Attaching forward functions to axon...")
         axon.attach(forward_fn=self.queryZkProof, blacklist_fn=self.proof_blacklist)
         axon.attach(
             forward_fn=self.handle_pow_request,
             blacklist_fn=self.pow_blacklist,
         )
+        axon.attach(
+            forward_fn=self.handleCompetitionRequest,
+            blacklist_fn=self.competition_blacklist,
+        )
+
         bt.logging.info("Attached forward functions to axon")
 
-        # Serve passes the axon information to the network + netuid we are hosting on.
-        # This will auto-update if the axon port of external ip has changed.
+        bt.logging.info(f"Starting axon server: {axon.info()}")
+        axon.start()
+        bt.logging.info(f"Started axon server: {axon.info()}")
+
+        existing_axon = self.metagraph.axons[self.subnet_uid]
+
+        if (
+            existing_axon
+            and existing_axon.port == axon.external_port
+            and existing_axon.ip == axon.external_ip
+        ):
+            bt.logging.debug(
+                f"Axon already serving on ip {axon.external_ip} and port {axon.external_port}"
+            )
+            return
         bt.logging.info(
             f"Serving axon on network: {self.subtensor.chain_endpoint} with netuid: {cli_parser.config.netuid}"
         )
+
         axon.serve(netuid=cli_parser.config.netuid, subtensor=self.subtensor)
         bt.logging.info(
             f"Served axon on network: {self.subtensor.chain_endpoint} with netuid: {cli_parser.config.netuid}"
         )
-
-        # Start the miner's axon, making it active on the network.
-        bt.logging.info(f"Starting axon server: {axon.info()}")
-        axon.start()
-        bt.logging.info(f"Started axon server: {axon.info()}")
 
         self.axon = axon
 
@@ -104,38 +132,37 @@ class MinerSession:
                         self.log_batch = []
                     else:
                         bt.logging.debug("No logs to log to WandB")
-
                 if step % 600 == 0:
                     self.check_register()
 
                 if step % 24 == 0 and self.subnet_uid is not None:
-                    try:
-                        self.metagraph = self.subtensor.metagraph(
-                            cli_parser.config.netuid
-                        )
-                        bt.logging.info(
-                            f"Step:{step} | "
-                            f"Block:{self.metagraph.block.item()} | "
-                            f"Stake:{self.metagraph.S[self.subnet_uid]} | "
-                            f"Rank:{self.metagraph.R[self.subnet_uid]} | "
-                            f"Trust:{self.metagraph.T[self.subnet_uid]} | "
-                            f"Consensus:{self.metagraph.C[self.subnet_uid]} | "
-                            f"Incentive:{self.metagraph.I[self.subnet_uid]} | "
-                            f"Emission:{self.metagraph.E[self.subnet_uid]}"
-                        )
-                    except Exception:
-                        bt.logging.warning(
-                            f"Failed to sync metagraph: {traceback.format_exc()}"
-                        )
+                    table = Table(title=f"Miner Status (UID: {self.subnet_uid})")
+                    table.add_column("Block", justify="center", style="cyan")
+                    table.add_column("Stake", justify="center", style="cyan")
+                    table.add_column("Rank", justify="center", style="cyan")
+                    table.add_column("Trust", justify="center", style="cyan")
+                    table.add_column("Consensus", justify="center", style="cyan")
+                    table.add_column("Incentive", justify="center", style="cyan")
+                    table.add_column("Emission", justify="center", style="cyan")
+                    table.add_row(
+                        str(self.metagraph.block.item()),
+                        str(self.metagraph.S[self.subnet_uid]),
+                        str(self.metagraph.R[self.subnet_uid]),
+                        str(self.metagraph.T[self.subnet_uid]),
+                        str(self.metagraph.C[self.subnet_uid]),
+                        str(self.metagraph.I[self.subnet_uid]),
+                        str(self.metagraph.E[self.subnet_uid]),
+                    )
+                    console = Console()
+                    console.print(table)
+                self.sync_metagraph()
 
                 time.sleep(1)
 
-            # If someone intentionally stops the miner, it'll safely terminate operations.
             except KeyboardInterrupt:
                 bt.logging.success("Miner killed via keyboard interrupt.")
                 clean_temp_files()
                 break
-            # In case of unforeseen errors, the miner will log the error and continue operations.
             except Exception:
                 bt.logging.error(traceback.format_exc())
                 continue
@@ -150,17 +177,55 @@ class MinerSession:
                 exit()
             self.subnet_uid = None
         else:
-            # Each miner gets a unique identity (UID) in the network for differentiation.
             subnet_uid = self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
-            bt.logging.info(f"Running miner on uid: {subnet_uid}")
             self.subnet_uid = subnet_uid
 
     def configure(self):
-        # === Configure Bittensor objects ====
         self.wallet = bt.wallet(config=cli_parser.config)
         self.subtensor = bt.subtensor(config=cli_parser.config)
         self.metagraph = self.subtensor.metagraph(cli_parser.config.netuid)
         wandb_logger.safe_init("Miner", self.wallet, self.metagraph, cli_parser.config)
+
+        if cli_parser.config.storage:
+            storage_config = {
+                "provider": cli_parser.config.storage.provider,
+                "bucket": cli_parser.config.storage.bucket,
+                "account_id": cli_parser.config.storage.account_id,
+                "access_key": cli_parser.config.storage.access_key,
+                "secret_key": cli_parser.config.storage.secret_key,
+                "region": cli_parser.config.storage.region,
+            }
+        else:
+            bt.logging.warning(
+                "No storage config provided, circuit manager will not be initialized."
+            )
+            storage_config = None
+
+        try:
+            current_commitment = self.subtensor.get_commitment(
+                cli_parser.config.netuid,
+                self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address),
+            )
+
+            self.circuit_manager = CircuitManager(
+                wallet=self.wallet,
+                netuid=cli_parser.config.netuid,
+                circuit_dir=COMPETITION_DIR,
+                storage_config=storage_config,
+                existing_vk_hash=current_commitment,
+            )
+        except Exception as e:
+            bt.logging.error(f"Error initializing circuit manager: {e}")
+            self.circuit_manager = None
+
+    @with_rate_limit(period=ONE_HOUR)
+    def sync_metagraph(self):
+        try:
+            self.metagraph.sync(subtensor=self.subtensor)
+            return True
+        except Exception as e:
+            bt.logging.warning(f"Failed to sync metagraph: {e}")
+            return False
 
     def proof_blacklist(self, synapse: QueryZkProof) -> Tuple[bool, str]:
         """
@@ -179,6 +244,12 @@ class MinerSession:
     def pow_blacklist(self, synapse: ProofOfWeightsSynapse) -> Tuple[bool, str]:
         """
         Blacklist method for the proof generation endpoint
+        """
+        return self._blacklist(synapse)
+
+    def competition_blacklist(self, synapse: Competition) -> Tuple[bool, str]:
+        """
+        Blacklist method for the competition endpoint
         """
         return self._blacklist(synapse)
 
@@ -232,10 +303,109 @@ class MinerSession:
             bt.logging.error(f"Error during blacklist {e}")
             return True, "An error occurred while filtering the request"
 
+    def handleCompetitionRequest(self, synapse: Competition) -> Competition:
+        """
+        Handle competition circuit requests from validators.
+
+        This endpoint provides signed URLs for validators to download circuit files.
+        The process ensures:
+        1. Files are uploaded to R2/S3
+        2. VK hash matches chain commitment
+        3. URLs are signed and time-limited
+        4. All operations are thread-safe
+        """
+        bt.logging.info(
+            f"Handling competition request for id={synapse.id} hash={synapse.hash}"
+        )
+        try:
+            if not self.circuit_manager:
+                bt.logging.critical(
+                    "Circuit manager not initialized, unable to respond to validator."
+                )
+                return Competition(
+                    id=synapse.id,
+                    hash=synapse.hash,
+                    file_name=synapse.file_name,
+                    error="Circuit manager not initialized",
+                )
+
+            bt.logging.info("Getting current commitment from circuit manager")
+            commitment = self.circuit_manager.get_current_commitment()
+            if not commitment:
+                bt.logging.critical(
+                    "No valid circuit commitment available. Unable to respond to validator."
+                )
+                return Competition(
+                    id=synapse.id,
+                    hash=synapse.hash,
+                    file_name=synapse.file_name,
+                    error="No valid circuit commitment available",
+                )
+
+            bt.logging.info("Getting chain commitment from subtensor")
+            chain_commitment = self.subtensor.get_commitment(
+                cli_parser.config.netuid,
+                self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address),
+            )
+            if commitment.vk_hash != chain_commitment:
+                bt.logging.critical(
+                    f"Hash mismatch - local: {commitment.vk_hash[:8]} "
+                    f"chain: {chain_commitment[:8]}"
+                )
+                return Competition(
+                    id=synapse.id,
+                    hash=synapse.hash,
+                    file_name=synapse.file_name,
+                    error="Hash mismatch between local and chain commitment",
+                )
+
+            bt.logging.info("Generating signed URLs for required files")
+            required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
+            object_keys = {}
+            for file_name in required_files:
+                object_keys[file_name] = f"{commitment.vk_hash}/{file_name}"
+            signed_urls = self.circuit_manager._get_signed_urls(object_keys)
+            if not signed_urls:
+                bt.logging.error("Failed to get signed URLs")
+                return Competition(
+                    id=synapse.id,
+                    hash=synapse.hash,
+                    file_name=synapse.file_name,
+                    error="Failed to get signed URLs",
+                )
+
+            bt.logging.info("Preparing commitment data response")
+            commitment_data = commitment.model_dump()
+            commitment_data["signed_urls"] = signed_urls
+
+            response = Competition(
+                id=synapse.id,
+                hash=synapse.hash,
+                file_name=synapse.file_name,
+                commitment=json.dumps(commitment_data),
+            )
+            bt.logging.info("Successfully prepared competition response")
+            return response
+
+        except Exception as e:
+            bt.logging.error(f"Error handling competition request: {str(e)}")
+            traceback.print_exc()
+            return Competition(
+                id=synapse.id,
+                hash=synapse.hash,
+                file_name=synapse.file_name,
+                error=str(e),
+            )
+
     def queryZkProof(self, synapse: QueryZkProof) -> QueryZkProof:
         """
         This function run proof generation of the model (with its output as well)
         """
+        if cli_parser.config.competition_only:
+            bt.logging.info("Competition only mode enabled. Skipping proof generation.")
+            synapse.query_output = "Competition only mode enabled"
+            return synapse
+
         time_in = time.time()
         bt.logging.debug("Received request from validator")
         bt.logging.debug(f"Input data: {synapse.query_input} \n")
@@ -250,13 +420,14 @@ class MinerSession:
         model_id = synapse.query_input.get("model_id", SINGLE_PROOF_OF_WEIGHTS_MODEL_ID)
         public_inputs = synapse.query_input["public_inputs"]
 
-        # Run inputs through the model and generate a proof.
+        circuit_timeout = CRICUIT_TIMEOUT_SECONDS
         try:
             circuit = circuit_store.get_circuit(str(model_id))
             if not circuit:
                 raise ValueError(
                     f"Circuit {model_id} not found. This indicates a missing deployment layer folder or invalid request"
                 )
+            circuit_timeout = circuit.timeout
             bt.logging.info(f"Running proof generation for {circuit}")
             model_session = VerifiedModelSession(
                 GenericInput(RequestType.RWR, public_inputs), circuit
@@ -300,10 +471,10 @@ class MinerSession:
             }
         )
 
-        if delta_t > VALIDATOR_REQUEST_TIMEOUT_SECONDS:
+        if delta_t > circuit_timeout:
             bt.logging.error(
-                "Response time is greater than validator timeout. "
-                "This indicates your hardware is not processing validator's requests in time."
+                "Response time is greater than circuit timeout. "
+                "This indicates your hardware is not processing the requests in time."
             )
         return synapse
 
@@ -313,6 +484,11 @@ class MinerSession:
         """
         Handles a proof of weights request
         """
+        if cli_parser.config.competition_only:
+            bt.logging.info("Competition only mode enabled. Skipping proof generation.")
+            synapse.query_output = "Competition only mode enabled"
+            return synapse
+
         time_in = time.time()
         bt.logging.debug("Received proof of weights request from validator")
         bt.logging.debug(f"Input data: {synapse.inputs} \n")
@@ -321,14 +497,15 @@ class MinerSession:
             bt.logging.error("Received empty input for proof of weights")
             return synapse
 
+        circuit_timeout = CRICUIT_TIMEOUT_SECONDS
         try:
             circuit = circuit_store.get_circuit(str(synapse.verification_key_hash))
-
             if not circuit:
                 raise ValueError(
                     f"Circuit {synapse.verification_key_hash} not found. "
                     "This indicates a missing deployment layer folder or invalid request"
                 )
+            circuit_timeout = circuit.timeout
             bt.logging.info(f"Running proof generation for {circuit}")
             model_session = VerifiedModelSession(
                 GenericInput(RequestType.RWR, synapse.inputs), circuit
@@ -364,10 +541,10 @@ class MinerSession:
             }
         )
 
-        if delta_t > VALIDATOR_REQUEST_TIMEOUT_SECONDS:
+        if delta_t > circuit_timeout:
             bt.logging.error(
-                "Response time is greater than validator timeout. "
-                "This indicates your hardware is not processing validator's requests in time."
+                "Response time is greater than circuit timeout. "
+                "This indicates your hardware is not processing the requests in time."
             )
         return synapse
 

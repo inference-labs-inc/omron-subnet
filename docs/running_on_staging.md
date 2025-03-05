@@ -2,6 +2,9 @@
 
 This tutorial will guide you through setting up a local subtensor chain, creating a subnetwork, and connecting your mechanism to it.
 
+> [!TIP]
+> The devcontainer provided in this repository already takes care of everything in this tutorial for you.
+
 ### 1. Install substrate dependencies
 
 Begin by installing the required dependencies for running a substrate node.

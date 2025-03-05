@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from _validator.models.request_type import RequestType
+from pydantic import BaseModel
 
 
 class BaseInput(ABC):
@@ -9,8 +10,12 @@ class BaseInput(ABC):
     for manipulating circuit input data.
     """
 
+    schema: type[BaseModel]
+
     def __init__(
-        self, request_type: RequestType, data: dict[str, object] | None = None
+        self,
+        request_type: RequestType,
+        data: dict[str, object] | None = None,
     ):
         self.request_type = request_type
         if request_type == RequestType.BENCHMARK:

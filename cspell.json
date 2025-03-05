@@ -24,6 +24,7 @@
     "logrows",
     "Mbps",
     "metagraph",
+    "ndarray",
     "netuid",
     "Omron",
     "onnxruntime",

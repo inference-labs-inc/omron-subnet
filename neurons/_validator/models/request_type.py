@@ -12,3 +12,12 @@ class RequestType(Enum):
             return "Real World Request"
         else:
             raise ValueError(f"Unknown request type: {self}")
+
+
+class ValidatorMessage(Enum):
+    WINDDOWN = "winddown"
+    WINDDOWN_COMPLETE = "winddown_complete"
+    COMPETITION_COMPLETE = "competition_complete"
+
+    def __str__(self) -> str:
+        return self.value

@@ -126,7 +126,31 @@ class VerifiedModelSession:
         """
         Verify a proven inference.
         """
-        return self.proof_handler.verify_proof(self, validator_inputs, proof)
+        try:
+            bt.logging.debug("Starting proof verification process...")
+            with multiprocessing.Pool(1) as p:
+                verification_result = p.apply(
+                    func=self._verify_worker,
+                    args=[self, validator_inputs, proof],
+                )
+            return verification_result
+
+        except Exception as e:
+            bt.logging.error(f"An error occurred during proof verification: {e}")
+            traceback.print_exc()
+            raise
+
+    @staticmethod
+    def _verify_worker(
+        session: VerifiedModelSession,
+        validator_inputs: GenericInput,
+        proof: dict | str,
+    ) -> bool:
+        """
+        Handle the proof verification process in a separate process.
+        """
+        bt.logging.debug("Starting verify_worker")
+        return session.proof_handler.verify_proof(session, validator_inputs, proof)
 
     def generate_witness(self, return_content: bool = False) -> list | dict:
         """

@@ -12,6 +12,7 @@ class ApiConfig:
         workers (int): The number of workers for the API.
         verify_external_signatures (bool): Whether to verify external signatures.
         certificate_path (str): The path to the certificate directory.
+        serve_axon (bool): Whether to serve the axon displaying your API information.
     """
 
     def __init__(self, config: bt.config):
@@ -22,3 +23,4 @@ class ApiConfig:
         self.verify_external_signatures = not config.do_not_verify_external_signatures
         self.certificate_path = config.certificate_path
         self.whitelisted_public_keys = config.whitelisted_public_keys
+        self.serve_axon = config.serve_axon

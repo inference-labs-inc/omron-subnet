@@ -49,6 +49,7 @@ class ProofOfWeightsItem:
     verified: torch.Tensor
     proof_size: torch.Tensor
     response_time: torch.Tensor
+    competition: torch.Tensor
     maximum_response_time: torch.Tensor
     minimum_response_time: torch.Tensor
     block_number: torch.Tensor
@@ -64,12 +65,35 @@ class ProofOfWeightsItem:
         self.maximum_response_time = to_tensor(
             self.maximum_response_time, torch.float32
         )
+        self.competition = to_tensor(self.competition, torch.float32)
         self.minimum_response_time = to_tensor(
             self.minimum_response_time, torch.float32
         )
         self.block_number = to_tensor(self.block_number, torch.int64)
         self.validator_uid = to_tensor(self.validator_uid, torch.int64)
         self.miner_uid = to_tensor(self.miner_uid, torch.int64)
+
+    @staticmethod
+    def for_competition(
+        uid: int,
+        maximum_score: float,
+        competition_score: float,
+        block_number: int,
+        validator_uid: int,
+    ):
+        return ProofOfWeightsItem(
+            maximum_score=maximum_score,
+            previous_score=0,
+            verified=torch.tensor(True),
+            proof_size=torch.tensor(1),
+            response_time=torch.tensor(1),
+            competition=torch.tensor(competition_score),
+            maximum_response_time=torch.tensor(1),
+            minimum_response_time=torch.tensor(0),
+            block_number=torch.tensor(block_number),
+            validator_uid=torch.tensor(validator_uid),
+            miner_uid=torch.tensor(uid, dtype=torch.int64),
+        )
 
     @staticmethod
     def from_miner_response(
@@ -80,6 +104,7 @@ class ProofOfWeightsItem:
         minimum_response_time,
         block_number,
         validator_uid,
+        competition,
     ):
         return ProofOfWeightsItem(
             maximum_score=maximum_score,
@@ -91,6 +116,7 @@ class ProofOfWeightsItem:
                 if response.verification_result
                 else maximum_response_time
             ),
+            competition=competition,
             maximum_response_time=maximum_response_time,
             minimum_response_time=minimum_response_time,
             block_number=block_number,
@@ -125,6 +151,7 @@ class ProofOfWeightsItem:
             response_time=torch.tensor(
                 VALIDATOR_REQUEST_TIMEOUT_SECONDS, dtype=torch.float32
             ),
+            competition=torch.tensor(0, dtype=torch.float32),
             maximum_response_time=torch.tensor(
                 VALIDATOR_REQUEST_TIMEOUT_SECONDS, dtype=torch.float32
             ),
@@ -135,43 +162,6 @@ class ProofOfWeightsItem:
         )
 
     @staticmethod
-    def from_tensor(tensor: torch.Tensor):
-        return ProofOfWeightsItem(
-            maximum_score=tensor[0],
-            previous_score=tensor[1],
-            verified=tensor[2],
-            proof_size=tensor[3],
-            response_time=tensor[4],
-            maximum_response_time=tensor[5],
-            minimum_response_time=tensor[6],
-            block_number=tensor[7],
-            validator_uid=tensor[8],
-            miner_uid=tensor[9],
-        )
-
-    def to_tensor(self):
-        return torch.tensor(
-            [
-                self.maximum_score,
-                self.previous_score,
-                self.verified,
-                self.proof_size,
-                self.response_time,
-                self.maximum_response_time,
-                self.minimum_response_time,
-                self.block_number,
-                self.validator_uid,
-                self.miner_uid,
-            ]
-        )
-
-    @staticmethod
-    def merge_items(
-        *items_lists: list["ProofOfWeightsItem"],
-    ) -> list["ProofOfWeightsItem"]:
-        return [item for items in items_lists for item in items]
-
-    @staticmethod
     def to_dict_list(items: list["ProofOfWeightsItem"]):
         result = {
             "maximum_score": [],
@@ -179,6 +169,7 @@ class ProofOfWeightsItem:
             "verified": [],
             "proof_size": [],
             "response_time": [],
+            "competition": [],
             "maximum_response_time": [],
             "minimum_response_time": [],
             "block_number": [],
@@ -191,32 +182,13 @@ class ProofOfWeightsItem:
             result["verified"].append(item.verified.item())
             result["proof_size"].append(item.proof_size.item())
             result["response_time"].append(item.response_time.item())
+            result["competition"].append(item.competition.item())
             result["maximum_response_time"].append(item.maximum_response_time.item())
             result["minimum_response_time"].append(item.minimum_response_time.item())
             result["block_number"].append(item.block_number.item())
             result["validator_uid"].append(item.validator_uid.item())
             result["miner_uid"].append(item.miner_uid.item())
         return result
-
-    @classmethod
-    def from_dict_list(cls, data: dict) -> list["ProofOfWeightsItem"]:
-        items = []
-        for i in range(len(data["maximum_score"])):
-            items.append(
-                cls(
-                    maximum_score=data["maximum_score"][i],
-                    previous_score=data["previous_score"][i],
-                    verified=data["verified"][i],
-                    proof_size=data["proof_size"][i],
-                    response_time=data["response_time"][i],
-                    maximum_response_time=data["maximum_response_time"][i],
-                    minimum_response_time=data["minimum_response_time"][i],
-                    block_number=data["block_number"][i],
-                    validator_uid=data["validator_uid"][i],
-                    miner_uid=data["miner_uid"][i],
-                )
-            )
-        return items
 
 
 def save_proof_of_weights(

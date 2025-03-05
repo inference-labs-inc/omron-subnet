@@ -7,8 +7,7 @@ from typing import Optional
 import bittensor as bt
 from packaging import version
 
-import cli_parser
-from constants import IGNORED_MODEL_HASHES
+from constants import IGNORED_MODEL_HASHES, MAINNET_TESTNET_UIDS
 from execution_layer.circuit import Circuit
 
 
@@ -45,9 +44,7 @@ class CircuitStore:
         attempts to create Circuit objects from these directories, and stores them
         in the circuits dictionary.
         """
-        deployment_layer_path = (
-            deployment_layer_path or cli_parser.config.full_path_models
-        )
+        deployment_layer_path = os.path.dirname(__file__)
         bt.logging.info(f"Loading circuits from {deployment_layer_path}")
 
         for folder_name in os.listdir(deployment_layer_path):
@@ -159,6 +156,37 @@ class CircuitStore:
         circuit_list = list(self.circuits.keys())
         bt.logging.debug(f"Listed {len(circuit_list)} circuits")
         return circuit_list
+
+    def list_circuit_metadata(self) -> list[dict]:
+        """
+        JSON safe circuit metadata for use in API serving.
+        """
+        data: list[dict] = []
+        for circuit in self.circuits.values():
+            data.append(
+                {
+                    "id": circuit.id,
+                    "name": circuit.metadata.name,
+                    "description": circuit.metadata.description,
+                    "author": circuit.metadata.author,
+                    "version": circuit.metadata.version,
+                    "type": circuit.metadata.type,
+                    "proof_system": circuit.metadata.proof_system,
+                    "netuid": circuit.metadata.netuid,
+                    "testnet_netuids": (
+                        [
+                            uid[1]
+                            for uid in MAINNET_TESTNET_UIDS
+                            if uid[0] == int(circuit.metadata.netuid)
+                        ]
+                        if circuit.metadata.netuid
+                        else None
+                    ),
+                    "weights_version": circuit.metadata.weights_version,
+                    "input_schema": circuit.input_handler.schema.model_json_schema(),
+                }
+            )
+        return data
 
 
 circuit_store = CircuitStore()

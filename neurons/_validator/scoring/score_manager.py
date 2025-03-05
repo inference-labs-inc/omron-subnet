@@ -1,24 +1,30 @@
-import os
+from __future__ import annotations
 import torch
 import bittensor as bt
+
 from _validator.models.miner_response import MinerResponse
 from _validator.utils.logging import log_scores
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
-from constants import (
-    MAXIMUM_SCORE_MEDIAN_SAMPLE,
-    MINIMUM_SCORE_SHIFT,
-    SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
-    VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-)
+from _validator.utils.uid import get_queryable_uids
+from constants import SINGLE_PROOF_OF_WEIGHTS_MODEL_ID, ONE_MINUTE
 from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
 from _validator.models.request_type import RequestType
+from execution_layer.circuit import CircuitEvaluationItem
+from utils.rate_limiter import with_rate_limit
+from _validator.competitions.competition import Competition
 
 
 class ScoreManager:
     """Manages the scoring of miners."""
 
-    def __init__(self, metagraph, user_uid, score_path: str):
+    def __init__(
+        self,
+        metagraph: bt.metagraph,
+        user_uid: int,
+        score_path: str,
+        competition: Competition | None = None,
+    ):
         """
         Initialize the ScoreManager.
 
@@ -30,118 +36,47 @@ class ScoreManager:
         self.user_uid = user_uid
         self.score_path = score_path
         self.scores = self.init_scores()
+        self.last_processed_queue_step = -1
         self.proof_of_weights_queue = []
+        self.competition = competition
 
-    def init_scores(self):
+    def init_scores(self) -> torch.Tensor:
         """Initialize or load existing scores."""
         bt.logging.info("Initializing validation weights")
         try:
-            if os.path.isfile("scores.pt") and not os.path.isfile(
-                os.path.join(self.score_path, "scores.pt")
-            ):
-                # Migrate the scores file from the old location
-                os.rename("scores.pt", os.path.join(self.score_path, "scores.pt"))
-            scores = torch.load(os.path.join(self.score_path, "scores.pt"))
+            scores = torch.load(self.score_path, weights_only=True)
         except FileNotFoundError:
             scores = self._create_initial_scores()
         except Exception as e:
             bt.logging.error(f"Error loading scores: {e}")
-            scores = torch.zeros_like(self.metagraph.S, dtype=torch.float32)
+            scores = self._create_initial_scores()
 
-        bt.logging.success("Successfully set up scores")
+        bt.logging.success("Successfully initialized scores")
         log_scores(scores)
         return scores
 
-    def _create_initial_scores(self):
+    def _create_initial_scores(self) -> torch.Tensor:
         """Create initial scores based on metagraph data."""
-        # Depending on how bittensor was installed, metagraph may be tensor or ndarray
-        total_stake = (
-            self.metagraph.S
-            if isinstance(self.metagraph.S, torch.Tensor)
-            else torch.tensor(self.metagraph.S)
-        )
-        scores = torch.zeros_like(total_stake, dtype=torch.float32)
-        return scores * torch.Tensor(
-            [
-                # trunk-ignore(bandit/B104)
-                self.metagraph.neurons[uid].axon_info.ip != "0.0.0.0"
-                for uid in self.metagraph.uids
-            ]
-        )
+        return torch.zeros(len(self.metagraph.uids), dtype=torch.float32)
 
-    def update_scores(self, responses: list[MinerResponse]) -> None:
+    def sync_scores_uids(self, uids: list[int]):
         """
-        Update scores based on miner responses.
-
-        Args:
-            responses: List of MinerResponse objects.
+        If there are more uids than scores, add more weights.
         """
-        if not responses or self.scores is None:
-            bt.logging.error("No responses or scores not initialized. Skipping update.")
-            return
-
-        max_score = 1 / len(self.scores)
-        responses = self._add_missing_responses(responses)
-
-        sorted_filtered_times = self._get_sorted_filtered_times(responses)
-        median_max_response_time, min_response_time = (
-            self._calculate_response_time_metrics(sorted_filtered_times)
-        )
-
-        proof_of_weights_items = self._create_pow_items(
-            responses, max_score, median_max_response_time, min_response_time
-        )
-
-        self._update_scores_from_witness(proof_of_weights_items)
-        self._update_pow_queue(proof_of_weights_items)
-
-        log_scores(self.scores)
-        self._try_store_scores()
-
-    def _add_missing_responses(
-        self, responses: list[MinerResponse]
-    ) -> list[MinerResponse]:
-        """Add missing responses for all UIDs not present in the original responses."""
-        all_uids = set(range(len(self.scores) - 1))
-        response_uids = set(r.uid for r in responses)
-        missing_uids = all_uids - response_uids
-        responses.extend(MinerResponse.empty(uid) for uid in missing_uids)
-        return responses
-
-    def _get_sorted_filtered_times(self, responses: list[MinerResponse]) -> list[float]:
-        """Get sorted list of valid response times."""
-        return sorted(
-            r.response_time
-            for r in responses
-            if r.verification_result and r.response_time > 0
-        )
-
-    def _calculate_response_time_metrics(
-        self, sorted_filtered_times: list[float]
-    ) -> tuple[float, float]:
-        """Calculate median max and minimum response times."""
-        if not sorted_filtered_times:
-            return VALIDATOR_REQUEST_TIMEOUT_SECONDS, 0
-
-        sample_size = max(
-            int(len(sorted_filtered_times) * MAXIMUM_SCORE_MEDIAN_SAMPLE), 1
-        )
-        median_max_response_time = torch.clamp(
-            torch.median(torch.tensor(sorted_filtered_times[-sample_size:])),
-            0,
-            VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-        ).item()
-
-        min_response_time = (
-            torch.clamp(
-                torch.min(torch.tensor(sorted_filtered_times)),
-                0,
-                VALIDATOR_REQUEST_TIMEOUT_SECONDS,
-            ).item()
-            - MINIMUM_SCORE_SHIFT
-        )
-
-        return median_max_response_time, min_response_time
+        if len(uids) > len(self.scores):
+            bt.logging.trace(
+                f"Scores length: {len(self.scores)}, UIDs length: {len(uids)}. Adding more weights"
+            )
+            size_difference = len(uids) - len(self.scores)
+            new_scores = torch.zeros(size_difference, dtype=torch.float32)
+            queryable_uids = set(get_queryable_uids(self.metagraph))
+            new_scores = new_scores * torch.Tensor(
+                [
+                    uid in queryable_uids
+                    for uid in self.metagraph.uids[len(self.scores) :]
+                ]
+            )
+            self.scores = torch.cat((self.scores, new_scores))
 
     def _create_pow_items(
         self,
@@ -149,6 +84,7 @@ class ScoreManager:
         max_score: float,
         median_max_response_time: float,
         min_response_time: float,
+        model_id: str,
     ) -> list[ProofOfWeightsItem]:
         """Create ProofOfWeightsItems from responses."""
         return [
@@ -164,45 +100,37 @@ class ScoreManager:
             for response in responses
         ]
 
+    @with_rate_limit(period=ONE_MINUTE)
+    def log_pow_queue_status(self):
+        bt.logging.info(f"PoW Queue Status: {len(self.proof_of_weights_queue)} items")
+
     def _update_scores_from_witness(
-        self, proof_of_weights_items: list[ProofOfWeightsItem]
+        self, proof_of_weights_items: list[ProofOfWeightsItem], model_id: str
     ):
-        """Update scores based on the witness generated from proof of weights items."""
-        pow_circuit = circuit_store.get_circuit(SINGLE_PROOF_OF_WEIGHTS_MODEL_ID)
+        pow_circuit = circuit_store.get_circuit(model_id)
+        bt.logging.info(
+            f"Processing PoW witness generation for {len(proof_of_weights_items)} items using {str(pow_circuit)}"
+        )
         if not pow_circuit:
             raise ValueError(
-                f"Proof of weights circuit not found for model ID: {SINGLE_PROOF_OF_WEIGHTS_MODEL_ID}"
+                f"Proof of weights circuit not found for model ID: {model_id}"
             )
 
-        padded_items = ProofOfWeightsItem.pad_items(proof_of_weights_items, 256)
-        for item in padded_items:
-            if item.response_time < item.minimum_response_time:
-                bt.logging.warning(
-                    f"Response time {item.response_time.item()} is less than minimum"
-                    f" {item.minimum_response_time.item()} for UID {item.miner_uid.item()}"
-                )
-
-                item.response_time = torch.max(
-                    item.response_time, item.minimum_response_time
-                )
-
-            # Ensure there is > 0 spread between min and max response times (usually during testing)
-            if item.maximum_response_time <= item.minimum_response_time:
-                bt.logging.warning(
-                    f"No spread between min and max response times for UID {item.miner_uid.item()}"
-                )
-                item.maximum_response_time = item.minimum_response_time + 1
-
         inputs = pow_circuit.input_handler(
-            RequestType.RWR, ProofOfWeightsItem.to_dict_list(padded_items)
+            RequestType.RWR, ProofOfWeightsItem.to_dict_list(proof_of_weights_items)
         )
-
         session = VerifiedModelSession(inputs, pow_circuit)
-        witness = session.generate_witness(return_content=True)
+        try:
+            witness = session.generate_witness(return_content=True)
+            bt.logging.success(
+                f"Witness for {str(pow_circuit)} generated successfully."
+            )
+        except Exception as e:
+            bt.logging.error(f"Error generating witness: {e}")
+            return
+
         witness_list = witness if isinstance(witness, list) else list(witness.values())
-
         self._process_witness_results(witness_list, pow_circuit.settings["scaling"])
-
         session.end()
 
     def _process_witness_results(self, witness: list, scaling: int):
@@ -222,35 +150,134 @@ class ScoreManager:
             self.scores[uid] = float(score)
             bt.logging.debug(f"Updated score for UID {uid}: {score}")
 
+        log_scores(self.scores)
+        self._try_store_scores()
+
     def _update_pow_queue(self, new_items: list[ProofOfWeightsItem]):
-        """Update the proof of weights queue with new items."""
-        self.proof_of_weights_queue = ProofOfWeightsItem.merge_items(
-            self.proof_of_weights_queue, new_items
-        )
+        if not new_items:
+            return
+
+        self.proof_of_weights_queue.extend(new_items)
+        self.log_pow_queue_status()
+
+    def process_pow_queue(self, model_id: str) -> bool:
+        """Process items in the proof of weights queue for a specific model."""
+        if (
+            len(self.proof_of_weights_queue) < 256
+            or len(self.proof_of_weights_queue) % 256 != 0
+        ):
+            return False
+
+        current_step = len(self.proof_of_weights_queue) >> 8
+        if current_step == self.last_processed_queue_step:
+            return False
+
+        pow_circuit = circuit_store.get_circuit(model_id)
+        if not pow_circuit:
+            bt.logging.error(f"Circuit not found for model ID: {model_id}")
+            return False
+
+        items_to_process = self.proof_of_weights_queue[-256:]
+        self._update_scores_from_witness(items_to_process, model_id)
+        self.last_processed_queue_step = current_step
+
+        return True
 
     def _try_store_scores(self):
         """Attempt to store scores to disk."""
         try:
-            torch.save(self.scores, os.path.join(self.score_path, "scores.pt"))
+            torch.save(self.scores, self.score_path)
         except Exception as e:
-            bt.logging.info(f"Error storing scores: {e}")
-
-    def get_proof_of_weights_queue(self):
-        """Return the current proof of weights queue."""
-        return self.proof_of_weights_queue
+            bt.logging.error(f"Error storing scores: {e}")
 
     def clear_proof_of_weights_queue(self):
         """Clear the proof of weights queue."""
         self.proof_of_weights_queue = []
 
-    def sync_scores_uids(self, uids: list[int]):
+    @with_rate_limit(period=ONE_MINUTE * 5)
+    def process_non_queryable_scores(self, queryable_uids: set[int], max_score: float):
         """
-        If there are more uids than scores, add more weights.
+        Decay scores for non-queryable UIDs.
         """
-        if len(uids) > len(self.scores):
-            bt.logging.trace(
-                f"Scores length: {len(self.scores)}, UIDs length: {len(uids)}. Adding more weights"
-            )
-            size_difference = len(uids) - len(self.scores)
-            new_scores = torch.zeros(size_difference, dtype=torch.float32)
-            self.scores = torch.cat((self.scores, new_scores))
+        for uid in range(len(self.scores)):
+            if uid not in queryable_uids:
+                hotkey = self.metagraph.hotkeys[uid]
+                if not (self.competition and hotkey in self.competition.miner_states):
+                    self.scores[uid] = 0
+                elif self.competition and hotkey in self.competition.miner_states:
+                    pow_item = ProofOfWeightsItem.for_competition(
+                        uid=uid,
+                        maximum_score=max_score,
+                        competition_score=self.competition.miner_states[
+                            hotkey
+                        ].sota_relative_score,
+                        block_number=self.metagraph.block.item(),
+                        validator_uid=self.user_uid,
+                    )
+                    self._update_pow_queue([pow_item])
+
+    def update_single_score(
+        self,
+        response: MinerResponse,
+        queryable_uids: set[int] | None = None,
+    ) -> None:
+        """
+        Update the score for a single miner based on their response.
+
+        Args:
+            response (MinerResponse): The processed response from a miner.
+            queryable_uids: Optional pre-computed set of queryable UIDs.
+        """
+        if queryable_uids is None:
+            queryable_uids = set(get_queryable_uids(self.metagraph))
+
+        circuit = response.circuit
+        hotkey = self.metagraph.hotkeys[response.uid]
+
+        competition_score = None
+        if self.competition and hotkey in self.competition.miner_states:
+            competition_score = self.competition.miner_states[
+                hotkey
+            ].sota_relative_score
+
+        evaluation_data = CircuitEvaluationItem(
+            circuit=circuit,
+            uid=response.uid,
+            minimum_response_time=circuit.evaluation_data.minimum_response_time,
+            proof_size=response.proof_size,
+            response_time=response.response_time,
+            score=self.scores[response.uid],
+            verification_result=response.verification_result,
+        )
+        circuit.evaluation_data.update(evaluation_data)
+
+        max_score = 1 / len(self.scores)
+        self.process_non_queryable_scores(queryable_uids, max_score)
+
+        pow_item = ProofOfWeightsItem.from_miner_response(
+            response,
+            max_score,
+            self.scores[response.uid],
+            circuit.evaluation_data.maximum_response_time,
+            circuit.evaluation_data.minimum_response_time,
+            self.metagraph.block.item(),
+            self.user_uid,
+            competition_score if competition_score is not None else 0,
+        )
+
+        self._update_pow_queue([pow_item])
+
+        if (
+            len(self.proof_of_weights_queue) >= 256
+            and len(self.proof_of_weights_queue) % 256 == 0
+        ):
+            self.process_pow_queue(SINGLE_PROOF_OF_WEIGHTS_MODEL_ID)
+
+    def get_pow_queue(self) -> list[ProofOfWeightsItem]:
+        """Get the current proof of weights queue."""
+        return self.proof_of_weights_queue
+
+    def remove_processed_items(self, count: int):
+        if count <= 0:
+            return
+        self.proof_of_weights_queue = self.proof_of_weights_queue[count:]

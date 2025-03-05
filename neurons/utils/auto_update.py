@@ -6,7 +6,7 @@ import sys
 import time
 import requests
 from typing import Optional
-from constants import REPO_URL
+from constants import REPO_URL, ONE_MINUTE
 from .wandb_logger import safe_log
 
 from bittensor import logging
@@ -96,19 +96,18 @@ class AutoUpdate:
                     "-m",
                     "ensurepip",
                 ],
-                timeout=60,
+                timeout=ONE_MINUTE,
             )
             subprocess.check_call(
                 [
-                    python_executable,
-                    "-m",
+                    "uv",
                     "pip",
                     "install",
                     "-r",
                     requirements_path,
                     "-U",
                 ],
-                timeout=60,
+                timeout=ONE_MINUTE,
             )
             logging.success("Successfully updated packages.")
         except Exception as e:
