@@ -413,6 +413,12 @@ class ValidatorLoop:
                 save_proof_of_weights(
                     public_signals=[response.public_json],
                     proof=[response.proof_content],
+                    metadata={
+                        "circuit": str(response.circuit),
+                        "request_hash": response.input_hash,
+                        "miner_uid": response.uid,
+                    },
+                    hotkey=self.config.wallet.hotkey,
                     proof_filename=request_hash,
                 )
 
