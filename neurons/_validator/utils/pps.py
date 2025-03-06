@@ -18,7 +18,7 @@ class ProofPublishingService:
         """
         try:
             timestamp = str(int(time.time()))
-            message = timestamp
+            message = timestamp.encode("utf-8")
             signature = hotkey.sign(message)
 
             response = requests.post(
