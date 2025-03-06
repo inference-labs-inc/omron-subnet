@@ -1,4 +1,4 @@
-import json
+import time
 import bittensor as bt
 import requests
 from substrateinterface import Keypair
@@ -17,13 +17,17 @@ class ProofPublishingService:
             hotkey (Keypair): The hotkey used to sign the proof
         """
         try:
-            body_sig = hotkey.sign(json.dumps(proof_json))
+            timestamp = str(int(time.time()))
+            message = timestamp
+            signature = hotkey.sign(message)
 
             response = requests.post(
                 f"{self.url}/proof",
                 json=proof_json,
                 headers={
-                    "Authorization": f"Signature {body_sig}",
+                    "x-timestamp": timestamp,
+                    "x-origin-ss58": hotkey.ss58_address,
+                    "x-signature": signature.hex(),
                     "Content-Type": "application/json",
                 },
             )
