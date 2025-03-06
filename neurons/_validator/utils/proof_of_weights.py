@@ -220,13 +220,18 @@ def save_proof_of_weights(
             "metadata": metadata,
         }
 
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(proof_json, f)
-
         pps = ProofPublishingService(PPS_URL)
-        pps.publish_proof(proof_json, hotkey)
+        response = pps.publish_proof(proof_json, hotkey)
 
-        bt.logging.success(f"Proof of weights saved to {file_path}")
+        if response is None:
+            bt.logging.error("Failed to publish proof of weights, saving to disk.")
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(proof_json, f)
+            return
+        else:
+            bt.logging.success(f"Proof of weights receipt saved to {file_path}")
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(response, f)
     except Exception as e:
         bt.logging.error(f"Error saving proof of weights to file: {e}")
         traceback.print_exc()

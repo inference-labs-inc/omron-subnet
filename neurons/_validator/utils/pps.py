@@ -33,12 +33,15 @@ class ProofPublishingService:
             )
 
             if response.status_code == 200:
+                response_json = response.json()
                 bt.logging.success(f"Proof of weights uploaded to {self.url}")
-                bt.logging.info(f"Response: {response.json()}")
+                bt.logging.info(f"Response: {response_json}")
+                return response_json
             else:
                 bt.logging.warning(
                     f"Failed to upload proof of weights to {self.url}. Status code: {response.status_code}"
                 )
-
+                return None
         except Exception as e:
             bt.logging.warning(f"Error uploading proof of weights: {e}")
+            return None
