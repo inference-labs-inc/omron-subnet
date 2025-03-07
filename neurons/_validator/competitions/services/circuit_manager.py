@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 import traceback
 from constants import ONE_HOUR
 from protocol import Competition
+import asyncio
 
 
 class CircuitManager:
@@ -45,14 +46,48 @@ class CircuitManager:
         except Exception:
             return False
 
+    async def _download_large_file(
+        self, session: aiohttp.ClientSession, url: str, file_path: str
+    ) -> bool:
+        try:
+            async with session.get(url, timeout=ONE_HOUR) as response:
+                response.raise_for_status()
+                total_size = int(response.headers.get("content-length", 0))
+
+                with open(file_path, "wb") as f:
+                    downloaded = 0
+                    chunk_size = 1024 * 1024
+                    last_log_time = 0
+
+                    async for chunk in response.content.iter_chunked(chunk_size):
+                        if chunk:
+                            f.write(chunk)
+                            downloaded += len(chunk)
+
+                            current_time = asyncio.get_event_loop().time()
+                            if current_time - last_log_time >= 5:
+                                progress = (
+                                    (downloaded / total_size * 100)
+                                    if total_size > 0
+                                    else 0
+                                )
+                                bt.logging.debug(
+                                    f"Download progress: {progress:.2f}% ({downloaded}/{total_size} bytes)"
+                                )
+                                last_log_time = current_time
+
+                return True
+        except Exception as e:
+            bt.logging.error(f"Error downloading file: {str(e)}")
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            return False
+
     async def download_files(self, axon: bt.axon, hash: str, circuit_dir: str) -> bool:
-        """Download circuit files from a miner."""
         try:
             bt.logging.info(
                 f"Starting download of circuit files from miner {axon.ip}:{axon.port}"
             )
-            bt.logging.debug(f"Requesting circuit files for hash {hash[:8]}...")
-            bt.logging.debug(f"Circuit directory: {circuit_dir}")
 
             if not self.dendrite:
                 bt.logging.error("Dendrite not initialized")
@@ -64,9 +99,6 @@ class CircuitManager:
                 file_name="commitment",
             )
 
-            bt.logging.info(
-                f"Requesting commitment data from axon {axon.ip}:{axon.port}"
-            )
             response = await self.dendrite.forward(
                 axons=[axon],
                 synapse=synapse,
@@ -90,8 +122,6 @@ class CircuitManager:
 
             try:
                 commitment = json.loads(response_synapse.commitment)
-                bt.logging.info("Successfully parsed commitment data from response")
-                bt.logging.debug(f"Received commitment data: {commitment}")
             except json.JSONDecodeError:
                 bt.logging.error("Invalid commitment data")
                 return False
@@ -104,10 +134,11 @@ class CircuitManager:
             required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
             all_files_downloaded = True
 
-            bt.logging.info(f"Starting download of {len(required_files)} circuit files")
+            timeout = aiohttp.ClientTimeout(total=ONE_HOUR, connect=60)
+            conn = aiohttp.TCPConnector(force_close=True, limit=1)
 
             async with aiohttp.ClientSession(
-                connector=aiohttp.TCPConnector(force_close=False)
+                connector=conn, timeout=timeout
             ) as session:
                 for file_name in required_files:
                     if file_name not in signed_urls:
@@ -122,32 +153,18 @@ class CircuitManager:
                         break
 
                     file_path = os.path.join(circuit_dir, file_name)
-                    try:
-                        bt.logging.debug(f"Downloading {file_name} from {url}")
-                        async with session.get(url, timeout=ONE_HOUR) as response:
-                            response.raise_for_status()
-                            content = await response.read()
-                            bt.logging.info(
-                                f"Successfully downloaded {file_name} ({len(content)} bytes)"
-                            )
-                            with open(file_path, "wb") as f:
-                                f.write(content)
-                            bt.logging.debug(f"Saved {file_name} to {file_path}")
-                    except Exception as e:
-                        bt.logging.error(f"Failed to download {file_name}: {e}")
-                        bt.logging.error(f"Stack trace: {traceback.format_exc()}")
+                    bt.logging.debug(f"Starting download of {file_name} from {url}")
+
+                    if not await self._download_large_file(session, url, file_path):
                         all_files_downloaded = False
                         break
 
+                    bt.logging.info(
+                        f"Successfully downloaded {file_name} ({os.path.getsize(file_path)} bytes)"
+                    )
+
             if all_files_downloaded:
                 bt.logging.success(f"Successfully downloaded all files for {hash[:8]}")
-                bt.logging.info("Verifying downloaded files...")
-                for root, dirs, files in os.walk(circuit_dir):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        bt.logging.info(
-                            f"Verified {file} ({os.path.getsize(file_path)} bytes)"
-                        )
                 return True
             else:
                 bt.logging.error(f"Failed to download all files for {hash[:8]}")
