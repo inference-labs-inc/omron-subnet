@@ -6,8 +6,9 @@ import bittensor as bt
 import torch
 import time
 from typing import Optional
+from _validator.utils.pps import ProofPublishingService
 
-from substrateinterface import ExtrinsicReceipt
+from substrateinterface import ExtrinsicReceipt, Keypair
 from _validator.models.miner_response import (
     MinerResponse,
 )
@@ -15,6 +16,8 @@ from constants import (
     DEFAULT_MAX_SCORE,
     DEFAULT_PROOF_SIZE,
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
+    PPS_URL,
+    TESTNET_PPS_URL,
 )
 
 # Constants
@@ -190,7 +193,12 @@ class ProofOfWeightsItem:
 
 
 def save_proof_of_weights(
-    public_signals: list, proof: str, proof_filename: Optional[str] = None
+    public_signals: list,
+    proof: str,
+    metadata: dict,
+    hotkey: Keypair,
+    is_testnet: bool = False,
+    proof_filename: Optional[str] = None,
 ):
     """
     Save the proof of weights to a JSON file.
@@ -198,8 +206,9 @@ def save_proof_of_weights(
     Args:
         public_signals (list): The public signals data as a JSON array.
         proof (str): The proof.
-
-    This function saves the proof of weights as a JSON file.
+        metadata (dict): Additional metadata for the proof.
+        hotkey (Keypair): The hotkey used to sign the proof.
+        proof_filename (Optional[str]): Custom filename for the proof file.
     """
     try:
         if proof_filename is None:
@@ -207,11 +216,24 @@ def save_proof_of_weights(
 
         file_path = os.path.join(POW_DIRECTORY, f"{proof_filename}.json")
 
-        proof_json = {"public_signals": public_signals, "proof": proof}
+        proof_json = {
+            "public_signals": public_signals,
+            "proof": proof,
+            "metadata": metadata,
+        }
 
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(proof_json, f)
-        bt.logging.success(f"Proof of weights saved to {file_path}")
+        pps = ProofPublishingService(PPS_URL if not is_testnet else TESTNET_PPS_URL)
+        response = pps.publish_proof(proof_json, hotkey)
+
+        if response is None:
+            bt.logging.error("Failed to publish proof of weights, saving to disk.")
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(proof_json, f)
+            return
+        else:
+            bt.logging.success(f"Proof of weights receipt saved to {file_path}")
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(response, f)
     except Exception as e:
         bt.logging.error(f"Error saving proof of weights to file: {e}")
         traceback.print_exc()
