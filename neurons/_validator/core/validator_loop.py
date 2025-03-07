@@ -419,6 +419,7 @@ class ValidatorLoop:
                         "miner_uid": response.uid,
                     },
                     hotkey=self.config.wallet.hotkey,
+                    is_testnet=self.config.subnet_uid == 118,
                     proof_filename=request_hash,
                 )
 

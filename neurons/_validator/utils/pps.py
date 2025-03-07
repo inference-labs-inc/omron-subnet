@@ -23,7 +23,7 @@ class ProofPublishingService:
 
             response = requests.post(
                 f"{self.url}/proof",
-                json=proof_json,
+                json={"proof": proof_json},
                 headers={
                     "x-timestamp": timestamp,
                     "x-origin-ss58": hotkey.ss58_address,

@@ -139,6 +139,8 @@ MAINNET_TESTNET_UIDS = [
 ]
 # Proof publishing service URL
 PPS_URL = os.getenv("OMRON_PPS_URL", "https://pps.omron.ai")
+# Testnet PPS URL
+TESTNET_PPS_URL = os.getenv("OMRON_PPS_URL", "https://pps-test.omron.ai")
 # EZKL path
 LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")
 # GitHub repository URL

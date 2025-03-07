@@ -17,6 +17,7 @@ from constants import (
     DEFAULT_PROOF_SIZE,
     VALIDATOR_REQUEST_TIMEOUT_SECONDS,
     PPS_URL,
+    TESTNET_PPS_URL,
 )
 
 # Constants
@@ -196,6 +197,7 @@ def save_proof_of_weights(
     proof: str,
     metadata: dict,
     hotkey: Keypair,
+    is_testnet: bool = False,
     proof_filename: Optional[str] = None,
 ):
     """
@@ -220,7 +222,7 @@ def save_proof_of_weights(
             "metadata": metadata,
         }
 
-        pps = ProofPublishingService(PPS_URL)
+        pps = ProofPublishingService(PPS_URL if not is_testnet else TESTNET_PPS_URL)
         response = pps.publish_proof(proof_json, hotkey)
 
         if response is None:
