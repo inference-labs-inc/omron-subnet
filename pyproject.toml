@@ -38,8 +38,15 @@ dependencies = [
 [dependency-groups]
 dev = [
   "black>=24.10.0",
+  "bpython>=0.25",
+  "ipykernel>=6.29.5",
+  "matplotlib>=3.10.1",
+  "nbdev>=2.3.34",
+  "onnx>=1.17.0",
+  "onnxruntime>=1.20.1",
   "pytest>=8.0.0",
   "snoop>=0.6.0",
+  "tach>=0.27.2",
 ]
 
 [tool.setuptools]
