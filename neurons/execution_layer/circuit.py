@@ -7,15 +7,18 @@ import json
 import cli_parser
 from execution_layer.input_registry import InputRegistry
 from execution_layer.base_input import BaseInput
-
-# trunk-ignore(pylint/E0611)
-from bittensor import logging
+from _validator.utils.logging import log_system_metrics
 from constants import (
     MAX_EVALUATION_ITEMS,
     DEFAULT_PROOF_SIZE,
     MAXIMUM_SCORE_MEDIAN_SAMPLE,
     CRICUIT_TIMEOUT_SECONDS,
+    ONE_MINUTE,
 )
+from utils import with_rate_limit
+
+# trunk-ignore(pylint/E0611)
+from bittensor import logging
 
 
 class CircuitType(str, Enum):
@@ -183,7 +186,9 @@ class CircuitEvaluationItem:
         """
         # Remove `circuit_id` gracefully if present in kwargs (legacy code might pass it)
         if "circuit_id" in kwargs:
-            logging.warning("Ignoring legacy `circuit_id` in CircuitEvaluationItem initialization.")
+            logging.warning(
+                "Ignoring legacy `circuit_id` in CircuitEvaluationItem initialization."
+            )
             kwargs.pop("circuit_id")
 
         # Manually set required attributes
@@ -198,7 +203,7 @@ class CircuitEvaluationItem:
         # Initialize derived/validated field
         self.maximum_response_time = (
             self.circuit.timeout
-            if hasattr(self.circuit, 'timeout') and self.circuit.timeout
+            if hasattr(self.circuit, "timeout") and self.circuit.timeout
             else CRICUIT_TIMEOUT_SECONDS  # Replace or define this constant
         )
 
@@ -236,7 +241,10 @@ class CircuitEvaluationData:
             if os.path.exists(evaluation_store_path):
                 with open(evaluation_store_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    self.data = [CircuitEvaluationItem(circuit=self.circuit, **item) for item in data]
+                    self.data = [
+                        CircuitEvaluationItem(circuit=self.circuit, **item)
+                        for item in data
+                    ]
         except Exception as e:
             logging.error(
                 f"Failed to load evaluation data for model {self.circuit.id}, starting fresh: {e}"
@@ -264,6 +272,16 @@ class CircuitEvaluationData:
                 json.dump([item.to_dict() for item in self.data], f)
         except Exception as e:
             logging.error(f"Failed to save evaluation data: {e}")
+
+        self._log_metrics()
+
+    @with_rate_limit(period=ONE_MINUTE)
+    def _log_metrics(self) -> None:
+
+        response_times = [r.response_time for r in self.data if r.verification_result]
+        verified_count = len([r for r in self.data if r.verification_result])
+        if response_times:
+            log_system_metrics(response_times, verified_count, str(self.circuit))
 
     @property
     def verification_ratio(self) -> float:
@@ -332,13 +350,11 @@ class Circuit:
         self.proof_system = ProofSystem[self.metadata.proof_system]
         self.paths.set_proof_system_paths(self.proof_system)
         self.settings = {}
-        self.evaluation_data = CircuitEvaluationData(
-            self, self.paths.evaluation_data
-        )
+        self.evaluation_data = CircuitEvaluationData(self, self.paths.evaluation_data)
         # if timeout attribute exists and is not None, else default
         self.timeout = (
             self.metadata.timeout
-            if hasattr(self.metadata, 'timeout') and self.metadata.timeout is not None
+            if hasattr(self.metadata, "timeout") and self.metadata.timeout is not None
             else CRICUIT_TIMEOUT_SECONDS
         )
         try:
