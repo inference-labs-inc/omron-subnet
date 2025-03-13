@@ -31,7 +31,7 @@ dependencies = [
   "torchvision>=0.19.1",
   "tqdm>=4.67.1",
   "uvicorn==0.34.0",
-  "wandb==0.18.7",
+  "wandb==0.19.8",
   "websocket-client>=1.8.0",
 ]
 
