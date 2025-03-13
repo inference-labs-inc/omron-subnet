@@ -7,7 +7,7 @@ import json
 import cli_parser
 from execution_layer.input_registry import InputRegistry
 from execution_layer.base_input import BaseInput
-from _validator.utils.logging import log_system_metrics
+from utils.metrics_logger import log_circuit_metrics
 from constants import (
     MAX_EVALUATION_ITEMS,
     DEFAULT_PROOF_SIZE,
@@ -277,11 +277,10 @@ class CircuitEvaluationData:
 
     @with_rate_limit(period=ONE_MINUTE)
     def _log_metrics(self) -> None:
-
         response_times = [r.response_time for r in self.data if r.verification_result]
         verified_count = len([r for r in self.data if r.verification_result])
         if response_times:
-            log_system_metrics(response_times, verified_count, str(self.circuit))
+            log_circuit_metrics(response_times, verified_count, str(self.circuit))
 
     @property
     def verification_ratio(self) -> float:
