@@ -133,8 +133,11 @@ def log_responses(responses: list[MinerResponse]):
 
     wandb_log = {"responses": {}}
     for response in sorted_responses:
+        if not response.verification_result:
+            continue
         if response.uid not in wandb_log["responses"]:
             wandb_log["responses"][response.uid] = {}
+        circuit = circuit_store.get_circuit(response.circuit.id)
         wandb_log["responses"][response.uid][str(circuit)] = {
             "verification_result": int(response.verification_result),
             "response_time": response.response_time,
