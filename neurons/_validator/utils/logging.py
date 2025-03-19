@@ -4,7 +4,6 @@ import torch
 from rich.console import Console, JustifyMethod
 from rich.table import Table
 
-from deployment_layer.circuit_store import circuit_store
 from utils import wandb_logger
 from _validator.models.miner_response import MinerResponse
 
@@ -27,7 +26,7 @@ def create_and_print_table(
         table.add_column(col_name, justify=justify, style=style, no_wrap=True)
     for row in rows:
         table.add_row(*row)
-    console = Console()
+    console = Console(color_system="truecolor")
     console.width = 120
     console.print(table)
 
@@ -41,9 +40,9 @@ def log_tensor_data(title: str, data: torch.Tensor, log_key: str):
         data (torch.Tensor): The tensor data to be logged.
         log_key (str): The key used for logging in Weights & Biases.
     """
-    rows = [[str(uid), str(round(value.item(), 4))] for uid, value in enumerate(data)]
+    rows = [[str(uid), f"{value.item():.6f}"] for uid, value in enumerate(data)]
     create_and_print_table(
-        title, [("uid", "right", "cyan"), (log_key, "right", "magenta")], rows
+        title, [("uid", "right", "cyan"), (log_key, "right", "yellow")], rows
     )
     wandb_logger.safe_log(
         {log_key: {uid: value.item() for uid, value in enumerate(data)}}
@@ -82,7 +81,7 @@ def log_verify_result(results: list[tuple[int, bool]]):
     rows = [[str(uid), str(result)] for uid, result in results]
     create_and_print_table(
         "proof verification result",
-        [("uid", "right", "cyan"), ("Verified?", "right", "magenta")],
+        [("uid", "right", "cyan"), ("Verified?", "right", "green")],
         rows,
     )
     wandb_logger.safe_log(
@@ -98,46 +97,39 @@ def log_responses(responses: list[MinerResponse]):
         responses (list[MinerResponse]): A list of MinerResponse objects to be logged.
     """
     columns = [
-        ("UID", "right", "magenta"),
-        ("Verification Result", "right", "magenta"),
-        ("Response Time", "right", "magenta"),
-        ("Proof Size", "right", "magenta"),
-        (
-            "Circuit Name",
-            "left",
-            "magenta",
-        ),
-        ("Proof System", "left", "magenta"),
+        ("UID", "right", "cyan"),
+        ("Verification Result", "right", "green"),
+        ("Response Time", "right", "yellow"),
+        ("Proof Size", "right", "blue"),
+        ("Circuit Name", "left", "magenta"),
+        ("Proof System", "left", "red"),
     ]
 
     sorted_responses = sorted(responses, key=lambda x: x.uid)
-
-    rows = []
-    for response in sorted_responses:
-        circuit = circuit_store.get_circuit(response.circuit.id)
-        rows.append(
-            [
-                str(response.uid),
-                str(response.verification_result),
-                str(response.response_time),
-                str(response.proof_size),
-                (
-                    circuit.metadata.name
-                    if circuit is not None
-                    else str(response.circuit.id)
-                ),
-                (circuit.metadata.proof_system if circuit is not None else "Unknown"),
-            ]
-        )
+    rows = [
+        [
+            str(response.uid),
+            str(response.verification_result),
+            str(response.response_time),
+            str(response.proof_size),
+            (response.circuit.metadata.name if response.circuit else "Unknown"),
+            (response.circuit.metadata.proof_system if response.circuit else "Unknown"),
+        ]
+        for response in sorted_responses
+    ]
     create_and_print_table("Responses", columns, rows)
 
-    wandb_log = {"responses": {}}
-    for response in sorted_responses:
-        if response.uid not in wandb_log["responses"]:
-            wandb_log["responses"][response.uid] = {}
-        wandb_log["responses"][response.uid][str(circuit)] = {
-            "verification_result": int(response.verification_result),
-            "response_time": response.response_time,
-            "proof_size": response.proof_size,
+    wandb_log = {
+        "responses": {
+            response.uid: {
+                str(response.circuit): {
+                    "verification_result": int(response.verification_result),
+                    "response_time": response.response_time,
+                    "proof_size": response.proof_size,
+                }
+            }
+            for response in sorted_responses
+            if response.verification_result
         }
+    }
     wandb_logger.safe_log(wandb_log)
