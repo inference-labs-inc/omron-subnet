@@ -137,8 +137,7 @@ def log_responses(responses: list[MinerResponse]):
             continue
         if response.uid not in wandb_log["responses"]:
             wandb_log["responses"][response.uid] = {}
-        circuit = circuit_store.get_circuit(response.circuit.id)
-        wandb_log["responses"][response.uid][str(circuit)] = {
+        wandb_log["responses"][response.uid][str(response.circuit)] = {
             "verification_result": int(response.verification_result),
             "response_time": response.response_time,
             "proof_size": response.proof_size,
