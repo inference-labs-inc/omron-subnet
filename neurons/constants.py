@@ -140,7 +140,7 @@ MAINNET_TESTNET_UIDS = [
 # Proof publishing service URL
 PPS_URL = os.getenv(
     "OMRON_PPS_URL",
-    "https://huewzsv64bef6rjaayy36qwbru0jhpcb.lambda-url.us-east-1.on.aws/",
+    "https://pps.omron.ai/",
 )
 # Testnet PPS URL
 TESTNET_PPS_URL = os.getenv(
