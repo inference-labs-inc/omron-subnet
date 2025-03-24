@@ -240,6 +240,11 @@ class ScoreManager:
                 hotkey
             ].sota_relative_score
 
+        if not response.verification_result and competition_score:
+            # If the miner is not responding to requests, but is in the competition, consider it verified
+            # Note that default values are set earlier up, therefore they receive a very poor response score.
+            response.verification_result = True
+
         evaluation_data = CircuitEvaluationItem(
             circuit=circuit,
             uid=response.uid,
