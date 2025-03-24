@@ -254,6 +254,11 @@ class ScoreManager:
         max_score = 1 / len(self.scores)
         self.process_non_queryable_scores(queryable_uids, max_score)
 
+        if not response.verification_result and competition_score:
+            # If the miner is not responding to requests, but is in the competition, consider it verified
+            # Note that default values are set earlier up, therefore they receive a very poor response score.
+            response.verification_result = True
+
         pow_item = ProofOfWeightsItem.from_miner_response(
             response,
             max_score,
