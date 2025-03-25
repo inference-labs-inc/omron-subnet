@@ -22,10 +22,6 @@ path = "miner"
 depends_on = ["constants", "cli_parser", "utils", "_miner.miner_session", "deployment_layer.circuit_store"]
 
 [[modules ]]
-path = "generate_test_input"
-depends_on = [ "_validator.models.request_type"]
-
-[[modules ]]
 path = "utils"
 depends_on = [ "utils.rate_limiter", "utils.system", "utils.auto_update", "utils.wandb_logger", "utils.pre_flight"]
 
@@ -384,3 +380,7 @@ depends_on = ["execution_layer.generic_input", "execution_layer.proof_handlers.b
 [[modules ]]
 path = "execution_layer.proof_handlers.circom_handler"
 depends_on = ["utils.pre_flight", "constants", "execution_layer.generic_input", "execution_layer.proof_handlers.base_handler"]
+
+[[modules ]]
+path = "generate_test_input"
+depends_on = ["_validator.models.request_type"]
