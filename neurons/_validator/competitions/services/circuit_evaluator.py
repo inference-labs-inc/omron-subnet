@@ -540,6 +540,7 @@ class CircuitEvaluator:
             avg_response_time,
             True,
             improvements,
+            avg_raw_accuracy,
         )
 
     def _get_input_shape(self, circuit_dir: str) -> Tuple[int, int] | None:

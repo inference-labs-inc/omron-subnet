@@ -253,7 +253,6 @@ class Competition:
             bt.logging.critical(
                 "Competitions are only supported on macOS arm64 architecture."
             )
-            return []
 
         queryable_uids = self.metagraph.uids
         hotkey_to_uid = {self.metagraph.hotkeys[uid]: uid for uid in queryable_uids}
@@ -430,6 +429,7 @@ class Competition:
                 response_time,
                 verification_result,
                 improvements,
+                accuracy,
             ) = self.circuit_evaluator.evaluate(circuit_dir)
 
             if circuit_owner not in self.miner_states:
@@ -449,7 +449,7 @@ class Competition:
             neuron_state.proof_size = proof_size
             neuron_state.response_time = response_time
             neuron_state.verification_result = verification_result
-
+            neuron_state.raw_accuracy = accuracy
             if verification_result and self.sota_manager.check_if_sota(
                 sota_relative_score, proof_size, response_time, improvements
             ):

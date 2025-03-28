@@ -40,6 +40,7 @@ from constants import (
     ONE_MINUTE,
     FIVE_MINUTES,
     ONE_HOUR,
+    DEFAULT_PROOF_SIZE,
 )
 from _validator.competitions.competition import Competition
 from multiprocessing import Queue as MPQueue
@@ -389,6 +390,11 @@ class ValidatorLoop:
         """
         try:
             request_hash = response.input_hash
+            if not response.verification_result:
+                response.response_time = (
+                    response.circuit.evaluation_data.maximum_response_time
+                )
+                response.proof_size = DEFAULT_PROOF_SIZE
             self.recent_responses.append(response)
             if response.request_type == RequestType.RWR:
                 if response.verification_result:

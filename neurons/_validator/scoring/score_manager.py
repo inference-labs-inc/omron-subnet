@@ -6,7 +6,7 @@ from _validator.models.miner_response import MinerResponse
 from _validator.utils.logging import log_scores
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
 from _validator.utils.uid import get_queryable_uids
-from constants import SINGLE_PROOF_OF_WEIGHTS_MODEL_ID, ONE_MINUTE
+from constants import SINGLE_PROOF_OF_WEIGHTS_MODEL_ID, ONE_MINUTE, DEFAULT_PROOF_SIZE
 from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
 from _validator.models.request_type import RequestType
@@ -239,6 +239,14 @@ class ScoreManager:
             competition_score = self.competition.miner_states[
                 hotkey
             ].sota_relative_score
+
+        if not response.verification_result and competition_score:
+            # If the miner is not responding to requests, but is in the competition, consider it verified
+            # Note that default values are set earlier up, therefore they receive a very poor response score.
+            # We set them again here to ensure the max response time is used.
+            response.verification_result = True
+            response.response_time = circuit.evaluation_data.maximum_response_time
+            response.proof_size = DEFAULT_PROOF_SIZE
 
         evaluation_data = CircuitEvaluationItem(
             circuit=circuit,
