@@ -8,6 +8,7 @@ import cli_parser
 from execution_layer.input_registry import InputRegistry
 from execution_layer.base_input import BaseInput
 from utils.metrics_logger import log_circuit_metrics
+from utils.gc_logging import gc_log_eval_metrics
 from constants import (
     MAX_EVALUATION_ITEMS,
     DEFAULT_PROOF_SIZE,
@@ -16,6 +17,7 @@ from constants import (
     ONE_MINUTE,
 )
 from utils import with_rate_limit
+import time
 
 # trunk-ignore(pylint/E0611)
 from bittensor import logging
@@ -279,8 +281,56 @@ class CircuitEvaluationData:
     def _log_metrics(self) -> None:
         response_times = [r.response_time for r in self.data if r.verification_result]
         verified_count = len([r for r in self.data if r.verification_result])
+
         if response_times:
             log_circuit_metrics(response_times, verified_count, str(self.circuit))
+
+            response_tensor = torch.tensor(response_times)
+            mean_response_time = torch.mean(response_tensor).item()
+            max_response_time = torch.max(response_tensor).item()
+            min_response_time = torch.min(response_tensor).item()
+
+            proof_sizes = torch.tensor(
+                [r.proof_size for r in self.data if r.verification_result]
+            )
+            mean_proof_size = (
+                torch.mean(proof_sizes).item() if len(proof_sizes) > 0 else 0
+            )
+
+            # Get latest verification timestamp and block
+            latest_verification = max(
+                (r for r in self.data if r.verification_result),
+                key=lambda x: x.response_time,
+                default=None,
+            )
+            last_block = (
+                cli_parser.config.subtensor.get_current_block()
+                if latest_verification
+                else 0
+            )
+
+            gc_log_eval_metrics(
+                model_id=self.circuit.id,
+                model_name=self.circuit.metadata.name,
+                netuid=self.circuit.metadata.netuid or 0,
+                weights_version=self.circuit.metadata.weights_version or 0,
+                proof_system=self.circuit.metadata.proof_system,
+                circuit_type=str(self.circuit.metadata.type),
+                proof_size=int(mean_proof_size),
+                timeout=float(self.circuit.timeout),
+                benchmark_weight=float(
+                    self.circuit.metadata.benchmark_choice_weight or 0.0
+                ),
+                total_verifications=len(self.data),
+                successful_verifications=verified_count,
+                min_response_time=float(min_response_time),
+                max_response_time=float(max_response_time),
+                avg_response_time=float(mean_response_time),
+                last_verification_time=int(time.time()),
+                last_block=last_block,
+                verification_ratio=self.verification_ratio,
+                hotkey=cli_parser.config.wallet.hotkey,
+            )
 
     @property
     def verification_ratio(self) -> float:
