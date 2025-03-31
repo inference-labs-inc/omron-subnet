@@ -1,7 +1,7 @@
 import base64
 import json
 import os
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import bittensor as bt
 import requests
@@ -9,7 +9,8 @@ import torch
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from _validator.models.miner_response import MinerResponse
+if TYPE_CHECKING:
+    from _validator.models.miner_response import MinerResponse
 
 LOGGING_URL = os.getenv(
     "OMRON_LOGGING_URL",
@@ -35,7 +36,7 @@ def log_responses(
     metagraph: bt.metagraph,
     hotkey: bt.Keypair,
     uid: int,
-    responses: list[MinerResponse],
+    responses: list["MinerResponse"],
     overhead_time: float,
     block: int,
     scores: torch.Tensor,
