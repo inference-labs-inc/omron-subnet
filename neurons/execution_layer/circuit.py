@@ -20,7 +20,7 @@ from utils import with_rate_limit
 import time
 
 # trunk-ignore(pylint/E0611)
-from bittensor import logging, subtensor
+from bittensor import logging, subtensor, Wallet
 
 
 class CircuitType(str, Enum):
@@ -300,6 +300,7 @@ class CircuitEvaluationData:
             )
             sub = subtensor(config=cli_parser.config)
             last_block = sub.get_current_block()
+            wallet = Wallet(config=cli_parser.config)
 
             gc_log_eval_metrics(
                 model_id=self.circuit.id,
@@ -321,7 +322,7 @@ class CircuitEvaluationData:
                 last_verification_time=int(time.time()),
                 last_block=last_block,
                 verification_ratio=self.verification_ratio,
-                hotkey=cli_parser.config.wallet.hotkey,
+                hotkey=wallet.hotkey,
             )
 
     @property
