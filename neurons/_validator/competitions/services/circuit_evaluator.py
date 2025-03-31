@@ -249,15 +249,19 @@ class CircuitEvaluator:
             config_path = os.path.join(
                 self.competition_directory, "competition_config.json"
             )
+            bt.logging.info(f"Loading competition config from {config_path}")
             with open(config_path) as f:
                 config = json.load(f)
                 data_config = config.get("data_source", {})
+                bt.logging.info(f"Data source config: {data_config}")
 
                 processor = None
                 processor_path = os.path.join(
                     self.competition_directory, "data_processor.py"
                 )
+                bt.logging.info(f"Looking for data processor at {processor_path}")
                 if os.path.exists(processor_path):
+                    bt.logging.info("Found data processor, loading module...")
                     import importlib.util
 
                     spec = importlib.util.spec_from_file_location(
@@ -274,20 +278,26 @@ class CircuitEvaluator:
                             and attr != CompetitionDataProcessor
                         ):
                             processor = attr()
+                            bt.logging.info(f"Loaded data processor: {attr.__name__}")
                             break
 
                 if data_config.get("type") == "remote":
+                    bt.logging.info("Initializing remote data source")
                     data_source = RemoteDataSource(
                         self.competition_directory, processor
                     )
                     if not data_source.sync_data():
                         bt.logging.error("Failed to sync remote data source")
+                        bt.logging.info("Falling back to random data source")
                         return RandomDataSource(self.competition_directory, processor)
+                    bt.logging.info("Successfully initialized remote data source")
                     return data_source
+                bt.logging.info("Using random data source")
                 return RandomDataSource(self.competition_directory, processor)
         except Exception as e:
             bt.logging.error(f"Error setting up data source: {e}")
             traceback.print_exc()
+            bt.logging.info("Falling back to random data source due to error")
             return RandomDataSource(self.competition_directory)
 
     def _calculate_relative_score(
