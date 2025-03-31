@@ -38,8 +38,7 @@ STORAGE_REGION="auto"
 
 ### Start the Miner
 
-> [!IMPORTANT]
-> **Port `8091` must be open** for your circuit to function properly. This requires configuration on your local machine and router, or, if you're using a cloud provider, adjustments to your network settings. Validators cannot query your circuit if port `8091` remains closed.
+> [!IMPORTANT] > **Port `8091` must be open** for your circuit to function properly. This requires configuration on your local machine and router, or, if you're using a cloud provider, adjustments to your network settings. Validators cannot query your circuit if port `8091` remains closed.
 
 ```bash
 pm2 start neurons/miner.py --name omron_miner -- --netuid 2 --wallet.name your_wallet --logging.debug
@@ -127,8 +126,35 @@ High-performing circuits that demonstrate excellence across these metrics will b
 - Review validator logs for specific failures via WandB
 - Verify input schema matches implementation
 
+## FAQ
+
+### How do I benchmark my circuit?
+
+To benchmark your circuit before submission to mainnet, it's recommended to run a validator and miner locally, pointed towards testnet or a local network. For guidance on how to do this, please refer to [testnet] and [localnet] guides respectively.
+
+### Which hardware do validators run to benchmark my circuit?
+
+Validators are instructed to run using macOS arm64 architectures. M1 or M2 processors are recommended for best performance and the majority of validators will be using these processors to test your circuits.
+For specific hardware requirements, please refer to the main [README] document.
+
+### What is the maximum proof time allowed for a circuit?
+
+The maximum proof time is a configurable property and is subject to change over time, however as it stands this value is set at 300 seconds (5 minutes).
+
+### What is the maximum `pk.key` size allowed for a circuit?
+
+The maximum `pk.key` size is a configurable property and is subject to change over time, however as it stands this value is set at 50GB.
+
+### When does the competition end?
+
+The competition will end on 2025-04-27.
+
 ## For additional assistance
 
 - Join Discord and reach out via the Subnet 2 channel: https://discord.gg/bittensor
 - For security reports, please see our bug bounty program: https://immunefi.com/bug-bounty/omron/
 - Otherwise, feel free to open a GitHub issue within the repository.
+
+[testnet]: ../running_on_testnet.md
+[localnet]: ../running_on_staging.md
+[README]: ../../README.md#minimum-1
