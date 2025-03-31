@@ -17,7 +17,7 @@ from constants import (
     STEAK,
     VALIDATOR_STAKE_THRESHOLD,
     ONE_HOUR,
-    CRICUIT_TIMEOUT_SECONDS,
+    CIRCUIT_TIMEOUT_SECONDS,
 )
 from deployment_layer.circuit_store import circuit_store
 from execution_layer.generic_input import GenericInput
@@ -420,7 +420,7 @@ class MinerSession:
         model_id = synapse.query_input.get("model_id", SINGLE_PROOF_OF_WEIGHTS_MODEL_ID)
         public_inputs = synapse.query_input["public_inputs"]
 
-        circuit_timeout = CRICUIT_TIMEOUT_SECONDS
+        circuit_timeout = CIRCUIT_TIMEOUT_SECONDS
         try:
             circuit = circuit_store.get_circuit(str(model_id))
             if not circuit:
@@ -497,7 +497,7 @@ class MinerSession:
             bt.logging.error("Received empty input for proof of weights")
             return synapse
 
-        circuit_timeout = CRICUIT_TIMEOUT_SECONDS
+        circuit_timeout = CIRCUIT_TIMEOUT_SECONDS
         try:
             circuit = circuit_store.get_circuit(str(synapse.verification_key_hash))
             if not circuit:

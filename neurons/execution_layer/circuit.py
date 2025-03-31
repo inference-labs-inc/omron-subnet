@@ -13,7 +13,7 @@ from constants import (
     MAX_EVALUATION_ITEMS,
     DEFAULT_PROOF_SIZE,
     MAXIMUM_SCORE_MEDIAN_SAMPLE,
-    CRICUIT_TIMEOUT_SECONDS,
+    CIRCUIT_TIMEOUT_SECONDS,
     ONE_MINUTE,
 )
 from utils import with_rate_limit
@@ -206,7 +206,7 @@ class CircuitEvaluationItem:
         self.maximum_response_time = (
             self.circuit.timeout
             if hasattr(self.circuit, "timeout") and self.circuit.timeout
-            else CRICUIT_TIMEOUT_SECONDS  # Replace or define this constant
+            else CIRCUIT_TIMEOUT_SECONDS  # Replace or define this constant
         )
 
         # Set any remaining extra attributes from kwargs
@@ -363,7 +363,7 @@ class CircuitEvaluationData:
 
         response_times = self.get_successful_response_times()
         if not response_times or len(response_times) in [0, 1]:
-            return CRICUIT_TIMEOUT_SECONDS
+            return CIRCUIT_TIMEOUT_SECONDS
 
         sample_size = max(int(len(response_times) * MAXIMUM_SCORE_MEDIAN_SAMPLE), 1)
 
@@ -397,7 +397,7 @@ class Circuit:
         self.timeout = (
             self.metadata.timeout
             if hasattr(self.metadata, "timeout") and self.metadata.timeout is not None
-            else CRICUIT_TIMEOUT_SECONDS
+            else CIRCUIT_TIMEOUT_SECONDS
         )
         try:
             with open(self.paths.settings, "r", encoding="utf-8") as f:
