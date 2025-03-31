@@ -126,18 +126,19 @@ class RemoteDataSource(CompetitionDataSource):
                 zip_ref.extractall(extracted_path)
 
             bt.logging.info("Processing images to 64x64...")
-            for img_name in tqdm(os.listdir(extracted_path)):
-                if img_name.lower().endswith((".png", ".jpg", ".jpeg")):
-                    img_path = os.path.join(extracted_path, img_name)
-                    try:
-                        img = cv2.imread(img_path)
-                        if img is not None:
-                            img = cv2.resize(img, (64, 64))
-                            cv2.imwrite(
-                                os.path.join(self.processed_path, img_name), img
-                            )
-                    except Exception as e:
-                        bt.logging.warning(f"Failed to process {img_name}: {e}")
+            for root, _, files in tqdm(os.walk(extracted_path)):
+                for img_name in files:
+                    if img_name.lower().endswith((".png", ".jpg", ".jpeg")):
+                        img_path = os.path.join(root, img_name)
+                        try:
+                            img = cv2.imread(img_path)
+                            if img is not None:
+                                img = cv2.resize(img, (64, 64))
+                                cv2.imwrite(
+                                    os.path.join(self.processed_path, img_name), img
+                                )
+                        except Exception as e:
+                            bt.logging.warning(f"Failed to process {img_name}: {e}")
 
             os.remove(zip_path)
             import shutil

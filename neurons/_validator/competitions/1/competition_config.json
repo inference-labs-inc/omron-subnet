@@ -65,7 +65,8 @@
     },
     "data_source": {
         "url": "https://storage.omron.ai/age.zip",
-        "format": "zip"
+        "format": "zip",
+        "type": "remote"
     },
     "evaluation": {
         "metric": "mean_absolute_error",
