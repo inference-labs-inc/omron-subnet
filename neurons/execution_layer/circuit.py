@@ -20,7 +20,7 @@ from utils import with_rate_limit
 import time
 
 # trunk-ignore(pylint/E0611)
-from bittensor import logging
+from bittensor import logging, subtensor
 
 
 class CircuitType(str, Enum):
@@ -298,18 +298,8 @@ class CircuitEvaluationData:
                 if len(proof_sizes) > 0
                 else 0
             )
-
-            # Get latest verification timestamp and block
-            latest_verification = max(
-                (r for r in self.data if r.verification_result),
-                key=lambda x: x.response_time,
-                default=None,
-            )
-            last_block = (
-                cli_parser.config.subtensor.get_current_block()
-                if latest_verification
-                else 0
-            )
+            sub = subtensor(config=cli_parser.config)
+            last_block = sub.get_current_block()
 
             gc_log_eval_metrics(
                 model_id=self.circuit.id,
