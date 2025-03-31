@@ -294,7 +294,9 @@ class CircuitEvaluationData:
                 [r.proof_size for r in self.data if r.verification_result]
             )
             mean_proof_size = (
-                torch.mean(proof_sizes).item() if len(proof_sizes) > 0 else 0
+                torch.mean(proof_sizes, dtype=torch.float32).item()
+                if len(proof_sizes) > 0
+                else 0
             )
 
             # Get latest verification timestamp and block
