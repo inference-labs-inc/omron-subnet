@@ -96,7 +96,7 @@ The miner will automatically:
 
 - Watch validator requests: `pm2 logs miner`
 - View metrics: https://wandb.ai/inferencelabs/omron
-- View leaderboard: https://accelerator.omron.ai
+- View leaderboard: https://accelerate.omron.ai
 
 ### 🏆 EZKL Performance Evaluation
 
