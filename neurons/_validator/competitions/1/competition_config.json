@@ -72,9 +72,9 @@
         "metric": "mean_absolute_error",
         "num_iterations": 10,
         "scoring_weights": {
-            "accuracy": 0.4,
-            "proof_size": 0.3,
-            "response_time": 0.3
+            "accuracy": 0.95,
+            "proof_size": 0.0,
+            "response_time": 0.05
         },
         "output_shape": [
             1,

@@ -139,13 +139,6 @@ class SotaManager:
             return False
 
         if improvements and "raw" in improvements and "weighted" in improvements:
-            if (
-                improvements["raw"]["accuracy"] > MAX_DEGRADATION
-                or improvements["raw"]["proof_size"] > MAX_DEGRADATION
-                or improvements["raw"]["response_time"] > MAX_DEGRADATION
-            ):
-                return False
-
             weighted_improvement = sum(-v for v in improvements["weighted"].values())
             return weighted_improvement > EPSILON
 
