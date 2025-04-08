@@ -126,6 +126,50 @@ local-validator: check-extra-args
 	--no-auto-update \
 	$(ARGS)
 
+debug-local-miner: check-extra-args
+	@echo "Starting local miner on staging with remote debugger"
+	.venv/bin/python -m debugpy --listen localhost:5678 --wait-for-client neurons/miner.py \
+	--localnet \
+	--no-auto-update \
+	$(ARGS)
+
+debug-local-validator: check-extra-args
+	@echo "Starting local validator on staging with remote debugger"
+	.venv/bin/python -m debugpy --listen localhost:5678 --wait-for-client neurons/validator.py \
+	--localnet \
+	--no-auto-update \
+	$(ARGS)
+
+debug-test-miner: check-extra-args
+	@echo "Starting miner on testnet with remote debugger"
+	.venv/bin/python -m debugpy --listen localhost:5678 --wait-for-client neurons/miner.py \
+	--wallet.path $(WALLET_PATH)/wallets \
+	--wallet.name $(WALLET_NAME) \
+	--wallet.hotkey $(WALLET_HOTKEY) \
+	--netuid 118 \
+	--subtensor.network test \
+	--disable-blacklist \
+	$(ARGS)
+
+debug-test-validator: check-extra-args
+	@echo "Starting validator on testnet with remote debugger"
+	.venv/bin/python -m debugpy --listen localhost:5678 --wait-for-client neurons/validator.py \
+	--wallet.path $(WALLET_PATH)/wallets \
+	--wallet.name $(WALLET_NAME) \
+	--wallet.hotkey $(WALLET_HOTKEY) \
+	--netuid 118 \
+	--subtensor.network test \
+	$(ARGS)
+
+debug-finney-validator: check-extra-args
+	@echo "Starting validator on mainnet with remote debugger"
+	.venv/bin/python -m debugpy --listen localhost:5678 --wait-for-client neurons/validator.py \
+	--wallet.path $(WALLET_PATH)/wallets \
+	--wallet.name $(WALLET_NAME) \
+	--wallet.hotkey $(WALLET_HOTKEY) \
+	--netuid $(NETUID) \
+	$(ARGS)
+
 pm2-setup:
 	./setup.sh
 

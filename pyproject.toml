@@ -44,6 +44,7 @@ dependencies = [
 dev = [
   "black>=24.10.0",
   "bpython>=0.25",
+  "debugpy>=1.8.13",
   "ipykernel>=6.29.5",
   "nbdev>=2.3.34",
   "onnx>=1.17.0",

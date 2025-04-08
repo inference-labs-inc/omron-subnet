@@ -3,6 +3,7 @@
 aiohappyeyeballs==2.6.1 \
     --hash=sha256:c3f9d0113123803ccadfdf3f0faa505bc78e6a72d1cc4806cbd719826e943558 \
     --hash=sha256:f349ba8f4b75cb25c99c5c2d84e997e485204d2902a9597802b0371f09331fb8
+    # via aiohttp
 aiohttp==3.10.11 \
     --hash=sha256:1dc0f4ca54842173d03322793ebcf2c8cc2d34ae91cc762478e295d8e361e03f \
     --hash=sha256:1e7b825da878464a252ccff2958838f9caa82f32a8dbc334eb9b34a026e2c636 \
@@ -20,57 +21,93 @@ aiohttp==3.10.11 \
     --hash=sha256:f4df4b8ca97f658c880fb4b90b1d1ec528315d4030af1ec763247ebfd33d8b9a \
     --hash=sha256:f65267266c9aeb2287a6622ee2bb39490292552f9fbf851baabc04c9f84e048d \
     --hash=sha256:f9f92a344c50b9667827da308473005f34767b6a2a60d9acff56ae94f895f385
+    # via
+    #   bittensor
+    #   bittensor-cli
+    #   omron
 aiosignal==1.3.2 \
     --hash=sha256:45cde58e409a301715980c2b01d0c28bdde3770d8290b5eb2173759d9acb31a5 \
     --hash=sha256:a8c255c66fafb1e499c9351d0bf32ff2d8a0321595ebac3b93713656d2436f54
+    # via aiohttp
 annotated-types==0.7.0 \
     --hash=sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53 \
     --hash=sha256:aff07c09a53a08bc8cfccb9c85b05f1aa9a2a6f23728d790723543408344ce89
+    # via pydantic
 anyio==4.9.0 \
     --hash=sha256:673c0c244e15788651a4ff38710fea9675823028a6f08a5eda409e0c9840a028 \
     --hash=sha256:9f76d541cad6e36af7beb62e978876f3b41e3e04f2c1fbf0884604c0a9c4d93c
+    # via starlette
 async-property==0.2.2 \
     --hash=sha256:17d9bd6ca67e27915a75d92549df64b5c7174e9dc806b30a3934dc4ff0506380 \
     --hash=sha256:8924d792b5843994537f8ed411165700b27b2bd966cefc4daeefc1253442a9d7
+    # via bittensor-cli
 async-substrate-interface==1.0.8 \
     --hash=sha256:372a498b3956cbeaf34a4b5887e3781c5bd59e60a99a623ccb78ad6c836c1fde \
     --hash=sha256:8952da2c8cedbba0f636f12b46c745c02823599726fd393ccc91f593bff9f16d
+    # via
+    #   bittensor
+    #   bittensor-cli
+    #   omron
 asyncstdlib==3.13.1 \
     --hash=sha256:a64da68176af1da8c699026cad98f70b184f82b4cb39739e0b9701a2a7541cf9 \
     --hash=sha256:f47564b9a3566f8f9172631d88c75fe074b0ce2127963b7265d310df9aeed03a
+    # via
+    #   async-substrate-interface
+    #   bittensor
 attrs==24.3.0 \
     --hash=sha256:8f5c07333d543103541ba7be0e2ce16eeee8130cb0b3f9238ab904ce1e85baff \
     --hash=sha256:ac96cd038792094f438ad1f6ff80837353805ac950cd2aa0e0625ef19850c308
+    # via
+    #   aiohttp
+    #   jsonschema
+    #   omron
+    #   referencing
 backoff==2.2.1 \
     --hash=sha256:03f829f5bb1923180821643f8753b0502c3b682293992485b0eef2807afa5cba \
     --hash=sha256:63579f9a0628e06278f7e47b7d7d5b6ce20dc65c5e96a6f3ca99a6adca0396e8
+    # via bittensor-cli
 base58==2.1.1 \
     --hash=sha256:11a36f4d3ce51dfc1043f3218591ac4eb1ceb172919cebe05b52a5bcc8d245c2 \
     --hash=sha256:c5d0cb3f5b6e81e8e35da5754388ddcc6d0d14b6c6a132cb93d69ed580a7278c
+    # via
+    #   scalecodec
+    #   substrate-interface
 bittensor==9.0.0 \
     --hash=sha256:1f5e97d2333b46c535b03e780b7e3d58204e2ed116db6244227433449f6616cc \
     --hash=sha256:64321a5f3acc07dbde41ecb81d753f05d0a8fcd19a22f35cb56e5af8e15e81aa
+    # via omron
 bittensor-cli==9.1.4 \
     --hash=sha256:59dcb32521fa0e29ccda5eeb94af056d787a3a27e48a56a6f6be077ca792a157 \
     --hash=sha256:c9845ceb58e5fccff9a5bd90e9dc574b26b1f0f1f74463ff1ed9dd3cd971fb79
+    # via bittensor
 bittensor-commit-reveal==0.2.0 \
     --hash=sha256:44773448eef88d28c0cc2953d06a4a7137f83b90ff4a246abd41c9d275601b4a \
     --hash=sha256:76218ffdba8b08248ea02b6f349d22171b12300126cb9a24d48241d746ad444f \
     --hash=sha256:81979fd35f95456a60da90e872d1c2d2e68babc8a745778ab5d4025659fef2d7 \
     --hash=sha256:9e6546b9b22fd392dfc569b58e6b3e86899427fc1c07ae52cb60e90c0a520796 \
     --hash=sha256:d67bc49cb93b94136ae10af25a98ec29fe9a88b4ebefadd4f8504eebf63643c0
+    # via bittensor
 bittensor-wallet==3.0.4 \
     --hash=sha256:05e1fa04de5636686504e2bb700811dc5f0d826888b7783a400c384218048064 \
     --hash=sha256:6f76c985b53a03b36396153926cf88239aeca0cd3da778f18d15cb7be2da8e66 \
     --hash=sha256:9101ba84f00b38249766d5516bd40d21eb01f0ab44921320003bcc985c89ce7b \
     --hash=sha256:e5993a25d1ed3d640502fa141f33e10120cc779599d27c52f8035d8494c339de \
     --hash=sha256:f105239b7b290998dcc0b59260507aa69f6f287dbe2cb814e32b985fbe84e7a3
+    # via
+    #   async-substrate-interface
+    #   bittensor
+    #   bittensor-cli
 boto3==1.37.19 \
     --hash=sha256:c69c90500f18fd72d782d1612170b7d3db9a98ed51a4da3bebe38e693497ebf8 \
     --hash=sha256:fbfc2c43ad686b63c8aa02aee634c269f856eed68941d8e570cc45950be52130
+    # via omron
 botocore==1.37.19 \
     --hash=sha256:6e1337e73a6b8146c1ec20a6a72d67e2809bd4c0af076431fe6e1561e0c89415 \
     --hash=sha256:eadcdc37de09df25cf1e62e8106660c61f60a68e984acfc1a8d43fb6267e53b8
+    # via
+    #   boto3
+    #   omron
+    #   s3transfer
 bt-decode==0.5.0 \
     --hash=sha256:1fac958f819c4d58e186b02e9486900641463c9fc074957cd308e24e0fb44584 \
     --hash=sha256:208bceb8c23de4f0ade98945e490ef932811ca4d796fe17e4124d5a2bd136c93 \
@@ -87,9 +124,14 @@ bt-decode==0.5.0 \
     --hash=sha256:d3fa6d0c88d76baacd67c45d2fc164e158a5ed9fdc09661c407204e624c066e3 \
     --hash=sha256:d8c3141ac0f4377515943fccab6793b9635b7a334a5f1ca44966e77ebaa981bb \
     --hash=sha256:ef9ab49da6a47505984bd0e4b1bf0c61416e0eef58e0a474ef17e50a90d298ad
+    # via async-substrate-interface
 certifi==2025.1.31 \
     --hash=sha256:3d5da6925056f6f18f119200434a4780a94263f10d1c21d032a6f6b2baa20651 \
     --hash=sha256:ca78db4565a652026a4db2bcdf68f2fb589ea80d0be70e03929ed730746b84fe
+    # via
+    #   requests
+    #   sentry-sdk
+    #   substrate-interface
 cffi==1.17.1 \
     --hash=sha256:1257bdabf294dceb59f5e70c64a3e2f462c30c7ad68092d01bbbfb1c16b1ba36 \
     --hash=sha256:1c39c6016c32bc48dd54561950ebd6836e1670f2ae46128f67cf49e789c52824 \
@@ -103,6 +145,9 @@ cffi==1.17.1 \
     --hash=sha256:d63afe322132c194cf832bfec0dc69a99fb9bb6bbd550f161a49e9e855cc78ff \
     --hash=sha256:da95af8214998d77a98cc14e3a3bd00aa191526343078b530ceb0bd710fb48a5 \
     --hash=sha256:f79fc4fc25f1c8698ff97788206bb3c2598949bfe0fef03d299eb1b5356ada99
+    # via
+    #   cryptography
+    #   pynacl
 charset-normalizer==3.4.1 \
     --hash=sha256:0f55e69f030f7163dffe9fd0752b32f070566451afe180f99dbeeb81f511ad8d \
     --hash=sha256:2369eea1ee4a7610a860d88f268eb39b95cb588acd7235e02fd5a5601773d4fa \
@@ -119,15 +164,26 @@ charset-normalizer==3.4.1 \
     --hash=sha256:dad3e487649f498dd991eeb901125411559b22e8d7ab25d3aeb1af367df5efd7 \
     --hash=sha256:e358e64305fe12299a08e08978f51fc21fac060dcfcddd95453eabe5b93ed0e1 \
     --hash=sha256:ffc9202a29ab3920fa812879e95a9e78b2465fd10be7fcbd042899695d75e616
+    # via requests
 click==8.1.8 \
     --hash=sha256:63c132bbbed01578a06712a2d1f497bb62d9c1c0d329b7903a866228027263b2 \
     --hash=sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a
+    # via
+    #   typer
+    #   uvicorn
+    #   wandb
 colorama==0.4.6 \
     --hash=sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44 \
     --hash=sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6
+    # via
+    #   bittensor
+    #   click
+    #   pytest
+    #   tqdm
 coloredlogs==15.0.1 \
     --hash=sha256:612ee75c546f53e92e70049c9dbfcc18c935a2b9a53b66085ce9ef6a6e5c0934 \
     --hash=sha256:7c991aa71a4577af2f82600d8f8f3a89f936baeaf9b50a9c197da014e5bf16b0
+    # via onnxruntime
 contourpy==1.3.1 \
     --hash=sha256:08d9d449a61cf53033612cb368f3a1b26cd7835d9b8cd326647efe43bca7568d \
     --hash=sha256:0ffa84be8e0bd33410b17189f7164c3589c229ce5db85798076a3fa136d0e509 \
@@ -140,6 +196,7 @@ contourpy==1.3.1 \
     --hash=sha256:dfd97abd83335045a913e3bcc4a09c0ceadbe66580cf573fe961f4a825efa699 \
     --hash=sha256:e914a8cb05ce5c809dd0fe350cfbb4e881bde5e2a38dc04e3afe1b3e58bd158e \
     --hash=sha256:efa874e87e4a647fd2e4f514d5e91c7d493697127beb95e77d2f7561f6905bd9
+    # via matplotlib
 cryptography==43.0.3 \
     --hash=sha256:0c580952eef9bf68c4747774cde7ec1d85a6e61de97281f2dba83c7d2c806362 \
     --hash=sha256:0f996e7268af62598f2fc1204afa98a3b5712313a55c4c9d434aef49cadc91d4 \
@@ -160,9 +217,13 @@ cryptography==43.0.3 \
     --hash=sha256:e1be4655c7ef6e1bbe6b5d0403526601323420bcf414598955968c9ef3eb7d16 \
     --hash=sha256:f46304d6f0c6ab8e52770addfa2fc41e6629495548862279641972b6215451cd \
     --hash=sha256:f7b178f11ed3664fd0e995a47ed2b5ff0a12d893e41dd0494f406d1cf555cab7
+    # via
+    #   bittensor-wallet
+    #   pyopenssl
 cycler==0.12.1 \
     --hash=sha256:85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30 \
     --hash=sha256:88bb128f02ba341da8ef447245a9e138fae777f6a23943da4540077d3601eb1c
+    # via matplotlib
 cytoolz==1.0.1 ; implementation_name == 'cpython' \
     --hash=sha256:207d4e4b445e087e65556196ff472ff134370d9a275d591724142e255f384662 \
     --hash=sha256:21cdf6bac6fd843f3b20280a66fd8df20dea4c58eb7214a2cd8957ec176f0bb3 \
@@ -179,27 +240,40 @@ cytoolz==1.0.1 ; implementation_name == 'cpython' \
     --hash=sha256:c8231b9abbd8e368e036f4cc2e16902c9482d4cf9e02a6147ed0e9a3cd4a9ab0 \
     --hash=sha256:fb988c333f05ee30ad4693fe4da55d95ec0bb05775d2b60191236493ea2e01f9 \
     --hash=sha256:fcb8f7d0d65db1269022e7e0428471edee8c937bc288ebdcb72f13eaa67c2fe4
+    # via eth-utils
 decorator==5.2.1 \
     --hash=sha256:65f266143752f734b0a7cc83c46f4618af75b8c5911b00ccb61d0ac9b6da0360 \
     --hash=sha256:d316bb415a2d9e2d2b3abcc4084c6502fc09240e292cd76a76afc106a1c8e04a
+    # via retry
 docker-pycreds==0.4.0 \
     --hash=sha256:6ce3270bcaf404cc4c3e27e4b6c70d3521deae82fb508767870fdbf772d584d4 \
     --hash=sha256:7266112468627868005106ec19cd0d722702d2b7d5912a28e19b826c3d37af49
+    # via wandb
 ecdsa==0.19.1 \
     --hash=sha256:30638e27cf77b7e15c4c4cc1973720149e1033827cfd00661ca5c8cc0cdb24c3 \
     --hash=sha256:478cba7b62555866fcb3bb3fe985e06decbdb68ef55713c4e5ab98c57d508e61
+    # via substrate-interface
 eth-hash==0.7.1 \
     --hash=sha256:0fb1add2adf99ef28883fd6228eb447ef519ea72933535ad1a0b28c6f65f868a \
     --hash=sha256:d2411a403a0b0a62e8247b4117932d900ffb4c8c64b15f92620547ca5ce46be5
+    # via eth-utils
 eth-keys==0.6.1 \
     --hash=sha256:7deae4cd56e862e099ec58b78176232b931c4ea5ecded2f50c7b1ccbc10c24cf \
     --hash=sha256:a43e263cbcabfd62fa769168efc6c27b1f5603040e4de22bb84d12567e4fd962
+    # via substrate-interface
 eth-typing==5.2.0 \
     --hash=sha256:28685f7e2270ea0d209b75bdef76d8ecef27703e1a16399f6929820d05071c28 \
     --hash=sha256:e1f424e97990fc3c6a1c05a7b0968caed4e20e9c99a4d5f4db3df418e25ddc80
+    # via
+    #   eth-keys
+    #   eth-utils
 eth-utils==2.2.2 \
     --hash=sha256:2580a8065273f62ca1ec4c175228c52e626a5f1007e965d2117e5eca1a93cae8 \
     --hash=sha256:5ca6265177ce544d9d43cdf2272ae2227e5d6d9529c270bbb707d17339087101
+    # via
+    #   bittensor-wallet
+    #   eth-keys
+    #   substrate-interface
 ezkl==19.0.7 \
     --hash=sha256:07cdc57dccff139d1904dbed2aadece70c15e2e83283121a58646de066d9f1b5 \
     --hash=sha256:5fcddc679bb316fab1227621bf66c780a8dae78babf15f235a27ea37ca600546 \
@@ -208,15 +282,21 @@ ezkl==19.0.7 \
     --hash=sha256:a8b2f4fb876dbec7151262d89691c2afe18c4448df09e258b5b75f2d73dc7e54 \
     --hash=sha256:bb06c9cc9be222dccdb79792b0b8ad60c3d83c911332c9c4c8355f30e46d99ec \
     --hash=sha256:e0a17c46a44aa94c6178c2c8417ac0e1dc0999db4364ffbced474986e8c6144c
+    # via omron
 fastapi==0.110.3 \
     --hash=sha256:555700b0159379e94fdbfc6bb66a0f1c43f4cf7060f25239af3d84b63a656626 \
     --hash=sha256:fd7600612f755e4050beb74001310b5a7e1796d149c2ee363124abdfa0289d32
+    # via
+    #   bittensor
+    #   omron
 filelock==3.18.0 \
     --hash=sha256:adbc88eabb99d2fec8c9c1b229b171f18afa655400173ddc653d5d01501fb9f2 \
     --hash=sha256:c401f4f8377c4464e6db25fff06205fd89bdd83b65eb0488ed1b160f780e21de
+    # via torch
 flatbuffers==25.2.10 \
     --hash=sha256:97e451377a41262f8d9bd4295cc836133415cc03d8cb966410a4af92eb00d26e \
     --hash=sha256:ebba5f4d5ea615af3f7fd70fc310636fbb2bbd1f566ac0a23d98dd412de50051
+    # via onnxruntime
 fonttools==4.56.0 \
     --hash=sha256:1088182f68c303b50ca4dc0c82d42083d176cba37af1937e1a976a31149d4d14 \
     --hash=sha256:300c310bb725b2bdb4f5fc7e148e190bd69f01925c7ab437b9c0ca3e1c7cd9ba \
@@ -228,6 +308,7 @@ fonttools==4.56.0 \
     --hash=sha256:d6f195c14c01bd057bc9b4f70756b510e009c83c5ea67b25ced3e2c38e6ee6e9 \
     --hash=sha256:f59746f7953f69cc3290ce2f971ab01056e55ddd0fb8b792c31a8acd7fee2d28 \
     --hash=sha256:fa760e5fe8b50cbc2d71884a1eff2ed2b95a005f02dda2fa431560db0ddd927f
+    # via matplotlib
 frozenlist==1.5.0 \
     --hash=sha256:000a77d6034fbad9b6bb880f7ec073027908f1b40254b5d6f26210d2dab1240e \
     --hash=sha256:29d94c256679247b33a3dc96cce0f93cbc69c23bf75ff715919332fdbb6a32b8 \
@@ -246,44 +327,71 @@ frozenlist==1.5.0 \
     --hash=sha256:9b93d7aaa36c966fa42efcaf716e6b3900438632a626fb09c049f6a2f09fc631 \
     --hash=sha256:d994863bba198a4a518b467bb971c56e1db3f180a25c6cf7bb1949c267f748c3 \
     --hash=sha256:feeb64bc9bcc6b45c6311c9e9b99406660a9c05ca8a5b30d14a78555088b0b3a
+    # via
+    #   aiohttp
+    #   aiosignal
 fsspec==2025.3.0 \
     --hash=sha256:a935fd1ea872591f2b5148907d103488fc523295e6c64b835cfad8c3eca44972 \
     --hash=sha256:efb87af3efa9103f94ca91a7f8cb7a4df91af9f74fc106c9c7ea0efd7277c1b3
+    # via torch
 fuzzywuzzy==0.18.0 \
     --hash=sha256:45016e92264780e58972dca1b3d939ac864b78437422beecebb3095f8efd00e8 \
     --hash=sha256:928244b28db720d1e0ee7587acf660ea49d7e4c632569cad4f1cd7e68a5f0993
+    # via bittensor-cli
 gitdb==4.0.12 \
     --hash=sha256:5ef71f855d191a3326fcfbc0d5da835f26b13fbcba60c32c21091c349ffdb571 \
     --hash=sha256:67073e15955400952c6565cc3e707c554a4eea2e428946f7a4c162fab9bd9bcf
+    # via gitpython
 gitpython==3.1.44 \
     --hash=sha256:9e0e10cda9bed1ee64bc9a6de50e7e38a9c9943241cd7f585f6df3ed28011110 \
     --hash=sha256:c87e30b26253bf5418b01b0660f818967f3c503193838337fe5e573331249269
+    # via
+    #   bittensor-cli
+    #   omron
+    #   wandb
 h11==0.14.0 \
     --hash=sha256:8f19fbbe99e72420ff35c00b27a34cb9937e902a8b810e2c88300c6f0a3b699d \
     --hash=sha256:e3fe4ac4b851c468cc8363d500db52c2ead036020723024a109d37346efaa761
+    # via uvicorn
 humanfriendly==10.0 \
     --hash=sha256:1697e1a8a8f550fd43c2865cd84542fc175a61dcb779b6fee18cf6b6ccba1477 \
     --hash=sha256:6b0b831ce8f15f7300721aa49829fc4e83921a9a301cc7f606be6686a2288ddc
+    # via coloredlogs
 idna==3.10 \
     --hash=sha256:12f65c9b470abda6dc35cf8e63cc574b1c52b11df2c86030af0ac09b01b13ea9 \
     --hash=sha256:946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3
+    # via
+    #   anyio
+    #   requests
+    #   substrate-interface
+    #   yarl
 iniconfig==2.1.0 \
     --hash=sha256:3abbd2e30b36733fee78f9c7f7308f2d0050e88f0087fd25c2645f63c773e1c7 \
     --hash=sha256:9deba5723312380e77435581c6bf4935c94cbfab9b1ed33ef8d238ea168eb760
+    # via pytest
 jinja2==3.1.6 \
     --hash=sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d \
     --hash=sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67
+    # via
+    #   bittensor-cli
+    #   torch
 jmespath==1.0.1 \
     --hash=sha256:02e2e4cc71b5bcab88332eebf907519190dd9e6e82107fa7f83b1003a6252980 \
     --hash=sha256:90261b206d6defd58fdd5e85f478bf633a2901798906be2ad389150c5c60edbe
+    # via
+    #   boto3
+    #   botocore
 jsonrpcserver==5.0.9 \
     --hash=sha256:a71fb2cfa18541c80935f60987f92755d94d74141248c7438847b96eee5c4482
+    # via omron
 jsonschema==4.23.0 \
     --hash=sha256:d71497fef26351a33265337fa77ffeb82423f3ea21283cd9467bb03999266bc4 \
     --hash=sha256:fbadb6f8b144a8f8cf9f0b89ba94501d143e50411a1278633f56a7acf7fd5566
+    # via jsonrpcserver
 jsonschema-specifications==2024.10.1 \
     --hash=sha256:0f38b83639958ce1152d02a7f062902c41c8fd20d558b0c34344292d417ae272 \
     --hash=sha256:a09a0680616357d9a0ecf05c12ad234479f549239d0f5b55f3deea67475da9bf
+    # via jsonschema
 kiwisolver==1.4.8 \
     --hash=sha256:01c3d31902c7db5fb6182832713d3b4122ad9317c2c5877d0539227d96bb2e50 \
     --hash=sha256:085940635c62697391baafaaeabdf3dd7a6c3643577dde337f4d66eba021b2b8 \
@@ -301,6 +409,7 @@ kiwisolver==1.4.8 \
     --hash=sha256:cc978a80a0db3a66d25767b03688f1147a69e6237175c0f4ffffaaedf744055a \
     --hash=sha256:d6af5e8815fd02997cb6ad9bbed0ee1e60014438ee1a5c2444c96f87b8843502 \
     --hash=sha256:eaa973f1e05131de5ff3569bbba7f5fd07ea0595d3870ed4a526d486fe57fa1b
+    # via matplotlib
 levenshtein==0.27.1 \
     --hash=sha256:060b48c45ed54bcea9582ce79c6365b20a1a7473767e0b3d6be712fa3a22929c \
     --hash=sha256:25fb540d8c55d1dc7bdc59b7de518ea5ed9df92eb2077e74bcb9bb6de7b06f69 \
@@ -318,9 +427,11 @@ levenshtein==0.27.1 \
     --hash=sha256:dafa29c0e616f322b574e0b2aeb5b1ff2f8d9a1a6550f22321f3bd9bb81036e3 \
     --hash=sha256:ec99871d98e517e1cc4a15659c62d6ea63ee5a2d72c5ddbebd7bae8b9e2670c8 \
     --hash=sha256:f09cfab6387e9c908c7b37961c045e8e10eb9b7ec4a700367f8e080ee803a562
+    # via python-levenshtein
 markdown-it-py==3.0.0 \
     --hash=sha256:355216845c60bd96232cd8d8c40e8f9765cc86f46880e43a8fd22dc1a1a8cab1 \
     --hash=sha256:e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb
+    # via rich
 markupsafe==3.0.2 \
     --hash=sha256:0f4ca02bea9a23221c0182836703cbf8930c5e9454bacce27e767509fa286a30 \
     --hash=sha256:1c99d261bd2d5f6b59325c92c73df481e05e57f19837bdca8413b9eac4bd8028 \
@@ -333,6 +444,7 @@ markupsafe==3.0.2 \
     --hash=sha256:ad10d3ded218f1039f11a75f8091880239651b52e9bb592ca27de44eed242a48 \
     --hash=sha256:e17c96c14e19278594aa4841ec148115f9c7615a47382ecb6b82bd8fea3ab0c8 \
     --hash=sha256:ee55d3edf80167e48ea11a923c7386f4669df67d7994554387f84e7d8b0a2bf0
+    # via jinja2
 matplotlib==3.10.1 \
     --hash=sha256:1985ad3d97f51307a2cbfc801a930f120def19ba22864182dacef55277102ba6 \
     --hash=sha256:35e87384ee9e488d8dd5a2dd7baf471178d38b90618d8ea147aced4ab59c9bea \
@@ -341,15 +453,19 @@ matplotlib==3.10.1 \
     --hash=sha256:cfd414bce89cc78a7e1d25202e979b3f1af799e416010a20ab2b5ebb3a02425c \
     --hash=sha256:e8d2d0e3881b129268585bf4765ad3ee73a4591d77b9a18c214ac7e3a79fb2ba \
     --hash=sha256:e9b4bb156abb8fa5e5b2b460196f7db7264fc6d62678c03457979e7d5254b7be
+    # via omron
 mdurl==0.1.2 \
     --hash=sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8 \
     --hash=sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba
+    # via markdown-it-py
 more-itertools==10.6.0 \
     --hash=sha256:2cd7fad1009c31cc9fb6a035108509e6547547a7a738374f10bd49a09eb3ee3b \
     --hash=sha256:6eb054cb4b6db1473f6e15fcc676a08e4732548acd47c708f0e179c2c7c01e89
+    # via scalecodec
 mpmath==1.3.0 \
     --hash=sha256:7a28eb2a9774d00c7bc92411c19a89209d5da7c4c9a9e227be8330a23a25b91f \
     --hash=sha256:a0b2b9fe80bbcd81a6647ff13108738cfb482d481d826cc0e02f5b35e5c88d2c
+    # via sympy
 msgpack==1.1.0 \
     --hash=sha256:06f5fd2f6bb2a7914922d935d3b8bb4a7fff3a9a91cfce6d06c13bc42bec975b \
     --hash=sha256:115a7af8ee9e8cddc10f87636767857e7e3717b7a2e97379dc2054712693e90f \
@@ -363,9 +479,11 @@ msgpack==1.1.0 \
     --hash=sha256:ad33e8400e4ec17ba782f7b9cf868977d867ed784a1f5f2ab46e7ba53b6e1e1b \
     --hash=sha256:d46cf9e3705ea9485687aa4001a76e44748b609d260af21c4ceea7f2212a501d \
     --hash=sha256:dd432ccc2c72b914e4cb77afce64aab761c1137cc698be3984eee260bcb2896e
+    # via msgpack-numpy-opentensor
 msgpack-numpy-opentensor==0.5.0 \
     --hash=sha256:213232c20e2efd528ec8a9882b605e8ad87cfc35b57dfcfefe05d33aaaabe574 \
     --hash=sha256:8a61c597a976425a87094d8e89846aa9528eb1f037e97ff1428fe3cd61a238e7
+    # via bittensor
 multidict==6.2.0 \
     --hash=sha256:0085b0afb2446e57050140240a8595846ed64d1cbd26cef936bfab3192c673b8 \
     --hash=sha256:095a2eabe8c43041d3e6c2cb8287a257b5f1801c2d6ebd1dd877424f1e89cf29 \
@@ -384,21 +502,33 @@ multidict==6.2.0 \
     --hash=sha256:ac380cacdd3b183338ba63a144a34e9044520a6fb30c58aa14077157a033c13e \
     --hash=sha256:e25b11a0417475f093d0f0809a149aff3943c2c56da50fdf2c3c88d57fe3dfbd \
     --hash=sha256:facaf11f21f3a4c51b62931feb13310e6fe3475f85e20d9c9fdce0d2ea561b87
+    # via
+    #   aiohttp
+    #   yarl
 munch==2.5.0 \
     --hash=sha256:2d735f6f24d4dba3417fa448cae40c6e896ec1fdab6cdb5e6510999758a4dbd2 \
     --hash=sha256:6f44af89a2ce4ed04ff8de41f70b226b984db10a91dcc7b9ac2efc1c77022fdd
+    # via
+    #   bittensor
+    #   bittensor-wallet
 narwhals==1.32.0 \
     --hash=sha256:8bdbf3f76155887412eea04b0b06303856ac1aa3d9e8bda5b5e54612855fa560 \
     --hash=sha256:bd0aa41434737adb4b26f8593f3559abc7d938730ece010fe727b58bc363580d
+    # via plotly
 nest-asyncio==1.6.0 \
     --hash=sha256:6f172d5449aca15afd6c646851f4e31e02c598d553a667e38cafa997cfec55fe \
     --hash=sha256:87af6efd6b5e897c81050477ef65c62e2b2f35d51703cae01aff2905b1852e1c
+    # via bittensor
 netaddr==1.3.0 \
     --hash=sha256:5c3c3d9895b551b763779ba7db7a03487dc1f8e3b385af819af341ae9ef6e48a \
     --hash=sha256:c2c6a8ebe5554ce33b7d5b3a306b71bbb373e000bbbf2350dd5213cc56e3dbbe
+    # via
+    #   bittensor
+    #   bittensor-cli
 networkx==3.4.2 \
     --hash=sha256:307c3669428c5362aab27c8a1260aa8f47c4e91d3891f48be0141738d8d053e1 \
     --hash=sha256:df5d4365b724cf81b8c6a7312509d0c22386097011ad1abe274afd5e9d3bbc5f
+    # via torch
 numpy==2.0.2 \
     --hash=sha256:0123ffdaa88fa4ab64835dcbde75dcdf89c453c922f18dced6e27c90d1d0ec5a \
     --hash=sha256:671bec6496f83202ed2d3c8fdc486a8fc86942f2e69ff0e986140339a63bcbe5 \
@@ -411,11 +541,22 @@ numpy==2.0.2 \
     --hash=sha256:cfd41e13fdc257aa5778496b8caa5e856dc4896d4ccf01841daee1d96465467a \
     --hash=sha256:df55d490dea7934f330006d0f81e8551ba6010a5bf035a249ef61a94f21c500b \
     --hash=sha256:ec9852fb39354b5a45a80bdab5ac02dd02b15f44b3804e9f00c556bf24b4bded
+    # via
+    #   bittensor
+    #   bittensor-cli
+    #   contourpy
+    #   matplotlib
+    #   msgpack-numpy-opentensor
+    #   omron
+    #   onnxruntime
+    #   opencv-contrib-python-headless
+    #   opencv-python
 onnxruntime==1.21.0 \
     --hash=sha256:37b7445c920a96271a8dfa16855e258dc5599235b41c7bbde0d262d55bcc105f \
     --hash=sha256:7f801318476cd7003d636a5b392f7a37c08b6c8d2f829773f3c3887029e03f32 \
     --hash=sha256:893d67c68ca9e7a58202fa8d96061ed86a5815b0925b5a97aef27b8ba246a20b \
     --hash=sha256:9a04aafb802c1e5573ba4552f8babcb5021b041eb4cfa802c9b7644ca3510eca
+    # via omron
 opencv-contrib-python-headless==4.11.0.86 \
     --hash=sha256:2671a828e5c8ec9d237dd8506a9e0268487d37e07625725f1a6de5fa973ea7fa \
     --hash=sha256:3e7a86bf02e8157a2d9fce26d44eaafd31113fc21fc8b4f44ff56c28ab32fdba \
@@ -424,6 +565,7 @@ opencv-contrib-python-headless==4.11.0.86 \
     --hash=sha256:b34485c0164057726eee8cb80d5cd5dedaab5edde716451fb4107dcc60cf40f0 \
     --hash=sha256:d2c10564c01f6c308ded345a3b37359714e694361e593e515c148465eda09c2a \
     --hash=sha256:ec88044ecb426549b05a8a6187e68051299848c4556ef8cef310621ca8f4316b
+    # via omron
 opencv-python==4.11.0.86 \
     --hash=sha256:03d60ccae62304860d232272e4a4fda93c39d595780cb40b161b310244b736a4 \
     --hash=sha256:085ad9b77c18853ea66283e98affefe2de8cc4c1f43eda4c100cf9b2721142ec \
@@ -432,15 +574,25 @@ opencv-python==4.11.0.86 \
     --hash=sha256:6b02611523803495003bd87362db3e1d2a0454a6a63025dc6658a9830570aa0d \
     --hash=sha256:810549cb2a4aedaa84ad9a1c92fbfdfc14090e2749cedf2c1589ad8359aa169b \
     --hash=sha256:9d05ef13d23fe97f575153558653e2d6e87103995d54e6a35db3f282fe1f9c66
+    # via omron
 oslash==0.6.3 \
     --hash=sha256:868aeb58a656f2ed3b73d9dd6abe387b20b74fc9413d3e8653b615b15bf728f3 \
     --hash=sha256:89b978443b7db3ac2666106bdc3680add3c886a6d8fcdd02fd062af86d29494f
+    # via jsonrpcserver
 packaging==24.2 \
     --hash=sha256:09abb1bccd265c01f4a3aa3f7a7db064b36514d2cba19a2f694fe6150451a759 \
     --hash=sha256:c228a6dc5e932d346bc5739379109d49e8853dd8223571c7c5b55260edc0b97f
+    # via
+    #   bittensor
+    #   matplotlib
+    #   omron
+    #   onnxruntime
+    #   plotly
+    #   pytest
 password-strength==0.0.3.post2 \
     --hash=sha256:6739357c2863d707b7c7f247ff7c6882a70904a18d12c9aaf98f8b95da176fb9 \
     --hash=sha256:bf4df10a58fcd3abfa182367307b4fd7b1cec518121dd83bf80c1c42ba796762
+    # via bittensor-wallet
 pillow==11.1.0 \
     --hash=sha256:2062ffb1d36544d42fcaa277b069c88b01bb7298f4efa06731a7fd6cc290b81a \
     --hash=sha256:368da70808b36d73b4b390a8ffac11069f8a5c85f29eff1f1b01bcf3ef5b2a20 \
@@ -454,20 +606,26 @@ pillow==11.1.0 \
     --hash=sha256:a697cd8ba0383bba3d2d3ada02b34ed268cb548b369943cd349007730c92bddf \
     --hash=sha256:a85b653980faad27e88b141348707ceeef8a1186f75ecc600c395dcac19f385b \
     --hash=sha256:cfd5cd998c2e36a862d0e27b2df63237e67273f2fc78f47445b14e73a810e7e6
+    # via matplotlib
 platformdirs==4.3.7 \
     --hash=sha256:a03875334331946f13c549dbd8f4bac7a13a50a895a0eb1e8c6a8ace80d40a94 \
     --hash=sha256:eb437d586b6a0986388f0d6f74aa0cde27b48d0e3d66843640bfb6bdcdb6e351
+    # via wandb
 plotille==5.0.0 \
     --hash=sha256:99e5ca51a2e4c922ead3a3b0863cc2c6a9a4b3f701944589df10f42ce02ab3dc
+    # via bittensor-cli
 plotly==6.0.1 \
     --hash=sha256:4714db20fea57a435692c548a4eb4fae454f7daddf15f8d8ba7e1045681d7768 \
     --hash=sha256:dd8400229872b6e3c964b099be699f8d00c489a974f2cfccfad5e8240873366b
+    # via bittensor-cli
 pluggy==1.5.0 \
     --hash=sha256:2cffa88e94fdc978c4c574f15f9e59b7f4201d439195c3715ca9e2486f1d0cf1 \
     --hash=sha256:44e1ad92c8ca002de6377e165f3e0f1be63266ab4d554740532335b9d75ea669
+    # via pytest
 prometheus-client==0.21.1 \
     --hash=sha256:252505a722ac04b0456be05c05f75f45d760c2911ffc45f2a06bcaed9f3ae3fb \
     --hash=sha256:594b45c410d6f4f8888940fe80b5cc2521b305a1fafe1c58609ef715a001f301
+    # via omron
 propcache==0.3.0 \
     --hash=sha256:2d15bc27163cd4df433e75f546b9ac31c1ba7b0b128bfb1b90df19082466ff57 \
     --hash=sha256:41de3da5458edd5678b0f6ff66691507f9885f5fe6a0fb99a5d10d10c0fd2d64 \
@@ -487,6 +645,7 @@ propcache==0.3.0 \
     --hash=sha256:bf15fc0b45914d9d1b706f7c9c4f66f2b7b053e9517e40123e137e8ca8958b3d \
     --hash=sha256:e53d19c2bf7d0d1e6998a7e693c7e87300dd971808e6618964621ccd0e01fe4e \
     --hash=sha256:fb91d20fa2d3b13deea98a690534697742029f4fb83673a3501ae6e3746508b5
+    # via yarl
 protobuf==5.29.4 \
     --hash=sha256:13eb236f8eb9ec34e63fc8b1d6efd2777d062fa6aaa68268fb67cf77f6839ad7 \
     --hash=sha256:307ecba1d852ec237e9ba668e087326a67564ef83e45a0189a772ede9e854dd0 \
@@ -495,6 +654,9 @@ protobuf==5.29.4 \
     --hash=sha256:aec4962f9ea93c431d5714ed1be1c93f13e1a8618e70035ba2b0564d9e633f2e \
     --hash=sha256:bcefcdf3976233f8a502d265eb65ea740c989bacc6c30a58290ed0e519eb4b8d \
     --hash=sha256:d7d3f7d1d5a66ed4942d4fefb12ac4b14a29028b209d4bfb25c68ae172059922
+    # via
+    #   onnxruntime
+    #   wandb
 psutil==6.1.1 \
     --hash=sha256:0bdd4eab935276290ad3cb718e9809412895ca6b5b334f5a9111ee6d9aff9377 \
     --hash=sha256:33431e84fee02bc84ea36d9e2c4a6d395d479c9dd9bba2376c1f6ee8f3a4e0b3 \
@@ -504,9 +666,13 @@ psutil==6.1.1 \
     --hash=sha256:eaa912e0b11848c4d9279a93d7e2783df352b082f40111e078388701fd479e53 \
     --hash=sha256:f35cfccb065fff93529d2afb4a2e89e363fe63ca1e4a5da22b603a85833c2649 \
     --hash=sha256:fc0ed7fe2231a444fc219b9c42d0376e0a9a1a72f16c5cfa0f68d19f1a0663e8
+    # via
+    #   omron
+    #   wandb
 py==1.11.0 \
     --hash=sha256:51c75c4126074b472f746a24399ad32f6053d1b34b68d2fa41e558e6f4a98719 \
     --hash=sha256:607c53218732647dff4acdfcd50cb62615cedf612e72d1724fb1a0cc6405b378
+    # via retry
 py-bip39-bindings==0.1.11 \
     --hash=sha256:6794187229eb0b04d0770f0fba936f0c5c598f552848a398ed5af9a61638cacb \
     --hash=sha256:6aed3e86f105a36676e8dd0c8bc3f611a81b7ba4309b22a77fdc0f63b260e094 \
@@ -518,6 +684,9 @@ py-bip39-bindings==0.1.11 \
     --hash=sha256:d202f051cf063abae3acd0b74454d9d7b1dbeaf466ef7cb47a34ccedac845b62 \
     --hash=sha256:e4d45324c598197dbddac10a0298197ca2587fa7b09d1450697517988a29d515 \
     --hash=sha256:ebc128ccf3a0750d758557e094802f0975c3760a939f8a8b76392d7dbe6b52a1
+    # via
+    #   bittensor-wallet
+    #   substrate-interface
 py-ed25519-zebra-bindings==1.2.0 \
     --hash=sha256:1317a8af53c658f1e89b346d361edaf10eccd428c937a17d0684b2192fa77c40 \
     --hash=sha256:4237cf821f74126077220d5826448c0b68c8807f40db961b1335bb6a66a83af8 \
@@ -533,6 +702,7 @@ py-ed25519-zebra-bindings==1.2.0 \
     --hash=sha256:d9ec63d54b1801d5b5bdef0b3096ed94e2e1a7c870c937682afc7b8b25ffc2fc \
     --hash=sha256:ec1965ed54fd162da564cc33676377888bd1ad14c15680465463d06e14aac74d \
     --hash=sha256:fe11223695c94040f31b48a2128f1642a1b689aaaa91b5f8ae018d53b1497409
+    # via substrate-interface
 py-sr25519-bindings==0.2.2 \
     --hash=sha256:192d65d3bc43c6f4121a0732e1f6eb6ad869897ca26368ba032e96a82b3b7606 \
     --hash=sha256:292be23ad53d9f9dbf1703a2a341005629a8f93c57cfad254c8c1230ec7d3fe3 \
@@ -548,9 +718,11 @@ py-sr25519-bindings==0.2.2 \
     --hash=sha256:f22542738ed98fac0d3da2479dd3f26c695594800877a4d8bb116c47e4fd4b7c \
     --hash=sha256:f44a0a9cb155af6408e3f73833a935abc98934ce097b2ad07dd13e3a88f82cb8 \
     --hash=sha256:fea3ce0ac6a26a52735bb48f8daafb82d17147f776bb6d9d3c330bd2ccffe20d
+    # via substrate-interface
 pycparser==2.22 \
     --hash=sha256:491c8be9c040f5390f5bf44a5b07752bd07f56edf992381b05c701439eec10f6 \
     --hash=sha256:c3702b6d3dd8c7abc1afa565d7e63d53a1d0bd86cdc24edd75470f4de499cfcc
+    # via cffi
 pycryptodome==3.22.0 \
     --hash=sha256:009e1c80eea42401a5bd5983c4bab8d516aef22e014a4705622e24e6d9d703c6 \
     --hash=sha256:18d5b0ddc7cf69231736d778bd3ae2b3efb681ae33b64b0c92fb4626bb48bb89 \
@@ -563,9 +735,18 @@ pycryptodome==3.22.0 \
     --hash=sha256:f02baa9f5e35934c6e8dcec91fcde96612bdefef6e442813b8ea34e82c84bbfb \
     --hash=sha256:f6cf6aa36fcf463e622d2165a5ad9963b2762bebae2f632d719dfb8544903cf5 \
     --hash=sha256:fd7ab568b3ad7b77c908d7c3f7e167ec5a8f035c64ff74f10d47a4edd043d723
+    # via
+    #   bittensor
+    #   bittensor-cli
+    #   substrate-interface
 pydantic==2.10.6 \
     --hash=sha256:427d664bf0b8a2b34ff5dd0f5a18df00591adcee7198fbd71981054cef37b584 \
     --hash=sha256:ca5daa827cce33de7a42be142548b0096bf05a7e7b365aebfa5f8eeec7128236
+    # via
+    #   bittensor
+    #   fastapi
+    #   omron
+    #   wandb
 pydantic-core==2.27.2 \
     --hash=sha256:05e3a55d124407fffba0dd6b0c0cd056d10e983ceb4e5dbd10dda135c31071d6 \
     --hash=sha256:172fce187655fece0c90d90a678424b013f8fbb0ca8b036ac266749c09438cb7 \
@@ -582,9 +763,11 @@ pydantic-core==2.27.2 \
     --hash=sha256:cc3f1a99a4f4f9dd1de4fe0312c114e740b5ddead65bb4102884b384c15d8bc9 \
     --hash=sha256:de3cd1899e2c279b140adde9357c4495ed9d47131b4a4eaff9052f23398076b3 \
     --hash=sha256:eb026e5a4c1fee05726072337ff51d1efb6f59090b7da90d30ea58625b1ffb39
+    # via pydantic
 pygments==2.19.1 \
     --hash=sha256:61c16d2a8576dc0649d9f39e089b5f02bcd27fba10d8fb4dcc28173f7a45151f \
     --hash=sha256:9ea1544ad55cecf4b8242fab6dd35a93bbce657034b0611ee383099054ab6d8c
+    # via rich
 pynacl==1.5.0 \
     --hash=sha256:06b8f6fa7f5de8d5d2f7573fe8c863c051225a27b61e6860fd047b1775807858 \
     --hash=sha256:0c84947a22519e013607c9be43706dd42513f9e6ae5d39d3613ca1e142fba44d \
@@ -596,32 +779,45 @@ pynacl==1.5.0 \
     --hash=sha256:a36d4a9dda1f19ce6e03c9a784a2921a4b726b02e1c736600ca9c22029474394 \
     --hash=sha256:a422368fc821589c228f4c49438a368831cb5bbc0eab5ebe1d7fac9dded6567b \
     --hash=sha256:e46dae94e34b085175f8abb3b0aaa7da40767865ac82c928eeb9e57e1ea8a543
+    # via substrate-interface
 pyopenssl==25.0.0 \
     --hash=sha256:424c247065e46e76a37411b9ab1782541c23bb658bf003772c3405fbaa128e90 \
     --hash=sha256:cd2cef799efa3936bb08e8ccb9433a575722b9dd986023f1cabc4ae64e9dac16
+    # via omron
 pyparsing==3.2.2 \
     --hash=sha256:2a857aee851f113c2de9d4bfd9061baea478cb0f1c7ca6cbf594942d6d111575 \
     --hash=sha256:6ab05e1cb111cc72acc8ed811a3ca4c2be2af8d7b6df324347f04fd057d8d793
+    # via matplotlib
 pyreadline3==3.5.4 ; sys_platform == 'win32' \
     --hash=sha256:8d57d53039a1c75adba8e50dd3d992b28143480816187ea5efbd5c78e6c885b7 \
     --hash=sha256:eaf8e6cc3c49bcccf145fc6067ba8643d1df34d604a1ec0eccbf7a18e6d3fae6
+    # via humanfriendly
 pytest==8.3.5 \
     --hash=sha256:c69214aa47deac29fad6c2a4f590b9c4a9fdb16a403176fe154b79c0b4d4d820 \
     --hash=sha256:f4efe70cc14e511565ac476b57c279e12a855b11f48f212af1080ef2263d3845
+    # via bittensor-cli
 python-dateutil==2.9.0.post0 \
     --hash=sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3 \
     --hash=sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427
+    # via
+    #   botocore
+    #   matplotlib
 python-levenshtein==0.27.1 \
     --hash=sha256:3a5314a011016d373d309a68e875fd029caaa692ad3f32e78319299648045f11 \
     --hash=sha256:e1a4bc2a70284b2ebc4c505646142fecd0f831e49aa04ed972995895aec57396
+    # via
+    #   bittensor
+    #   bittensor-cli
 python-statemachine==2.5.0 \
     --hash=sha256:0ed53846802c17037fcb2a92323f4bc0c833290fa9d17a3587c50886c1541e62 \
     --hash=sha256:ae88cd22e47930b92b983a2176e61d811e571b69897be2568ec812c2885fb93a
+    # via bittensor
 pywry==0.6.2 \
     --hash=sha256:1d9ffd826a3a08c132843340e6d896efb7b972b301d045e3239a7dc08d9cac2f \
     --hash=sha256:45d6bb827bf76b2532a9d70b539209d70f37dfb13e9862549b7bff8500ad2495 \
     --hash=sha256:4f0e5b502555ee8b8e799baeaebe63243a84b7ce51df01a1c439dbc4e8227b9e \
     --hash=sha256:9bd88c36ab0860728d9e64360010f8abcede43645656030e4a63e69e81a98c95
+    # via bittensor-cli
 pyyaml==6.0.2 \
     --hash=sha256:0833f8694549e586547b576dcfaba4a6b55b9e96098b36cdc7ebefe667dfed48 \
     --hash=sha256:1f71ea527786de97d1a0cc0eacd1defc0985dcf6b3f17bb77dcfc8c34bec4dc5 \
@@ -633,6 +829,10 @@ pyyaml==6.0.2 \
     --hash=sha256:ce826d6ef20b1bc864f0a68340c8b3287705cae2f8b4b1d932177dcc76721725 \
     --hash=sha256:d584d9ec91ad65861cc08d42e834324ef890a082e591037abe114850ff7bbc3e \
     --hash=sha256:ef6107725bd54b262d6dedcc2af448a266975032bc85ef0172c5f059da6325b4
+    # via
+    #   bittensor
+    #   bittensor-cli
+    #   wandb
 rapidfuzz==3.12.2 \
     --hash=sha256:02e6466caa0222d5233b1f05640873671cd99549a5c5ba4c29151634a1e56080 \
     --hash=sha256:19fa5bc4301a1ee55400d4a38a8ecf9522b0391fc31e6da5f4d68513fe5c0026 \
@@ -650,18 +850,35 @@ rapidfuzz==3.12.2 \
     --hash=sha256:dccf8d4fb5b86d39c581a59463c596b1d09df976da26ff04ae219604223d502f \
     --hash=sha256:e956b3f053e474abae69ac693a52742109d860ac2375fe88e9387d3277f4c96c \
     --hash=sha256:f21af27c5e001f0ba1b88c36a0936437dfe034c452548d998891c21125eb640f
+    # via levenshtein
 referencing==0.36.2 \
     --hash=sha256:df2e89862cd09deabbdba16944cc3f10feb6b3e6f18e902f7cc25609a34775aa \
     --hash=sha256:e8699adbbf8b5c7de96d8ffa0eb5c158b3beafce084968e2ea8bb08c6794dcd0
+    # via
+    #   jsonschema
+    #   jsonschema-specifications
 requests==2.32.3 \
     --hash=sha256:55365417734eb18255590a9ff9eb97e9e1da868d4ccd6402399eaf68af20a760 \
     --hash=sha256:70761cfe03c773ceb22aa2f671b4757976145175cdfca038c02654d061d6dcc6
+    # via
+    #   bittensor
+    #   omron
+    #   scalecodec
+    #   substrate-interface
+    #   wandb
 retry==0.9.2 \
     --hash=sha256:ccddf89761fa2c726ab29391837d4327f819ea14d244c232a1d24c67a2f98606 \
     --hash=sha256:f8bfa8b99b69c4506d6f5bd3b0aabf77f98cdb17f3c9fc3f5ca820033336fba4
+    # via bittensor
 rich==13.8.1 \
     --hash=sha256:1760a3c0848469b97b558fc61c85233e3dafb69c7a071b4d60c38099d3cd4c06 \
     --hash=sha256:8260cda28e3db6bf04d2d1ef4dbc03ba80a824c88b0e7668a0f23126a424844a
+    # via
+    #   bittensor
+    #   bittensor-cli
+    #   bittensor-wallet
+    #   omron
+    #   typer
 rpds-py==0.23.1 \
     --hash=sha256:0f3288930b947cbebe767f84cf618d2cbe0b13be476e749da0e6a009f986248c \
     --hash=sha256:112b8774b0b4ee22368fec42749b94366bd9b536f8f74c3d4175d4395f5cbd31 \
@@ -677,15 +894,25 @@ rpds-py==0.23.1 \
     --hash=sha256:d7031d493c4465dbc8d40bd6cafefef4bd472b17db0ab94c53e7909ee781b9ef \
     --hash=sha256:e0df046f2266e8586cf09d00588302a32923eb6386ced0ca5c9deade6af9a149 \
     --hash=sha256:e14f86b871ea74c3fddc9a40e947d6a5d09def5adc2076ee61fb910a9014fb35
+    # via
+    #   jsonschema
+    #   referencing
 s3transfer==0.11.4 \
     --hash=sha256:559f161658e1cf0a911f45940552c696735f5c74e64362e515f333ebed87d679 \
     --hash=sha256:ac265fa68318763a03bf2dc4f39d5cbd6a9e178d81cc9483ad27da33637e320d
+    # via boto3
 scalecodec==1.2.11 \
     --hash=sha256:99a2cdbfccdcaf22bd86b86da55a730a2855514ad2309faef4a4a93ac6cbeb8d \
     --hash=sha256:d15c94965f617caa25096f83a45f5f73031d05e6ee08d6039969f0a64fc35de1
+    # via
+    #   async-substrate-interface
+    #   bittensor
+    #   bittensor-cli
+    #   substrate-interface
 sentry-sdk==2.24.1 \
     --hash=sha256:36baa6a1128b9d98d2adc5e9b2f887eff0a6af558fc2b96ed51919042413556d \
     --hash=sha256:8ba3c29990fa48865b908b3b9dc5ae7fa7e72407c7c9e91303e5206b32d7b8b1
+    # via wandb
 setproctitle==1.3.5 \
     --hash=sha256:0b91e68e6685998e6353f296100ecabc313a6cb3e413d66a03d74b988b61f5ff \
     --hash=sha256:1e6eaeaf8a734d428a95d8c104643b39af7d247d604f40a7bebcf3960a853c5e \
@@ -700,60 +927,109 @@ setproctitle==1.3.5 \
     --hash=sha256:ea6c505264275a43e9b2acd2acfc11ac33caf52bc3167c9fced4418a810f6b1c \
     --hash=sha256:f3b5e2eacd572444770026c9dd3ddc7543ce427cdf452d40a408d1e95beefb30 \
     --hash=sha256:f7a8c01ffd013dda2bed6e7d5cb59fbb609e72f805abf3ee98360f38f7758d9b
+    # via
+    #   pywry
+    #   wandb
 setuptools==70.0.0 \
     --hash=sha256:54faa7f2e8d2d11bcd2c07bed282eef1046b5c080d1c32add737d7b5817b1ad4 \
     --hash=sha256:f211a66637b8fa059bb28183da127d4e86396c991a942b028c6650d4319c3fd0
+    # via
+    #   bittensor
+    #   torch
+    #   wandb
 shellingham==1.5.4 \
     --hash=sha256:7ecfff8f2fd72616f7481040475a65b2bf8af90a56c89140852d1120324e8686 \
     --hash=sha256:8dbca0739d487e5bd35ab3ca4b36e11c4078f3a234bfce294b0a0291363404de
+    # via typer
 six==1.17.0 \
     --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274 \
     --hash=sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81
+    # via
+    #   docker-pycreds
+    #   ecdsa
+    #   munch
+    #   password-strength
+    #   python-dateutil
 smmap==5.0.2 \
     --hash=sha256:26ea65a03958fa0c8a1c7e8c7a58fdc77221b8910f6be2131affade476898ad5 \
     --hash=sha256:b30115f0def7d7531d22a0fb6502488d879e75b260a9db4d0819cfb25403af5e
+    # via gitdb
 sniffio==1.3.1 \
     --hash=sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2 \
     --hash=sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc
+    # via anyio
 starlette==0.37.2 \
     --hash=sha256:6fe59f29268538e5d0d182f2791a479a0c64638e6935d1c6989e63fb2699c6ee \
     --hash=sha256:9af890290133b79fc3db55474ade20f6220a364a0402e0b556e7cd5e1e093823
+    # via fastapi
 substrate-interface==1.7.11 \
     --hash=sha256:4caa5eacb9996edbe76ad12249521b3542bbd8d9d69b96734087201db1fef8f6 \
     --hash=sha256:ce19bc97481769238ed23c752db985a3058637918693f2db6aeed2fab3756075
+    # via omron
 sympy==1.13.3 \
     --hash=sha256:54612cf55a62755ee71824ce692986f23c88ffa77207b30c1368eda4a7060f73 \
     --hash=sha256:b27fd2c6530e0ab39e275fc9b683895367e51d5da91baa8d3d64db2565fec4d9
+    # via
+    #   onnxruntime
+    #   torch
 termcolor==2.5.0 \
     --hash=sha256:37b17b5fc1e604945c2642c872a3764b5d547a48009871aea3edd3afa180afb8 \
     --hash=sha256:998d8d27da6d48442e8e1f016119076b690d962507531df4890fcd2db2ef8a6f
+    # via bittensor-wallet
 toml==0.10.0 \
     --hash=sha256:229f81c57791a41d65e399fc06bf0848bab550a9dfd5ed66df18ce5f05e73d5c \
     --hash=sha256:235682dd292d5899d361a811df37e04a8828a5b1da3115886b73cf81ebc9100e
+    # via bt-decode
 toolz==1.0.0 ; implementation_name == 'cpython' or implementation_name == 'pypy' \
     --hash=sha256:292c8f1c4e7516bf9086f8850935c799a874039c8bcf959d47b600e4c44a6236 \
     --hash=sha256:2c86e3d9a04798ac556793bced838816296a2f085017664e4995cb40a1047a02
+    # via
+    #   cytoolz
+    #   eth-utils
 torch==2.4.1 ; (platform_machine == 'aarch64' and sys_platform == 'linux') or sys_platform == 'darwin' \
     --hash=sha256:36109432b10bd7163c9b30ce896f3c2cca1b86b9765f956a1594f0ff43091e2a \
     --hash=sha256:72b484d5b6cec1a735bf3fa5a1c4883d01748698c5e9cfdbeb4ffab7c7987e0d
+    # via omron
 torch==2.4.1+cpu ; (platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux') \
     --hash=sha256:3a570e5c553415cdbddfe679207327b3a3806b21c6adea14fba77684d1619e97 \
     --hash=sha256:8800deef0026011d502c0c256cc4b67d002347f63c3a38cd8e45f1f445c61364
+    # via omron
 tqdm==4.67.1 \
     --hash=sha256:26445eca388f82e72884e0d580d5464cd801a3ea01e63e5601bdff9ba6a48de2 \
     --hash=sha256:f8aef9c52c08c13a65f30ea34f4e5aac3fd1a34959879d7e59e63027286627f2
+    # via omron
 typer==0.15.2 \
     --hash=sha256:46a499c6107d645a9c13f7ee46c5d5096cae6f5fc57dd11eccbbb9ae3e44ddfc \
     --hash=sha256:ab2fab47533a813c49fe1f16b1a370fd5819099c00b119e0633df65f22144ba5
+    # via bittensor-cli
 typing-extensions==4.12.2 \
     --hash=sha256:04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d \
     --hash=sha256:1a7ead55c7e559dd4dee8856e3a88b41225abfe1ce8df57b7c13915fe121ffb8
+    # via
+    #   anyio
+    #   eth-typing
+    #   fastapi
+    #   oslash
+    #   pydantic
+    #   pydantic-core
+    #   pyopenssl
+    #   referencing
+    #   torch
+    #   typer
 urllib3==2.3.0 \
     --hash=sha256:1cee9ad369867bfdbbb48b7dd50374c0967a0bb7710050facf0dd6911440e3df \
     --hash=sha256:f8c5449b3cf0861679ce7e0503c7b44b5ec981bec0d1d3795a07f1ba96f0204d
+    # via
+    #   botocore
+    #   omron
+    #   requests
+    #   sentry-sdk
 uvicorn==0.34.0 \
     --hash=sha256:023dc038422502fa28a09c7a30bf2b6991512da7dcdb8fd35fe57cfc154126f4 \
     --hash=sha256:404051050cd7e905de2c9a7e61790943440b3416f49cb409f965d9dcd0fa73e9
+    # via
+    #   bittensor
+    #   omron
 wandb==0.19.8 \
     --hash=sha256:068eb0154f80be973ab291346d831e9cc80a9de1b8752bdeb48a997c3506fec4 \
     --hash=sha256:1781b36434d494d6b34e2149201bae8cab960cb31571f11b981c4a62462d5af8 \
@@ -766,9 +1042,13 @@ wandb==0.19.8 \
     --hash=sha256:c25f0e40025b838b7a424b51837a2a5fd071686c59e1c46d73f04e760d305f79 \
     --hash=sha256:f68517c2059d12912a90ae32ce95a2711e39f6c157c759eb191527739a12db8b \
     --hash=sha256:f7da8e6fc6693014c72fb7db3ecd5e1116066198d2aca96f6eb7220cea03081c
+    # via omron
 websocket-client==1.8.0 \
     --hash=sha256:17b44cc997f5c498e809b22cdf2d9c7a9e71c02c8cc2b6c56e7c2d1239bfa526 \
     --hash=sha256:3239df9f44da632f96012472805d40a23281a991027ce11d2f45a6f24ac4c3da
+    # via
+    #   omron
+    #   substrate-interface
 websockets==15.0.1 \
     --hash=sha256:0701bc3cfcb9164d04a14b149fd74be7347a530ad3bbf15ab2c678a2cd3dd9a2 \
     --hash=sha256:0af68c55afbd5f07986df82831c7bff04846928ea8d1fd7f30052638788bc9b5 \
@@ -783,9 +1063,17 @@ websockets==15.0.1 \
     --hash=sha256:e8b56bdcdb4505c8078cb6c7157d9811a85790f2f2b3632c7d1462ab5783d215 \
     --hash=sha256:f7a866fbc1e97b5c617ee4116daaa09b722101d4a3c170c787450ba409f9736f \
     --hash=sha256:fcd5cf9e305d7b8338754470cf69cf81f420459dbae8a3b40cee57417f4614a7
+    # via
+    #   async-substrate-interface
+    #   bittensor
+    #   bittensor-cli
 wheel==0.45.1 \
     --hash=sha256:661e1abd9198507b1409a20c02106d9670b2576e916d58f520316666abca6729 \
     --hash=sha256:708e7481cc80179af0e556bbf0cc00b8444c7321e2700b8d8580231d13017248
+    # via
+    #   async-substrate-interface
+    #   bittensor
+    #   bittensor-cli
 xxhash==3.5.0 \
     --hash=sha256:08424f6648526076e28fae6ea2806c0a7d504b9ef05ae61d196d571e5c879c84 \
     --hash=sha256:14470ace8bd3b5d51318782cd94e6f94431974f16cb3b8dc15d52f3b69df8e00 \
@@ -803,6 +1091,9 @@ xxhash==3.5.0 \
     --hash=sha256:f7b58d1fd3551b8c80a971199543379be1cee3d0d409e1f6d8b01c1a2eebf1f8 \
     --hash=sha256:fa0cafd3a2af231b4e113fba24a65d7922af91aeb23774a8b78228e6cd785e3e \
     --hash=sha256:fa9f547bd98f5553d03160967866a71056a60960be00356a15ecc44efb40ba8e
+    # via
+    #   async-substrate-interface
+    #   substrate-interface
 yarl==1.18.3 \
     --hash=sha256:00e5a1fea0fd4f5bfa7440a47eff01d9822a65b4488f7cff83155a0f31a2ecba \
     --hash=sha256:1dd4bdd05407ced96fed3d7f25dbbf88d2ffb045a0db60dbc247f5b3c5c25d50 \
@@ -822,3 +1113,4 @@ yarl==1.18.3 \
     --hash=sha256:d0e883008013c0e4aef84dcfe2a0b172c4d23c2669412cf5b3371003941f72bb \
     --hash=sha256:e35ef8683211db69ffe129a25d5634319a677570ab6b2eba4afa860f54eeaf75 \
     --hash=sha256:f91c4803173928a25e1a55b943c81f55b8872f0018be83e3ad4938adffb77dd2
+    # via aiohttp

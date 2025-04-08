@@ -29,11 +29,8 @@
     }
   },
   // Install ezkl cli, done here instead of the Dockerfile to test new versions without rebuilding the image.
-  // "onCreateCommand": "curl https://raw.githubusercontent.com/zkonduit/ezkl/main/install_ezkl_cli.sh | bash -s v19.0.7",
-  // Unsuccesfully trying to avoid errors on mounting .ezkl/srs, but switched to python api so not needed anymore.
-  // "postCreateCommand": "mkdir -p /home/vscode/.ezkl/srs",
-  // "waitFor": "postCreateCommand",
-  // "remoteEnv": { "PATH": "${containerEnv:PATH}:/home/vscode/.ezkl" },
+  "onCreateCommand": "curl https://raw.githubusercontent.com/zkonduit/ezkl/main/install_ezkl_cli.sh | bash -s v19.0.7",
+  "remoteEnv": { "PATH": "${containerEnv:PATH}:/home/vscode/.ezkl" },
   // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
   // "remoteUser": "root",
   "mounts": [

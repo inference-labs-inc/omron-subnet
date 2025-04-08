@@ -186,10 +186,6 @@ path = "_validator.api"
 depends_on = ["_validator.api.certificate_manager", "_validator.api.cache", "_validator.models.poc_rpc_request", "_validator.api.websocket_manager", "_validator.models.pow_rpc_request", "constants", "_validator.config", "deployment_layer.circuit_store"]
 
 [[modules ]]
-path = "_validator.proof_of_weights"
-depends_on = []
-
-[[modules ]]
 path = "_validator.competitions.services.data_source"
 depends_on = []
 
@@ -207,11 +203,7 @@ depends_on = ["_validator.models.base_rpc_request", "deployment_layer.circuit_st
 
 [[modules ]]
 path = "execution_layer.circuit"
-depends_on = ["execution_layer.input_registry", "utils.metrics_logger", "cli_parser", "utils", "constants", "execution_layer.base_input"]
-
-[[modules ]]
-path = "_validator.proof_of_weights.receipts"
-depends_on = []
+depends_on = ["execution_layer.input_registry", "utils.metrics_logger", "cli_parser", "utils", "constants", "execution_layer.base_input", "utils.gc_logging"]
 
 [[modules ]]
 path = "execution_layer.generic_input"
@@ -290,10 +282,6 @@ path = "_validator.competitions.utils"
 depends_on = []
 
 [[modules ]]
-path = "execution_layer.temp"
-depends_on = []
-
-[[modules ]]
 path = "scripts.create_competition_circuit"
 depends_on = []
 
@@ -315,7 +303,7 @@ depends_on = ["execution_layer.generic_input", "execution_layer.base_input", "ex
 
 [[modules ]]
 path = "utils.gc_logging"
-depends_on = ["_validator.models.miner_response"]
+depends_on = []
 
 [[modules ]]
 path = "_validator.core"

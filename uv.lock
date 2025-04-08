@@ -1453,6 +1453,7 @@ dependencies = [
 dev = [
     { name = "black" },
     { name = "bpython" },
+    { name = "debugpy" },
     { name = "ipykernel" },
     { name = "nbdev" },
     { name = "onnx" },
@@ -1498,6 +1499,7 @@ requires-dist = [
 dev = [
     { name = "black", specifier = ">=24.10.0" },
     { name = "bpython", specifier = ">=0.25" },
+    { name = "debugpy", specifier = ">=1.8.13" },
     { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "nbdev", specifier = ">=2.3.34" },
     { name = "onnx", specifier = ">=1.17.0" },
