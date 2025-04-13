@@ -22,6 +22,7 @@ from _validator.competitions.services.data_source import (
 )
 import logging
 from utils.system import get_temp_folder
+import sys
 
 logging.getLogger("onnxruntime").setLevel(logging.ERROR)
 os.environ["ONNXRUNTIME_LOGGING_LEVEL"] = "3"
@@ -166,22 +167,16 @@ class CircuitEvaluator:
             bt.logging.debug(f"Creating ONNX venv at {self.onnx_venv}")
 
             result = subprocess.run(
-                ["python", "-m", "venv", self.onnx_venv], capture_output=True, text=True
+                [sys.executable, "-m", "venv", self.onnx_venv],
+                capture_output=True,
+                text=True,
             )
 
             if result.returncode != 0:
-                bt.logging.error(f"Failed to create venv: {result.stderr}")
-
-                result = subprocess.run(
-                    ["python3", "-m", "venv", self.onnx_venv],
-                    capture_output=True,
-                    text=True,
+                bt.logging.error(
+                    f"Failed to create venv using {sys.executable}: {result.stderr}"
                 )
-                if result.returncode != 0:
-                    bt.logging.error(
-                        f"Failed to create venv with python3: {result.stderr}"
-                    )
-                    return False
+                return False
 
             python_path = self._get_python_path()
             if not python_path:
