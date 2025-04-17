@@ -219,6 +219,41 @@ class ValidatorLoop:
             self.is_syncing_competition = False
             bt.logging.debug("Competition sync complete")
 
+    @with_rate_limit(period=ONE_HOUR)
+    def update_competition_metrics(self):
+        bt.logging.debug("Updating competition metrics...")
+        if self.competition and getattr(self.competition, "is_active", False):
+            try:
+                metrics_to_log = self.competition.get_summary_for_logging()
+
+                if metrics_to_log:
+                    metrics_to_log["validator_key"] = (
+                        self.config.wallet.hotkey.ss58_address
+                    )
+
+                    bt.logging.debug("Logging competition metrics summary...")
+                    response = gc_log_competition_metrics(
+                        metrics_to_log, self.config.wallet.hotkey
+                    )
+
+                    if response and response.status_code == 200:
+                        bt.logging.success(
+                            "Successfully logged competition metrics summary."
+                        )
+                    else:
+                        status_code = response.status_code if response else "N/A"
+                        response_text = response.text if response else "N/A"
+                        bt.logging.error(
+                            "Failed to log competition metrics summary."
+                            f" Status: {status_code}, Response: {response_text}"
+                        )
+
+            except Exception as e:
+                bt.logging.error(
+                    f"Error during competition metric summary logging: {e}",
+                    exc_info=True,
+                )
+
     @with_rate_limit(period=ONE_MINUTE)
     async def log_responses(self):
         if self.recent_responses:
@@ -327,44 +362,7 @@ class ValidatorLoop:
                 self.sync_metagraph()
                 self.sync_scores_uids()
                 self.update_weights()
-
-                if self.competition and getattr(self.competition, "is_active", False):
-                    try:
-                        bt.logging.info(
-                            "Attempting to log competition metrics summary..."
-                        )
-                        metrics_to_log = self.competition.get_summary_for_logging()
-
-                        if metrics_to_log:
-                            metrics_to_log["validator_key"] = (
-                                self.config.wallet.hotkey.ss58_address
-                            )
-
-                            bt.logging.debug("Logging competition metrics summary...")
-                            response = gc_log_competition_metrics(
-                                metrics_to_log, self.config.wallet.hotkey
-                            )
-
-                            if response and response.status_code == 200:
-                                bt.logging.success(
-                                    "Successfully logged competition metrics summary."
-                                )
-                            else:
-                                status_code = (
-                                    response.status_code if response else "N/A"
-                                )
-                                response_text = response.text if response else "N/A"
-                                bt.logging.error(
-                                    "Failed to log competition metrics summary."
-                                    f" Status: {status_code}, Response: {response_text}"
-                                )
-
-                    except Exception as e:
-                        bt.logging.error(
-                            f"Error during competition metric summary logging: {e}",
-                            exc_info=True,
-                        )
-
+                self.update_competition_metrics()
                 self.update_queryable_uids()
                 self.update_processed_uids()
                 self.log_health()

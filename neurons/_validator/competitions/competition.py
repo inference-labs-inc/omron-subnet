@@ -552,7 +552,6 @@ class Competition:
 
             current_miner_states = getattr(self, "miner_states", {})
             if not current_miner_states:
-                bt.logging.warning("No miner states found for logging summary.")
                 return None
 
             avg_accuracy_val = getattr(self, "avg_raw_accuracy", 0.0)
