@@ -32,6 +32,7 @@ from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
 from utils import AutoUpdate, clean_temp_files, with_rate_limit
 from utils.gc_logging import log_responses as gc_log_responses
+from utils.gc_logging import gc_log_competition_metrics
 from _validator.utils.logging import log_responses as console_log_responses
 from constants import (
     LOOP_DELAY_SECONDS,
@@ -326,6 +327,44 @@ class ValidatorLoop:
                 self.sync_metagraph()
                 self.sync_scores_uids()
                 self.update_weights()
+
+                if self.competition and getattr(self.competition, "is_active", False):
+                    try:
+                        bt.logging.info(
+                            "Attempting to log competition metrics summary..."
+                        )
+                        metrics_to_log = self.competition.get_summary_for_logging()
+
+                        if metrics_to_log:
+                            metrics_to_log["validator_key"] = (
+                                self.config.wallet.hotkey.ss58_address
+                            )
+
+                            bt.logging.debug("Logging competition metrics summary...")
+                            response = gc_log_competition_metrics(
+                                metrics_to_log, self.config.wallet.hotkey
+                            )
+
+                            if response and response.status_code == 200:
+                                bt.logging.success(
+                                    "Successfully logged competition metrics summary."
+                                )
+                            else:
+                                status_code = (
+                                    response.status_code if response else "N/A"
+                                )
+                                response_text = response.text if response else "N/A"
+                                bt.logging.error(
+                                    "Failed to log competition metrics summary."
+                                    f" Status: {status_code}, Response: {response_text}"
+                                )
+
+                    except Exception as e:
+                        bt.logging.error(
+                            f"Error during competition metric summary logging: {e}",
+                            exc_info=True,
+                        )
+
                 self.update_queryable_uids()
                 self.update_processed_uids()
                 self.log_health()
