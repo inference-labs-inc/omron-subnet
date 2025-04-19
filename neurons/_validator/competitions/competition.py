@@ -28,7 +28,6 @@ from .utils.cleanup import cleanup_temp_dir
 from constants import VALIDATOR_REQUEST_TIMEOUT_SECONDS
 from _validator.models.request_type import ValidatorMessage
 from utils.system import get_temp_folder
-from utils.wandb_logger import safe_log
 
 
 class CompetitionThread(threading.Thread):
@@ -236,6 +235,9 @@ class Competition:
 
         self.miner_states: Dict[str, NeuronState] = {}
 
+        self.circuits_evaluated_count: int = 0
+        self.is_active: bool = True
+
         self.download_queue: List[Tuple[int, str, str]] = []
         self.current_download: Optional[Tuple[int, str, str]] = None
         self.download_complete = asyncio.Event()
@@ -432,6 +434,8 @@ class Competition:
                 accuracy,
             ) = self.circuit_evaluator.evaluate(circuit_dir)
 
+            self.circuits_evaluated_count += 1
+
             if circuit_owner not in self.miner_states:
                 self.miner_states[circuit_owner] = NeuronState(
                     hotkey=circuit_owner,
@@ -465,140 +469,161 @@ class Competition:
             return False
 
     def _update_competition_metrics(self):
+        """Calculates ranks and overall averages based on current miner states."""
         try:
             active_miners = [
                 (k, v)
                 for k, v in self.miner_states.items()
-                if v.verification_result and v.sota_relative_score > 0
+                if getattr(v, "verification_result", False)
+                and getattr(v, "sota_relative_score", 0) > 0
             ]
             active_participants = len(active_miners)
 
-            sota_state = self.sota_manager.current_state
+            self.avg_raw_accuracy = 0.0
+            self.avg_proof_size = 0.0
+            self.avg_response_time = 0.0
+            self.avg_verification_rate = 1.0
 
             if active_miners:
                 sorted_by_accuracy = sorted(
-                    active_miners, key=lambda x: x[1].raw_accuracy, reverse=True
+                    active_miners,
+                    key=lambda x: getattr(x[1], "raw_accuracy", 0),
+                    reverse=True,
                 )
                 sorted_by_proof_size = sorted(
-                    active_miners, key=lambda x: x[1].proof_size
+                    active_miners,
+                    key=lambda x: getattr(x[1], "proof_size", float("inf")),
                 )
                 sorted_by_response_time = sorted(
-                    active_miners, key=lambda x: x[1].response_time
+                    active_miners,
+                    key=lambda x: getattr(x[1], "response_time", float("inf")),
+                )
+                sorted_by_sota_score = sorted(
+                    active_miners,
+                    key=lambda x: getattr(x[1], "sota_relative_score", 0),
+                    reverse=True,
                 )
 
-                metrics = {}
+                max_rank = len(self.miner_states) + 1
+                for _hotkey, state in self.miner_states.items():
+                    state.rank_overall = max_rank
+                    state.rank_accuracy = max_rank
+                    state.rank_proof_size = max_rank
+                    state.rank_response_time = max_rank
 
-                for miner_hotkey, miner_state in active_miners:
-                    accuracy_rank = (
-                        next(
-                            i
-                            for i, (h, _) in enumerate(sorted_by_accuracy)
-                            if h == miner_hotkey
-                        )
-                        + 1
-                    )
-                    proof_size_rank = (
-                        next(
-                            i
-                            for i, (h, _) in enumerate(sorted_by_proof_size)
-                            if h == miner_hotkey
-                        )
-                        + 1
-                    )
-                    response_time_rank = (
-                        next(
-                            i
-                            for i, (h, _) in enumerate(sorted_by_response_time)
-                            if h == miner_hotkey
-                        )
-                        + 1
-                    )
-                    overall_rank = (
-                        accuracy_rank + proof_size_rank + response_time_rank
-                    ) / 3
+                for i, (h, state) in enumerate(sorted_by_sota_score):
+                    state.rank_overall = i + 1
+                for i, (h, state) in enumerate(sorted_by_accuracy):
+                    state.rank_accuracy = i + 1
+                for i, (h, state) in enumerate(sorted_by_proof_size):
+                    state.rank_proof_size = i + 1
+                for i, (h, state) in enumerate(sorted_by_response_time):
+                    state.rank_response_time = i + 1
 
-                    metrics.update(
-                        {
-                            f"hotkey.{miner_hotkey}.uid": miner_state.uid,
-                            f"hotkey.{miner_hotkey}.sota_score": miner_state.sota_relative_score,
-                            f"hotkey.{miner_hotkey}.raw_accuracy": miner_state.raw_accuracy,
-                            f"hotkey.{miner_hotkey}.proof_size": miner_state.proof_size,
-                            f"hotkey.{miner_hotkey}.response_time": miner_state.response_time,
-                            f"hotkey.{miner_hotkey}.relative_to_sota.accuracy": (
-                                miner_state.raw_accuracy / sota_state.raw_accuracy
-                                if sota_state.raw_accuracy > 0
-                                else 0
-                            ),
-                            f"hotkey.{miner_hotkey}.relative_to_sota.proof_size": (
-                                sota_state.proof_size / miner_state.proof_size
-                                if miner_state.proof_size > 0
-                                else 0
-                            ),
-                            f"hotkey.{miner_hotkey}.relative_to_sota.response_time": (
-                                sota_state.response_time / miner_state.response_time
-                                if miner_state.response_time > 0
-                                else 0
-                            ),
-                            f"hotkey.{miner_hotkey}.rank.overall": overall_rank,
-                            f"hotkey.{miner_hotkey}.rank.accuracy": accuracy_rank,
-                            f"hotkey.{miner_hotkey}.rank.proof_size": proof_size_rank,
-                            f"hotkey.{miner_hotkey}.rank.response_time": response_time_rank,
-                        }
-                    )
-
-                    if hasattr(miner_state, "last_score"):
-                        time_delta = (
-                            time.time() - miner_state.last_score_time
-                            if hasattr(miner_state, "last_score_time")
-                            else 1
-                        )
-                        improvement_rate = (
-                            miner_state.sota_relative_score - miner_state.last_score
-                        ) / time_delta
-                        metrics.update(
-                            {
-                                f"hotkey.{miner_hotkey}.historical.improvement_rate": improvement_rate,
-                                f"hotkey.{miner_hotkey}.historical.best_sota_score": max(
-                                    miner_state.sota_relative_score,
-                                    getattr(miner_state, "best_sota_score", 0),
-                                ),
-                            }
-                        )
-
-                    miner_state.last_score = miner_state.sota_relative_score
-                    miner_state.last_score_time = time.time()
-                    miner_state.best_sota_score = max(
-                        miner_state.sota_relative_score,
-                        getattr(miner_state, "best_sota_score", 0),
-                    )
-
-                metrics.update(
-                    {
-                        "active_participants": active_participants,
-                        "avg_raw_accuracy": sum(
-                            m[1].raw_accuracy for m in active_miners
-                        )
-                        / active_participants,
-                        "avg_proof_size": sum(m[1].proof_size for m in active_miners)
-                        / active_participants,
-                        "avg_response_time": sum(
-                            m[1].response_time for m in active_miners
-                        )
-                        / active_participants,
-                        "sota_relative_score": sota_state.sota_relative_score,
-                        "sota_hotkey": sota_state.hotkey,
-                        "sota_proof_size": sota_state.proof_size,
-                        "sota_response_time": sota_state.response_time,
-                        "sota_timestamp": sota_state.timestamp,
-                        "sota_raw_accuracy": sota_state.raw_accuracy,
-                        "sota_uid": sota_state.uid,
-                    }
+                self.avg_raw_accuracy = (
+                    sum(getattr(m[1], "raw_accuracy", 0) for m in active_miners)
+                    / active_participants
+                )
+                self.avg_proof_size = (
+                    sum(getattr(m[1], "proof_size", 0) for m in active_miners)
+                    / active_participants
+                )
+                self.avg_response_time = (
+                    sum(getattr(m[1], "response_time", 0) for m in active_miners)
+                    / active_participants
+                )
+                num_valid = len(active_miners)
+                total_attempts = len(self.miner_states)
+                self.avg_verification_rate = (
+                    float(num_valid / total_attempts) if total_attempts else 1.0
                 )
 
-                safe_log(metrics)
         except Exception as e:
-            bt.logging.warning(f"Error updating competition metrics: {e}")
+            bt.logging.warning(f"Error updating competition ranks/averages: {e}")
             bt.logging.debug(f"Stack trace: {traceback.format_exc()}")
+
+    def get_summary_for_logging(self) -> dict | None:
+        """Prepares a summary dictionary for logging competition state to the backend."""
+        try:
+            comp_config = getattr(self, "config", None)
+            if not comp_config:
+                bt.logging.warning("Competition config not found for logging summary.")
+                return None
+
+            current_miner_states = getattr(self, "miner_states", {})
+            if not current_miner_states:
+                return None
+
+            avg_accuracy_val = getattr(self, "avg_raw_accuracy", 0.0)
+            avg_proof_size_val = getattr(self, "avg_proof_size", 0.0)
+            avg_response_time_val = getattr(self, "avg_response_time", 0.0)
+            avg_verification_rate_val = getattr(self, "avg_verification_rate", 1.0)
+
+            metrics_to_log = {
+                "competition_id": self.competition_id,
+                "name": comp_config.get("name", f"Competition_{self.competition_id}"),
+                "status": "running",
+                "accuracy_weight": float(
+                    comp_config.get("evaluation", {})
+                    .get("scoring_weights", {})
+                    .get("accuracy", 0.4)
+                ),
+                "total_circuits_evaluated": int(
+                    getattr(self, "circuits_evaluated_count", 0)
+                ),
+                "timestamp": int(time.time()),
+                "active_participants": len(current_miner_states),
+                "avg_accuracy": avg_accuracy_val,
+                "avg_proof_size": avg_proof_size_val,
+                "avg_response_time": avg_response_time_val,
+                "avg_verification_rate": avg_verification_rate_val,
+                "competitors": [
+                    {
+                        "hotkey": state.hotkey,
+                        "uid": state.uid,
+                        "historical_best_sota_score": int(
+                            getattr(state, "historical_best_sota_score", 0)
+                        ),
+                        "historical_improvement_rate": float(
+                            getattr(state, "historical_improvement_rate", 0.0)
+                        ),
+                        "sota_score": int(getattr(state, "sota_relative_score", 0)),
+                        "raw_accuracy": float(getattr(state, "raw_accuracy", 0.0)),
+                        "proof_size": int(getattr(state, "proof_size", 0)),
+                        "response_time": float(getattr(state, "response_time", 0.0)),
+                        "verification_rate": float(
+                            getattr(state, "verification_rate", 1.0)
+                        ),
+                        "relative_to_sota_accuracy": float(
+                            getattr(state, "relative_to_sota", {}).get("accuracy", 0.0)
+                        ),
+                        "relative_to_sota_proof_size": float(
+                            getattr(state, "relative_to_sota", {}).get(
+                                "proof_size", 0.0
+                            )
+                        ),
+                        "relative_to_sota_response_time": float(
+                            getattr(state, "relative_to_sota", {}).get(
+                                "response_time", 0.0
+                            )
+                        ),
+                        "rank_overall": int(getattr(state, "rank_overall", 999)),
+                        "rank_accuracy": int(getattr(state, "rank_accuracy", 999)),
+                        "rank_proof_size": int(getattr(state, "rank_proof_size", 999)),
+                        "rank_response_time": int(
+                            getattr(state, "rank_response_time", 999)
+                        ),
+                    }
+                    for hotkey, state in current_miner_states.items()
+                ],
+            }
+            return metrics_to_log
+
+        except Exception as e:
+            bt.logging.error(
+                f"Error preparing competition summary for logging: {e}", exc_info=True
+            )
+            return None
 
     def set_validator_message_queues(
         self,
