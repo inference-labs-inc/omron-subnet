@@ -76,38 +76,24 @@ def log_responses(
 
 
 def gc_log_competition_metrics(
-    metrics: dict, hotkey: bt.Keypair
+    summary_data: dict, hotkey: bt.Keypair
 ) -> Optional[requests.Response]:
     """
-    Log competition metrics to the centralized logging server.
+    Logs a pre-formatted competition summary
     """
     try:
-        metrics["validator_key"] = hotkey.ss58_address
 
-        # some metrics are nested under the hotkey, so we need to move them to the competitors list
-        # for example `hotkey.0x374672364.historical.improvement_rate` isn't really good for BigQuery
-        # so preparing miners data to go to a separate table
-        metrics["competitors"] = {}
-        for key in metrics.keys():
-            if not key.startswith("hotkey."):
-                continue
-            hotkey = key.split(".")[1]
-            if metrics["competitors"].get(hotkey) is None:
-                metrics["competitors"][hotkey] = {
-                    "hotkey": hotkey,
-                }
-            # something like `hotkey.{miner_hotkey}.historical.improvement_rate` turns into
-            # `historical_improvement_rate` in the competitors dict
-            metrics["competitors"][hotkey]["_".join(key.split(".")[2:])] = metrics.pop(
-                key
+        if "validator_key" not in summary_data:
+            bt.logging.warning(
+                "Validator key not found in competition summary data, adding it."
             )
-        metrics["competitors"] = list(metrics["competitors"].values())
+            summary_data["validator_key"] = hotkey.ss58_address
 
-        input_bytes = json.dumps(metrics).encode("utf-8")
-        # sign the inputs with your hotkey
+        input_bytes = json.dumps(summary_data).encode("utf-8")
         signature = hotkey.sign(input_bytes)
-        # encode the inputs and signature as base64
         signature_str = base64.b64encode(signature).decode("utf-8")
+
+        bt.logging.trace(f"Logging competition summary: {summary_data}")
 
         return session.post(
             COMPETITION_LOGGING_URL,
@@ -116,10 +102,15 @@ def gc_log_competition_metrics(
                 "Content-Type": "application/json",
                 "X-Request-Signature": signature_str,
             },
-            timeout=5,
+            timeout=10,
         )
     except requests.exceptions.RequestException as e:
-        bt.logging.error(f"Failed to log competition metrics: {e}")
+        bt.logging.error(f"Failed to log competition summary: {e}")
+        return None
+    except Exception as e:
+        bt.logging.error(
+            f"Unexpected error logging competition summary: {e}", exc_info=True
+        )
         return None
 
 

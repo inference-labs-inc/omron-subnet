@@ -552,6 +552,7 @@ class Competition:
 
             current_miner_states = getattr(self, "miner_states", {})
             if not current_miner_states:
+                bt.logging.warning("No miner states found for logging summary.")
                 return None
 
             avg_accuracy_val = getattr(self, "avg_raw_accuracy", 0.0)
@@ -579,40 +580,15 @@ class Competition:
                 "avg_verification_rate": avg_verification_rate_val,
                 "competitors": [
                     {
-                        "hotkey": state.hotkey,
-                        "uid": state.uid,
-                        "historical_best_sota_score": int(
-                            getattr(state, "historical_best_sota_score", 0)
-                        ),
-                        "historical_improvement_rate": float(
-                            getattr(state, "historical_improvement_rate", 0.0)
-                        ),
+                        "hotkey": getattr(state, "hotkey", "unknown"),
+                        "uid": int(getattr(state, "uid", -1)),
                         "sota_score": int(getattr(state, "sota_relative_score", 0)),
-                        "raw_accuracy": float(getattr(state, "raw_accuracy", 0.0)),
                         "proof_size": int(getattr(state, "proof_size", 0)),
                         "response_time": float(getattr(state, "response_time", 0.0)),
                         "verification_rate": float(
                             getattr(state, "verification_rate", 1.0)
                         ),
-                        "relative_to_sota_accuracy": float(
-                            getattr(state, "relative_to_sota", {}).get("accuracy", 0.0)
-                        ),
-                        "relative_to_sota_proof_size": float(
-                            getattr(state, "relative_to_sota", {}).get(
-                                "proof_size", 0.0
-                            )
-                        ),
-                        "relative_to_sota_response_time": float(
-                            getattr(state, "relative_to_sota", {}).get(
-                                "response_time", 0.0
-                            )
-                        ),
                         "rank_overall": int(getattr(state, "rank_overall", 999)),
-                        "rank_accuracy": int(getattr(state, "rank_accuracy", 999)),
-                        "rank_proof_size": int(getattr(state, "rank_proof_size", 999)),
-                        "rank_response_time": int(
-                            getattr(state, "rank_response_time", 999)
-                        ),
                     }
                     for hotkey, state in current_miner_states.items()
                 ],
