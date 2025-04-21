@@ -582,7 +582,7 @@ class Competition:
                     {
                         "hotkey": state.hotkey,
                         "uid": state.uid,
-                        "sota_score": int(getattr(state, "sota_relative_score", 0)),
+                        "sota_score": float(getattr(state, "sota_relative_score", 0.0)),
                         "proof_size": int(getattr(state, "proof_size", 0)),
                         "response_time": float(getattr(state, "response_time", 0.0)),
                         "verification_rate": float(
