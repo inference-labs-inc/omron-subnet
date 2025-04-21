@@ -580,8 +580,8 @@ class Competition:
                 "avg_verification_rate": avg_verification_rate_val,
                 "competitors": [
                     {
-                        "hotkey": getattr(state, "hotkey", "unknown"),
-                        "uid": int(getattr(state, "uid", -1)),
+                        "hotkey": state.hotkey,
+                        "uid": state.uid,
                         "sota_score": int(getattr(state, "sota_relative_score", 0)),
                         "proof_size": int(getattr(state, "proof_size", 0)),
                         "response_time": float(getattr(state, "response_time", 0.0)),
@@ -589,6 +589,7 @@ class Competition:
                             getattr(state, "verification_rate", 1.0)
                         ),
                         "rank_overall": int(getattr(state, "rank_overall", 999)),
+                        "raw_accuracy": float(getattr(state, "raw_accuracy", 0.0)),
                     }
                     for hotkey, state in current_miner_states.items()
                 ],
