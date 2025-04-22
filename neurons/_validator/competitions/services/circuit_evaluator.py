@@ -406,6 +406,10 @@ class CircuitEvaluator:
             bt.logging.error(f"Error loading num_iterations, using default: {e}")
             num_iterations = 10
 
+        first_valid_output_tensor = None
+        all_outputs_identical = True
+        successful_valid_outputs = 0
+
         for i in range(num_iterations):
             bt.logging.debug(f"Running evaluation {i + 1}/{num_iterations}")
 
@@ -459,6 +463,17 @@ class CircuitEvaluator:
                 verification_results.append(verify_result)
 
                 if verify_result:
+                    current_output_tensor = torch.tensor(public_signals)
+                    if first_valid_output_tensor is None:
+                        first_valid_output_tensor = current_output_tensor
+                        successful_valid_outputs += 1
+                    elif all_outputs_identical:
+                        successful_valid_outputs += 1
+                        if not torch.allclose(
+                            first_valid_output_tensor, current_output_tensor, atol=1e-8
+                        ):
+                            all_outputs_identical = False
+
                     raw_accuracy = self._compare_outputs(
                         baseline_output, public_signals
                     )
@@ -483,6 +498,12 @@ class CircuitEvaluator:
                 "One or more verifications failed - setting all scores to 0"
             )
             return 0.0, float("inf"), float("inf"), False, {}
+
+        if successful_valid_outputs > 1 and all_outputs_identical:
+            bt.logging.warning(
+                "Detected constant output from circuit across multiple inputs. Penalizing accuracy."
+            )
+            raw_accuracy_scores = [0.0] * len(raw_accuracy_scores)
 
         avg_raw_accuracy = (
             sum(raw_accuracy_scores) / len(raw_accuracy_scores)
