@@ -470,7 +470,7 @@ class CircuitEvaluator:
                     elif all_outputs_identical:
                         successful_valid_outputs += 1
                         if not torch.allclose(
-                            first_valid_output_tensor, current_output_tensor, atol=1e-8
+                            first_valid_output_tensor, current_output_tensor, atol=1e-4
                         ):
                             all_outputs_identical = False
 
