@@ -6,6 +6,7 @@ import traceback
 import time
 from typing import NoReturn
 import concurrent.futures
+import os
 
 import bittensor as bt
 
@@ -64,6 +65,7 @@ class ValidatorLoop:
         self.config = config
         self.config.check_register()
         self.auto_update = AutoUpdate()
+        self.clear_sota_state()
 
         self.validator_to_competition_queue = MPQueue()  # Messages TO competition
         self.competition_to_validator_queue = MPQueue()  # Messages FROM competition
@@ -133,6 +135,17 @@ class ValidatorLoop:
 
         if self.config.bt_config.prometheus_monitoring:
             start_prometheus_logging(self.config.bt_config.prometheus_port)
+
+    def clear_sota_state(self):
+        try:
+            os.remove(
+                os.path.join(
+                    self.competition.competition_directory, "sota", "sota_state.json"
+                )
+            )
+        except Exception as e:
+            bt.logging.error(f"Error clearing sota state: {e}")
+            traceback.print_exc()
 
     @with_rate_limit(period=FIVE_MINUTES)
     def update_weights(self):
