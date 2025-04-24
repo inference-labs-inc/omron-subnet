@@ -807,7 +807,9 @@ class CircuitEvaluator:
             expected_tensor = torch.tensor(expected)
             actual_tensor = torch.tensor(actual)
 
-            mae = torch.nn.functional.l1_loss(actual_tensor, expected_tensor)
+            mae = torch.nn.functional.l1_loss(
+                actual_tensor, expected_tensor, reduction="sum"
+            )
             raw_accuracy = torch.exp(-(mae * ACCURACY_MAE_SCALE_FACTOR)).item()
             return raw_accuracy
         except Exception as e:
