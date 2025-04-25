@@ -35,7 +35,7 @@ class CircuitEvaluator:
         competition_directory: str,
         sota_manager: SotaManager,
     ):
-
+        self.config = config
         self.competition_directory = competition_directory
         self.sota_manager = sota_manager
 
@@ -241,59 +241,55 @@ class CircuitEvaluator:
 
     def _setup_data_source(self) -> CompetitionDataSource:
         try:
-            config_path = os.path.join(
-                self.competition_directory, "competition_config.json"
+            data_config = self.config.get("data_source", {})
+            bt.logging.info(f"Data source config: {data_config}")
+
+            processor = None
+            processor_path = os.path.join(
+                self.competition_directory, "data_processor.py"
             )
-            bt.logging.info(f"Loading competition config from {config_path}")
-            with open(config_path) as f:
-                config = json.load(f)
-                data_config = config.get("data_source", {})
-                bt.logging.info(f"Data source config: {data_config}")
+            bt.logging.info(f"Looking for data processor at {processor_path}")
+            if os.path.exists(processor_path):
+                bt.logging.info("Found data processor, loading module...")
+                import importlib.util
 
-                processor = None
-                processor_path = os.path.join(
-                    self.competition_directory, "data_processor.py"
+                spec = importlib.util.spec_from_file_location(
+                    "data_processor", processor_path
                 )
-                bt.logging.info(f"Looking for data processor at {processor_path}")
-                if os.path.exists(processor_path):
-                    bt.logging.info("Found data processor, loading module...")
-                    import importlib.util
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
 
-                    spec = importlib.util.spec_from_file_location(
-                        "data_processor", processor_path
+                for attr_name in dir(module):
+                    attr = getattr(module, attr_name)
+                    if (
+                        isinstance(attr, type)
+                        and issubclass(attr, CompetitionDataProcessor)
+                        and attr != CompetitionDataProcessor
+                    ):
+                        processor = attr()
+                        bt.logging.info(f"Loaded data processor: {attr.__name__}")
+                        break
+
+            if data_config.get("type") == "remote":
+                bt.logging.info("Initializing remote data source")
+                data_source = RemoteDataSource(
+                    self.config, self.competition_directory, processor
+                )
+                if not data_source.sync_data():
+                    bt.logging.error("Failed to sync remote data source")
+                    bt.logging.info("Falling back to random data source")
+                    return RandomDataSource(
+                        self.config, self.competition_directory, processor
                     )
-                    module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(module)
-
-                    for attr_name in dir(module):
-                        attr = getattr(module, attr_name)
-                        if (
-                            isinstance(attr, type)
-                            and issubclass(attr, CompetitionDataProcessor)
-                            and attr != CompetitionDataProcessor
-                        ):
-                            processor = attr()
-                            bt.logging.info(f"Loaded data processor: {attr.__name__}")
-                            break
-
-                if data_config.get("type") == "remote":
-                    bt.logging.info("Initializing remote data source")
-                    data_source = RemoteDataSource(
-                        self.competition_directory, processor
-                    )
-                    if not data_source.sync_data():
-                        bt.logging.error("Failed to sync remote data source")
-                        bt.logging.info("Falling back to random data source")
-                        return RandomDataSource(self.competition_directory, processor)
-                    bt.logging.info("Successfully initialized remote data source")
-                    return data_source
-                bt.logging.info("Using random data source")
-                return RandomDataSource(self.competition_directory, processor)
+                bt.logging.info("Successfully initialized remote data source")
+                return data_source
+            bt.logging.info("Using random data source")
+            return RandomDataSource(self.config, self.competition_directory, processor)
         except Exception as e:
             bt.logging.error(f"Error setting up data source: {e}")
             traceback.print_exc()
             bt.logging.info("Falling back to random data source due to error")
-            return RandomDataSource(self.competition_directory)
+            return RandomDataSource(self.config, self.competition_directory)
 
     def _calculate_relative_score(
         self, raw_accuracy: float, proof_size: float, response_time: float
@@ -304,11 +300,7 @@ class CircuitEvaluator:
         sota_state = self.sota_manager.current_state
 
         try:
-            with open(
-                os.path.join(self.competition_directory, "competition_config.json")
-            ) as f:
-                config = json.load(f)
-                weights = config["evaluation"]["scoring_weights"]
+            weights = self.config["evaluation"]["scoring_weights"]
         except Exception as e:
             bt.logging.error(f"Error loading scoring weights, using defaults: {e}")
             weights = {"accuracy": 0.4, "proof_size": 0.3, "response_time": 0.3}
@@ -349,11 +341,7 @@ class CircuitEvaluator:
             }
 
         try:
-            with open(
-                os.path.join(self.competition_directory, "competition_config.json")
-            ) as f:
-                config = json.load(f)
-                weights = config["evaluation"]["scoring_weights"]
+            weights = self.config["evaluation"]["scoring_weights"]
         except Exception as e:
             bt.logging.error(f"Error loading scoring weights, using defaults: {e}")
             weights = {"accuracy": 0.4, "proof_size": 0.3, "response_time": 0.3}
@@ -397,11 +385,7 @@ class CircuitEvaluator:
             return 0.0, float("inf"), float("inf"), False, {}
 
         try:
-            with open(
-                os.path.join(self.competition_directory, "competition_config.json")
-            ) as f:
-                config = json.load(f)
-                num_iterations = config["evaluation"]["num_iterations"]
+            num_iterations = self.config["evaluation"]["num_iterations"]
         except Exception as e:
             bt.logging.error(f"Error loading num_iterations, using default: {e}")
             num_iterations = 10
@@ -571,18 +555,7 @@ class CircuitEvaluator:
 
     def _get_input_shape(self, circuit_dir: str) -> Tuple[int, int] | None:
         try:
-            config_path = os.path.join(
-                self.competition_directory, "competition_config.json"
-            )
-            bt.logging.debug(f"Reading config from: {config_path}")
-            with open(config_path) as f:
-                config = json.load(f)
-                if (
-                    "circuit_settings" in config
-                    and "input_shape" in config["circuit_settings"]
-                ):
-                    return tuple(config["circuit_settings"]["input_shape"])
-            return None
+            return tuple(self.config["circuit_settings"]["input_shape"])
         except Exception as e:
             bt.logging.error(f"Error reading input shape: {e}")
             return None
@@ -782,12 +755,8 @@ class CircuitEvaluator:
 
     def _compare_outputs(self, expected: list[float], actual: list[float]) -> float:
         try:
-            with open(
-                os.path.join(self.competition_directory, "competition_config.json")
-            ) as f:
-                config = json.load(f)
-                output_shapes = config["circuit_settings"]["output_shapes"]
-                total_size = sum(np.prod(shape) for shape in output_shapes.values())
+            output_shapes = self.config["circuit_settings"]["output_shapes"]
+            total_size = sum(np.prod(shape) for shape in output_shapes.values())
 
             if isinstance(actual, dict) and "pretty_public_inputs" in actual:
                 rescaled = actual["pretty_public_inputs"].get("rescaled_outputs", [])

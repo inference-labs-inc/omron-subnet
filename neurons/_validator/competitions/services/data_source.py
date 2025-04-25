@@ -43,23 +43,13 @@ class DefaultDataProcessor(CompetitionDataProcessor):
 class CompetitionDataSource(ABC):
     def __init__(
         self,
+        competition_config: dict,
         competition_directory: str,
         processor: Optional[CompetitionDataProcessor] = None,
     ):
+        self.config = competition_config
         self.competition_directory = competition_directory
         self.processor = processor or DefaultDataProcessor()
-        self._load_config()
-
-    def _load_config(self):
-        config_path = os.path.join(
-            self.competition_directory, "competition_config.json"
-        )
-        try:
-            with open(config_path) as f:
-                self.config = json.load(f)
-        except Exception as e:
-            bt.logging.error(f"Error loading competition config: {e}")
-            self.config = {}
 
     @abstractmethod
     def get_benchmark_data(self) -> Optional[torch.Tensor]:

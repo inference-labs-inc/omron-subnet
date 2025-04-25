@@ -161,6 +161,12 @@ class ValidatorLoop:
     @with_rate_limit(period=FIVE_MINUTES)
     def update_queryable_uids(self):
         self.queryable_uids = list(get_queryable_uids(self.config.metagraph))
+        self.competition_uids = []
+        try:
+            for miner_state in self.competition.miner_states:
+                self.competition_uids.append(miner_state.uid)
+        except Exception as e:
+            bt.logging.error(f"Error updating competition UIDs: {e}")
 
     @with_rate_limit(period=ONE_MINUTE / 4)
     def log_health(self):
