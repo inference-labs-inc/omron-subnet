@@ -187,7 +187,7 @@ class CompetitionManager:
 
     def log_metrics(self, metrics: dict):
         """Log competition metrics."""
-        if not self.current_competition:
+        if not self.current_competition or not self.is_competition_active():
             return
 
         try:
