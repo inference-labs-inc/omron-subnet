@@ -1339,11 +1339,11 @@ wheels = [
 
 [[package]]
 name = "narwhals"
-version = "1.37.0"
+version = "1.37.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d0/b8/8adb05ab8ad7eb13069a241081fda5653de8532078b128cd58f647f690c7/narwhals-1.37.0.tar.gz", hash = "sha256:47cb7bb63afd85e72c5260a8c6281fce88b2e12fbe18eba777b980e3dccd5a45", size = 271458 }
+sdist = { url = "https://files.pythonhosted.org/packages/13/e1/a602073ef14da8f065b08c178861cf782f08a3676492042566ae3ccc5671/narwhals-1.37.1.tar.gz", hash = "sha256:1eb8f17ff00e6c471d5afb704e9068f41657234eb73bde2ee66ad975a170015b", size = 272029 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8e/37/9f0f514d0912bc6d4b9476904b39cba1d38f5e21731552f3d52f5e594bcf/narwhals-1.37.0-py3-none-any.whl", hash = "sha256:d7df62f3bc2bf951a7ba3589cd1f6b8ed1298da281c348444d19f9c0b5a063f6", size = 331872 },
+    { url = "https://files.pythonhosted.org/packages/b1/e3/79d95ed89f46b134dd801b54375e362c505303bd739a6737efc14d0de835/narwhals-1.37.1-py3-none-any.whl", hash = "sha256:6f358a23b7351897d6efb45496dc0528918ce4ca6c8f9631594885cd873576a7", size = 332366 },
 ]
 
 [[package]]
