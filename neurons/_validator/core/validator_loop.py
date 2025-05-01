@@ -204,6 +204,9 @@ class ValidatorLoop:
         if self.is_syncing_competition:
             bt.logging.debug("Competition sync already in progress, skipping")
             return
+        if not self.competition.is_active:
+            bt.logging.debug("Competition is not active, skipping sync")
+            return
         try:
             self.is_syncing_competition = True
             bt.logging.info("Starting competition sync...")
