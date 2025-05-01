@@ -255,6 +255,9 @@ class Competition:
             bt.logging.critical(
                 "Competitions are only supported on macOS arm64 architecture."
             )
+        if not self.is_active:
+            bt.logging.info("Competition is not active, skipping commitment fetch")
+            return []
 
         queryable_uids = self.metagraph.uids
         hotkey_to_uid = {self.metagraph.hotkeys[uid]: uid for uid in queryable_uids}
