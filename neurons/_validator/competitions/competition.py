@@ -236,7 +236,11 @@ class Competition:
         self.miner_states: Dict[str, NeuronState] = {}
 
         self.circuits_evaluated_count: int = 0
-        self.is_active: bool = True
+        self.is_active: bool = (
+            self.config.get("start_timestamp")
+            < time.time()
+            < self.config.get("end_timestamp")
+        )
 
         self.download_queue: List[Tuple[int, str, str]] = []
         self.current_download: Optional[Tuple[int, str, str]] = None
