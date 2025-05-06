@@ -69,7 +69,7 @@
         "type": "remote"
     },
     "evaluation": {
-        "metric": "mean_absolute_error",
+        "metric": "mean_squared_error",
         "num_iterations": 10,
         "scoring_weights": {
             "accuracy": 0.95,
