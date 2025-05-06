@@ -781,7 +781,6 @@ class CircuitEvaluator:
                 os.unlink(proof_path)
 
     def _compare_outputs(self, expected: list[float], actual: list[float]) -> float:
-        ACCURACY_MAE_SCALE_FACTOR = 1.0
         try:
             with open(
                 os.path.join(self.competition_directory, "competition_config.json")
@@ -806,11 +805,10 @@ class CircuitEvaluator:
             expected = expected[:total_size]
             expected_tensor = torch.tensor(expected)
             actual_tensor = torch.tensor(actual)
-
-            mae = torch.nn.functional.l1_loss(
+            mse = torch.nn.functional.mse_loss(
                 actual_tensor, expected_tensor, reduction="sum"
             )
-            raw_accuracy = torch.exp(-(mae * ACCURACY_MAE_SCALE_FACTOR)).item()
+            raw_accuracy = torch.exp(-mse).item()
             return raw_accuracy
         except Exception as e:
             bt.logging.error(f"Error comparing outputs: {e}")
