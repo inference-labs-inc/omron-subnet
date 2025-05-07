@@ -87,7 +87,6 @@ class Reward(nn.Module):
         )
 
         # Ensure maximum_response_time is not equal to minimum_response_time to avoid division by zero
-        # If they are equal, add 1 to maximum_response_time (assuming response times are in seconds or similar units)
         # Adding a small constant like 1 ensures the divisor is non-zero.
         adjusted_max_response_time = torch.where(
             torch.eq(maximum_response_time, minimum_response_time),
