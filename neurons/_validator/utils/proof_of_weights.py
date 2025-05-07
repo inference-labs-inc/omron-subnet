@@ -107,6 +107,14 @@ class ProofOfWeightsItem:
         validator_uid,
         competition,
     ):
+        max_val_float = float(maximum_response_time)
+        min_val_float = float(minimum_response_time)
+
+        if (max_val_float - min_val_float) < 1.0:
+            adjusted_max_response_time = min_val_float + 1.0
+        else:
+            adjusted_max_response_time = max_val_float
+
         return ProofOfWeightsItem(
             maximum_score=maximum_score,
             previous_score=previous_score,
@@ -115,11 +123,15 @@ class ProofOfWeightsItem:
             response_time=(
                 torch.tensor(response.response_time, dtype=torch.float32)
                 if response.verification_result
-                else maximum_response_time
+                else torch.tensor(
+                    adjusted_max_response_time, dtype=torch.float32
+                )  # Use adjusted time here as well for consistency if not verified
             ),
             competition=competition,
-            maximum_response_time=maximum_response_time,
-            minimum_response_time=minimum_response_time,
+            maximum_response_time=torch.tensor(
+                adjusted_max_response_time, dtype=torch.float32
+            ),
+            minimum_response_time=torch.tensor(min_val_float, dtype=torch.float32),
             block_number=block_number,
             validator_uid=validator_uid,
             miner_uid=torch.tensor(response.uid, dtype=torch.int64),
