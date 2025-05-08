@@ -298,10 +298,11 @@ class CircuitEvaluator:
     def _calculate_relative_score(
         self, raw_accuracy: float, proof_size: float, response_time: float
     ) -> float:
-        if raw_accuracy == 0:
-            return 0.0
-
         sota_state = self.sota_manager.current_state
+        sota_raw_acc = sota_state.raw_accuracy
+
+        if not (raw_accuracy > sota_raw_acc * 1.02):
+            return 0.0
 
         try:
             with open(
@@ -313,12 +314,7 @@ class CircuitEvaluator:
             bt.logging.error(f"Error loading scoring weights, using defaults: {e}")
             weights = {"accuracy": 0.4, "proof_size": 0.3, "response_time": 0.3}
 
-        sota_raw_acc = sota_state.raw_accuracy
-        if raw_accuracy > sota_raw_acc * 1.02:
-            accuracy_diff = sota_raw_acc - raw_accuracy
-        else:
-            # Ignore non-significant accuracy improvements
-            accuracy_diff = max(0, sota_raw_acc - raw_accuracy)
+        accuracy_diff = sota_raw_acc - raw_accuracy
 
         if sota_state.proof_size > 0:
             proof_size_diff = max(
