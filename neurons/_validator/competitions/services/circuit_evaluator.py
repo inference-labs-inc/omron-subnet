@@ -313,7 +313,12 @@ class CircuitEvaluator:
             bt.logging.error(f"Error loading scoring weights, using defaults: {e}")
             weights = {"accuracy": 0.4, "proof_size": 0.3, "response_time": 0.3}
 
-        accuracy_diff = max(0, sota_state.raw_accuracy - raw_accuracy)
+        sota_raw_acc = sota_state.raw_accuracy
+        if raw_accuracy > sota_raw_acc * 1.02:
+            accuracy_diff = sota_raw_acc - raw_accuracy
+        else:
+            # Ignore non-significant accuracy improvements
+            accuracy_diff = max(0, sota_raw_acc - raw_accuracy)
 
         if sota_state.proof_size > 0:
             proof_size_diff = max(
