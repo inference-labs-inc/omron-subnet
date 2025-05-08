@@ -130,30 +130,16 @@ class SotaManager:
         improvements: dict = None,
     ) -> bool:
         EPSILON = 1e-6
-        MAX_DEGRADATION = 0.1
 
         if self.sota_state.sota_relative_score == 0:
             return True
 
-        if sota_relative_score < self.sota_state.sota_relative_score - MAX_DEGRADATION:
+        if sota_relative_score < self.sota_state.sota_relative_score:
             return False
 
         if improvements and "raw" in improvements and "weighted" in improvements:
             weighted_improvement = sum(-v for v in improvements["weighted"].values())
             return weighted_improvement > EPSILON
-
-        proof_size_degradation = (
-            proof_size - self.sota_state.proof_size
-        ) / self.sota_state.proof_size
-        response_time_degradation = (
-            response_time - self.sota_state.response_time
-        ) / self.sota_state.response_time
-
-        if (
-            proof_size_degradation > MAX_DEGRADATION
-            or response_time_degradation > MAX_DEGRADATION
-        ):
-            return False
 
         return False
 

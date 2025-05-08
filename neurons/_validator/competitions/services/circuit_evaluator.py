@@ -335,7 +335,11 @@ class CircuitEvaluator:
             + response_time_diff * weights["response_time"]
         )
 
-        return torch.exp(-total_diff).item()
+        return (
+            torch.exp(-total_diff).item()
+            if raw_accuracy > sota_state.raw_accuracy * 1.02
+            else 0.0
+        )
 
     def _calculate_improvements(
         self, raw_accuracy: float, proof_size: float, response_time: float
