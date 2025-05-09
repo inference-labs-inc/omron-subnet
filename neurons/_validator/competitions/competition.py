@@ -223,7 +223,7 @@ class Competition:
             )
             bt.logging.debug(f"Loaded accuracy weight: {self.accuracy_weight}")
 
-        self.sota_manager = SotaManager(self.sota_directory)
+        self.sota_manager = SotaManager(self.config, self.sota_directory)
         self.circuit_manager = CircuitManager(
             self.temp_directory, self.competition_id, self.dendrite
         )

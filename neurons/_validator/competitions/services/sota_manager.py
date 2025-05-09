@@ -9,7 +9,8 @@ import torch
 
 
 class SotaManager:
-    def __init__(self, sota_directory: str):
+    def __init__(self, competition_config: dict, sota_directory: str):
+        self.config = competition_config
         self.sota_directory = sota_directory
         self.sota_state_path = os.path.join(sota_directory, "sota_state.json")
         self.sota_state = self._load_state()
@@ -71,13 +72,7 @@ class SotaManager:
     def recalculate_miner_scores(self, miner_states: dict[str, NeuronState]) -> None:
         """Recalculate all miner scores relative to the new SOTA."""
         try:
-            with open(
-                os.path.join(
-                    os.path.dirname(self.sota_directory), "competition_config.json"
-                )
-            ) as f:
-                config = json.load(f)
-                weights = config["evaluation"]["scoring_weights"]
+            weights = self.config["evaluation"]["scoring_weights"]
         except Exception as e:
             bt.logging.error(
                 f"Error loading scoring weights for recalculation, using defaults: {e}"
