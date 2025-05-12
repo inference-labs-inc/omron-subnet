@@ -257,7 +257,10 @@ class CircuitManager:
                 with self._lock:
                     new_vk_hash = self._calculate_vk_hash()
                     if not new_vk_hash:
-                        bt.logging.warning("No verification key found")
+                        bt.logging.warning(
+                            "No verification key found. This means you are not participating in the competition.\n"
+                            "See https://accelerate.omron.ai for details."
+                        )
                         time.sleep(self.check_interval)
                         continue
 
