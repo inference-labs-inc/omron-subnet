@@ -5,10 +5,8 @@ import shutil
 import bittensor as bt
 from ..models.sota import SotaState
 from ..models.neuron import NeuronState
-import torch
 import traceback
-from rich.console import Console
-from rich.table import Table
+from _validator.utils.logging import log_sota_scores
 
 
 class SotaManager:
@@ -150,29 +148,7 @@ class SotaManager:
             performance_scores.sort(key=lambda x: x[1])
             decay_rate = 3.0
 
-            table = Table(title="SOTA Scores")
-            table.add_column("Hotkey", style="cyan")
-            table.add_column("Score", justify="right", style="green")
-            table.add_column("Raw Accuracy", justify="right", style="yellow")
-            table.add_column("Proof Size", justify="right", style="blue")
-            table.add_column("Response Time", justify="right", style="magenta")
-
-            for rank, (hotkey, _) in enumerate(performance_scores):
-                rank_score = torch.exp(torch.tensor(-decay_rate * rank)).item()
-                miner_states[hotkey].sota_relative_score = rank_score
-
-                state = miner_states[hotkey]
-                table.add_row(
-                    hotkey[:8] + "...",
-                    f"{rank_score:.6f}",
-                    f"{state.raw_accuracy:.4f}",
-                    f"{state.proof_size:.0f}",
-                    f"{state.response_time:.4f}",
-                )
-
-            console = Console(color_system="truecolor")
-            console.width = 120
-            console.print(table)
+            log_sota_scores(performance_scores, miner_states, decay_rate)
 
         except Exception as e:
             bt.logging.error(f"Error recalculating miner scores: {e}")
