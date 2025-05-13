@@ -7,6 +7,8 @@ from ..models.sota import SotaState
 from ..models.neuron import NeuronState
 import torch
 import traceback
+from rich.console import Console
+from rich.table import Table
 
 
 class SotaManager:
@@ -108,7 +110,6 @@ class SotaManager:
             weights = {"accuracy": 0.4, "proof_size": 0.3, "response_time": 0.3}
 
         try:
-            # First, calculate raw performance metrics for each miner
             performance_scores = []
 
             for hotkey, state in miner_states.items():
@@ -144,21 +145,34 @@ class SotaManager:
                     + response_time_diff * weights["response_time"]
                 )
 
-                # Store the performance score and hotkey
                 performance_scores.append((hotkey, total_diff))
 
-            # Sort by performance (lower total_diff is better)
             performance_scores.sort(key=lambda x: x[1])
+            decay_rate = 3.0
 
-            # Assign scores based on rank position with extreme exponential decay
-            # This ensures only the top performer gets a high score
-            decay_rate = 3.0  # Higher means steeper drop-off between ranks
+            table = Table(title="SOTA Scores")
+            table.add_column("Hotkey", style="cyan")
+            table.add_column("Score", justify="right", style="green")
+            table.add_column("Raw Accuracy", justify="right", style="yellow")
+            table.add_column("Proof Size", justify="right", style="blue")
+            table.add_column("Response Time", justify="right", style="magenta")
 
             for rank, (hotkey, _) in enumerate(performance_scores):
-                # Exponential decay based on rank position
-                # First place (rank 0) gets 1.0, others drop off extremely quickly
                 rank_score = torch.exp(-decay_rate * rank).item()
                 miner_states[hotkey].sota_relative_score = rank_score
+
+                state = miner_states[hotkey]
+                table.add_row(
+                    hotkey[:8] + "...",
+                    f"{rank_score:.6f}",
+                    f"{state.raw_accuracy:.4f}",
+                    f"{state.proof_size:.0f}",
+                    f"{state.response_time:.4f}",
+                )
+
+            console = Console(color_system="truecolor")
+            console.width = 120
+            console.print(table)
 
         except Exception as e:
             bt.logging.error(f"Error recalculating miner scores: {e}")
