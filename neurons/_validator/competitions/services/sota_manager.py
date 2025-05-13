@@ -6,6 +6,7 @@ import bittensor as bt
 from ..models.sota import SotaState
 from ..models.neuron import NeuronState
 import torch
+import traceback
 
 
 class SotaManager:
@@ -35,41 +36,63 @@ class SotaManager:
     def preserve_circuit(
         self,
         circuit_dir: str,
-        neuron_state: NeuronState,
+        hotkey: str,
+        uid: int,
+        raw_accuracy: float,
+        proof_size: float,
+        response_time: float,
+        current_hash: str,
         miner_states: dict[str, NeuronState],
     ):
+        """Preserves the circuit if it represents a new SOTA based on raw performance."""
         try:
-            sota_circuit_dir = os.path.join(self.sota_directory, "circuit")
-            if os.path.exists(sota_circuit_dir):
-                shutil.rmtree(sota_circuit_dir)
-            shutil.copytree(circuit_dir, sota_circuit_dir)
+            is_new_sota = False
+            if self.sota_state.raw_accuracy == 0:
+                is_new_sota = True
+            elif raw_accuracy > self.sota_state.raw_accuracy:
+                is_new_sota = True
+            elif raw_accuracy == self.sota_state.raw_accuracy:
+                if proof_size < self.sota_state.proof_size:
+                    is_new_sota = True
+                elif proof_size == self.sota_state.proof_size:
+                    if response_time < self.sota_state.response_time:
+                        is_new_sota = True
 
-            self.sota_state = SotaState(
-                sota_relative_score=neuron_state.sota_relative_score,
-                hash=neuron_state.hash,
-                hotkey=neuron_state.hotkey,
-                uid=neuron_state.uid,
-                proof_size=neuron_state.proof_size,
-                response_time=neuron_state.response_time,
-                timestamp=int(time.time()),
-                raw_accuracy=neuron_state.raw_accuracy,
-            )
-            self._save_state()
+            if is_new_sota:
+                sota_circuit_dir = os.path.join(self.sota_directory, "circuit")
+                if os.path.exists(sota_circuit_dir):
+                    shutil.rmtree(sota_circuit_dir)
+                shutil.copytree(circuit_dir, sota_circuit_dir)
 
-            bt.logging.success(
-                f"New SOTA achieved by {neuron_state.hotkey}! "
-                f"Score: {neuron_state.sota_relative_score:.4f}, "
-                f"Raw Accuracy: {neuron_state.raw_accuracy:.4f}, "
-                f"Proof Size: {neuron_state.proof_size:.2f} bytes, "
-                f"Response Time: {neuron_state.response_time:.4f}s"
-            )
+                self.sota_state = SotaState(
+                    sota_relative_score=1.0,
+                    hash=current_hash,
+                    hotkey=hotkey,
+                    uid=uid,
+                    proof_size=proof_size,
+                    response_time=response_time,
+                    timestamp=int(time.time()),
+                    raw_accuracy=raw_accuracy,
+                )
+                self._save_state()
 
-            self.recalculate_miner_scores(miner_states)
+                bt.logging.success(
+                    f"New SOTA achieved by {hotkey}! "
+                    f"Raw Accuracy: {raw_accuracy:.4f}, "
+                    f"Proof Size: {proof_size:.0f} bytes, "
+                    f"Response Time: {response_time:.4f}s"
+                )
+
+                self.recalculate_miner_scores(miner_states)
+            else:
+                bt.logging.debug(f"Submission from {hotkey} did not improve SOTA.")
+
         except Exception as e:
             bt.logging.error(f"Error preserving SOTA circuit: {e}")
+            bt.logging.error(traceback.format_exc())
 
     def recalculate_miner_scores(self, miner_states: dict[str, NeuronState]) -> None:
-        """Recalculate all miner scores relative to the new SOTA."""
+        """Recalculate all miner scores using a strict ranking system."""
         try:
             with open(
                 os.path.join(
@@ -85,6 +108,9 @@ class SotaManager:
             weights = {"accuracy": 0.4, "proof_size": 0.3, "response_time": 0.3}
 
         try:
+            # First, calculate raw performance metrics for each miner
+            performance_scores = []
+
             for hotkey, state in miner_states.items():
                 if not state.verification_result or state.raw_accuracy == 0:
                     state.sota_relative_score = 0.0
@@ -112,36 +138,30 @@ class SotaManager:
                 else:
                     response_time_diff = 0 if state.response_time == 0 else 1
 
-                total_diff = torch.tensor(
+                total_diff = (
                     accuracy_diff * weights["accuracy"]
                     + proof_size_diff * weights["proof_size"]
                     + response_time_diff * weights["response_time"]
                 )
 
-                state.sota_relative_score = torch.exp(-total_diff).item()
+                # Store the performance score and hotkey
+                performance_scores.append((hotkey, total_diff))
+
+            # Sort by performance (lower total_diff is better)
+            performance_scores.sort(key=lambda x: x[1])
+
+            # Assign scores based on rank position with extreme exponential decay
+            # This ensures only the top performer gets a high score
+            decay_rate = 3.0  # Higher means steeper drop-off between ranks
+
+            for rank, (hotkey, _) in enumerate(performance_scores):
+                # Exponential decay based on rank position
+                # First place (rank 0) gets 1.0, others drop off extremely quickly
+                rank_score = torch.exp(-decay_rate * rank).item()
+                miner_states[hotkey].sota_relative_score = rank_score
+
         except Exception as e:
             bt.logging.error(f"Error recalculating miner scores: {e}")
-
-    def check_if_sota(
-        self,
-        sota_relative_score: float,
-        proof_size: float,
-        response_time: float,
-        improvements: dict = None,
-    ) -> bool:
-        EPSILON = 1e-6
-
-        if self.sota_state.sota_relative_score == 0:
-            return True
-
-        if sota_relative_score < self.sota_state.sota_relative_score:
-            return False
-
-        if improvements and "raw" in improvements and "weighted" in improvements:
-            weighted_improvement = sum(-v for v in improvements["weighted"].values())
-            return weighted_improvement > EPSILON
-
-        return False
 
     @property
     def current_state(self) -> SotaState:
