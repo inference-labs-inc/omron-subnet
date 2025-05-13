@@ -158,7 +158,7 @@ class SotaManager:
             table.add_column("Response Time", justify="right", style="magenta")
 
             for rank, (hotkey, _) in enumerate(performance_scores):
-                rank_score = torch.exp(-decay_rate * rank).item()
+                rank_score = torch.exp(torch.tensor(-decay_rate * rank)).item()
                 miner_states[hotkey].sota_relative_score = rank_score
 
                 state = miner_states[hotkey]
