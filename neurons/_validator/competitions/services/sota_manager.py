@@ -83,13 +83,14 @@ class SotaManager:
                     f"Response Time: {response_time:.4f}s"
                 )
 
-                self.recalculate_miner_scores(miner_states)
             else:
                 bt.logging.debug(f"Submission from {hotkey} did not improve SOTA.")
 
         except Exception as e:
             bt.logging.error(f"Error preserving SOTA circuit: {e}")
             bt.logging.error(traceback.format_exc())
+        finally:
+            self.recalculate_miner_scores(miner_states)
 
     def recalculate_miner_scores(self, miner_states: dict[str, NeuronState]) -> None:
         """Recalculate all miner scores using a strict ranking system."""
