@@ -6,7 +6,7 @@ from rich.table import Table
 
 from utils import wandb_logger
 from _validator.models.miner_response import MinerResponse
-from _validator.models.neuron_state import NeuronState
+from _validator.competitions.models.neuron import NeuronState
 
 
 def create_and_print_table(
