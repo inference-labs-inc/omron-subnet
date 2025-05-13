@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import traceback
 import random
+import time
 
 import bittensor as bt
 
@@ -33,6 +34,10 @@ class RequestPipeline:
         self.score_manager = score_manager
         self.api = api
         self.hash_guard = HashGuard()
+
+        # Dictionary of miners with --competition-only flag
+        # Keys are UID of the miner, Values are the timestamp of the last request
+        self.competition_only_mode = {}
 
     def prepare_requests(self, filtered_uids) -> list[Request]:
         """
