@@ -49,7 +49,7 @@ class SotaManager:
         """Preserves the circuit if it represents a new SOTA based on raw performance."""
         try:
             is_new_sota = False
-            if self.sota_state.raw_accuracy == 0:
+            if self.sota_state.raw_accuracy == 0 or self.sota_state.hash is None:
                 is_new_sota = True
             elif raw_accuracy > self.sota_state.raw_accuracy:
                 is_new_sota = True
