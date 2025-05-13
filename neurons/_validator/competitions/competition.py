@@ -437,7 +437,6 @@ class Competition:
                 proof_size,
                 response_time,
                 verification_result,
-                improvements,
                 accuracy,
             ) = self.circuit_evaluator.evaluate(circuit_dir)
 
@@ -461,11 +460,17 @@ class Competition:
             neuron_state.response_time = response_time
             neuron_state.verification_result = verification_result
             neuron_state.raw_accuracy = accuracy
-            if verification_result and self.sota_manager.check_if_sota(
-                sota_relative_score, proof_size, response_time, improvements
-            ):
+
+            if verification_result:
                 self.sota_manager.preserve_circuit(
-                    circuit_dir, neuron_state, self.miner_states
+                    circuit_dir=circuit_dir,
+                    hotkey=circuit_owner,
+                    uid=int(circuit_uid),
+                    raw_accuracy=accuracy,
+                    proof_size=proof_size,
+                    response_time=response_time,
+                    hash=os.path.basename(circuit_dir),
+                    miner_states=self.miner_states,
                 )
 
             self._update_competition_metrics()

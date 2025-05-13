@@ -43,7 +43,7 @@ class SotaManager:
         raw_accuracy: float,
         proof_size: float,
         response_time: float,
-        current_hash: str,
+        hash: str,
         miner_states: dict[str, NeuronState],
     ):
         """Preserves the circuit if it represents a new SOTA based on raw performance."""
@@ -68,7 +68,7 @@ class SotaManager:
 
                 self.sota_state = SotaState(
                     sota_relative_score=1.0,
-                    hash=current_hash,
+                    hash=hash,
                     hotkey=hotkey,
                     uid=uid,
                     proof_size=proof_size,
