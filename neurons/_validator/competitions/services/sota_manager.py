@@ -5,7 +5,8 @@ import shutil
 import bittensor as bt
 from ..models.sota import SotaState
 from ..models.neuron import NeuronState
-import torch
+import traceback
+from _validator.utils.logging import log_sota_scores
 
 
 class SotaManager:
@@ -13,6 +14,15 @@ class SotaManager:
         self.sota_directory = sota_directory
         self.sota_state_path = os.path.join(sota_directory, "sota_state.json")
         self.sota_state = self._load_state()
+
+        try:
+            competition_dir = os.path.dirname(os.path.dirname(sota_directory))
+            with open(os.path.join(competition_dir, "competition_config.json")) as f:
+                config = json.load(f)
+                self.weights = config["evaluation"]["scoring_weights"]
+        except Exception as e:
+            bt.logging.error(f"Error loading scoring weights, using defaults: {e}")
+            self.weights = {"accuracy": 0.95, "proof_size": 0.0, "response_time": 0.05}
 
     def _load_state(self) -> SotaState:
         try:
@@ -32,116 +42,163 @@ class SotaManager:
         except Exception as e:
             bt.logging.error(f"Error saving SOTA state: {e}")
 
+    def calculate_score(
+        self,
+        accuracy: float,
+        proof_size: float,
+        response_time: float,
+        reference_states: dict[str, NeuronState] = None,
+    ) -> float:
+        if reference_states:
+            best_accuracy = max(
+                state.raw_accuracy for state in reference_states.values()
+            )
+            min_proof_size = min(
+                state.proof_size
+                for state in reference_states.values()
+                if state.proof_size > 0
+            )
+            min_response_time = min(
+                state.response_time
+                for state in reference_states.values()
+                if state.response_time > 0
+            )
+        else:
+            best_accuracy = (
+                self.sota_state.raw_accuracy
+                if self.sota_state.raw_accuracy > 0
+                else accuracy
+            )
+            min_proof_size = (
+                self.sota_state.proof_size
+                if self.sota_state.proof_size > 0
+                else proof_size
+            )
+            min_response_time = (
+                self.sota_state.response_time
+                if self.sota_state.response_time > 0
+                else response_time
+            )
+
+        accuracy_score = accuracy / best_accuracy if best_accuracy > 0 else 1
+        proof_size_score = min_proof_size / proof_size if proof_size > 0 else 0
+        response_time_score = (
+            min_response_time / response_time if response_time > 0 else 0
+        )
+
+        return (
+            accuracy_score * self.weights["accuracy"]
+            + proof_size_score * self.weights["proof_size"]
+            + response_time_score * self.weights["response_time"]
+        )
+
     def preserve_circuit(
         self,
         circuit_dir: str,
-        neuron_state: NeuronState,
-        miner_states: dict[str, NeuronState],
-    ):
-        try:
-            sota_circuit_dir = os.path.join(self.sota_directory, "circuit")
-            if os.path.exists(sota_circuit_dir):
-                shutil.rmtree(sota_circuit_dir)
-            shutil.copytree(circuit_dir, sota_circuit_dir)
-
-            self.sota_state = SotaState(
-                sota_relative_score=neuron_state.sota_relative_score,
-                hash=neuron_state.hash,
-                hotkey=neuron_state.hotkey,
-                uid=neuron_state.uid,
-                proof_size=neuron_state.proof_size,
-                response_time=neuron_state.response_time,
-                timestamp=int(time.time()),
-                raw_accuracy=neuron_state.raw_accuracy,
-            )
-            self._save_state()
-
-            bt.logging.success(
-                f"New SOTA achieved by {neuron_state.hotkey}! "
-                f"Score: {neuron_state.sota_relative_score:.4f}, "
-                f"Raw Accuracy: {neuron_state.raw_accuracy:.4f}, "
-                f"Proof Size: {neuron_state.proof_size:.2f} bytes, "
-                f"Response Time: {neuron_state.response_time:.4f}s"
-            )
-
-            self.recalculate_miner_scores(miner_states)
-        except Exception as e:
-            bt.logging.error(f"Error preserving SOTA circuit: {e}")
-
-    def recalculate_miner_scores(self, miner_states: dict[str, NeuronState]) -> None:
-        """Recalculate all miner scores relative to the new SOTA."""
-        try:
-            with open(
-                os.path.join(
-                    os.path.dirname(self.sota_directory), "competition_config.json"
-                )
-            ) as f:
-                config = json.load(f)
-                weights = config["evaluation"]["scoring_weights"]
-        except Exception as e:
-            bt.logging.error(
-                f"Error loading scoring weights for recalculation, using defaults: {e}"
-            )
-            weights = {"accuracy": 0.4, "proof_size": 0.3, "response_time": 0.3}
-
-        try:
-            for hotkey, state in miner_states.items():
-                if not state.verification_result or state.raw_accuracy == 0:
-                    state.sota_relative_score = 0.0
-                    continue
-
-                accuracy_diff = max(
-                    0, self.sota_state.raw_accuracy - state.raw_accuracy
-                )
-
-                if self.sota_state.proof_size > 0:
-                    proof_size_diff = max(
-                        0,
-                        (state.proof_size - self.sota_state.proof_size)
-                        / self.sota_state.proof_size,
-                    )
-                else:
-                    proof_size_diff = 0 if state.proof_size == 0 else 1
-
-                if self.sota_state.response_time > 0:
-                    response_time_diff = max(
-                        0,
-                        (state.response_time - self.sota_state.response_time)
-                        / self.sota_state.response_time,
-                    )
-                else:
-                    response_time_diff = 0 if state.response_time == 0 else 1
-
-                total_diff = torch.tensor(
-                    accuracy_diff * weights["accuracy"]
-                    + proof_size_diff * weights["proof_size"]
-                    + response_time_diff * weights["response_time"]
-                )
-
-                state.sota_relative_score = torch.exp(-total_diff).item()
-        except Exception as e:
-            bt.logging.error(f"Error recalculating miner scores: {e}")
-
-    def check_if_sota(
-        self,
-        sota_relative_score: float,
+        hotkey: str,
+        uid: int,
+        raw_accuracy: float,
         proof_size: float,
         response_time: float,
-        improvements: dict = None,
-    ) -> bool:
-        EPSILON = 1e-6
+        hash: str,
+        miner_states: dict[str, NeuronState],
+    ):
+        """Preserves the circuit if it represents a new SOTA based on raw performance."""
+        try:
+            current_score = self.calculate_score(
+                raw_accuracy, proof_size, response_time
+            )
+            sota_score = (
+                self.calculate_score(
+                    self.sota_state.raw_accuracy,
+                    self.sota_state.proof_size,
+                    self.sota_state.response_time,
+                )
+                if self.sota_state.hash
+                else 0
+            )
 
-        if self.sota_state.sota_relative_score == 0:
-            return True
+            is_new_sota = current_score > sota_score * 1.02
 
-        if sota_relative_score < self.sota_state.sota_relative_score:
-            return False
+            if is_new_sota:
+                sota_circuit_dir = os.path.join(self.sota_directory, "circuit")
+                if os.path.exists(sota_circuit_dir):
+                    shutil.rmtree(sota_circuit_dir)
+                shutil.copytree(circuit_dir, sota_circuit_dir)
 
-        if improvements and "raw" in improvements and "weighted" in improvements:
-            weighted_improvement = sum(-v for v in improvements["weighted"].values())
-            return weighted_improvement > EPSILON
+                self.sota_state = SotaState(
+                    sota_relative_score=1.0,
+                    hash=hash,
+                    hotkey=hotkey,
+                    uid=uid,
+                    proof_size=proof_size,
+                    response_time=response_time,
+                    timestamp=int(time.time()),
+                    raw_accuracy=raw_accuracy,
+                )
+                self._save_state()
 
-        return False
+                bt.logging.success(
+                    f"New SOTA achieved by {hotkey}! "
+                    f"Score: {current_score:.4f}, "
+                    f"Raw Accuracy: {raw_accuracy:.4f}, "
+                    f"Proof Size: {proof_size:.0f} bytes, "
+                    f"Response Time: {response_time:.4f}s"
+                )
+            else:
+                bt.logging.debug(
+                    f"Submission from {hotkey} did not improve SOTA. "
+                    f"Score: {current_score:.4f} vs SOTA: {sota_score:.4f}"
+                )
+
+        except Exception as e:
+            bt.logging.error(f"Error preserving SOTA circuit: {e}")
+            bt.logging.error(traceback.format_exc())
+        finally:
+            self.recalculate_miner_scores(miner_states)
+
+    def recalculate_miner_scores(self, miner_states: dict[str, NeuronState]) -> None:
+        """Recalculate all miner scores using a strict ranking system."""
+        try:
+            valid_miners = {
+                hotkey: state
+                for hotkey, state in miner_states.items()
+                if state.verification_result and state.raw_accuracy > 0
+            }
+
+            if not valid_miners:
+                bt.logging.info("No valid miners to rank")
+                return
+
+            performance_scores = []
+            for hotkey, state in valid_miners.items():
+                score = self.calculate_score(
+                    state.raw_accuracy,
+                    state.proof_size,
+                    state.response_time,
+                    reference_states=valid_miners,
+                )
+                performance_scores.append((hotkey, score))
+
+            performance_scores.sort(key=lambda x: x[1], reverse=True)
+            max_score = (
+                max(score for _, score in performance_scores)
+                if performance_scores
+                else 1
+            )
+
+            for hotkey, score in performance_scores:
+                miner_states[hotkey].sota_relative_score = score / max_score
+
+            for hotkey, state in miner_states.items():
+                if hotkey not in [h for h, _ in performance_scores]:
+                    state.sota_relative_score = 0.0
+
+            log_sota_scores(performance_scores, miner_states, max_score)
+
+        except Exception as e:
+            bt.logging.error(f"Error recalculating miner scores: {e}")
+            bt.logging.error(traceback.format_exc())
 
     @property
     def current_state(self) -> SotaState:

@@ -295,98 +295,7 @@ class CircuitEvaluator:
             bt.logging.info("Falling back to random data source due to error")
             return RandomDataSource(self.competition_directory)
 
-    def _calculate_relative_score(
-        self, raw_accuracy: float, proof_size: float, response_time: float
-    ) -> float:
-        if raw_accuracy == 0:
-            return 0.0
-
-        sota_state = self.sota_manager.current_state
-
-        try:
-            with open(
-                os.path.join(self.competition_directory, "competition_config.json")
-            ) as f:
-                config = json.load(f)
-                weights = config["evaluation"]["scoring_weights"]
-        except Exception as e:
-            bt.logging.error(f"Error loading scoring weights, using defaults: {e}")
-            weights = {"accuracy": 0.4, "proof_size": 0.3, "response_time": 0.3}
-
-        accuracy_diff = max(0, sota_state.raw_accuracy - raw_accuracy)
-
-        if sota_state.proof_size > 0:
-            proof_size_diff = max(
-                0, (proof_size - sota_state.proof_size) / sota_state.proof_size
-            )
-        else:
-            proof_size_diff = 0 if proof_size == 0 else 1
-
-        if sota_state.response_time > 0:
-            response_time_diff = max(
-                0, (response_time - sota_state.response_time) / sota_state.response_time
-            )
-        else:
-            response_time_diff = 0 if response_time == 0 else 1
-
-        total_diff = torch.tensor(
-            accuracy_diff * weights["accuracy"]
-            + proof_size_diff * weights["proof_size"]
-            + response_time_diff * weights["response_time"]
-        )
-
-        return (
-            torch.exp(-total_diff).item()
-            if raw_accuracy > sota_state.raw_accuracy * 1.02
-            else 0.0
-        )
-
-    def _calculate_improvements(
-        self, raw_accuracy: float, proof_size: float, response_time: float
-    ) -> dict:
-        sota_state = self.sota_manager.current_state
-
-        if sota_state.sota_relative_score == 0:
-            return {
-                "raw": {"accuracy": 0, "proof_size": 0, "response_time": 0},
-                "weighted": {"accuracy": 0, "proof_size": 0, "response_time": 0},
-            }
-
-        try:
-            with open(
-                os.path.join(self.competition_directory, "competition_config.json")
-            ) as f:
-                config = json.load(f)
-                weights = config["evaluation"]["scoring_weights"]
-        except Exception as e:
-            bt.logging.error(f"Error loading scoring weights, using defaults: {e}")
-            weights = {"accuracy": 0.4, "proof_size": 0.3, "response_time": 0.3}
-
-        raw_improvements = {
-            "accuracy": sota_state.raw_accuracy - raw_accuracy,
-            "proof_size": (
-                (proof_size - sota_state.proof_size) / sota_state.proof_size
-                if sota_state.proof_size > 0
-                else 0
-            ),
-            "response_time": (
-                (response_time - sota_state.response_time) / sota_state.response_time
-                if sota_state.response_time > 0
-                else 0
-            ),
-        }
-
-        return {
-            "raw": raw_improvements,
-            "weighted": {
-                "accuracy": raw_improvements["accuracy"] * weights["accuracy"],
-                "proof_size": raw_improvements["proof_size"] * weights["proof_size"],
-                "response_time": raw_improvements["response_time"]
-                * weights["response_time"],
-            },
-        }
-
-    def evaluate(self, circuit_dir: str) -> Tuple[float, float, float, bool, dict]:
+    def evaluate(self, circuit_dir: str) -> Tuple[float, float, float, bool, float]:
         raw_accuracy_scores, proof_sizes, response_times, verification_results = (
             [],
             [],
@@ -398,7 +307,7 @@ class CircuitEvaluator:
 
         if not input_shape:
             bt.logging.error("Failed to get input shape")
-            return 0.0, float("inf"), float("inf"), False, {}
+            return 0.0, float("inf"), float("inf"), False, 0.0
 
         try:
             with open(
@@ -497,11 +406,12 @@ class CircuitEvaluator:
                 proof_sizes.append(float("inf"))
                 response_times.append(float("inf"))
 
-        if not all(verification_results):
+        overall_verification_successful = all(verification_results)
+        if not overall_verification_successful:
             bt.logging.error(
                 "One or more verifications failed - setting all scores to 0"
             )
-            return 0.0, float("inf"), float("inf"), False, {}
+            return 0.0, float("inf"), float("inf"), False, 0.0
 
         if successful_valid_outputs > 1 and all_outputs_identical:
             bt.logging.warning(
@@ -523,17 +433,8 @@ class CircuitEvaluator:
             else float("inf")
         )
 
-        sota_relative_score = self._calculate_relative_score(
-            avg_raw_accuracy, avg_proof_size, avg_response_time
-        )
-
-        improvements = self._calculate_improvements(
-            avg_raw_accuracy, avg_proof_size, avg_response_time
-        )
-
         safe_log(
             {
-                "sota_relative_score": float(sota_relative_score),
                 "avg_raw_accuracy": float(avg_raw_accuracy),
                 "avg_proof_size": (
                     float(avg_proof_size) if avg_proof_size != float("inf") else -1
@@ -543,7 +444,6 @@ class CircuitEvaluator:
                     if avg_response_time != float("inf")
                     else -1
                 ),
-                "improvements": improvements,
                 "total_iterations": num_iterations,
                 "successful_iterations": len([s for s in raw_accuracy_scores if s > 0]),
                 "verification_success_rate": sum(verification_results)
@@ -559,17 +459,15 @@ class CircuitEvaluator:
         )
 
         bt.logging.info(
-            f"Circuit evaluation complete - SOTA Score: {sota_relative_score:.4f}, "
-            f"Raw Accuracy: {avg_raw_accuracy:.4f}, "
+            f"Circuit evaluation complete - Raw Accuracy: {avg_raw_accuracy:.4f}, "
             f"Proof Size: {avg_proof_size:.0f}, Response Time: {avg_response_time:.2f}s"
         )
 
         return (
-            sota_relative_score,
+            avg_raw_accuracy,
             avg_proof_size,
             avg_response_time,
-            True,
-            improvements,
+            overall_verification_successful,
             avg_raw_accuracy,
         )
 
