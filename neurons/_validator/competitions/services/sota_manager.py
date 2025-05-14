@@ -15,6 +15,16 @@ class SotaManager:
         self.sota_state_path = os.path.join(sota_directory, "sota_state.json")
         self.sota_state = self._load_state()
 
+        try:
+            with open(
+                os.path.join(os.path.dirname(sota_directory), "competition_config.json")
+            ) as f:
+                config = json.load(f)
+                self.weights = config["evaluation"]["scoring_weights"]
+        except Exception as e:
+            bt.logging.error(f"Error loading scoring weights, using defaults: {e}")
+            self.weights = {"accuracy": 0.4, "proof_size": 0.3, "response_time": 0.3}
+
     def _load_state(self) -> SotaState:
         try:
             if os.path.exists(self.sota_state_path):
@@ -33,6 +43,56 @@ class SotaManager:
         except Exception as e:
             bt.logging.error(f"Error saving SOTA state: {e}")
 
+    def calculate_score(
+        self,
+        accuracy: float,
+        proof_size: float,
+        response_time: float,
+        reference_states: dict[str, NeuronState] = None,
+    ) -> float:
+        if reference_states:
+            best_accuracy = max(
+                state.raw_accuracy for state in reference_states.values()
+            )
+            min_proof_size = min(
+                state.proof_size
+                for state in reference_states.values()
+                if state.proof_size > 0
+            )
+            min_response_time = min(
+                state.response_time
+                for state in reference_states.values()
+                if state.response_time > 0
+            )
+        else:
+            best_accuracy = (
+                self.sota_state.raw_accuracy
+                if self.sota_state.raw_accuracy > 0
+                else accuracy
+            )
+            min_proof_size = (
+                self.sota_state.proof_size
+                if self.sota_state.proof_size > 0
+                else proof_size
+            )
+            min_response_time = (
+                self.sota_state.response_time
+                if self.sota_state.response_time > 0
+                else response_time
+            )
+
+        accuracy_score = accuracy / best_accuracy if best_accuracy > 0 else 1
+        proof_size_score = min_proof_size / proof_size if proof_size > 0 else 0
+        response_time_score = (
+            min_response_time / response_time if response_time > 0 else 0
+        )
+
+        return (
+            accuracy_score * self.weights["accuracy"]
+            + proof_size_score * self.weights["proof_size"]
+            + response_time_score * self.weights["response_time"]
+        )
+
     def preserve_circuit(
         self,
         circuit_dir: str,
@@ -46,17 +106,20 @@ class SotaManager:
     ):
         """Preserves the circuit if it represents a new SOTA based on raw performance."""
         try:
-            is_new_sota = False
-            if self.sota_state.raw_accuracy == 0 or self.sota_state.hash is None:
-                is_new_sota = True
-            elif raw_accuracy > self.sota_state.raw_accuracy * 1.02:
-                is_new_sota = True
-            elif raw_accuracy == self.sota_state.raw_accuracy:
-                if proof_size < self.sota_state.proof_size:
-                    is_new_sota = True
-                elif proof_size == self.sota_state.proof_size:
-                    if response_time < self.sota_state.response_time:
-                        is_new_sota = True
+            current_score = self.calculate_score(
+                raw_accuracy, proof_size, response_time
+            )
+            sota_score = (
+                self.calculate_score(
+                    self.sota_state.raw_accuracy,
+                    self.sota_state.proof_size,
+                    self.sota_state.response_time,
+                )
+                if self.sota_state.hash
+                else 0
+            )
+
+            is_new_sota = current_score > sota_score * 1.02
 
             if is_new_sota:
                 sota_circuit_dir = os.path.join(self.sota_directory, "circuit")
@@ -78,13 +141,16 @@ class SotaManager:
 
                 bt.logging.success(
                     f"New SOTA achieved by {hotkey}! "
+                    f"Score: {current_score:.4f}, "
                     f"Raw Accuracy: {raw_accuracy:.4f}, "
                     f"Proof Size: {proof_size:.0f} bytes, "
                     f"Response Time: {response_time:.4f}s"
                 )
-
             else:
-                bt.logging.debug(f"Submission from {hotkey} did not improve SOTA.")
+                bt.logging.debug(
+                    f"Submission from {hotkey} did not improve SOTA. "
+                    f"Score: {current_score:.4f} vs SOTA: {sota_score:.4f}"
+                )
 
         except Exception as e:
             bt.logging.error(f"Error preserving SOTA circuit: {e}")
@@ -95,21 +161,6 @@ class SotaManager:
     def recalculate_miner_scores(self, miner_states: dict[str, NeuronState]) -> None:
         """Recalculate all miner scores using a strict ranking system."""
         try:
-            with open(
-                os.path.join(
-                    os.path.dirname(self.sota_directory), "competition_config.json"
-                )
-            ) as f:
-                config = json.load(f)
-                weights = config["evaluation"]["scoring_weights"]
-        except Exception as e:
-            bt.logging.error(
-                f"Error loading scoring weights for recalculation, using defaults: {e}"
-            )
-            weights = {"accuracy": 0.4, "proof_size": 0.3, "response_time": 0.3}
-
-        try:
-
             valid_miners = {
                 hotkey: state
                 for hotkey, state in miner_states.items()
@@ -121,40 +172,24 @@ class SotaManager:
                 return
 
             performance_scores = []
-
             for hotkey, state in valid_miners.items():
-                accuracy_score = state.raw_accuracy / max(
-                    self.sota_state.raw_accuracy,
-                    max(s.raw_accuracy for s in valid_miners.values()),
+                score = self.calculate_score(
+                    state.raw_accuracy,
+                    state.proof_size,
+                    state.response_time,
+                    reference_states=valid_miners,
                 )
-
-                min_proof_size = min(s.proof_size for s in valid_miners.values())
-                proof_size_score = (
-                    min_proof_size / state.proof_size if state.proof_size > 0 else 0
-                )
-
-                min_response_time = min(s.response_time for s in valid_miners.values())
-                response_time_score = (
-                    min_response_time / state.response_time
-                    if state.response_time > 0
-                    else 0
-                )
-
-                total_score = (
-                    accuracy_score * weights["accuracy"]
-                    + proof_size_score * weights["proof_size"]
-                    + response_time_score * weights["response_time"]
-                )
-
-                score = total_score
                 performance_scores.append((hotkey, score))
 
             performance_scores.sort(key=lambda x: x[1], reverse=True)
-            max_score = max(score for _, score in performance_scores)
+            max_score = (
+                max(score for _, score in performance_scores)
+                if performance_scores
+                else 1
+            )
 
             for hotkey, score in performance_scores:
-                normalized_score = score / max_score if max_score > 0 else 0
-                miner_states[hotkey].sota_relative_score = normalized_score
+                miner_states[hotkey].sota_relative_score = score / max_score
 
             for hotkey, state in miner_states.items():
                 if hotkey not in [h for h, _ in performance_scores]:
