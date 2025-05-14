@@ -1,0 +1,30 @@
+{
+  "name": "null",
+  "description": "null",
+  "author": "Inference Labs",
+  "version": "0.0.1",
+  "proof_system": "EZKL",
+  "type": "proof_of_computation",
+  "external_files": {},
+  "benchmark_choice_weight": 0.2,
+  "layer_map": [
+    {
+      "id": "fa0d509d52abe2d1e809124f8aba46258a02f7253582f7b7f5a22e1e0bca0dfb",
+      "external_files": {
+        "vk.key": "https://storage.omron.ai/fa0d509d52abe2d1e809124f8aba46258a02f7253582f7b7f5a22e1e0bca0dfb/vk.key"
+      }
+    },
+    {
+      "id": "fa0d509d52abe2d1e809124f8aba46258a02f7253582f7b7f5a22e1e0bca0dfa",
+      "external_files": {
+        "vk.key": "https://storage.omron.ai/fa0d509d52abe2d1e809124f8aba46258a02f7253582f7b7f5a22e1e0bca0dfa/vk.key"
+      }
+    },
+    {
+      "id": "fa0d509d52abe2d1e809124f8aba46258a02f7253582f7b7f5a22e1e0bca0df9",
+      "external_files": {
+        "vk.key": "https://storage.omron.ai/fa0d509d52abe2d1e809124f8aba46258a02f7253582f7b7f5a22e1e0bca0df9/vk.key"
+      }
+    }
+  ]
+}
