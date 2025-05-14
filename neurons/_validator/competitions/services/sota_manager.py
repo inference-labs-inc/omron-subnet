@@ -7,6 +7,7 @@ from ..models.sota import SotaState
 from ..models.neuron import NeuronState
 import traceback
 from _validator.utils.logging import log_sota_scores
+import torch
 
 
 class SotaManager:
@@ -49,7 +50,7 @@ class SotaManager:
             is_new_sota = False
             if self.sota_state.raw_accuracy == 0 or self.sota_state.hash is None:
                 is_new_sota = True
-            elif raw_accuracy > self.sota_state.raw_accuracy:
+            elif raw_accuracy > self.sota_state.raw_accuracy * 1.02:
                 is_new_sota = True
             elif raw_accuracy == self.sota_state.raw_accuracy:
                 if proof_size < self.sota_state.proof_size:
@@ -109,13 +110,20 @@ class SotaManager:
             weights = {"accuracy": 0.4, "proof_size": 0.3, "response_time": 0.3}
 
         try:
+
+            valid_miners = {
+                hotkey: state
+                for hotkey, state in miner_states.items()
+                if state.verification_result and state.raw_accuracy > 0
+            }
+
+            if not valid_miners:
+                bt.logging.info("No valid miners to rank")
+                return
+
             performance_scores = []
 
-            for hotkey, state in miner_states.items():
-                if not state.verification_result or state.raw_accuracy == 0:
-                    state.sota_relative_score = 0.0
-                    continue
-
+            for hotkey, state in valid_miners.items():
                 accuracy_diff = max(
                     0, self.sota_state.raw_accuracy - state.raw_accuracy
                 )
@@ -138,21 +146,31 @@ class SotaManager:
                 else:
                     response_time_diff = 0 if state.response_time == 0 else 1
 
-                total_diff = (
+                total_diff = torch.tensor(
                     accuracy_diff * weights["accuracy"]
                     + proof_size_diff * weights["proof_size"]
                     + response_time_diff * weights["response_time"]
                 )
 
-                performance_scores.append((hotkey, total_diff))
+                score = torch.exp(-total_diff).item()
+                performance_scores.append((hotkey, score))
 
-            performance_scores.sort(key=lambda x: x[1])
+            performance_scores.sort(key=lambda x: x[1], reverse=True)
             decay_rate = 3.0
+
+            for rank, (hotkey, _) in enumerate(performance_scores):
+                rank_score = torch.exp(torch.tensor(-decay_rate * rank)).item()
+                miner_states[hotkey].sota_relative_score = rank_score
+
+            for hotkey, state in miner_states.items():
+                if hotkey not in [h for h, _ in performance_scores]:
+                    state.sota_relative_score = 0.0
 
             log_sota_scores(performance_scores, miner_states, decay_rate)
 
         except Exception as e:
             bt.logging.error(f"Error recalculating miner scores: {e}")
+            bt.logging.error(traceback.format_exc())
 
     @property
     def current_state(self) -> SotaState:
