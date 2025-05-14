@@ -16,14 +16,13 @@ class SotaManager:
         self.sota_state = self._load_state()
 
         try:
-            with open(
-                os.path.join(os.path.dirname(sota_directory), "competition_config.json")
-            ) as f:
+            competition_dir = os.path.dirname(os.path.dirname(sota_directory))
+            with open(os.path.join(competition_dir, "competition_config.json")) as f:
                 config = json.load(f)
                 self.weights = config["evaluation"]["scoring_weights"]
         except Exception as e:
             bt.logging.error(f"Error loading scoring weights, using defaults: {e}")
-            self.weights = {"accuracy": 0.4, "proof_size": 0.3, "response_time": 0.3}
+            self.weights = {"accuracy": 0.95, "proof_size": 0.0, "response_time": 0.05}
 
     def _load_state(self) -> SotaState:
         try:
