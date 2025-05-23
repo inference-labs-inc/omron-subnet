@@ -6,6 +6,7 @@ import bittensor as bt
 import psutil
 import torch
 import wandb
+import os
 import threading
 from queue import Queue
 from typing import Dict, Any
@@ -84,7 +85,7 @@ def safe_init(name=None, wallet=None, metagraph=None, config=None):
                         "gpu_memory": torch.cuda.get_device_properties(0).total_memory,
                     }
                 )
-
+        os.environ["WANDB_CONSOLE"] = "off"
         wandb.init(
             entity=ENTITY_NAME,
             project=PROJECT_NAME
