@@ -37,14 +37,14 @@ This step fetches the subtensor codebase to your local machine.
 git clone https://github.com/opentensor/subtensor.git
 ```
 
-### 4. Switch to the User-Creation Branch
+### 4. Switch to the Devnet-Ready Branch
 
 Navigate into the repository and switch to the desired branch.
 
 ```bash
 cd subtensor
-git fetch origin subnets/user-creation
-git checkout subnets/user-creation
+git fetch origin subnets/devnet-ready
+git checkout subnets/devnet-ready
 ```
 
 ### 5. Setup Rust for Substrate Development
