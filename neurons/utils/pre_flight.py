@@ -273,7 +273,9 @@ def ensure_nodejs_version():
         node_version = subprocess.check_output(["node", "--version"]).decode().strip()
         npm_version = subprocess.check_output(["npm", "--version"]).decode().strip()
 
-        if node_version.startswith("v20."):
+        if node_version.startswith("v20.") or (
+            node_version.startswith("v") and float(node_version[1:].split(".")[0]) > 20
+        ):
             bt.logging.info(
                 NODE_LOG_PREFIX
                 + f"Node.js version {node_version} and npm version {npm_version} are installed."
