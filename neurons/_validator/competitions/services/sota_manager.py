@@ -16,7 +16,7 @@ class SotaManager:
         self.sota_state = self._load_state()
 
         try:
-            competition_dir = os.path.dirname(os.path.dirname(sota_directory))
+            competition_dir = os.path.dirname(sota_directory)
             with open(os.path.join(competition_dir, "competition_config.json")) as f:
                 config = json.load(f)
                 self.weights = config["evaluation"]["scoring_weights"]

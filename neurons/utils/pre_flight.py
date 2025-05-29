@@ -57,10 +57,10 @@ def run_shared_preflight_checks(role: Optional[Roles] = None):
 
     preflight_checks = OrderedDict(
         {
-            "Syncing model files": partial(sync_model_files, role=role),
             "Ensuring Node.js version": ensure_nodejs_version,
             "Checking SnarkJS installation": ensure_snarkjs_installed,
             "Checking EZKL installation": ensure_ezkl_installed,
+            "Syncing model files": partial(sync_model_files, role=role),
         }
     )
 
@@ -273,7 +273,9 @@ def ensure_nodejs_version():
         node_version = subprocess.check_output(["node", "--version"]).decode().strip()
         npm_version = subprocess.check_output(["npm", "--version"]).decode().strip()
 
-        if node_version.startswith("v20."):
+        if node_version.startswith("v20.") or (
+            node_version.startswith("v") and float(node_version[1:].split(".")[0]) > 20
+        ):
             bt.logging.info(
                 NODE_LOG_PREFIX
                 + f"Node.js version {node_version} and npm version {npm_version} are installed."
