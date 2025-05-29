@@ -57,10 +57,10 @@ def run_shared_preflight_checks(role: Optional[Roles] = None):
 
     preflight_checks = OrderedDict(
         {
-            "Syncing model files": partial(sync_model_files, role=role),
             "Ensuring Node.js version": ensure_nodejs_version,
             "Checking SnarkJS installation": ensure_snarkjs_installed,
             "Checking EZKL installation": ensure_ezkl_installed,
+            "Syncing model files": partial(sync_model_files, role=role),
         }
     )
 
