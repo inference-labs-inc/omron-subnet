@@ -47,6 +47,7 @@ class CompetitionThread(threading.Thread):
         self.competition_to_validator_queue = None  # Messages TO validator
         self._loop = None
         self._loop_lock = threading.Lock()
+        self._is_wound_down_for_eval = False
 
         self.subtensor = bt.subtensor(config=config)
 
@@ -114,7 +115,10 @@ class CompetitionThread(threading.Thread):
 
                 if download_success:
                     bt.logging.info("Pausing request processing for evaluation...")
-                    if self.competition_to_validator_queue:
+                    if (
+                        self.competition_to_validator_queue
+                        and not self._is_wound_down_for_eval
+                    ):
                         self.competition_to_validator_queue.put(
                             ValidatorMessage.WINDDOWN
                         )
@@ -126,6 +130,7 @@ class CompetitionThread(threading.Thread):
                             bt.logging.error(
                                 "Failed to wait for validator winddown, proceeding anyway"
                             )
+                        self._is_wound_down_for_eval = True
 
                     bt.logging.info("Starting circuit evaluation...")
                     try:
@@ -140,10 +145,22 @@ class CompetitionThread(threading.Thread):
                         bt.logging.error(f"Error during circuit evaluation: {str(e)}")
                         bt.logging.error(f"Stack trace: {traceback.format_exc()}")
                     finally:
-                        bt.logging.info("Resuming request processing...")
-                        if self.competition_to_validator_queue:
-                            self.competition_to_validator_queue.put(
-                                ValidatorMessage.COMPETITION_COMPLETE
+                        if not self.competition.download_queue:
+                            bt.logging.info(
+                                "Resuming request processing as download queue is empty..."
+                            )
+                            if (
+                                self.competition_to_validator_queue
+                                and self._is_wound_down_for_eval
+                            ):
+                                self.competition_to_validator_queue.put(
+                                    ValidatorMessage.COMPETITION_COMPLETE
+                                )
+                                self._is_wound_down_for_eval = False
+                        else:
+                            bt.logging.info(
+                                "Download queue is not empty, proceeding "
+                                "to next download without resuming request processing."
                             )
                 else:
                     bt.logging.error(
@@ -157,6 +174,12 @@ class CompetitionThread(threading.Thread):
 
         while self._should_run.is_set():
             try:
+                if (
+                    self.competition.current_download
+                ):  # If already processing a download, just continue
+                    time.sleep(0.1)  # Small sleep to prevent busy-waiting
+                    continue
+
                 if (
                     not self.competition.download_queue
                     and not self.competition.current_download
