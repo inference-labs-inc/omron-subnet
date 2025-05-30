@@ -637,9 +637,9 @@ class CircuitEvaluator:
                         )
 
         if not proof_iteration_indices:
-            overall_verification_successful = True
+            overall_verification_successful = False
             bt.logging.warning(
-                "No full proof iterations were scheduled. Overall verification defaults to True."
+                "No full proof iterations were scheduled. Overall verification defaults to False."
             )
         elif not verification_results_collected:
             overall_verification_successful = False
