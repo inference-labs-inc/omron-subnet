@@ -597,8 +597,8 @@ class Competition:
                         "sota_score": float(getattr(state, "sota_relative_score", 0.0)),
                         "proof_size": int(getattr(state, "proof_size", 0)),
                         "response_time": float(getattr(state, "response_time", 0.0)),
-                        "verification_rate": float(
-                            getattr(state, "verification_rate", 1.0)
+                        "verification_rate": (
+                            1.0 if getattr(state, "verification_result", False) else 0.0
                         ),
                         "rank_overall": int(getattr(state, "rank_overall", 999)),
                         "raw_accuracy": float(getattr(state, "raw_accuracy", 0.0)),

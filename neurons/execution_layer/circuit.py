@@ -182,18 +182,7 @@ class CircuitEvaluationItem:
     verification_result: bool = False
 
     def __init__(self, *args, circuit: Circuit, **kwargs):
-        """
-        Custom `__init__` to handle legacy cases where `circuit_id` is passed,
-        and to set default and derived values manually.
-        """
-        # Remove `circuit_id` gracefully if present in kwargs (legacy code might pass it)
-        if "circuit_id" in kwargs:
-            logging.warning(
-                "Ignoring legacy `circuit_id` in CircuitEvaluationItem initialization."
-            )
-            kwargs.pop("circuit_id")
 
-        # Manually set required attributes
         self.circuit = circuit
         self.uid = kwargs.pop("uid", 0)
         self.minimum_response_time = kwargs.pop("minimum_response_time", 0.0)
@@ -202,14 +191,12 @@ class CircuitEvaluationItem:
         self.score = kwargs.pop("score", 0.0)
         self.verification_result = kwargs.pop("verification_result", False)
 
-        # Initialize derived/validated field
         self.maximum_response_time = (
             self.circuit.timeout
             if hasattr(self.circuit, "timeout") and self.circuit.timeout
-            else CIRCUIT_TIMEOUT_SECONDS  # Replace or define this constant
+            else CIRCUIT_TIMEOUT_SECONDS
         )
 
-        # Set any remaining extra attributes from kwargs
         for key, value in kwargs.items():
             setattr(self, key, value)
 
