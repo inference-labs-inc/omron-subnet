@@ -172,8 +172,8 @@ class CircuitEvaluationItem:
     Data collected from the evaluation of the circuit.
     """
 
-    circuit: Circuit  # Pass the Circuit object directly
-    maximum_response_time: float  # Will be initialized in  __init__
+    circuit: Circuit
+    maximum_response_time: float
     minimum_response_time: float = 0.0
     uid: int = 0
     proof_size: int = DEFAULT_PROOF_SIZE

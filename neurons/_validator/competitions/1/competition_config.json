@@ -71,6 +71,8 @@
     "evaluation": {
         "metric": "mean_squared_error",
         "num_iterations": 10,
+        "num_total_evaluations": 100,
+        "num_proof_evaluations": 10,
         "scoring_weights": {
             "accuracy": 0.95,
             "proof_size": 0.0,

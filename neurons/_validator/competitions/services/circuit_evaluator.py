@@ -283,11 +283,8 @@ class CircuitEvaluator:
                         self.competition_directory, processor
                     )
                     if not data_source.sync_data():
-                        bt.logging.error(
-                            "Failed to sync remote data source. THIS IS A CRITICAL ISSUE."
-                        )
                         bt.logging.warning(
-                            "Falling back to random data source due to remote sync failure."
+                            "Failed to sync remote dataset; falling back to randomized data for evaluation."
                         )
                         return RandomDataSource(self.competition_directory, processor)
                     bt.logging.info("Successfully initialized remote data source")
@@ -308,11 +305,11 @@ class CircuitEvaluator:
         self, circuit_dir: str, test_inputs: torch.Tensor
     ) -> Tuple[Optional[List[float]], float, Optional[str]]:
         """
-        Generates a witness and attempts to extract rescaled outputs directly from it.
+        Generates a witness and extracts rescaled outputs.
         Returns:
             - A list of public signals (rescaled outputs) or None if failed.
             - Time taken for witness generation.
-            - Path to the witness file (for cleanup or further inspection if needed).
+            - Path to the witness file.
         """
         witness_gen_start_time = time.perf_counter()
         public_signals = None
@@ -452,10 +449,10 @@ class CircuitEvaluator:
             ) as f:
                 config = json.load(f)
                 num_total_evaluations = config["evaluation"].get(
-                    "num_total_evaluations", 10
+                    "num_total_evaluations", 100
                 )
                 num_proof_evaluations = config["evaluation"].get(
-                    "num_proof_evaluations", 3
+                    "num_proof_evaluations", 10
                 )
                 if num_proof_evaluations > num_total_evaluations:
                     bt.logging.warning(
@@ -466,8 +463,8 @@ class CircuitEvaluator:
             bt.logging.error(
                 f"Error loading evaluation counts from config, using defaults: {e}"
             )
-            num_total_evaluations = 10
-            num_proof_evaluations = 3
+            num_total_evaluations = 100
+            num_proof_evaluations = 10
 
         bt.logging.info(
             f"Starting evaluation: {num_total_evaluations} total, {num_proof_evaluations} with full proof."
@@ -520,7 +517,7 @@ class CircuitEvaluator:
                 raw_accuracy_this_iter = 0.0
 
                 if iteration_is_full_proof:
-                    bt.logging.debug(f"Iteration {i + 1} is a FULL PROOF evaluation.")
+                    bt.logging.debug(f"Iteration {i + 1} is a proof evaluation.")
                     proof_result = self._generate_proof(circuit_dir, test_inputs)
                     if not proof_result:
                         bt.logging.error("Full Proof: Proof generation failed")
@@ -563,7 +560,7 @@ class CircuitEvaluator:
                     raw_accuracy_scores.append(raw_accuracy_this_iter)
 
                 else:
-                    bt.logging.debug(f"Iteration {i + 1} is a WITNESS-ONLY evaluation.")
+                    bt.logging.debug(f"Iteration {i + 1} is a witness only evaluation.")
                     witness_outputs, witness_gen_time, witness_file_path = (
                         self._generate_witness_and_get_outputs(circuit_dir, test_inputs)
                     )
