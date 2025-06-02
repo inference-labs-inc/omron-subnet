@@ -23,6 +23,7 @@ from _validator.competitions.services.data_source import (
 import logging
 from utils.system import get_temp_folder
 import sys
+import random
 
 logging.getLogger("onnxruntime").setLevel(logging.ERROR)
 os.environ["ONNXRUNTIME_LOGGING_LEVEL"] = "3"
@@ -282,8 +283,9 @@ class CircuitEvaluator:
                         self.competition_directory, processor
                     )
                     if not data_source.sync_data():
-                        bt.logging.error("Failed to sync remote data source")
-                        bt.logging.info("Falling back to random data source")
+                        bt.logging.warning(
+                            "Failed to sync remote dataset; falling back to randomized data for evaluation."
+                        )
                         return RandomDataSource(self.competition_directory, processor)
                     bt.logging.info("Successfully initialized remote data source")
                     return data_source
@@ -292,16 +294,148 @@ class CircuitEvaluator:
         except Exception as e:
             bt.logging.error(f"Error setting up data source: {e}")
             traceback.print_exc()
-            bt.logging.info("Falling back to random data source due to error")
-            return RandomDataSource(self.competition_directory)
+            bt.logging.warning(
+                "Falling back to random data source due to critical error in setup."
+            )
+            return RandomDataSource(
+                self.competition_directory, processor=getattr(self, "processor", None)
+            )
+
+    def _generate_witness_and_get_outputs(
+        self, circuit_dir: str, test_inputs: torch.Tensor
+    ) -> Tuple[Optional[List[float]], float, Optional[str]]:
+        """
+        Generates a witness and extracts rescaled outputs.
+        Returns:
+            - A list of public signals (rescaled outputs) or None if failed.
+            - Time taken for witness generation.
+            - Path to the witness file.
+        """
+        witness_gen_start_time = time.perf_counter()
+        public_signals = None
+        temp_witness_path = None
+
+        try:
+            input_data = {
+                "input_data": [[float(x) for x in test_inputs.flatten().tolist()]]
+            }
+
+            with tempfile.NamedTemporaryFile(
+                mode="w+", suffix=".json", dir=get_temp_folder(), delete=False
+            ) as temp_input:
+                json.dump(input_data, temp_input, indent=2)
+                temp_input_path = temp_input.name
+
+            with tempfile.NamedTemporaryFile(
+                mode="w+", suffix=".json", dir=get_temp_folder(), delete=False
+            ) as temp_witness:
+                temp_witness_path = temp_witness.name
+
+            model_path = os.path.join(circuit_dir, "model.compiled")
+            if not os.path.exists(model_path):
+                bt.logging.error(f"model.compiled not found at {model_path}")
+                os.unlink(temp_input_path)
+                if temp_witness_path and os.path.exists(temp_witness_path):
+                    os.unlink(temp_witness_path)
+                return None, time.perf_counter() - witness_gen_start_time, None
+
+            bt.logging.debug(
+                f"Witness-Only: Input data: {json.dumps(input_data, indent=2)}"
+            )
+            witness_result = subprocess.run(
+                [
+                    LOCAL_EZKL_PATH,
+                    "gen-witness",
+                    "--data",
+                    temp_input_path,
+                    "--compiled-circuit",
+                    model_path,
+                    "--output",
+                    temp_witness_path,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+
+            os.unlink(temp_input_path)
+
+            if witness_result.returncode != 0:
+                bt.logging.error(
+                    f"Witness-Only: Witness generation failed with code {witness_result.returncode}"
+                )
+                bt.logging.error(f"STDOUT: {witness_result.stdout}")
+                bt.logging.error(f"STDERR: {witness_result.stderr}")
+                if temp_witness_path and os.path.exists(temp_witness_path):
+                    os.unlink(temp_witness_path)
+                return None, time.perf_counter() - witness_gen_start_time, None
+
+            try:
+                with open(temp_witness_path, "r") as f_wit:
+                    witness_content = json.load(f_wit)
+
+                pretty_elements_dict = witness_content.get("pretty_elements", {})
+                rescaled_outputs_nested = pretty_elements_dict.get(
+                    "rescaled_outputs", []
+                )
+                public_signals = [
+                    float(x) for sublist in rescaled_outputs_nested for x in sublist
+                ]
+
+            except Exception as e:
+                bt.logging.warning(
+                    f"Witness-Only: Could not parse outputs from witness file {temp_witness_path}: {e}"
+                )
+                public_signals = None
+
+            if not public_signals:
+                bt.logging.warning(
+                    f"Witness-Only: Failed to extract public signals from witness: {temp_witness_path}"
+                )
+                return (
+                    None,
+                    time.perf_counter() - witness_gen_start_time,
+                    temp_witness_path,
+                )
+
+            bt.logging.debug(
+                f"Witness-Only: Successfully extracted signals from witness {temp_witness_path}"
+            )
+            return (
+                public_signals,
+                time.perf_counter() - witness_gen_start_time,
+                temp_witness_path,
+            )
+
+        except Exception as e:
+            bt.logging.error(
+                f"Witness-Only: Error in witness generation and output extraction: {e}"
+            )
+            bt.logging.error(f"Stack trace: {traceback.format_exc()}")
+            if temp_witness_path and os.path.exists(temp_witness_path):
+                try:
+                    os.unlink(temp_witness_path)
+                except OSError as ose:
+                    bt.logging.warning(
+                        f"Could not unlink temporary witness file {temp_witness_path}: {ose}"
+                    )
+
+            return None, time.perf_counter() - witness_gen_start_time, None
 
     def evaluate(self, circuit_dir: str) -> Tuple[float, float, float, bool, float]:
-        raw_accuracy_scores, proof_sizes, response_times, verification_results = (
+        (
+            raw_accuracy_scores,
+            proof_sizes_collected,
+            response_times_collected,
+            verification_results_collected,
+        ) = (
             [],
             [],
             [],
             [],
         )
+        all_collected_outputs_for_constancy_check = []
+
         input_shape = self._get_input_shape(circuit_dir)
         bt.logging.debug(f"Got input shape: {input_shape}")
 
@@ -314,108 +448,216 @@ class CircuitEvaluator:
                 os.path.join(self.competition_directory, "competition_config.json")
             ) as f:
                 config = json.load(f)
-                num_iterations = config["evaluation"]["num_iterations"]
+                num_total_evaluations = config["evaluation"].get(
+                    "num_total_evaluations", 100
+                )
+                num_proof_evaluations = config["evaluation"].get(
+                    "num_proof_evaluations", 10
+                )
+                if num_proof_evaluations > num_total_evaluations:
+                    bt.logging.warning(
+                        "num_proof_evaluations cannot exceed num_total_evaluations. Setting to num_total_evaluations."
+                    )
+                    num_proof_evaluations = num_total_evaluations
         except Exception as e:
-            bt.logging.error(f"Error loading num_iterations, using default: {e}")
-            num_iterations = 10
+            bt.logging.error(
+                f"Error loading evaluation counts from config, using defaults: {e}"
+            )
+            num_total_evaluations = 100
+            num_proof_evaluations = 10
+
+        bt.logging.info(
+            f"Starting evaluation: {num_total_evaluations} total, {num_proof_evaluations} with full proof."
+        )
+
+        if num_total_evaluations > 0 and num_proof_evaluations > 0:
+            proof_iteration_indices = sorted(
+                random.sample(range(num_total_evaluations), num_proof_evaluations)
+            )
+        else:
+            proof_iteration_indices = []
+
+        bt.logging.debug(
+            f"Iterations selected for full proof: {proof_iteration_indices}"
+        )
 
         first_valid_output_tensor = None
         all_outputs_identical = True
-        successful_valid_outputs = 0
+        successful_valid_outputs_count = 0
 
-        for i in range(num_iterations):
-            bt.logging.debug(f"Running evaluation {i + 1}/{num_iterations}")
+        for i in range(num_total_evaluations):
+            bt.logging.debug(f"Running evaluation {i + 1}/{num_total_evaluations}")
+            iteration_is_full_proof = i in proof_iteration_indices
+            witness_file_for_this_iter = None
 
             try:
                 test_inputs = self.data_source.get_benchmark_data()
                 if test_inputs is None:
-                    bt.logging.error("Failed to get benchmark data")
+                    bt.logging.error("Failed to get benchmark data for iteration")
                     raw_accuracy_scores.append(0.0)
+                    if iteration_is_full_proof:
+                        verification_results_collected.append(False)
                     continue
 
                 bt.logging.debug(f"Got benchmark data with shape: {test_inputs.shape}")
 
                 baseline_output = self._run_baseline_model(test_inputs)
                 if baseline_output is None:
-                    bt.logging.error("Baseline model run failed")
+                    bt.logging.error("Baseline model run failed for iteration")
                     raw_accuracy_scores.append(0.0)
+                    if iteration_is_full_proof:
+                        verification_results_collected.append(False)
                     continue
 
                 bt.logging.debug(
                     f"Got baseline output with shape: {np.array(baseline_output).shape}"
                 )
 
-                proof_result = self._generate_proof(circuit_dir, test_inputs)
-                if not proof_result:
-                    bt.logging.error("Proof generation failed")
+                current_output_signals = None
+                raw_accuracy_this_iter = 0.0
 
-                    raw_accuracy_scores.append(0.0)
-                    verification_results.append(False)
-                    proof_sizes.append(float("inf"))
-                    response_times.append(float("inf"))
-                    continue
+                if iteration_is_full_proof:
+                    bt.logging.debug(f"Iteration {i + 1} is a proof evaluation.")
+                    proof_result = self._generate_proof(circuit_dir, test_inputs)
+                    if not proof_result:
+                        bt.logging.error("Full Proof: Proof generation failed")
+                        raw_accuracy_scores.append(0.0)
+                        verification_results_collected.append(False)
+                        proof_sizes_collected.append(float("inf"))
+                        response_times_collected.append(float("inf"))
+                        continue
 
-                proof_path, proof_data, response_time = proof_result
-                bt.logging.debug(
-                    f"Generated proof with size: {len(proof_data['proof'])}"
-                )
-                response_times.append(response_time)
+                    proof_path, proof_data, response_time = proof_result
+                    response_times_collected.append(response_time)
 
-                proof = proof_data.get("proof", [])
-                public_signals = [
-                    float(x)
-                    for sublist in proof_data.get("pretty_public_inputs", {}).get(
-                        "rescaled_outputs", []
+                    proof_bytes = proof_data.get("proof", [])
+                    public_signals_from_proof = [
+                        float(x)
+                        for sublist in proof_data.get("pretty_public_inputs", {}).get(
+                            "rescaled_outputs", []
+                        )
+                        for x in sublist
+                    ]
+                    proof_sizes_collected.append(len(proof_bytes))
+                    current_output_signals = public_signals_from_proof
+
+                    verify_result = self._verify_proof(circuit_dir, proof_path)
+                    bt.logging.debug(
+                        f"Full Proof: Proof verification result: {verify_result}"
                     )
-                    for x in sublist
-                ]
-                proof_sizes.append(len(proof))
+                    verification_results_collected.append(verify_result)
 
-                verify_result = self._verify_proof(circuit_dir, proof_path)
-                bt.logging.debug(f"Proof verification result: {verify_result}")
-                verification_results.append(verify_result)
+                    if verify_result:
+                        raw_accuracy_this_iter = self._compare_outputs(
+                            baseline_output, public_signals_from_proof
+                        )
+                        bt.logging.debug(
+                            f"Full Proof: Raw accuracy: {raw_accuracy_this_iter}"
+                        )
+                    else:
+                        bt.logging.error("Full Proof: Proof verification failed")
+                        raw_accuracy_this_iter = 0.0
+                    raw_accuracy_scores.append(raw_accuracy_this_iter)
 
-                if verify_result:
-                    current_output_tensor = torch.tensor(public_signals)
+                else:
+                    bt.logging.debug(f"Iteration {i + 1} is a witness only evaluation.")
+                    witness_outputs, witness_gen_time, witness_file_path = (
+                        self._generate_witness_and_get_outputs(circuit_dir, test_inputs)
+                    )
+
+                    witness_file_for_this_iter = witness_file_path
+
+                    if witness_outputs is not None:
+                        current_output_signals = witness_outputs
+                        raw_accuracy_this_iter = self._compare_outputs(
+                            baseline_output, witness_outputs
+                        )
+                        bt.logging.debug(
+                            f"Witness-Only: Raw accuracy: {raw_accuracy_this_iter}"
+                        )
+                    else:
+                        bt.logging.error(
+                            "Witness-Only: Failed to get outputs from witness"
+                        )
+                        raw_accuracy_this_iter = 0.0
+                    raw_accuracy_scores.append(raw_accuracy_this_iter)
+
+                if current_output_signals is not None:
+                    all_collected_outputs_for_constancy_check.append(
+                        torch.tensor(current_output_signals)
+                    )
+                    current_output_tensor_for_check = torch.tensor(
+                        current_output_signals
+                    )
                     if first_valid_output_tensor is None:
-                        first_valid_output_tensor = current_output_tensor
-                        successful_valid_outputs += 1
+                        first_valid_output_tensor = current_output_tensor_for_check
+                        successful_valid_outputs_count += 1
                     elif all_outputs_identical:
-                        successful_valid_outputs += 1
+                        successful_valid_outputs_count += 1
                         if not torch.allclose(
-                            first_valid_output_tensor, current_output_tensor, atol=1e-4
+                            first_valid_output_tensor,
+                            current_output_tensor_for_check,
+                            atol=1e-4,
                         ):
                             all_outputs_identical = False
 
-                    raw_accuracy = self._compare_outputs(
-                        baseline_output, public_signals
-                    )
-                    bt.logging.debug(f"Raw accuracy: {raw_accuracy}")
-                    raw_accuracy_scores.append(raw_accuracy)
-
-                else:
-                    bt.logging.error("Proof verification failed")
-                    raw_accuracy_scores.append(0.0)
+                if witness_file_for_this_iter and os.path.exists(
+                    witness_file_for_this_iter
+                ):
+                    try:
+                        os.unlink(witness_file_for_this_iter)
+                        bt.logging.debug(
+                            f"Cleaned up temp witness file: {witness_file_for_this_iter}"
+                        )
+                    except OSError as ose:
+                        bt.logging.warning(
+                            f"Could not unlink temp witness file {witness_file_for_this_iter} post-iteration: {ose}"
+                        )
 
             except Exception as e:
-                bt.logging.error(f"Error in evaluation iteration: {str(e)}")
+                bt.logging.error(f"Error in evaluation iteration {i + 1}: {str(e)}")
                 bt.logging.error(f"Stack trace: {traceback.format_exc()}")
-
                 raw_accuracy_scores.append(0.0)
-                verification_results.append(False)
-                proof_sizes.append(float("inf"))
-                response_times.append(float("inf"))
+                if iteration_is_full_proof:
+                    verification_results_collected.append(False)
+                    proof_sizes_collected.append(float("inf"))
+                    response_times_collected.append(float("inf"))
+                if witness_file_for_this_iter and os.path.exists(
+                    witness_file_for_this_iter
+                ):
+                    try:
+                        os.unlink(witness_file_for_this_iter)
+                    except OSError as ose:
+                        bt.logging.warning(
+                            f"Could not unlink temp witness file "
+                            f"{witness_file_for_this_iter} during exception handling: {ose}"
+                        )
 
-        overall_verification_successful = all(verification_results)
+        if not proof_iteration_indices:
+            overall_verification_successful = False
+            bt.logging.warning(
+                "No full proof iterations were scheduled. Overall verification defaults to False."
+            )
+        elif not verification_results_collected:
+            overall_verification_successful = False
+            bt.logging.warning(
+                "No verification results from proof iterations. Overall verification defaults to False."
+            )
+        else:
+            overall_verification_successful = all(
+                v for v in verification_results_collected if isinstance(v, bool)
+            )
+
         if not overall_verification_successful:
             bt.logging.error(
-                "One or more verifications failed - setting all scores to 0"
+                "One or more required verifications (from full proof set) failed - setting all scores to 0"
             )
             return 0.0, float("inf"), float("inf"), False, 0.0
 
-        if successful_valid_outputs > 1 and all_outputs_identical:
+        if successful_valid_outputs_count > 1 and all_outputs_identical:
             bt.logging.warning(
-                "Detected constant output from circuit across multiple inputs. Penalizing accuracy."
+                f"Detected constant output from circuit across "
+                f"{successful_valid_outputs_count} valid inputs. Penalizing accuracy."
             )
             raw_accuracy_scores = [0.0] * len(raw_accuracy_scores)
 
@@ -424,43 +666,62 @@ class CircuitEvaluator:
             if raw_accuracy_scores
             else 0
         )
+        valid_proof_sizes = [ps for ps in proof_sizes_collected if ps != float("inf")]
         avg_proof_size = (
-            sum(proof_sizes) / len(proof_sizes) if proof_sizes else float("inf")
+            sum(valid_proof_sizes) / len(valid_proof_sizes)
+            if valid_proof_sizes
+            else float("inf")
         )
+        valid_response_times = [
+            rt for rt in response_times_collected if rt != float("inf")
+        ]
         avg_response_time = (
-            sum(response_times) / len(response_times)
-            if response_times
+            sum(valid_response_times) / len(valid_response_times)
+            if valid_response_times
             else float("inf")
         )
 
-        safe_log(
-            {
-                "avg_raw_accuracy": float(avg_raw_accuracy),
-                "avg_proof_size": (
-                    float(avg_proof_size) if avg_proof_size != float("inf") else -1
-                ),
-                "avg_response_time": (
-                    float(avg_response_time)
-                    if avg_response_time != float("inf")
-                    else -1
-                ),
-                "total_iterations": num_iterations,
-                "successful_iterations": len([s for s in raw_accuracy_scores if s > 0]),
-                "verification_success_rate": sum(verification_results)
-                / max(len(verification_results), 1),
-                "raw_accuracy_distribution": raw_accuracy_scores,
-                "proof_sizes_distribution": [
-                    float(x) if x != float("inf") else -1 for x in proof_sizes
-                ],
-                "response_times_distribution": [
-                    float(x) if x != float("inf") else -1 for x in response_times
-                ],
-            }
-        )
+        successful_accuracy_iterations = len([s for s in raw_accuracy_scores if s > 0])
+        num_actual_proof_attempts = len(verification_results_collected)
+
+        safe_log_payload = {
+            "avg_raw_accuracy": float(avg_raw_accuracy),
+            "avg_proof_size": (
+                float(avg_proof_size) if avg_proof_size != float("inf") else -1
+            ),
+            "avg_response_time": (
+                float(avg_response_time) if avg_response_time != float("inf") else -1
+            ),
+            "total_eval_iterations": num_total_evaluations,
+            "num_proof_iterations_scheduled": num_proof_evaluations,
+            "num_proof_iterations_attempted": num_actual_proof_attempts,
+            "successful_accuracy_iterations": successful_accuracy_iterations,
+            "verification_success_rate_on_proof_subset": (
+                sum(v for v in verification_results_collected if v is True)
+                / max(num_actual_proof_attempts, 1)
+                if num_actual_proof_attempts > 0
+                else 0
+            ),
+            "constant_output_detected": successful_valid_outputs_count > 1
+            and all_outputs_identical,
+            "raw_accuracy_distribution": [
+                float(f"{x:.4f}") for x in raw_accuracy_scores
+            ],
+            "proof_sizes_distribution_from_proof_subset": [
+                float(x) if x != float("inf") else -1 for x in proof_sizes_collected
+            ],
+            "response_times_distribution_from_proof_subset": [
+                float(f"{x:.2f}") if x != float("inf") else -1
+                for x in response_times_collected
+            ],
+        }
+        safe_log(safe_log_payload)
 
         bt.logging.info(
-            f"Circuit evaluation complete - Raw Accuracy: {avg_raw_accuracy:.4f}, "
-            f"Proof Size: {avg_proof_size:.0f}, Response Time: {avg_response_time:.2f}s"
+            f"Circuit evaluation complete - Avg Raw Accuracy (all iters): {avg_raw_accuracy:.4f}, "
+            f"Avg Proof Size (proof subset): {avg_proof_size:.0f}, "
+            f"Avg Response Time (proof subset): {avg_response_time:.2f}s. "
+            f"Overall Verification (proof subset): {overall_verification_successful}"
         )
 
         return (
@@ -565,34 +826,50 @@ class CircuitEvaluator:
 
     def _generate_proof(
         self, circuit_dir: str, test_inputs: torch.Tensor
-    ) -> Tuple[str, dict] | None:
+    ) -> Tuple[str, dict, float] | None:
         try:
             input_data = {
                 "input_data": [[float(x) for x in test_inputs.flatten().tolist()]]
             }
 
-            with tempfile.NamedTemporaryFile(
-                mode="w+", suffix=".json", dir=get_temp_folder(), delete=False
-            ) as temp_input:
-                json.dump(input_data, temp_input, indent=2)
-                temp_input_path = temp_input.name
+            temp_input_path = None
+            witness_path = None
+            temp_proof_path = None
 
-            with tempfile.NamedTemporaryFile(
+            temp_input_obj = tempfile.NamedTemporaryFile(
                 mode="w+", suffix=".json", dir=get_temp_folder(), delete=False
-            ) as temp_witness:
-                witness_path = temp_witness.name
+            )
+            temp_input_path = temp_input_obj.name
+            json.dump(input_data, temp_input_obj, indent=2)
+            temp_input_obj.close()
 
-            with tempfile.NamedTemporaryFile(
+            temp_witness_obj = tempfile.NamedTemporaryFile(
                 mode="w+", suffix=".json", dir=get_temp_folder(), delete=False
-            ) as temp_proof:
-                temp_proof_path = temp_proof.name
+            )
+            witness_path = temp_witness_obj.name
+            temp_witness_obj.close()
+
+            temp_proof_obj = tempfile.NamedTemporaryFile(
+                mode="w+", suffix=".json", dir=get_temp_folder(), delete=False
+            )
+            temp_proof_path = temp_proof_obj.name
+            temp_proof_obj.close()
 
             model_path = os.path.join(circuit_dir, "model.compiled")
             if not os.path.exists(model_path):
                 bt.logging.error(f"model.compiled not found at {model_path}")
+                if temp_input_path and os.path.exists(temp_input_path):
+                    os.unlink(temp_input_path)
+                if witness_path and os.path.exists(witness_path):
+                    os.unlink(witness_path)
+                if temp_proof_path and os.path.exists(temp_proof_path):
+                    os.unlink(temp_proof_path)
                 return None
 
-            bt.logging.debug(f"Input data: {json.dumps(input_data, indent=2)}")
+            bt.logging.debug(
+                f"Full Proof: Input data: {json.dumps(input_data, indent=2)}"
+            )
+            witness_start_time = time.perf_counter()
             witness_result = subprocess.run(
                 [
                     LOCAL_EZKL_PATH,
@@ -608,17 +885,29 @@ class CircuitEvaluator:
                 text=True,
                 timeout=300,
             )
+            witness_time = time.perf_counter() - witness_start_time
 
             if witness_result.returncode != 0:
                 bt.logging.error(
-                    f"Witness generation failed with code {witness_result.returncode}"
+                    f"Full Proof: Witness generation failed with code {witness_result.returncode}"
                 )
                 bt.logging.error(f"STDOUT: {witness_result.stdout}")
                 bt.logging.error(f"STDERR: {witness_result.stderr}")
+                if temp_input_path and os.path.exists(temp_input_path):
+                    os.unlink(temp_input_path)
+                if witness_path and os.path.exists(witness_path):
+                    os.unlink(witness_path)
+                if temp_proof_path and os.path.exists(temp_proof_path):
+                    os.unlink(temp_proof_path)
                 return None
 
-            bt.logging.debug("Witness generation successful, starting proof generation")
-            proof_start = time.perf_counter()
+            os.unlink(temp_input_path)
+            temp_input_path = None
+
+            bt.logging.debug(
+                "Full Proof: Witness generation successful, starting proof generation"
+            )
+            proof_gen_start_time = time.perf_counter()
             prove_result = subprocess.run(
                 [
                     LOCAL_EZKL_PATH,
@@ -636,25 +925,48 @@ class CircuitEvaluator:
                 text=True,
                 timeout=300,
             )
-            proof_time = time.perf_counter() - proof_start
+            proof_gen_time = time.perf_counter() - proof_gen_start_time
 
-            os.unlink(temp_input_path)
             os.unlink(witness_path)
+            witness_path = None
 
             if prove_result.returncode != 0:
                 bt.logging.error(
-                    f"Proof generation failed with code {prove_result.returncode}"
+                    f"Full Proof: Proof generation failed with code {prove_result.returncode}"
                 )
                 bt.logging.error(f"STDOUT: {prove_result.stdout}")
                 bt.logging.error(f"STDERR: {prove_result.stderr}")
+                if temp_proof_path and os.path.exists(temp_proof_path):
+                    os.unlink(temp_proof_path)
                 return None
 
             with open(temp_proof_path) as f:
                 proof_data = json.load(f)
-                bt.logging.debug(f"Proof timing - Proof: {proof_time:.3f}s")
-                return temp_proof_path, proof_data, proof_time
+
+            total_response_time = witness_time + proof_gen_time
+            bt.logging.debug(
+                f"Full Proof: Timing - Witness: {witness_time:.3f}s,"
+                f" Proof: {proof_gen_time:.3f}s, Total: {total_response_time:.3f}s"
+            )
+            return temp_proof_path, proof_data, total_response_time
         except Exception as e:
-            bt.logging.error(f"Error generating proof: {e}")
+            bt.logging.error(f"Full Proof: Error generating proof: {e}")
+            bt.logging.error(f"Stack trace: {traceback.format_exc()}")
+            if temp_input_path and os.path.exists(temp_input_path):
+                try:
+                    os.unlink(temp_input_path)
+                except OSError:
+                    pass
+            if witness_path and os.path.exists(witness_path):
+                try:
+                    os.unlink(witness_path)
+                except OSError:
+                    pass
+            if temp_proof_path and os.path.exists(temp_proof_path):
+                try:
+                    os.unlink(temp_proof_path)
+                except OSError:
+                    pass
             return None
 
     def _verify_proof(self, circuit_dir: str, proof_path: str) -> bool:
