@@ -45,8 +45,9 @@ class SotaManager:
 
     def save_miner_states(self, miner_states: dict[str, NeuronState]):
         try:
+            serialized_states = {k: v.__dict__ for k, v in miner_states.items()}
             with open(self.miner_states_path, "w") as f:
-                json.dump(miner_states, f, indent=4)
+                json.dump(serialized_states, f, indent=4)
         except Exception as e:
             bt.logging.error(f"Error saving miner states: {e}")
 
