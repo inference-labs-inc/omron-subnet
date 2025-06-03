@@ -83,7 +83,7 @@ class ValidatorLoop:
                 self.validator_to_competition_queue, self.competition_to_validator_queue
             )
             bt.logging.success("Competition module initialized successfully")
-            self.clear_sota_state()
+            # self.clear_sota_state()
         except Exception as e:
             bt.logging.warning(
                 f"Failed to initialize competition, continuing without competition support: {e}"
