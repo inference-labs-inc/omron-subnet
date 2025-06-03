@@ -233,7 +233,9 @@ class Competition:
             self.config, self.competition_directory, self.sota_manager
         )
 
-        self.miner_states: Dict[str, NeuronState] = {}
+        self.miner_states: Dict[str, NeuronState] = (
+            self.sota_manager.load_miner_states()
+        )
 
         self.circuits_evaluated_count: int = 0
         self.is_active: bool = (
@@ -268,6 +270,7 @@ class Competition:
         self.miner_states = {
             k: v for k, v in self.miner_states.items() if k in self.metagraph.hotkeys
         }
+
         commitments = []
 
         try:

@@ -13,6 +13,7 @@ class SotaManager:
     def __init__(self, sota_directory: str):
         self.sota_directory = sota_directory
         self.sota_state_path = os.path.join(sota_directory, "sota_state.json")
+        self.miner_states_path = os.path.join(sota_directory, "miner_states.json")
         self.sota_state = self._load_state()
 
         try:
@@ -41,6 +42,23 @@ class SotaManager:
                 json.dump(self.sota_state.__dict__, f, indent=4)
         except Exception as e:
             bt.logging.error(f"Error saving SOTA state: {e}")
+
+    def save_miner_states(self, miner_states: dict[str, NeuronState]):
+        try:
+            with open(self.miner_states_path, "w") as f:
+                json.dump(miner_states, f, indent=4)
+        except Exception as e:
+            bt.logging.error(f"Error saving miner states: {e}")
+
+    def load_miner_states(self) -> dict[str, NeuronState]:
+        try:
+            if os.path.exists(self.miner_states_path):
+                with open(self.miner_states_path, "r") as f:
+                    return json.load(f)
+            return {}
+        except Exception as e:
+            bt.logging.error(f"Error loading miner states: {e}")
+            return {}
 
     def calculate_score(
         self,
@@ -195,6 +213,7 @@ class SotaManager:
                     state.sota_relative_score = 0.0
 
             log_sota_scores(performance_scores, miner_states, max_score)
+            self.save_miner_states(miner_states)
 
         except Exception as e:
             bt.logging.error(f"Error recalculating miner scores: {e}")
