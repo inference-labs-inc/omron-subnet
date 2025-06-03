@@ -55,7 +55,8 @@ class SotaManager:
         try:
             if os.path.exists(self.miner_states_path):
                 with open(self.miner_states_path, "r") as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    return {k: NeuronState(**v) for k, v in data.items()}
             return {}
         except Exception as e:
             bt.logging.error(f"Error loading miner states: {e}")
