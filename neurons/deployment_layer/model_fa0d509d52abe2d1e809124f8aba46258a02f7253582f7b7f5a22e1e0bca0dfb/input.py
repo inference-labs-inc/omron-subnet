@@ -129,13 +129,16 @@ class CircuitInput(BaseInput):
         competition_end_time = 1749312000
         competition_decay_start_time = 1749063760
 
-        linear_weight = max(
-            0.0,
-            min(
-                1.0,
-                (competition_end_time - current_time)
-                / (competition_end_time - competition_decay_start_time),
-            ),
+        linear_weight = (
+            max(
+                0.0,
+                min(
+                    1.0,
+                    (competition_end_time - current_time)
+                    / (competition_end_time - competition_decay_start_time),
+                ),
+            )
+            * COMPETITION_WEIGHT
         )
 
         data["COMPETITION_WEIGHT"] = int(linear_weight * SCALING)
