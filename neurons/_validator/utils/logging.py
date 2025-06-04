@@ -45,9 +45,6 @@ def log_tensor_data(title: str, data: torch.Tensor, log_key: str):
     create_and_print_table(
         title, [("uid", "right", "cyan"), (log_key, "right", "yellow")], rows
     )
-    wandb_logger.safe_log(
-        {log_key: {uid: value.item() for uid, value in enumerate(data)}}
-    )
 
 
 def log_scores(scores: torch.Tensor):
@@ -58,7 +55,7 @@ def log_scores(scores: torch.Tensor):
         scores (torch.Tensor): The scores tensor to be logged.
 
     """
-    # log_tensor_data("scores", scores, "scores")
+    log_tensor_data("scores", scores, "scores")
 
 
 def log_weights(weights: torch.Tensor):
@@ -68,7 +65,7 @@ def log_weights(weights: torch.Tensor):
     Args:
         weights (torch.Tensor): The weights tensor to be logged.
     """
-    # log_tensor_data("weights", weights, "weights")
+    log_tensor_data("weights", weights, "weights")
 
 
 def log_verify_result(results: list[tuple[int, bool]]):
