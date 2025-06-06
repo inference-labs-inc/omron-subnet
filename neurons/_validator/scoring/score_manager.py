@@ -240,7 +240,11 @@ class ScoreManager:
                 hotkey
             ].sota_relative_score
 
-        if not response.verification_result and competition_score:
+        if (
+            not response.verification_result
+            and competition_score is not None
+            and competition_score > 0.001
+        ):
             # If the miner is not responding to requests, but is in the competition, consider it verified
             # Note that default values are set earlier up, therefore they receive a very poor response score.
             # We set them again here to ensure the max response time is used.
