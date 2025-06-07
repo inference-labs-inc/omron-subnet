@@ -39,6 +39,7 @@ class ScoreManager:
         self.last_processed_queue_step = -1
         self.proof_of_weights_queue = []
         self.competition = competition
+        self.last_ema_segment_per_uid = {}
 
     def init_scores(self) -> torch.Tensor:
         """Initialize or load existing scores."""
@@ -310,12 +311,20 @@ class ScoreManager:
             current_segment = cycle_position // 360
             miner_group = response.uid % 8
 
-            if miner_group == current_segment - 1:
+            # Check if this UID already got EMA this segment
+            last_ema_segment = self.last_ema_segment_per_uid.get(response.uid, -1)
+
+            if (
+                miner_group == current_segment - 1
+                and last_ema_segment != current_segment
+            ):
                 # EMA boost when about to reset
                 self.scores[response.uid] = self.scores[response.uid] * 1.001
-            else:
+                self.last_ema_segment_per_uid[response.uid] = current_segment
+            elif last_ema_segment != current_segment:
                 # EMA decay when not about to reset
                 self.scores[response.uid] = self.scores[response.uid] * 0.9999
+                self.last_ema_segment_per_uid[response.uid] = current_segment
 
         evaluation_data = CircuitEvaluationItem(
             circuit=circuit,
