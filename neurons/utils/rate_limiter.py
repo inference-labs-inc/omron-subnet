@@ -22,39 +22,36 @@ class RateLimiter:
 
 
 def with_rate_limit(period: float):
-    """
-    Rate limits a function to one call per time period.
-    Works with both async and sync functions.
-
-    Args:
-        period: Time period in seconds
-    """
-
     def decorator(func: Callable[P, T]) -> Callable[P, T]:
         limiter = RateLimiter.get_limiter(func.__name__, period)
+        last_result = None
 
         if asyncio.iscoroutinefunction(func):
 
             @wraps(func)
             async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+                nonlocal last_result
                 now = time.time()
                 if now - limiter.last_call < period:
-                    return None
+                    return last_result
 
                 limiter.last_call = now
-                return await func(*args, **kwargs)
+                last_result = await func(*args, **kwargs)
+                return last_result
 
             return async_wrapper
         else:
 
             @wraps(func)
             def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+                nonlocal last_result
                 now = time.time()
                 if now - limiter.last_call < period:
-                    return None
+                    return last_result
 
                 limiter.last_call = now
-                return func(*args, **kwargs)
+                last_result = func(*args, **kwargs)
+                return last_result
 
             return sync_wrapper
 

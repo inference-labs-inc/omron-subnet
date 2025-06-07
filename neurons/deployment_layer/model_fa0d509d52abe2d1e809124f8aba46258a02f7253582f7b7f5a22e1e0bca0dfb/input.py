@@ -6,7 +6,6 @@ from _validator.models.request_type import RequestType
 from constants import ONE_MINUTE
 import random
 import secrets
-import time
 
 BATCH_SIZE = 256
 RATE_OF_DECAY = 0.4
@@ -14,8 +13,8 @@ RATE_OF_RECOVERY = 0.1
 FLATTENING_COEFFICIENT = 0.9
 PROOF_SIZE_THRESHOLD = 3648
 PROOF_SIZE_WEIGHT = 0
-RESPONSE_TIME_WEIGHT = 0.25
-COMPETITION_WEIGHT = 0.75
+RESPONSE_TIME_WEIGHT = 1
+COMPETITION_WEIGHT = 0
 MAXIMUM_RESPONSE_TIME_DECIMAL = 0.99
 SCALING = 100000000
 
@@ -124,25 +123,6 @@ class CircuitInput(BaseInput):
         for constant in constants:
             if constant not in data:
                 data[constant] = int(globals()[constant] * SCALING)
-
-        current_time = time.time()
-        competition_end_time = 1749312000
-        competition_decay_start_time = 1749063760
-
-        linear_weight = (
-            max(
-                0.0,
-                min(
-                    1.0,
-                    (competition_end_time - current_time)
-                    / (competition_end_time - competition_decay_start_time),
-                ),
-            )
-            * COMPETITION_WEIGHT
-        )
-
-        data["COMPETITION_WEIGHT"] = int(linear_weight * SCALING)
-        data["RESPONSE_TIME_WEIGHT"] = int((1 - linear_weight) * SCALING)
 
         if "scaling" not in data:
             data["scaling"] = SCALING

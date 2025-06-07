@@ -6,7 +6,7 @@ from _validator.models.miner_response import MinerResponse
 from _validator.utils.logging import log_scores
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
 from _validator.utils.uid import get_queryable_uids
-from constants import SINGLE_PROOF_OF_WEIGHTS_MODEL_ID, ONE_MINUTE, DEFAULT_PROOF_SIZE
+from constants import SINGLE_PROOF_OF_WEIGHTS_MODEL_ID, ONE_MINUTE
 from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
 from _validator.models.request_type import RequestType
@@ -39,6 +39,7 @@ class ScoreManager:
         self.last_processed_queue_step = -1
         self.proof_of_weights_queue = []
         self.competition = competition
+        self.last_ema_segment_per_uid = {}
 
     def init_scores(self) -> torch.Tensor:
         """Initialize or load existing scores."""
@@ -195,6 +196,53 @@ class ScoreManager:
         self.proof_of_weights_queue = []
 
     @with_rate_limit(period=ONE_MINUTE * 5)
+    def _get_last_bonds_submissions(self) -> int:
+        """Get the latest bonds submissions."""
+        return self.metagraph.subtensor.substrate.query_map(
+            "Commitments",
+            "LastBondsReset",
+            params=[self.metagraph.netuid],
+        )
+
+    def _miner_missed_reset(self, uid: int) -> bool:
+        """
+        Check if a miner missed their required reset submission during their tempo.
+        Returns True if the miner was supposed to reset but didn't.
+        """
+        try:
+            current_block = self.metagraph.block.item()
+            tempo_blocks = 360
+            miner_group = uid % 8
+            cycle_length = 8 * tempo_blocks
+            current_cycle_position = current_block % cycle_length
+            group_trigger_position = miner_group * tempo_blocks
+
+            last_bonds_submissions = self._get_last_bonds_submissions()
+
+            if uid not in last_bonds_submissions:
+                return True
+
+            last_reset_block = last_bonds_submissions[uid]
+
+            current_cycle_start = current_block - current_cycle_position
+            latest_window_start = current_cycle_start + group_trigger_position
+            latest_window_end = latest_window_start + 360
+
+            if latest_window_start <= last_reset_block <= latest_window_end:
+                return False
+
+            if current_cycle_position < group_trigger_position:
+                previous_window_start = latest_window_start - cycle_length
+                previous_window_end = previous_window_start + 360
+                if previous_window_start <= last_reset_block <= previous_window_end:
+                    return False
+
+            return True
+        except Exception as e:
+            bt.logging.error(f"Error checking reset status for miner {uid}: {e}")
+            return False
+
+    @with_rate_limit(period=ONE_MINUTE * 5)
     def process_non_queryable_scores(self, queryable_uids: set[int], max_score: float):
         """
         Decay scores for non-queryable UIDs.
@@ -232,25 +280,33 @@ class ScoreManager:
             queryable_uids = set(get_queryable_uids(self.metagraph))
 
         circuit = response.circuit
-        hotkey = self.metagraph.hotkeys[response.uid]
 
-        competition_score = None
-        if self.competition and hotkey in self.competition.miner_states:
-            competition_score = self.competition.miner_states[
-                hotkey
-            ].sota_relative_score
+        if self._miner_missed_reset(response.uid):
+            bt.logging.warning(
+                f"Miner {response.uid} missed required reset submission, marking as unverified"
+            )
+            response.verification_result = False
 
-        if (
-            not response.verification_result
-            and competition_score is not None
-            and competition_score > 0.001
-        ):
-            # If the miner is not responding to requests, but is in the competition, consider it verified
-            # Note that default values are set earlier up, therefore they receive a very poor response score.
-            # We set them again here to ensure the max response time is used.
-            response.verification_result = True
-            response.response_time = circuit.evaluation_data.maximum_response_time
-            response.proof_size = DEFAULT_PROOF_SIZE
+        if self.scores[response.uid] is not None:
+            current_block = self.metagraph.block.item()
+            cycle_position = current_block % (8 * 360)
+            current_segment = cycle_position // 360
+            miner_group = response.uid % 8
+
+            # Check if this UID already got EMA this segment
+            last_ema_segment = self.last_ema_segment_per_uid.get(response.uid, -1)
+
+            if (
+                miner_group == current_segment - 1
+                and last_ema_segment != current_segment
+            ):
+                # EMA boost when about to reset
+                self.scores[response.uid] = self.scores[response.uid] * 1.001
+                self.last_ema_segment_per_uid[response.uid] = current_segment
+            elif last_ema_segment != current_segment:
+                # EMA decay when not about to reset
+                self.scores[response.uid] = self.scores[response.uid] * 0.9999
+                self.last_ema_segment_per_uid[response.uid] = current_segment
 
         evaluation_data = CircuitEvaluationItem(
             circuit=circuit,
@@ -274,7 +330,7 @@ class ScoreManager:
             circuit.evaluation_data.minimum_response_time,
             self.metagraph.block.item(),
             self.user_uid,
-            competition_score if competition_score is not None else 0,
+            0,
         )
 
         self._update_pow_queue([pow_item])

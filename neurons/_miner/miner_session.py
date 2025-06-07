@@ -101,6 +101,33 @@ class MinerSession:
 
         self.axon = axon
 
+    def perform_reset(self):
+        """
+        Coordinated reset performed by all miners in
+        the same group at synchronized block intervals.
+        """
+        bt.logging.info(f"Performing coordinated reset for group {self.subnet_uid % 8}")
+        try:
+            call = self.subtensor.substrate.compose_call(
+                call_module="Commitments",
+                call_function="set_commitment",
+                call_params={
+                    "netuid": cli_parser.config.netuid,
+                    "info": {"fields": [{"ResetBondsFlag": b""}]},
+                },
+            )
+            success, message = self.subtensor.sign_and_send_extrinsic(
+                call=call, wallet=self.wallet, sign_with="hotkey", period=10
+            )
+            if not success:
+                bt.logging.error(f"Failed to perform reset: {message}")
+            else:
+                bt.logging.info(
+                    f"Successfully performed reset for group {self.subnet_uid % 8}"
+                )
+        except Exception as e:
+            bt.logging.error(f"Error performing reset: {e}")
+
     def run(self):
         """
         Keep the miner alive.
@@ -114,7 +141,21 @@ class MinerSession:
         while True:
             step += 1
             try:
-                if step % 10 == 0:
+                current_block = self.metagraph.block.item()
+                tempo_blocks = 360
+                miner_group = self.subnet_uid % 8
+                cycle_length = 8 * tempo_blocks
+                current_cycle_position = current_block % cycle_length
+                group_trigger_position = miner_group * tempo_blocks
+
+                if current_cycle_position == group_trigger_position:
+                    bt.logging.info(
+                        f"Current block: {current_block} (Group {miner_group} coordination trigger "
+                        f"- cycle position {current_cycle_position})"
+                    )
+                    self.perform_reset()
+
+                if step % 100 == 0:
                     if not cli_parser.config.no_auto_update:
                         self.auto_update.try_update()
                     else:
@@ -132,6 +173,7 @@ class MinerSession:
                         self.log_batch = []
                     else:
                         bt.logging.debug("No logs to log to WandB")
+
                 if step % 600 == 0:
                     self.check_register()
 
