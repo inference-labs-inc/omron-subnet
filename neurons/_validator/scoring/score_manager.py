@@ -195,6 +195,53 @@ class ScoreManager:
         self.proof_of_weights_queue = []
 
     @with_rate_limit(period=ONE_MINUTE * 5)
+    def _get_last_bonds_submissions(self) -> int:
+        """Get the latest bonds submissions."""
+        return self.metagraph.subtensor.substrate.query_map(
+            "Commitments",
+            "LastBondsReset",
+            params=[self.metagraph.netuid],
+        )
+
+    def _miner_missed_reset(self, uid: int) -> bool:
+        """
+        Check if a miner missed their required reset submission during their tempo.
+        Returns True if the miner was supposed to reset but didn't.
+        """
+        try:
+            current_block = self.metagraph.block.item()
+            tempo_blocks = 360
+            miner_group = uid % 8
+            cycle_length = 8 * tempo_blocks
+            current_cycle_position = current_block % cycle_length
+            group_trigger_position = miner_group * tempo_blocks
+
+            last_bonds_submissions = self._get_last_bonds_submissions()
+
+            if uid not in last_bonds_submissions:
+                return True
+
+            last_reset_block = last_bonds_submissions[uid]
+
+            current_cycle_start = current_block - current_cycle_position
+            latest_window_start = current_cycle_start + group_trigger_position
+            latest_window_end = latest_window_start + 360
+
+            if latest_window_start <= last_reset_block <= latest_window_end:
+                return False
+
+            if current_cycle_position < group_trigger_position:
+                previous_window_start = latest_window_start - cycle_length
+                previous_window_end = previous_window_start + 360
+                if previous_window_start <= last_reset_block <= previous_window_end:
+                    return False
+
+            return True
+        except Exception as e:
+            bt.logging.error(f"Error checking reset status for miner {uid}: {e}")
+            return False
+
+    @with_rate_limit(period=ONE_MINUTE * 5)
     def process_non_queryable_scores(self, queryable_uids: set[int], max_score: float):
         """
         Decay scores for non-queryable UIDs.
@@ -240,6 +287,11 @@ class ScoreManager:
                 hotkey
             ].sota_relative_score
 
+        if self._miner_missed_reset(response.uid):
+            bt.logging.warning(
+                f"Miner {response.uid} missed required reset submission, marking as unverified"
+            )
+            response.verification_result = False
         if (
             not response.verification_result
             and competition_score is not None
