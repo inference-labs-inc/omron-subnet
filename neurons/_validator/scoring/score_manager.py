@@ -304,6 +304,19 @@ class ScoreManager:
             response.response_time = circuit.evaluation_data.maximum_response_time
             response.proof_size = DEFAULT_PROOF_SIZE
 
+        if self.scores[response.uid] is not None:
+            current_block = self.metagraph.block.item()
+            cycle_position = current_block % (8 * 360)
+            current_segment = cycle_position // 360
+            miner_group = response.uid % 8
+
+            if miner_group == current_segment - 1:
+                # EMA boost when about to reset
+                self.scores[response.uid] = self.scores[response.uid] * 1.001
+            else:
+                # EMA decay when not about to reset
+                self.scores[response.uid] = self.scores[response.uid] * 0.9999
+
         evaluation_data = CircuitEvaluationItem(
             circuit=circuit,
             uid=response.uid,
