@@ -301,11 +301,11 @@ class ScoreManager:
                 and last_ema_segment != current_segment
             ):
                 # EMA boost when about to reset
-                self.scores[response.uid] = self.scores[response.uid] * 1.001
+                self.scores[response.uid] = self.scores[response.uid] * 1.2
                 self.last_ema_segment_per_uid[response.uid] = current_segment
             elif last_ema_segment != current_segment:
                 # EMA decay when not about to reset
-                self.scores[response.uid] = self.scores[response.uid] * 0.9999
+                self.scores[response.uid] = self.scores[response.uid] * 0.99
                 self.last_ema_segment_per_uid[response.uid] = current_segment
 
         evaluation_data = CircuitEvaluationItem(
