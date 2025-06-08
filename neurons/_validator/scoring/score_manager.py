@@ -219,10 +219,10 @@ class ScoreManager:
 
             last_bonds_submissions = self._get_last_bonds_submissions()
 
-            if uid not in last_bonds_submissions:
+            if self.metagraph.hotkeys[uid] not in last_bonds_submissions:
                 return True
 
-            last_reset_block = last_bonds_submissions[uid]
+            last_reset_block = last_bonds_submissions[self.metagraph.hotkeys[uid]]
 
             current_cycle_start = current_block - current_cycle_position
             latest_window_start = current_cycle_start + group_trigger_position
