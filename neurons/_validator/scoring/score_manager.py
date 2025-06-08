@@ -6,7 +6,7 @@ from _validator.models.miner_response import MinerResponse
 from _validator.utils.logging import log_scores
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
 from _validator.utils.uid import get_queryable_uids
-from constants import SINGLE_PROOF_OF_WEIGHTS_MODEL_ID, ONE_MINUTE, DEFAULT_PROOF_SIZE
+from constants import SINGLE_PROOF_OF_WEIGHTS_MODEL_ID, ONE_MINUTE
 from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
 from _validator.models.request_type import RequestType
@@ -232,26 +232,6 @@ class ScoreManager:
             queryable_uids = set(get_queryable_uids(self.metagraph))
 
         circuit = response.circuit
-        hotkey = self.metagraph.hotkeys[response.uid]
-
-        competition_score = None
-        if self.competition and hotkey in self.competition.miner_states:
-            competition_score = self.competition.miner_states[
-                hotkey
-            ].sota_relative_score
-
-        if (
-            not response.verification_result
-            and competition_score is not None
-            and competition_score > 0.001
-        ):
-            # If the miner is not responding to requests, but is in the competition, consider it verified
-            # Note that default values are set earlier up, therefore they receive a very poor response score.
-            # We set them again here to ensure the max response time is used.
-            response.verification_result = True
-            response.response_time = circuit.evaluation_data.maximum_response_time
-            response.proof_size = DEFAULT_PROOF_SIZE
-
         evaluation_data = CircuitEvaluationItem(
             circuit=circuit,
             uid=response.uid,
@@ -274,7 +254,7 @@ class ScoreManager:
             circuit.evaluation_data.minimum_response_time,
             self.metagraph.block.item(),
             self.user_uid,
-            competition_score if competition_score is not None else 0,
+            0,
         )
 
         self._update_pow_queue([pow_item])
