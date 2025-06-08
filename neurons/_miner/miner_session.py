@@ -148,11 +148,15 @@ class MinerSession:
                 current_cycle_position = current_block % cycle_length
                 group_trigger_position = miner_group * tempo_blocks
 
-                last_bonds_submission = self.subtensor.substrate.query(
-                    "Commitments",
-                    "LastBondsReset",
-                    params=[cli_parser.config.netuid, self.subnet_uid],
-                )
+                last_bonds_submission = 0
+                try:
+                    last_bonds_submission = self.subtensor.substrate.query(
+                        "Commitments",
+                        "LastBondsReset",
+                        params=[cli_parser.config.netuid, self.subnet_uid],
+                    )
+                except Exception as e:
+                    bt.logging.error(f"Error querying last bonds submission: {e}")
 
                 last_reset_block = last_bonds_submission
                 current_cycle_start = current_block - current_cycle_position
