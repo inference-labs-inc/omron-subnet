@@ -153,7 +153,10 @@ class MinerSession:
                     last_bonds_submission = self.subtensor.substrate.query(
                         "Commitments",
                         "LastBondsReset",
-                        params=[cli_parser.config.netuid, self.subnet_uid],
+                        params=[
+                            cli_parser.config.netuid,
+                            self.wallet.hotkey.ss58_address,
+                        ],
                     )
                 except Exception as e:
                     bt.logging.error(f"Error querying last bonds submission: {e}")
