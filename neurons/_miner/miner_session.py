@@ -144,7 +144,7 @@ class MinerSession:
         while True:
             step += 1
             try:
-                if step % 120 == 0:
+                if step % 100 == 0:
                     current_block = self.subtensor.get_current_block()
                     miner_group = self.subnet_uid % NUM_MINER_GROUPS
 
