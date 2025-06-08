@@ -148,12 +148,23 @@ class MinerSession:
                 current_cycle_position = current_block % cycle_length
                 group_trigger_position = miner_group * tempo_blocks
 
-                if current_cycle_position == group_trigger_position:
-                    bt.logging.info(
-                        f"Current block: {current_block} (Group {miner_group} coordination trigger "
-                        f"- cycle position {current_cycle_position})"
-                    )
-                    self.perform_reset()
+                last_bonds_submission = self.subtensor.substrate.query(
+                    "Commitments",
+                    "LastBondsReset",
+                    params=[cli_parser.config.netuid, self.subnet_uid],
+                )
+
+                last_reset_block = last_bonds_submission
+                current_cycle_start = current_block - current_cycle_position
+                latest_window_start = current_cycle_start + group_trigger_position
+                latest_window_end = latest_window_start + 360
+                if latest_window_start <= current_block <= latest_window_end:
+                    if last_reset_block < latest_window_start:
+                        bt.logging.info(
+                            f"Current block: {current_block} (Group {miner_group} coordination trigger "
+                            f"- cycle position {current_cycle_position})"
+                        )
+                        self.perform_reset()
 
                 if step % 100 == 0:
                     if not cli_parser.config.no_auto_update:
