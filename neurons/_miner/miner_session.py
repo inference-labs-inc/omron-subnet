@@ -32,7 +32,7 @@ from protocol import (
 )
 from utils import AutoUpdate, clean_temp_files, wandb_logger
 from utils.rate_limiter import with_rate_limit
-from neurons._validator.utils.epoch import get_current_epoch_info
+from utils.epoch import get_current_epoch_info
 from .circuit_manager import CircuitManager
 
 COMPETITION_DIR = os.path.join(

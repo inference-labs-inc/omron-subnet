@@ -1,6 +1,6 @@
 from typing import Tuple
 
-from neurons.constants import EPOCH_TEMPO
+from constants import EPOCH_TEMPO
 
 
 def get_current_epoch_info(current_block: int, netuid: int) -> Tuple[int, int, int]:
