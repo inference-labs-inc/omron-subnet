@@ -18,6 +18,8 @@ from constants import (
     VALIDATOR_STAKE_THRESHOLD,
     ONE_HOUR,
     CIRCUIT_TIMEOUT_SECONDS,
+    NUM_MINER_GROUPS,
+    MINER_RESET_WINDOW_BLOCKS,
 )
 from deployment_layer.circuit_store import circuit_store
 from execution_layer.generic_input import GenericInput
@@ -30,6 +32,7 @@ from protocol import (
 )
 from utils import AutoUpdate, clean_temp_files, wandb_logger
 from utils.rate_limiter import with_rate_limit
+from neurons._validator.utils.epoch import get_current_epoch_info
 from .circuit_manager import CircuitManager
 
 COMPETITION_DIR = os.path.join(
@@ -143,15 +146,16 @@ class MinerSession:
             try:
                 if step % 120 == 0:
                     current_block = self.subtensor.get_current_block()
-                    miner_group = self.subnet_uid % 8
+                    miner_group = self.subnet_uid % NUM_MINER_GROUPS
 
-                    adjusted_block = current_block + cli_parser.config.netuid + 1
-                    blocks_until_next_epoch = 360 - (adjusted_block % 361)
-                    current_epoch = adjusted_block // 361
+                    (
+                        current_epoch,
+                        blocks_until_next_epoch,
+                        epoch_start_block,
+                    ) = get_current_epoch_info(current_block, cli_parser.config.netuid)
 
-                    if current_epoch % 8 == miner_group:
-                        reset_window = 10
-                        if blocks_until_next_epoch <= reset_window:
+                    if current_epoch % NUM_MINER_GROUPS == miner_group:
+                        if blocks_until_next_epoch <= MINER_RESET_WINDOW_BLOCKS:
                             last_bonds_submission = 0
                             try:
                                 last_bonds_submission = self.subtensor.substrate.query(
@@ -167,11 +171,7 @@ class MinerSession:
                                     f"Error querying last bonds submission: {e}"
                                 )
 
-                            current_epoch_start = current_block - (
-                                360 - blocks_until_next_epoch
-                            )
-
-                            if last_bonds_submission < current_epoch_start:
+                            if last_bonds_submission < epoch_start_block:
                                 bt.logging.info(
                                     f"Current block: {current_block}, epoch: {current_epoch}, "
                                     f"group {miner_group} reset trigger "

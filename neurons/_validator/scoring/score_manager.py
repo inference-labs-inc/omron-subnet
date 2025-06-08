@@ -6,12 +6,20 @@ from _validator.models.miner_response import MinerResponse
 from _validator.utils.logging import log_scores
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
 from _validator.utils.uid import get_queryable_uids
-from constants import SINGLE_PROOF_OF_WEIGHTS_MODEL_ID, ONE_MINUTE
+from constants import (
+    SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
+    ONE_MINUTE,
+    NUM_MINER_GROUPS,
+    EPOCH_TEMPO,
+    VALIDATOR_BOOST_WINDOW_BLOCKS,
+    MINER_RESET_WINDOW_BLOCKS,
+)
 from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
 from _validator.models.request_type import RequestType
 from execution_layer.circuit import CircuitEvaluationItem
 from utils.rate_limiter import with_rate_limit
+from utils.epoch import get_current_epoch_info, get_epoch_start_block
 from _validator.competitions.competition import Competition
 
 
@@ -204,17 +212,18 @@ class ScoreManager:
             params=[self.metagraph.netuid],
         )
 
-    def _miner_missed_reset(self, uid: int) -> bool:
+    def _miner_missed_reset(
+        self,
+        uid: int,
+        miner_group: int,
+        current_epoch: int,
+        blocks_until_next_epoch: int,
+    ) -> bool:
         """
         Check if a miner missed their required reset submission during their tempo.
         Returns True if the miner was supposed to reset but didn't.
         """
         try:
-            current_block = self.metagraph.subtensor.get_current_block()
-            miner_group = uid % 8
-            adjusted_block = current_block + 3
-            current_epoch = adjusted_block // 361
-
             last_bonds_submissions = self._get_last_bonds_submissions()
 
             if self.metagraph.hotkeys[uid] not in last_bonds_submissions:
@@ -222,20 +231,25 @@ class ScoreManager:
 
             last_reset_block = last_bonds_submissions[self.metagraph.hotkeys[uid]]
 
-            # Finds the most recent epoch assigned to this miner's group
-            # Determines whether the miner submitted a reset
-            # Flags out-of-order or missing resets
-            if current_epoch % 8 == miner_group:
+            if (
+                current_epoch % NUM_MINER_GROUPS == miner_group
+                and blocks_until_next_epoch <= MINER_RESET_WINDOW_BLOCKS
+            ):
                 most_recent_group_epoch = current_epoch
             else:
-                epochs_since_last = (current_epoch % 8 - miner_group) % 8
+                epochs_since_last = (
+                    current_epoch % NUM_MINER_GROUPS - miner_group
+                ) % NUM_MINER_GROUPS
                 most_recent_group_epoch = current_epoch - epochs_since_last
 
             if most_recent_group_epoch >= 0:
-                epoch_start = (most_recent_group_epoch * 361) - 3
+                epoch_start_block = get_epoch_start_block(
+                    most_recent_group_epoch, self.metagraph.netuid
+                )
+                epoch_end_block = epoch_start_block + EPOCH_TEMPO
                 if (
-                    last_reset_block < epoch_start
-                    or last_reset_block > epoch_start + 361
+                    last_reset_block < (epoch_end_block - MINER_RESET_WINDOW_BLOCKS)
+                    or last_reset_block > epoch_end_block
                 ):
                     return True
 
@@ -283,28 +297,29 @@ class ScoreManager:
 
         circuit = response.circuit
 
-        if self._miner_missed_reset(response.uid):
+        current_block = self.metagraph.subtensor.get_current_block()
+        miner_group = response.uid % NUM_MINER_GROUPS
+        current_epoch, blocks_until_next_epoch, _ = get_current_epoch_info(
+            current_block, self.metagraph.netuid
+        )
+
+        if self._miner_missed_reset(
+            response.uid, miner_group, current_epoch, blocks_until_next_epoch
+        ):
             bt.logging.warning(
                 f"Miner {response.uid} missed required reset submission, marking as unverified"
             )
             response.verification_result = False
 
         if self.scores[response.uid] is not None:
-            current_block = self.metagraph.subtensor.get_current_block()
-            miner_group = response.uid % 8
-            adjusted_block = current_block + 3
-            blocks_until_next_epoch = 360 - (adjusted_block % 361)
-            current_epoch = adjusted_block // 361
             last_ema_epoch = self.last_ema_segment_per_uid.get(response.uid, -1)
 
             if last_ema_epoch != current_epoch:
-                next_epoch = current_epoch + 1
-                next_active_group = next_epoch % 8
-                boost_window = 50
+                active_group = current_epoch % NUM_MINER_GROUPS
 
                 if (
-                    miner_group == next_active_group
-                    and blocks_until_next_epoch <= boost_window
+                    miner_group == active_group
+                    and blocks_until_next_epoch <= VALIDATOR_BOOST_WINDOW_BLOCKS
                 ):
                     self.scores[response.uid] = self.scores[response.uid] * 1.2
                 else:
