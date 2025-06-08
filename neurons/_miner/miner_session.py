@@ -142,36 +142,41 @@ class MinerSession:
             step += 1
             try:
                 current_block = self.metagraph.block.item()
-                tempo_blocks = 360
                 miner_group = self.subnet_uid % 8
-                cycle_length = 8 * tempo_blocks
-                current_cycle_position = current_block % cycle_length
-                group_trigger_position = miner_group * tempo_blocks
 
-                last_bonds_submission = 0
-                try:
-                    last_bonds_submission = self.subtensor.substrate.query(
-                        "Commitments",
-                        "LastBondsReset",
-                        params=[
-                            cli_parser.config.netuid,
-                            self.wallet.hotkey.ss58_address,
-                        ],
-                    )
-                except Exception as e:
-                    bt.logging.error(f"Error querying last bonds submission: {e}")
+                adjusted_block = current_block + cli_parser.config.netuid + 1
+                blocks_until_next_epoch = 360 - (adjusted_block % 361)
+                current_epoch = adjusted_block // 361
 
-                last_reset_block = last_bonds_submission
-                current_cycle_start = current_block - current_cycle_position
-                latest_window_start = current_cycle_start + group_trigger_position
-                latest_window_end = latest_window_start + 360
-                if latest_window_start <= current_block <= latest_window_end:
-                    if last_reset_block < latest_window_start:
-                        bt.logging.info(
-                            f"Current block: {current_block} (Group {miner_group} coordination trigger "
-                            f"- cycle position {current_cycle_position})"
+                if current_epoch % 8 == miner_group:
+                    reset_window = 10
+                    if blocks_until_next_epoch <= reset_window:
+                        last_bonds_submission = 0
+                        try:
+                            last_bonds_submission = self.subtensor.substrate.query(
+                                "Commitments",
+                                "LastBondsReset",
+                                params=[
+                                    cli_parser.config.netuid,
+                                    self.wallet.hotkey.ss58_address,
+                                ],
+                            )
+                        except Exception as e:
+                            bt.logging.error(
+                                f"Error querying last bonds submission: {e}"
+                            )
+
+                        current_epoch_start = current_block - (
+                            360 - blocks_until_next_epoch
                         )
-                        self.perform_reset()
+
+                        if last_bonds_submission < current_epoch_start:
+                            bt.logging.info(
+                                f"Current block: {current_block}, epoch: {current_epoch}, "
+                                f"group {miner_group} reset trigger "
+                                f"(blocks until next epoch: {blocks_until_next_epoch})"
+                            )
+                            self.perform_reset()
 
                 if step % 100 == 0:
                     if not cli_parser.config.no_auto_update:

@@ -211,11 +211,9 @@ class ScoreManager:
         """
         try:
             current_block = self.metagraph.block.item()
-            tempo_blocks = 360
             miner_group = uid % 8
-            cycle_length = 8 * tempo_blocks
-            current_cycle_position = current_block % cycle_length
-            group_trigger_position = miner_group * tempo_blocks
+            adjusted_block = current_block + 3
+            current_epoch = adjusted_block // 361
 
             last_bonds_submissions = self._get_last_bonds_submissions()
 
@@ -224,20 +222,24 @@ class ScoreManager:
 
             last_reset_block = last_bonds_submissions[self.metagraph.hotkeys[uid]]
 
-            current_cycle_start = current_block - current_cycle_position
-            latest_window_start = current_cycle_start + group_trigger_position
-            latest_window_end = latest_window_start + 360
+            # Finds the most recent epoch assigned to this miner's group
+            # Determines whether the miner submitted a reset
+            # Flags out-of-order or missing resets
+            if current_epoch % 8 == miner_group:
+                most_recent_group_epoch = current_epoch
+            else:
+                epochs_since_last = (current_epoch % 8 - miner_group) % 8
+                most_recent_group_epoch = current_epoch - epochs_since_last
 
-            if latest_window_start <= last_reset_block <= latest_window_end:
-                return False
+            if most_recent_group_epoch >= 0:
+                epoch_start = (most_recent_group_epoch * 361) - 3
+                if (
+                    last_reset_block < epoch_start
+                    or last_reset_block > epoch_start + 361
+                ):
+                    return True
 
-            if current_cycle_position < group_trigger_position:
-                previous_window_start = latest_window_start - cycle_length
-                previous_window_end = previous_window_start + 360
-                if previous_window_start <= last_reset_block <= previous_window_end:
-                    return False
-
-            return True
+            return False
         except Exception as e:
             bt.logging.error(f"Error checking reset status for miner {uid}: {e}")
             return False
@@ -289,24 +291,26 @@ class ScoreManager:
 
         if self.scores[response.uid] is not None:
             current_block = self.metagraph.block.item()
-            cycle_position = current_block % (8 * 360)
-            current_segment = cycle_position // 360
             miner_group = response.uid % 8
+            adjusted_block = current_block + 3
+            blocks_until_next_epoch = 360 - (adjusted_block % 361)
+            current_epoch = adjusted_block // 361
+            last_ema_epoch = self.last_ema_segment_per_uid.get(response.uid, -1)
 
-            # Check if this UID already got EMA this segment
-            last_ema_segment = self.last_ema_segment_per_uid.get(response.uid, -1)
+            if last_ema_epoch != current_epoch:
+                next_epoch = current_epoch + 1
+                next_active_group = next_epoch % 8
+                boost_window = 50
 
-            if (
-                miner_group == current_segment - 1
-                and last_ema_segment != current_segment
-            ):
-                # EMA boost when about to reset
-                self.scores[response.uid] = self.scores[response.uid] * 1.2
-                self.last_ema_segment_per_uid[response.uid] = current_segment
-            elif last_ema_segment != current_segment:
-                # EMA decay when not about to reset
-                self.scores[response.uid] = self.scores[response.uid] * 0.99
-                self.last_ema_segment_per_uid[response.uid] = current_segment
+                if (
+                    miner_group == next_active_group
+                    and blocks_until_next_epoch <= boost_window
+                ):
+                    self.scores[response.uid] = self.scores[response.uid] * 1.2
+                else:
+                    self.scores[response.uid] = self.scores[response.uid] * 0.99
+
+                self.last_ema_segment_per_uid[response.uid] = current_epoch
 
         evaluation_data = CircuitEvaluationItem(
             circuit=circuit,
