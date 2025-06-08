@@ -33,6 +33,7 @@ IGNORED_MODEL_HASHES = [
     "a4bcecaf699fd9212600a1f2fcaa40c444e1aeaab409ea240a38c33ed356f4e2",
     "e84b2e5f223621fa20078eb9f920d8d4d3a4ff95fa6e2357646fdbb43a2557c9",
     "a849500803abdbb86a9460e18684a6411dc7ae0b75f1f6330e3028081a497dea",
+    "f5b6043594f46ae6bd176ce60c7a099291cc6a3f6436fecd46142b1b1ecca5fb",
 ]
 
 # The maximum timespan allowed for miners to respond to a query
