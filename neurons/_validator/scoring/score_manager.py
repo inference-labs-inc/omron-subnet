@@ -210,7 +210,7 @@ class ScoreManager:
         Returns True if the miner was supposed to reset but didn't.
         """
         try:
-            current_block = self.metagraph.block.item()
+            current_block = self.metagraph.subtensor.get_current_block()
             miner_group = uid % 8
             adjusted_block = current_block + 3
             current_epoch = adjusted_block // 361
@@ -290,7 +290,7 @@ class ScoreManager:
             response.verification_result = False
 
         if self.scores[response.uid] is not None:
-            current_block = self.metagraph.block.item()
+            current_block = self.metagraph.subtensor.get_current_block()
             miner_group = response.uid % 8
             adjusted_block = current_block + 3
             blocks_until_next_epoch = 360 - (adjusted_block % 361)

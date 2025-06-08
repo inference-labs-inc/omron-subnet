@@ -142,7 +142,7 @@ class MinerSession:
             step += 1
             try:
                 if step % 120 == 0:
-                    current_block = self.metagraph.block.item()
+                    current_block = self.subtensor.get_current_block()
                     miner_group = self.subnet_uid % 8
 
                     adjusted_block = current_block + cli_parser.config.netuid + 1
