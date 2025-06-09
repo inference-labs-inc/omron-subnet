@@ -113,7 +113,7 @@ class MinerSession:
             f"Performing coordinated reset for group {self.subnet_uid % NUM_MINER_GROUPS}"
         )
         try:
-            commitment_info = {"fields": [{"ResetBondsFlag": b""}]}
+            commitment_info = [{"ResetBondsFlag": b""}]
             call = self.subtensor.substrate.compose_call(
                 call_module="Commitments",
                 call_function="set_commitment",
