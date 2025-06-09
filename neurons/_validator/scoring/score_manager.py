@@ -1,6 +1,8 @@
 from __future__ import annotations
 import torch
 import bittensor as bt
+from rich.console import Console
+from rich.table import Table
 
 from _validator.models.miner_response import MinerResponse
 from _validator.utils.logging import log_scores
@@ -11,7 +13,6 @@ from constants import (
     ONE_MINUTE,
     NUM_MINER_GROUPS,
     EPOCH_TEMPO,
-    VALIDATOR_BOOST_WINDOW_BLOCKS,
     MINER_RESET_WINDOW_BLOCKS,
 )
 from execution_layer.verified_model_session import VerifiedModelSession
@@ -296,6 +297,32 @@ class ScoreManager:
                     )
                     self._update_pow_queue([pow_item])
 
+    @with_rate_limit(period=ONE_MINUTE)
+    def log_ema(
+        self,
+        current_epoch: int,
+        blocks_until_next_epoch: int,
+        active_group: int,
+        boosted_group: int,
+    ):
+        """Logs a summary of the current EMA boosting status for miner groups."""
+        table = Table(
+            title=f"EMA Boost Status (Epoch: {current_epoch}, Blocks Until Next: "
+            f"{blocks_until_next_epoch}, Active Group: {active_group}, Boosted Group: {boosted_group})"
+        )
+        table.add_column("Group ID", justify="center", style="cyan")
+        table.add_column("Status", justify="center", style="magenta")
+
+        for group_id in range(NUM_MINER_GROUPS):
+            if group_id == boosted_group:
+                status = "🚀"
+            else:
+                status = "📉"
+            table.add_row(str(group_id), status)
+
+        console = Console()
+        console.print(table)
+
     def update_single_score(
         self,
         response: MinerResponse,
@@ -319,6 +346,12 @@ class ScoreManager:
             current_block, self.metagraph.netuid
         )
 
+        active_group = current_epoch % NUM_MINER_GROUPS
+        boosted_group = (active_group - 1 + NUM_MINER_GROUPS) % NUM_MINER_GROUPS
+        self.log_ema(
+            current_epoch, blocks_until_next_epoch, active_group, boosted_group
+        )
+
         if self._miner_missed_reset(
             response.uid, miner_group, current_epoch, blocks_until_next_epoch
         ):
@@ -331,13 +364,7 @@ class ScoreManager:
             last_ema_epoch = self.last_ema_segment_per_uid.get(response.uid, -1)
 
             if last_ema_epoch != current_epoch:
-                active_group = current_epoch % NUM_MINER_GROUPS
-                # -1 for commit reveal delay; max bonds impact at t0
-                if (
-                    miner_group
-                    == (active_group - 1 + NUM_MINER_GROUPS) % NUM_MINER_GROUPS
-                    and blocks_until_next_epoch <= VALIDATOR_BOOST_WINDOW_BLOCKS
-                ):
+                if miner_group == boosted_group:
                     self.scores[response.uid] = self.scores[response.uid] * 1.2
                 else:
                     self.scores[response.uid] = self.scores[response.uid] * 0.99

@@ -75,8 +75,6 @@ NUM_MINER_GROUPS = 8
 EPOCH_TEMPO = 360
 # The window in blocks before an epoch boundary where a miner can reset.
 MINER_RESET_WINDOW_BLOCKS = 10
-# The window in blocks before an epoch boundary where a validator applies an EMA boost.
-VALIDATOR_BOOST_WINDOW_BLOCKS = 50
 # Whether on-chain proof of weights is enabled by default
 ONCHAIN_PROOF_OF_WEIGHTS_ENABLED = False
 # Frequency in terms of blocks at which proof of weights are posted
