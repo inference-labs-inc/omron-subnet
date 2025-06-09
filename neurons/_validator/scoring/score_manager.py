@@ -203,7 +203,7 @@ class ScoreManager:
         """Clear the proof of weights queue."""
         self.proof_of_weights_queue = []
 
-    @with_rate_limit(period=ONE_MINUTE * 5)
+    @with_rate_limit(period=ONE_MINUTE)
     def _get_last_bonds_submissions(self) -> dict[str, int]:
         """Get the latest bonds submissions and format them into a dict."""
         raw_submissions = self.metagraph.subtensor.substrate.query_map(
