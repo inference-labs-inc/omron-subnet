@@ -334,7 +334,8 @@ class ScoreManager:
                 active_group = current_epoch % NUM_MINER_GROUPS
                 # -1 for commit reveal delay; max bonds impact at t0
                 if (
-                    miner_group == active_group - 1
+                    miner_group
+                    == (active_group - 1 + NUM_MINER_GROUPS) % NUM_MINER_GROUPS
                     and blocks_until_next_epoch <= VALIDATOR_BOOST_WINDOW_BLOCKS
                 ):
                     self.scores[response.uid] = self.scores[response.uid] * 1.2
