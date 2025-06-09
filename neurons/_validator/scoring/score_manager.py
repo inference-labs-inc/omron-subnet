@@ -353,7 +353,7 @@ class ScoreManager:
         )
 
         active_group = current_epoch % NUM_MINER_GROUPS
-        boosted_group = (active_group - 1 + NUM_MINER_GROUPS) % NUM_MINER_GROUPS
+        boosted_group = (active_group + 1) % NUM_MINER_GROUPS
         self.log_ema(
             current_epoch, blocks_until_next_epoch, active_group, boosted_group
         )
