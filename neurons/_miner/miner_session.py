@@ -123,7 +123,10 @@ class MinerSession:
                 },
             )
             success, message = self.subtensor.sign_and_send_extrinsic(
-                call=call, wallet=self.wallet, sign_with="hotkey", period=10
+                call=call,
+                wallet=self.wallet,
+                sign_with="hotkey",
+                period=MINER_RESET_WINDOW_BLOCKS,
             )
             if not success:
                 bt.logging.error(f"Failed to perform reset: {message}")
@@ -287,6 +290,7 @@ class MinerSession:
                 existing_vk_hash=current_commitment,
             )
         except Exception as e:
+            traceback.print_exc()
             bt.logging.error(f"Error initializing circuit manager: {e}")
             self.circuit_manager = None
 
