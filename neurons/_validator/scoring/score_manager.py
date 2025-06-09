@@ -204,13 +204,29 @@ class ScoreManager:
         self.proof_of_weights_queue = []
 
     @with_rate_limit(period=ONE_MINUTE * 5)
-    def _get_last_bonds_submissions(self) -> int:
-        """Get the latest bonds submissions."""
-        return self.metagraph.subtensor.substrate.query_map(
+    def _get_last_bonds_submissions(self) -> dict[str, int]:
+        """Get the latest bonds submissions and format them into a dict."""
+        raw_submissions = self.metagraph.subtensor.substrate.query_map(
             "Commitments",
             "LastBondsReset",
             params=[self.metagraph.netuid],
         )
+
+        submissions = {}
+        if not raw_submissions:
+            return submissions
+
+        for key_tuple, block_number_scale in raw_submissions:
+            try:
+                hotkey_bytes = bytes(key_tuple[0])
+                hotkey_ss58 = bt.Keypair(public_key=hotkey_bytes).ss58_address
+                submissions[hotkey_ss58] = block_number_scale.value
+            except Exception as e:
+                bt.logging.warning(
+                    f"Could not decode hotkey from LastBondsReset storage map: {e}"
+                )
+
+        return submissions
 
     def _miner_missed_reset(
         self,
