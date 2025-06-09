@@ -15,6 +15,7 @@ from constants import (
     EPOCH_TEMPO,
     MINER_RESET_WINDOW_BLOCKS,
     BOOST_BUFFER,
+    RESET_PENALTY_ENABLED,
 )
 from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
@@ -241,6 +242,8 @@ class ScoreManager:
         Check if a miner missed their required reset submission during their tempo.
         Returns True if the miner was supposed to reset but didn't.
         """
+        if not RESET_PENALTY_ENABLED:
+            return False
         try:
             last_bonds_submissions = self._get_last_bonds_submissions()
 
