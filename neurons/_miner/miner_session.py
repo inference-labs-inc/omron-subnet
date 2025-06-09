@@ -119,7 +119,7 @@ class MinerSession:
                 call_function="set_commitment",
                 call_params={
                     "netuid": cli_parser.config.netuid,
-                    "info": [commitment_info],
+                    "info": {"fields": [commitment_info]},
                 },
             )
             success, message = self.subtensor.sign_and_send_extrinsic(
