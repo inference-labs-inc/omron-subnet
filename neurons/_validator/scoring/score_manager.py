@@ -249,16 +249,15 @@ class ScoreManager:
 
             last_reset_block = last_bonds_submissions[self.metagraph.hotkeys[uid]]
 
-            if (
-                current_epoch % NUM_MINER_GROUPS == miner_group
-                and blocks_until_next_epoch <= MINER_RESET_WINDOW_BLOCKS
-            ):
-                most_recent_group_epoch = current_epoch
+            current_active_group = current_epoch % NUM_MINER_GROUPS
+            if miner_group == current_active_group:
+                most_recent_group_epoch = current_epoch - NUM_MINER_GROUPS
             else:
                 epochs_since_last = (
-                    current_epoch % NUM_MINER_GROUPS - miner_group
+                    current_active_group - miner_group + NUM_MINER_GROUPS
                 ) % NUM_MINER_GROUPS
                 most_recent_group_epoch = current_epoch - epochs_since_last
+
             # Do not penalize miners for resets before deployment
             if most_recent_group_epoch < 5744188:
                 return False
