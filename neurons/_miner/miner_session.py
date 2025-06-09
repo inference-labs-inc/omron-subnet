@@ -20,6 +20,7 @@ from constants import (
     CIRCUIT_TIMEOUT_SECONDS,
     NUM_MINER_GROUPS,
     MINER_RESET_WINDOW_BLOCKS,
+    ONE_MINUTE,
 )
 from deployment_layer.circuit_store import circuit_store
 from execution_layer.generic_input import GenericInput
@@ -32,7 +33,7 @@ from protocol import (
 )
 from utils import AutoUpdate, clean_temp_files, wandb_logger
 from utils.rate_limiter import with_rate_limit
-from utils.epoch import get_current_epoch_info
+from utils.epoch import get_current_epoch_info, get_epoch_start_block
 from .circuit_manager import CircuitManager
 
 COMPETITION_DIR = os.path.join(
@@ -137,6 +138,72 @@ class MinerSession:
         except Exception as e:
             bt.logging.error(f"Error performing reset: {e}")
 
+    @with_rate_limit(period=ONE_MINUTE)
+    def log_reset_check(self, current_block: int, current_epoch: int, miner_group: int):
+        """Logs information about the next scheduled reset for the miner's group."""
+        current_group_in_rotation = current_epoch % NUM_MINER_GROUPS
+        epochs_until_next_turn = (
+            miner_group - current_group_in_rotation + NUM_MINER_GROUPS
+        ) % NUM_MINER_GROUPS
+
+        if epochs_until_next_turn == 0:
+            # This is our group's epoch, so the next one is a full cycle away.
+            next_reset_epoch = current_epoch + NUM_MINER_GROUPS
+        else:
+            next_reset_epoch = current_epoch + epochs_until_next_turn
+
+        next_reset_start_block = get_epoch_start_block(
+            next_reset_epoch, cli_parser.config.netuid
+        )
+        blocks_until_next_reset = next_reset_start_block - current_block
+
+        bt.logging.info(
+            f"Group {miner_group} | "
+            f"Current Block: {current_block} | "
+            f"Next Reset Epoch: {next_reset_epoch} (starts at block ~{next_reset_start_block}) | "
+            f"Blocks Until Reset: ~{blocks_until_next_reset}"
+        )
+
+    def perform_reset_check(self):
+        if self.subnet_uid is None:
+            return
+
+        current_block = self.subtensor.get_current_block()
+        miner_group = self.subnet_uid % NUM_MINER_GROUPS
+        (
+            current_epoch,
+            blocks_until_next_epoch,
+            epoch_start_block,
+        ) = get_current_epoch_info(current_block, cli_parser.config.netuid)
+
+        self.log_reset_check(current_block, current_epoch, miner_group)
+
+        if current_epoch % NUM_MINER_GROUPS == miner_group:
+            if blocks_until_next_epoch <= MINER_RESET_WINDOW_BLOCKS:
+                last_bonds_submission = 0
+                try:
+                    last_bonds_submission = self.subtensor.substrate.query(
+                        "Commitments",
+                        "LastBondsReset",
+                        params=[
+                            cli_parser.config.netuid,
+                            self.wallet.hotkey.ss58_address,
+                        ],
+                    )
+                except Exception as e:
+                    bt.logging.error(f"Error querying last bonds submission: {e}")
+
+                if (
+                    not last_bonds_submission
+                    or last_bonds_submission < epoch_start_block
+                ):
+                    bt.logging.info(
+                        f"Current block: {current_block}, epoch: {current_epoch}, "
+                        f"group {miner_group} reset trigger "
+                        f"(blocks until next epoch: {blocks_until_next_epoch})"
+                    )
+                    self.perform_reset()
+
     def run(self):
         """
         Keep the miner alive.
@@ -150,49 +217,14 @@ class MinerSession:
         while True:
             step += 1
             try:
-                if step % 100 == 0:
-                    current_block = self.subtensor.get_current_block()
-                    miner_group = self.subnet_uid % NUM_MINER_GROUPS
-
-                    (
-                        current_epoch,
-                        blocks_until_next_epoch,
-                        epoch_start_block,
-                    ) = get_current_epoch_info(current_block, cli_parser.config.netuid)
-
-                    if current_epoch % NUM_MINER_GROUPS == miner_group:
-                        if blocks_until_next_epoch <= MINER_RESET_WINDOW_BLOCKS:
-                            last_bonds_submission = 0
-                            try:
-                                last_bonds_submission = self.subtensor.substrate.query(
-                                    "Commitments",
-                                    "LastBondsReset",
-                                    params=[
-                                        cli_parser.config.netuid,
-                                        self.wallet.hotkey.ss58_address,
-                                    ],
-                                )
-                            except Exception as e:
-                                bt.logging.error(
-                                    f"Error querying last bonds submission: {e}"
-                                )
-
-                            if (
-                                not last_bonds_submission
-                                or last_bonds_submission < epoch_start_block
-                            ):
-                                bt.logging.info(
-                                    f"Current block: {current_block}, epoch: {current_epoch}, "
-                                    f"group {miner_group} reset trigger "
-                                    f"(blocks until next epoch: {blocks_until_next_epoch})"
-                                )
-                                self.perform_reset()
+                if step % 10 == 0:
+                    self.perform_reset_check()
 
                 if step % 100 == 0:
                     if not cli_parser.config.no_auto_update:
                         self.auto_update.try_update()
                     else:
-                        bt.logging.info(
+                        bt.logging.debug(
                             "Automatic updates are disabled, skipping version check"
                         )
 
