@@ -1,17 +1,27 @@
 from __future__ import annotations
 import torch
 import bittensor as bt
+from rich.console import Console
+from rich.table import Table
 
 from _validator.models.miner_response import MinerResponse
 from _validator.utils.logging import log_scores
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
 from _validator.utils.uid import get_queryable_uids
-from constants import SINGLE_PROOF_OF_WEIGHTS_MODEL_ID, ONE_MINUTE
+from constants import (
+    SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
+    ONE_MINUTE,
+    NUM_MINER_GROUPS,
+    EPOCH_TEMPO,
+    MINER_RESET_WINDOW_BLOCKS,
+    BOOST_BUFFER,
+)
 from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
 from _validator.models.request_type import RequestType
 from execution_layer.circuit import CircuitEvaluationItem
 from utils.rate_limiter import with_rate_limit
+from utils.epoch import get_current_epoch_info, get_epoch_start_block
 from _validator.competitions.competition import Competition
 
 
@@ -39,6 +49,7 @@ class ScoreManager:
         self.last_processed_queue_step = -1
         self.proof_of_weights_queue = []
         self.competition = competition
+        self.last_ema_segment_per_uid = {}
 
     def init_scores(self) -> torch.Tensor:
         """Initialize or load existing scores."""
@@ -194,6 +205,77 @@ class ScoreManager:
         """Clear the proof of weights queue."""
         self.proof_of_weights_queue = []
 
+    @with_rate_limit(period=ONE_MINUTE)
+    def _get_last_bonds_submissions(self) -> dict[str, int]:
+        """Get the latest bonds submissions and format them into a dict."""
+        raw_submissions = self.metagraph.subtensor.substrate.query_map(
+            "Commitments",
+            "LastBondsReset",
+            params=[self.metagraph.netuid],
+        )
+
+        submissions = {}
+        if not raw_submissions:
+            return submissions
+
+        for key_tuple, block_number_scale in raw_submissions:
+            try:
+                hotkey_bytes = bytes(key_tuple[0])
+                hotkey_ss58 = bt.Keypair(public_key=hotkey_bytes.hex()).ss58_address
+                submissions[hotkey_ss58] = block_number_scale.value
+            except Exception as e:
+                bt.logging.warning(
+                    f"Could not decode hotkey from LastBondsReset storage map: {e}"
+                )
+
+        return submissions
+
+    def _miner_missed_reset(
+        self,
+        uid: int,
+        miner_group: int,
+        current_epoch: int,
+        blocks_until_next_epoch: int,
+    ) -> bool:
+        """
+        Check if a miner missed their required reset submission during their tempo.
+        Returns True if the miner was supposed to reset but didn't.
+        """
+        try:
+            last_bonds_submissions = self._get_last_bonds_submissions()
+
+            if self.metagraph.hotkeys[uid] not in last_bonds_submissions:
+                return True
+
+            last_reset_block = last_bonds_submissions[self.metagraph.hotkeys[uid]]
+
+            if (
+                current_epoch % NUM_MINER_GROUPS == miner_group
+                and blocks_until_next_epoch <= MINER_RESET_WINDOW_BLOCKS
+            ):
+                most_recent_group_epoch = current_epoch
+            else:
+                epochs_since_last = (
+                    current_epoch % NUM_MINER_GROUPS - miner_group
+                ) % NUM_MINER_GROUPS
+                most_recent_group_epoch = current_epoch - epochs_since_last
+
+            if most_recent_group_epoch >= 0:
+                epoch_start_block = get_epoch_start_block(
+                    most_recent_group_epoch, self.metagraph.netuid
+                )
+                epoch_end_block = epoch_start_block + EPOCH_TEMPO
+                if (
+                    last_reset_block < (epoch_end_block - MINER_RESET_WINDOW_BLOCKS)
+                    or last_reset_block > epoch_end_block
+                ):
+                    return True
+
+            return False
+        except Exception as e:
+            bt.logging.error(f"Error checking reset status for miner {uid}: {e}")
+            return False
+
     @with_rate_limit(period=ONE_MINUTE * 5)
     def process_non_queryable_scores(self, queryable_uids: set[int], max_score: float):
         """
@@ -216,6 +298,32 @@ class ScoreManager:
                     )
                     self._update_pow_queue([pow_item])
 
+    @with_rate_limit(period=ONE_MINUTE)
+    def log_ema(
+        self,
+        current_epoch: int,
+        blocks_until_next_epoch: int,
+        active_group: int,
+        boosted_group: int,
+    ):
+        """Logs a summary of the current EMA boosting status for miner groups."""
+        table = Table(
+            title=f"EMA Boost Status (Epoch: {current_epoch}, Blocks Until Next: "
+            f"{blocks_until_next_epoch}, Active Group: {active_group}, Boosted Group: {boosted_group})"
+        )
+        table.add_column("Group ID", justify="center", style="cyan")
+        table.add_column("Status", justify="center", style="magenta")
+
+        for group_id in range(NUM_MINER_GROUPS):
+            if group_id == boosted_group:
+                status = "🚀"
+            else:
+                status = "📉"
+            table.add_row(str(group_id), status)
+
+        console = Console()
+        console.print(table)
+
     def update_single_score(
         self,
         response: MinerResponse,
@@ -232,6 +340,41 @@ class ScoreManager:
             queryable_uids = set(get_queryable_uids(self.metagraph))
 
         circuit = response.circuit
+
+        current_block = self.metagraph.subtensor.get_current_block()
+        miner_group = response.uid % NUM_MINER_GROUPS
+        current_epoch, blocks_until_next_epoch, _ = get_current_epoch_info(
+            current_block, self.metagraph.netuid
+        )
+
+        active_group = current_epoch % NUM_MINER_GROUPS
+        boosted_group = (active_group - 1 + NUM_MINER_GROUPS) % NUM_MINER_GROUPS
+        self.log_ema(
+            current_epoch, blocks_until_next_epoch, active_group, boosted_group
+        )
+
+        if self._miner_missed_reset(
+            response.uid, miner_group, current_epoch, blocks_until_next_epoch
+        ):
+            bt.logging.warning(
+                f"Miner {response.uid} missed required reset submission, marking as unverified"
+            )
+            response.verification_result = False
+
+        if self.scores[response.uid] is not None:
+            last_ema_epoch = self.last_ema_segment_per_uid.get(response.uid, -1)
+
+            if last_ema_epoch != current_epoch:
+                if (
+                    miner_group == boosted_group
+                    and blocks_until_next_epoch <= BOOST_BUFFER
+                ):
+                    self.scores[response.uid] = self.scores[response.uid] * 1.2
+                else:
+                    self.scores[response.uid] = self.scores[response.uid] * 0.99
+
+                self.last_ema_segment_per_uid[response.uid] = current_epoch
+
         evaluation_data = CircuitEvaluationItem(
             circuit=circuit,
             uid=response.uid,

@@ -4,7 +4,7 @@
     "description": "Age detection model evaluation with 64x64x3 inputs",
     "version": "1.0.0",
     "start_timestamp": 1746633600,
-    "end_timestamp": 1749312000,
+    "end_timestamp": 1749264870,
     "baseline_model_path": "age.onnx",
     "circuit_settings": {
         "input_shape": [

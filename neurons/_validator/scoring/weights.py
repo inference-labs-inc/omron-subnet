@@ -2,9 +2,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import torch
 import bittensor as bt
-from constants import WEIGHT_RATE_LIMIT, WEIGHTS_VERSION, ONE_MINUTE
+from constants import (
+    WEIGHT_RATE_LIMIT,
+    WEIGHTS_VERSION,
+    ONE_MINUTE,
+    WEIGHT_UPDATE_BUFFER,
+)
 from _validator.utils.logging import log_weights
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
+from utils.epoch import get_current_epoch_info
 
 
 @dataclass
@@ -40,7 +46,7 @@ class WeightsManager:
         )
 
     def should_update_weights(self) -> tuple[bool, str]:
-        """Check if weights should be updated based on rate limiting."""
+        """Check if weights should be updated based on rate limiting and epoch timing."""
         blocks_since_last_update = self.subtensor.blocks_since_last_update(
             self.metagraph.netuid, self.user_uid
         )
@@ -52,6 +58,19 @@ class WeightsManager:
                 f"Next weight update in {blocks_until_update} blocks "
                 f"(approximately {minutes_until_update:.1f} minutes)",
             )
+
+        current_block = self.subtensor.get_current_block()
+        _, blocks_until_next_epoch, _ = get_current_epoch_info(
+            current_block, self.metagraph.netuid
+        )
+
+        if blocks_until_next_epoch > WEIGHT_UPDATE_BUFFER:
+            return (
+                False,
+                f"Weight updates only allowed in last {WEIGHT_UPDATE_BUFFER} blocks of epoch. "
+                f"Wait {blocks_until_next_epoch - WEIGHT_UPDATE_BUFFER} more blocks.",
+            )
+
         return True, ""
 
     def update_weights(self, scores: torch.Tensor) -> bool:
