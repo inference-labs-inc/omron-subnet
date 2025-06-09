@@ -147,7 +147,7 @@ class ValidatorLoop:
             bt.logging.error(f"Error clearing sota state: {e}")
             traceback.print_exc()
 
-    @with_rate_limit(period=FIVE_MINUTES)
+    @with_rate_limit(period=ONE_MINUTE)
     def update_weights(self):
         start_time = time.time()
         try:

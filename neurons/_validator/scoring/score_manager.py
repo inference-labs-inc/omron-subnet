@@ -14,6 +14,7 @@ from constants import (
     NUM_MINER_GROUPS,
     EPOCH_TEMPO,
     MINER_RESET_WINDOW_BLOCKS,
+    BOOST_BUFFER,
 )
 from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
@@ -364,7 +365,10 @@ class ScoreManager:
             last_ema_epoch = self.last_ema_segment_per_uid.get(response.uid, -1)
 
             if last_ema_epoch != current_epoch:
-                if miner_group == boosted_group:
+                if (
+                    miner_group == boosted_group
+                    and blocks_until_next_epoch <= BOOST_BUFFER
+                ):
                     self.scores[response.uid] = self.scores[response.uid] * 1.2
                 else:
                     self.scores[response.uid] = self.scores[response.uid] * 0.99

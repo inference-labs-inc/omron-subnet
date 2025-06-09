@@ -73,6 +73,10 @@ FIELD_MODULUS = (
 NUM_MINER_GROUPS = 8
 # Subnet tempo for epochs
 EPOCH_TEMPO = 360
+# Weight update buffer
+WEIGHT_UPDATE_BUFFER = 15
+# How close to the end of the epoch the boost is applied
+BOOST_BUFFER = 50
 # The window in blocks before an epoch boundary where a miner can reset.
 MINER_RESET_WINDOW_BLOCKS = 10
 # Whether on-chain proof of weights is enabled by default
