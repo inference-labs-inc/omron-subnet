@@ -316,9 +316,9 @@ class ScoreManager:
 
             if last_ema_epoch != current_epoch:
                 active_group = current_epoch % NUM_MINER_GROUPS
-
+                # -1 for commit reveal delay; max bonds impact at t0
                 if (
-                    miner_group == active_group
+                    miner_group == active_group - 1
                     and blocks_until_next_epoch <= VALIDATOR_BOOST_WINDOW_BLOCKS
                 ):
                     self.scores[response.uid] = self.scores[response.uid] * 1.2
