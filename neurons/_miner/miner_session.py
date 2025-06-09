@@ -131,7 +131,7 @@ class MinerSession:
             if not success:
                 bt.logging.error(f"Failed to perform reset: {message}")
             else:
-                bt.logging.info(
+                bt.logging.success(
                     f"Successfully performed reset for group {self.subnet_uid % NUM_MINER_GROUPS}"
                 )
         except Exception as e:
