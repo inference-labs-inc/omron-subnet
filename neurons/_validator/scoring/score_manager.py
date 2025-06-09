@@ -219,7 +219,7 @@ class ScoreManager:
         for key_tuple, block_number_scale in raw_submissions:
             try:
                 hotkey_bytes = bytes(key_tuple[0])
-                hotkey_ss58 = bt.Keypair(public_key=hotkey_bytes).ss58_address
+                hotkey_ss58 = bt.Keypair(public_key=hotkey_bytes.hex()).ss58_address
                 submissions[hotkey_ss58] = block_number_scale.value
             except Exception as e:
                 bt.logging.warning(
