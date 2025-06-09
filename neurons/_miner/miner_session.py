@@ -171,7 +171,10 @@ class MinerSession:
                                     f"Error querying last bonds submission: {e}"
                                 )
 
-                            if last_bonds_submission < epoch_start_block:
+                            if (
+                                not last_bonds_submission
+                                or last_bonds_submission < epoch_start_block
+                            ):
                                 bt.logging.info(
                                     f"Current block: {current_block}, epoch: {current_epoch}, "
                                     f"group {miner_group} reset trigger "
