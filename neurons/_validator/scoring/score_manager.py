@@ -259,6 +259,9 @@ class ScoreManager:
                     current_epoch % NUM_MINER_GROUPS - miner_group
                 ) % NUM_MINER_GROUPS
                 most_recent_group_epoch = current_epoch - epochs_since_last
+            # Do not penalize miners for resets before deployment
+            if most_recent_group_epoch < 5744188:
+                return False
 
             if most_recent_group_epoch >= 0:
                 epoch_start_block = get_epoch_start_block(
