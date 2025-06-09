@@ -109,14 +109,17 @@ class MinerSession:
         Coordinated reset performed by all miners in
         the same group at synchronized block intervals.
         """
-        bt.logging.info(f"Performing coordinated reset for group {self.subnet_uid % 8}")
+        bt.logging.info(
+            f"Performing coordinated reset for group {self.subnet_uid % NUM_MINER_GROUPS}"
+        )
         try:
+            commitment_info = {"fields": [{"ResetBondsFlag": b""}]}
             call = self.subtensor.substrate.compose_call(
                 call_module="Commitments",
                 call_function="set_commitment",
                 call_params={
                     "netuid": cli_parser.config.netuid,
-                    "info": {"fields": [{"ResetBondsFlag": b""}]},
+                    "info": [commitment_info],
                 },
             )
             success, message = self.subtensor.sign_and_send_extrinsic(
@@ -126,7 +129,7 @@ class MinerSession:
                 bt.logging.error(f"Failed to perform reset: {message}")
             else:
                 bt.logging.info(
-                    f"Successfully performed reset for group {self.subnet_uid % 8}"
+                    f"Successfully performed reset for group {self.subnet_uid % NUM_MINER_GROUPS}"
                 )
         except Exception as e:
             bt.logging.error(f"Error performing reset: {e}")
