@@ -45,6 +45,9 @@ def log_tensor_data(title: str, data: torch.Tensor, log_key: str):
     create_and_print_table(
         title, [("uid", "right", "cyan"), (log_key, "right", "yellow")], rows
     )
+    wandb_logger.safe_log(
+        {log_key: {uid: value.item() for uid, value in enumerate(data)}}
+    )
 
 
 def log_scores(scores: torch.Tensor):
