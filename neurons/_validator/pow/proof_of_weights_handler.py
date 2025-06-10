@@ -19,7 +19,8 @@ class ProofOfWeightsHandler:
     def prepare_pow_request(
         circuit: Circuit, score_manager
     ) -> ProofOfWeightsSynapse | QueryZkProof:
-        queue = score_manager.get_pow_queue()
+        pow_manager = score_manager.get_pow_manager()
+        queue = pow_manager.get_pow_queue()
         batch_size = 1024
 
         if circuit.id != BATCHED_PROOF_OF_WEIGHTS_MODEL_ID:
@@ -37,7 +38,7 @@ class ProofOfWeightsHandler:
         )
 
         logging.info(f"Preparing PoW request for {str(circuit)}")
-        score_manager.remove_processed_items(batch_size)
+        pow_manager.remove_processed_items(batch_size)
         return (
             ProofOfWeightsHandler._create_request_from_items(circuit, pow_items),
             True,
