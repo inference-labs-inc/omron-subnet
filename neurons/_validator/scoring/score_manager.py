@@ -16,6 +16,7 @@ from constants import (
     MINER_RESET_WINDOW_BLOCKS,
     BOOST_BUFFER,
     RESET_PENALTY_ENABLED,
+    FIVE_MINUTES,
 )
 from execution_layer.verified_model_session import VerifiedModelSession
 from deployment_layer.circuit_store import circuit_store
@@ -24,6 +25,7 @@ from execution_layer.circuit import CircuitEvaluationItem
 from utils.rate_limiter import with_rate_limit
 from utils.epoch import get_current_epoch_info, get_epoch_start_block
 from _validator.competitions.competition import Competition
+from utils import wandb_logger
 
 
 class ScoreManager:
@@ -51,6 +53,7 @@ class ScoreManager:
         self.proof_of_weights_queue = []
         self.competition = competition
         self.last_ema_segment_per_uid = {}
+        self.reset_tracker = [True for _ in range(len(self.metagraph.uids))]
 
     def init_scores(self) -> torch.Tensor:
         """Initialize or load existing scores."""
@@ -115,6 +118,23 @@ class ScoreManager:
     @with_rate_limit(period=ONE_MINUTE)
     def log_pow_queue_status(self):
         bt.logging.info(f"PoW Queue Status: {len(self.proof_of_weights_queue)} items")
+
+    @with_rate_limit(period=FIVE_MINUTES)
+    def _log_reset_tracker(self):
+        table = Table(title="Reset Tracker")
+        table.add_column("UID", justify="center", style="cyan")
+        table.add_column("Reset", justify="center", style="magenta")
+        for uid, reset in enumerate(self.reset_tracker):
+            table.add_row(str(uid), "✅" if not reset else "❌")
+        console = Console()
+        console.print(table)
+        wandb_logger.safe_log(
+            {
+                "reset_tracker": {
+                    uid: int(value) for uid, value in enumerate(self.reset_tracker)
+                }
+            }
+        )
 
     def _update_scores_from_witness(
         self, proof_of_weights_items: list[ProofOfWeightsItem], model_id: str
@@ -358,9 +378,12 @@ class ScoreManager:
             current_epoch, blocks_until_next_epoch, active_group, boosted_group
         )
 
-        if self._miner_missed_reset(
+        miner_missed_reset = self._miner_missed_reset(
             response.uid, miner_group, current_epoch, blocks_until_next_epoch
-        ):
+        )
+        self.reset_tracker[response.uid] = miner_missed_reset
+        self._log_reset_tracker()
+        if miner_missed_reset:
             bt.logging.warning(
                 f"Miner {response.uid} missed required reset submission, marking as unverified"
             )
