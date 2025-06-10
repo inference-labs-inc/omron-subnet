@@ -1,8 +1,6 @@
 from __future__ import annotations
 import torch
 import bittensor as bt
-from rich.console import Console
-from rich.table import Table
 
 from _validator.models.miner_response import MinerResponse
 from _validator.utils.logging import log_scores
@@ -10,22 +8,15 @@ from _validator.utils.proof_of_weights import ProofOfWeightsItem
 from _validator.utils.uid import get_queryable_uids
 from constants import (
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
-    ONE_MINUTE,
     NUM_MINER_GROUPS,
-    EPOCH_TEMPO,
-    MINER_RESET_WINDOW_BLOCKS,
-    BOOST_BUFFER,
     RESET_PENALTY_ENABLED,
-    FIVE_MINUTES,
 )
-from execution_layer.verified_model_session import VerifiedModelSession
-from deployment_layer.circuit_store import circuit_store
-from _validator.models.request_type import RequestType
 from execution_layer.circuit import CircuitEvaluationItem
-from utils.rate_limiter import with_rate_limit
-from utils.epoch import get_current_epoch_info, get_epoch_start_block
+from utils.epoch import get_current_epoch_info
 from _validator.competitions.competition import Competition
-from utils import wandb_logger
+from _validator.scoring.ema_manager import EMAManager
+from _validator.scoring.pow_manager import ProofOfWeightsManager
+from _validator.scoring.reset_manager import ResetManager
 
 
 class ScoreManager:
@@ -49,11 +40,11 @@ class ScoreManager:
         self.user_uid = user_uid
         self.score_path = score_path
         self.scores = self.init_scores()
-        self.last_processed_queue_step = -1
-        self.proof_of_weights_queue = []
         self.competition = competition
-        self.last_ema_segment_per_uid = {}
-        self.reset_tracker = [True for _ in range(len(self.metagraph.uids))]
+
+        self.pow_manager = ProofOfWeightsManager(self.metagraph, self.scores)
+        self.reset_manager = ResetManager(self.metagraph)
+        self.ema_manager = EMAManager(self.scores, self.metagraph)
 
     def init_scores(self) -> torch.Tensor:
         """Initialize or load existing scores."""
@@ -92,214 +83,16 @@ class ScoreManager:
                 ]
             )
             self.scores = torch.cat((self.scores, new_scores))
-
-    def _create_pow_items(
-        self,
-        responses: list[MinerResponse],
-        max_score: float,
-        median_max_response_time: float,
-        min_response_time: float,
-        model_id: str,
-    ) -> list[ProofOfWeightsItem]:
-        """Create ProofOfWeightsItems from responses."""
-        return [
-            ProofOfWeightsItem.from_miner_response(
-                response,
-                max_score,
-                self.scores[response.uid],
-                median_max_response_time,
-                min_response_time,
-                self.metagraph.block.item(),
-                self.user_uid,
-            )
-            for response in responses
-        ]
-
-    @with_rate_limit(period=ONE_MINUTE)
-    def log_pow_queue_status(self):
-        bt.logging.info(f"PoW Queue Status: {len(self.proof_of_weights_queue)} items")
-
-    @with_rate_limit(period=FIVE_MINUTES)
-    def _log_reset_tracker(self):
-        table = Table(title="Reset Tracker")
-        table.add_column("UID", justify="center", style="cyan")
-        table.add_column("Reset", justify="center", style="magenta")
-        for uid, reset in enumerate(self.reset_tracker):
-            table.add_row(str(uid), "✅" if not reset else "❌")
-        console = Console()
-        console.print(table)
-        wandb_logger.safe_log(
-            {
-                "reset_tracker": {
-                    uid: int(value) for uid, value in enumerate(self.reset_tracker)
-                }
-            }
-        )
-
-    def _update_scores_from_witness(
-        self, proof_of_weights_items: list[ProofOfWeightsItem], model_id: str
-    ):
-        pow_circuit = circuit_store.get_circuit(model_id)
-        bt.logging.info(
-            f"Processing PoW witness generation for {len(proof_of_weights_items)} items using {str(pow_circuit)}"
-        )
-        if not pow_circuit:
-            raise ValueError(
-                f"Proof of weights circuit not found for model ID: {model_id}"
-            )
-
-        inputs = pow_circuit.input_handler(
-            RequestType.RWR, ProofOfWeightsItem.to_dict_list(proof_of_weights_items)
-        )
-        session = VerifiedModelSession(inputs, pow_circuit)
-        try:
-            witness = session.generate_witness(return_content=True)
-            bt.logging.success(
-                f"Witness for {str(pow_circuit)} generated successfully."
-            )
-        except Exception as e:
-            bt.logging.error(f"Error generating witness: {e}")
-            return
-
-        witness_list = witness if isinstance(witness, list) else list(witness.values())
-        self._process_witness_results(witness_list, pow_circuit.settings["scaling"])
-        session.end()
-
-    def _process_witness_results(self, witness: list, scaling: int):
-        """Process the results from the witness."""
-        scores = torch.div(
-            torch.tensor([float(w) for w in witness[1:257]]), scaling
-        ).tolist()
-        miner_uids = [int(float(w)) for w in witness[513:769]]
-
-        bt.logging.debug(
-            f"Proof of weights scores: {scores} for miner UIDs: {miner_uids}, existing scores: {self.scores}"
-        )
-
-        for uid, score in zip(miner_uids, scores):
-            if uid < 0 or uid >= len(self.scores):
-                continue
-            self.scores[uid] = float(score)
-            bt.logging.debug(f"Updated score for UID {uid}: {score}")
-
-        log_scores(self.scores)
-        self._try_store_scores()
-
-    def _update_pow_queue(self, new_items: list[ProofOfWeightsItem]):
-        if not new_items:
-            return
-
-        self.proof_of_weights_queue.extend(new_items)
-        self.log_pow_queue_status()
-
-    def process_pow_queue(self, model_id: str) -> bool:
-        """Process items in the proof of weights queue for a specific model."""
-        if (
-            len(self.proof_of_weights_queue) < 256
-            or len(self.proof_of_weights_queue) % 256 != 0
-        ):
-            return False
-
-        current_step = len(self.proof_of_weights_queue) >> 8
-        if current_step == self.last_processed_queue_step:
-            return False
-
-        pow_circuit = circuit_store.get_circuit(model_id)
-        if not pow_circuit:
-            bt.logging.error(f"Circuit not found for model ID: {model_id}")
-            return False
-
-        items_to_process = self.proof_of_weights_queue[-256:]
-        self._update_scores_from_witness(items_to_process, model_id)
-        self.last_processed_queue_step = current_step
-
-        return True
+            self.reset_manager.reset_tracker = [True for _ in range(len(uids))]
 
     def _try_store_scores(self):
         """Attempt to store scores to disk."""
         try:
             torch.save(self.scores, self.score_path)
+            bt.logging.info(f"Saved scores to {self.score_path}")
         except Exception as e:
             bt.logging.error(f"Error storing scores: {e}")
 
-    def clear_proof_of_weights_queue(self):
-        """Clear the proof of weights queue."""
-        self.proof_of_weights_queue = []
-
-    @with_rate_limit(period=ONE_MINUTE)
-    def _get_last_bonds_submissions(self) -> dict[str, int]:
-        """Get the latest bonds submissions and format them into a dict."""
-        raw_submissions = self.metagraph.subtensor.substrate.query_map(
-            "Commitments",
-            "LastBondsReset",
-            params=[self.metagraph.netuid],
-        )
-
-        submissions = {}
-        if not raw_submissions:
-            return submissions
-
-        for key_tuple, block_number_scale in raw_submissions:
-            try:
-                hotkey_bytes = bytes(key_tuple[0])
-                hotkey_ss58 = bt.Keypair(public_key=hotkey_bytes.hex()).ss58_address
-                submissions[hotkey_ss58] = block_number_scale.value
-            except Exception as e:
-                bt.logging.warning(
-                    f"Could not decode hotkey from LastBondsReset storage map: {e}"
-                )
-
-        return submissions
-
-    def _miner_missed_reset(
-        self,
-        uid: int,
-        miner_group: int,
-        current_epoch: int,
-        blocks_until_next_epoch: int,
-    ) -> bool:
-        """
-        Check if a miner missed their required reset submission during their tempo.
-        Returns True if the miner was supposed to reset but didn't.
-        """
-        try:
-            last_bonds_submissions = self._get_last_bonds_submissions()
-
-            if self.metagraph.hotkeys[uid] not in last_bonds_submissions:
-                return True
-
-            last_reset_block = last_bonds_submissions[self.metagraph.hotkeys[uid]]
-
-            current_active_group = current_epoch % NUM_MINER_GROUPS
-            if miner_group == current_active_group:
-                most_recent_group_epoch = current_epoch - NUM_MINER_GROUPS
-            else:
-                epochs_since_last = (
-                    current_active_group - miner_group + NUM_MINER_GROUPS
-                ) % NUM_MINER_GROUPS
-                most_recent_group_epoch = current_epoch - epochs_since_last
-
-            # Do not penalize miners for resets before deployment
-            if most_recent_group_epoch < 5744188:
-                return False
-
-            if most_recent_group_epoch >= 0:
-                epoch_start_block = get_epoch_start_block(
-                    most_recent_group_epoch, self.metagraph.netuid
-                )
-                epoch_end_block = epoch_start_block + EPOCH_TEMPO
-                if (
-                    last_reset_block < (epoch_end_block - MINER_RESET_WINDOW_BLOCKS)
-                    or last_reset_block > epoch_end_block
-                ):
-                    return True
-
-            return False
-        except Exception as e:
-            bt.logging.error(f"Error checking reset status for miner {uid}: {e}")
-            return False
-
-    @with_rate_limit(period=ONE_MINUTE * 5)
     def process_non_queryable_scores(self, queryable_uids: set[int], max_score: float):
         """
         Decay scores for non-queryable UIDs.
@@ -319,33 +112,7 @@ class ScoreManager:
                         block_number=self.metagraph.block.item(),
                         validator_uid=self.user_uid,
                     )
-                    self._update_pow_queue([pow_item])
-
-    @with_rate_limit(period=ONE_MINUTE)
-    def log_ema(
-        self,
-        current_epoch: int,
-        blocks_until_next_epoch: int,
-        active_group: int,
-        boosted_group: int,
-    ):
-        """Logs a summary of the current EMA boosting status for miner groups."""
-        table = Table(
-            title=f"EMA Boost Status (Epoch: {current_epoch}, Blocks Until Next: "
-            f"{blocks_until_next_epoch}, Active Group: {active_group}, Boosted Group: {boosted_group})"
-        )
-        table.add_column("Group ID", justify="center", style="cyan")
-        table.add_column("Status", justify="center", style="magenta")
-
-        for group_id in range(NUM_MINER_GROUPS):
-            if group_id == boosted_group:
-                status = "🚀"
-            else:
-                status = "📉"
-            table.add_row(str(group_id), status)
-
-        console = Console()
-        console.print(table)
+                    self.pow_manager.update_pow_queue([pow_item])
 
     def update_single_score(
         self,
@@ -370,36 +137,18 @@ class ScoreManager:
             current_block, self.metagraph.netuid
         )
 
-        active_group = current_epoch % NUM_MINER_GROUPS
-        boosted_group = (active_group + 1) % NUM_MINER_GROUPS
-        self.log_ema(
-            current_epoch, blocks_until_next_epoch, active_group, boosted_group
-        )
-
-        miner_missed_reset = self._miner_missed_reset(
+        miner_missed_reset = self.reset_manager.miner_missed_reset(
             response.uid, miner_group, current_epoch, blocks_until_next_epoch
         )
-        self.reset_tracker[response.uid] = miner_missed_reset
-        self._log_reset_tracker()
+        self.reset_manager.set_reset_status(response.uid, miner_missed_reset)
+        self.reset_manager.log_reset_tracker()
         if miner_missed_reset and RESET_PENALTY_ENABLED:
             bt.logging.warning(
                 f"Miner {response.uid} missed required reset submission, marking as unverified"
             )
             response.verification_result = False
 
-        if self.scores[response.uid] is not None:
-            last_ema_epoch = self.last_ema_segment_per_uid.get(response.uid, -1)
-
-            if last_ema_epoch != current_epoch:
-                if (
-                    miner_group == boosted_group
-                    and blocks_until_next_epoch <= BOOST_BUFFER
-                ):
-                    self.scores[response.uid] = self.scores[response.uid] * 1.2
-                else:
-                    self.scores[response.uid] = self.scores[response.uid] * 0.99
-
-                self.last_ema_segment_per_uid[response.uid] = current_epoch
+        self.ema_manager.apply_ema_boost(response.uid)
 
         evaluation_data = CircuitEvaluationItem(
             circuit=circuit,
@@ -426,19 +175,12 @@ class ScoreManager:
             0,
         )
 
-        self._update_pow_queue([pow_item])
+        self.pow_manager.update_pow_queue([pow_item])
 
-        if (
-            len(self.proof_of_weights_queue) >= 256
-            and len(self.proof_of_weights_queue) % 256 == 0
-        ):
-            self.process_pow_queue(SINGLE_PROOF_OF_WEIGHTS_MODEL_ID)
+        if self.pow_manager.process_pow_queue(SINGLE_PROOF_OF_WEIGHTS_MODEL_ID):
+            self._try_store_scores()
+            log_scores(self.scores)
 
-    def get_pow_queue(self) -> list[ProofOfWeightsItem]:
-        """Get the current proof of weights queue."""
-        return self.proof_of_weights_queue
-
-    def remove_processed_items(self, count: int):
-        if count <= 0:
-            return
-        self.proof_of_weights_queue = self.proof_of_weights_queue[count:]
+    def get_pow_manager(self) -> ProofOfWeightsManager:
+        """Get the proof of weights manager."""
+        return self.pow_manager
