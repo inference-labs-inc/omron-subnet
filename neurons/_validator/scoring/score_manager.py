@@ -262,8 +262,6 @@ class ScoreManager:
         Check if a miner missed their required reset submission during their tempo.
         Returns True if the miner was supposed to reset but didn't.
         """
-        if not RESET_PENALTY_ENABLED:
-            return False
         try:
             last_bonds_submissions = self._get_last_bonds_submissions()
 
@@ -383,7 +381,7 @@ class ScoreManager:
         )
         self.reset_tracker[response.uid] = miner_missed_reset
         self._log_reset_tracker()
-        if miner_missed_reset:
+        if miner_missed_reset and RESET_PENALTY_ENABLED:
             bt.logging.warning(
                 f"Miner {response.uid} missed required reset submission, marking as unverified"
             )
