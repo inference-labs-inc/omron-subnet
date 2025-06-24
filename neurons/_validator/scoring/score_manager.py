@@ -65,6 +65,15 @@ class ScoreManager:
         """Create initial scores based on metagraph data."""
         return torch.zeros(len(self.metagraph.uids), dtype=torch.float32)
 
+    def _get_safe_score(self, uid: int) -> float:
+        """Safely get score for a UID, returning 0 if out of bounds."""
+        if uid >= len(self.scores):
+            bt.logging.warning(
+                f"UID {uid} is out of bounds for scores tensor of size {len(self.scores)}"
+            )
+            return 0.0
+        return float(self.scores[uid])
+
     def sync_scores_uids(self, uids: list[int]):
         """
         If there are more uids than scores, add more weights.
@@ -156,7 +165,7 @@ class ScoreManager:
             minimum_response_time=circuit.evaluation_data.minimum_response_time,
             proof_size=response.proof_size,
             response_time=response.response_time,
-            score=self.scores[response.uid],
+            score=self._get_safe_score(response.uid),
             verification_result=response.verification_result,
         )
         circuit.evaluation_data.update(evaluation_data)
@@ -167,7 +176,7 @@ class ScoreManager:
         pow_item = ProofOfWeightsItem.from_miner_response(
             response,
             max_score,
-            self.scores[response.uid],
+            self._get_safe_score(response.uid),
             circuit.evaluation_data.maximum_response_time,
             circuit.evaluation_data.minimum_response_time,
             self.metagraph.block.item(),
