@@ -46,6 +46,12 @@ class EMAManager:
         console.print(table)
 
     def apply_ema_boost(self, uid: int):
+        if uid >= len(self.scores):
+            bt.logging.warning(
+                f"UID {uid} is out of bounds for scores tensor of size {len(self.scores)}"
+            )
+            return
+
         miner_group = uid % NUM_MINER_GROUPS
         current_block = self.metagraph.subtensor.get_current_block()
         current_epoch, blocks_until_next_epoch, _ = get_current_epoch_info(

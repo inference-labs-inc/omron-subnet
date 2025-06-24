@@ -482,17 +482,9 @@ class ValidatorLoop:
                     proof_filename=request_hash,
                 )
 
-            old_score = (
-                float(self.score_manager.scores[response.uid])
-                if response.uid < len(self.score_manager.scores)
-                else 0.0
-            )
+            old_score = self.score_manager._get_safe_score(response.uid)
             self.score_manager.update_single_score(response, self.queryable_uids)
-            new_score = (
-                float(self.score_manager.scores[response.uid])
-                if response.uid < len(self.score_manager.scores)
-                else 0.0
-            )
+            new_score = self.score_manager._get_safe_score(response.uid)
             log_score_change(old_score, new_score)
 
         except Exception as e:
