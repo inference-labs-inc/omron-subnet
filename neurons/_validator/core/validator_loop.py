@@ -123,9 +123,11 @@ class ValidatorLoop:
 
         self._should_run = True
 
-        self.thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=16)
+        self.thread_pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=os.cpu_count() * 2
+        )
         self.response_thread_pool = concurrent.futures.ThreadPoolExecutor(
-            max_workers=16
+            max_workers=os.cpu_count() * 2
         )
         self.last_competition_sync = 0
         self.is_syncing_competition = False
@@ -416,18 +418,15 @@ class ValidatorLoop:
         Process a single request and return the response.
         """
         try:
-            response = await asyncio.get_event_loop().run_in_executor(
-                self.thread_pool,
-                lambda: query_single_axon(self.config.dendrite, request),
-            )
-            response = await response
-            processed_response = await asyncio.get_event_loop().run_in_executor(
-                self.response_thread_pool,
-                self.response_processor.process_single_response,
-                response,
-            )
-            if processed_response:
-                await self._handle_response(processed_response)
+            response = await query_single_axon(self.config.dendrite, request)
+            if response:
+                processed_response = await asyncio.get_event_loop().run_in_executor(
+                    self.response_thread_pool,
+                    self.response_processor.process_single_response,
+                    response,
+                )
+                if processed_response:
+                    await self._handle_response(processed_response)
         except Exception as e:
             bt.logging.error(f"Error processing request for UID {request.uid}: {e}")
             traceback.print_exc()
