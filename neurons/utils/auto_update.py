@@ -1,7 +1,5 @@
-import os
 import subprocess
 import git
-import sys
 import time
 import requests
 from typing import Optional
@@ -65,31 +63,10 @@ class AutoUpdate:
         logging.info("Attempting to update packages...")
 
         try:
-            repo = git.Repo(search_parent_directories=True)
-            repo_path: str = (
-                str(repo.working_tree_dir) if repo.working_tree_dir is not None else ""
-            )
-
-            requirements_path = os.path.join(repo_path, "requirements.txt")
-
-            python_executable = sys.executable
-            # trunk-ignore(bandit/B603)
-            subprocess.check_call(
-                [
-                    python_executable,
-                    "-m",
-                    "ensurepip",
-                ],
-                timeout=ONE_MINUTE,
-            )
             subprocess.check_call(
                 [
                     "uv",
-                    "pip",
-                    "install",
-                    "-r",
-                    requirements_path,
-                    "-U",
+                    "sync",
                 ],
                 timeout=ONE_MINUTE,
             )
