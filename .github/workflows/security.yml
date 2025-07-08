@@ -200,21 +200,12 @@ jobs:
       - name: Run pip-audit
         run: |
           pip-audit --format=json --output=pip-audit-results.json || true
-          pip-audit --format=sarif --output=pip-audit-results.sarif || true
 
       - name: Upload pip-audit Results
         uses: actions/upload-artifact@v4
         with:
           name: pip-audit-results
-          path: |
-            pip-audit-results.json
-            pip-audit-results.sarif
-
-      - name: Upload SARIF results to GitHub
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: pip-audit-results.sarif
-          category: pip-audit
+          path: pip-audit-results.json
 
   secrets-detection:
     name: Secret Detection
