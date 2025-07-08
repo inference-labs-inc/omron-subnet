@@ -12,8 +12,6 @@ permissions:
   actions: read
   contents: read
   security-events: write
-  issues: write
-  pull-requests: write
 
 jobs:
   bandit:
@@ -298,17 +296,3 @@ jobs:
         with:
           name: security-summary
           path: security-summary.md
-
-      - name: Comment PR with Security Summary
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const summary = fs.readFileSync('security-summary.md', 'utf8');
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: summary
-            });
