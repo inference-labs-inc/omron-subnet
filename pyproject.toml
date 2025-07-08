@@ -25,6 +25,7 @@ dependencies = [
   "opencv-contrib-python-headless>=4.11.0.86",
   "opencv-python>=4.11.0.86",
   "packaging==24.2",
+  "pillow>=11.3.0",
   "prometheus_client==0.21.1",
   "psutil==6.1.1",
   "pydantic==2.10.6",
