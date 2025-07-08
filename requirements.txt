@@ -644,21 +644,21 @@ starlette==0.37.2 \
 substrate-interface==1.7.11 \
     --hash=sha256:4caa5eacb9996edbe76ad12249521b3542bbd8d9d69b96734087201db1fef8f6 \
     --hash=sha256:ce19bc97481769238ed23c752db985a3058637918693f2db6aeed2fab3756075
-sympy==1.14.0 \
-    --hash=sha256:d3d3fe8df1e5a0b42f0e7bdf50541697dbe7d23746e894990c030e2b05e72517 \
-    --hash=sha256:e091cc3e99d2141a0ba2847328f5479b05d94a6635cb96148ccb3f34671bd8f5
+sympy==1.13.1 \
+    --hash=sha256:9cebf7e04ff162015ce31c9c6c9144daa34a93bd082f54fd8f12deca4f47515f \
+    --hash=sha256:db36cdc64bf61b9b24578b6f7bab1ecdd2452cf008f34faa33776680c26d66f8
 toml==0.10.0 \
     --hash=sha256:229f81c57791a41d65e399fc06bf0848bab550a9dfd5ed66df18ce5f05e73d5c \
     --hash=sha256:235682dd292d5899d361a811df37e04a8828a5b1da3115886b73cf81ebc9100e
 toolz==1.0.0 ; implementation_name == 'cpython' or implementation_name == 'pypy' \
     --hash=sha256:292c8f1c4e7516bf9086f8850935c799a874039c8bcf959d47b600e4c44a6236 \
     --hash=sha256:2c86e3d9a04798ac556793bced838816296a2f085017664e4995cb40a1047a02
-torch==2.4.1 ; (platform_machine == 'aarch64' and sys_platform == 'linux') or sys_platform == 'darwin' \
-    --hash=sha256:36109432b10bd7163c9b30ce896f3c2cca1b86b9765f956a1594f0ff43091e2a \
-    --hash=sha256:72b484d5b6cec1a735bf3fa5a1c4883d01748698c5e9cfdbeb4ffab7c7987e0d
-torch==2.4.1+cpu ; (platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux') \
-    --hash=sha256:3a570e5c553415cdbddfe679207327b3a3806b21c6adea14fba77684d1619e97 \
-    --hash=sha256:8800deef0026011d502c0c256cc4b67d002347f63c3a38cd8e45f1f445c61364
+torch==2.6.0 ; sys_platform == 'darwin' \
+    --hash=sha256:9a610afe216a85a8b9bc9f8365ed561535c93e804c2a317ef7fabcc5deda0989
+torch==2.6.0+cpu ; sys_platform != 'darwin' \
+    --hash=sha256:318290e8924353c61b125cdc8768d15208704e279e7757c113b9620740deca98 \
+    --hash=sha256:4027d982eb2781c93825ab9527f17fbbb12dbabf422298e4b954be60016f87d8 \
+    --hash=sha256:59e78aa0c690f70734e42670036d6b541930b8eabbaa18d94e090abf14cc4d91
 tqdm==4.67.1 \
     --hash=sha256:26445eca388f82e72884e0d580d5464cd801a3ea01e63e5601bdff9ba6a48de2 \
     --hash=sha256:f8aef9c52c08c13a65f30ea34f4e5aac3fd1a34959879d7e59e63027286627f2

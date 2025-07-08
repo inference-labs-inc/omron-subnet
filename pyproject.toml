@@ -32,7 +32,7 @@ dependencies = [
   "requests==2.32.3",
   "rich==13.8.1",
   "substrate-interface>=1.7.11",
-  "torch==2.4.1",
+  "torch==2.6.0",
   "tqdm>=4.67.1",
   "urllib3>=2.3.0",
   "uvicorn==0.34.0",
