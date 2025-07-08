@@ -108,7 +108,7 @@ class RemoteDataSource(CompetitionDataSource):
                 return False
 
             bt.logging.info("Downloading dataset...")
-            response = requests.get(url, stream=True)
+            response = requests.get(url, stream=True, timeout=900)
             total_size = int(response.headers.get("content-length", 0))
 
             with (

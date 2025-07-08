@@ -30,6 +30,7 @@ class ProofPublishingService:
                     "x-signature": signature.hex(),
                     "Content-Type": "application/json",
                 },
+                timeout=60,
             )
 
             if response.status_code == 200:

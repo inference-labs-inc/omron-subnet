@@ -18,6 +18,7 @@ from constants import (
 )
 from utils import with_rate_limit
 import time
+import re
 
 # trunk-ignore(pylint/E0611)
 from bittensor import logging, subtensor, Wallet
@@ -373,6 +374,28 @@ class Circuit:
         Args:
             circuit_id (str): Unique identifier for the model.
         """
+
+        if not circuit_id:
+            raise ValueError("Circuit ID cannot be empty")
+
+        if not re.match(r"^[a-f0-9]{64}$", circuit_id):
+            raise ValueError(
+                "Circuit ID must be a valid SHA-256 hash (64 lowercase hex characters)"
+            )
+
+        deployment_folder = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "deployment_layer",
+            f"model_{circuit_id}",
+        )
+
+        if not os.path.exists(deployment_folder):
+            raise ValueError(f"Circuit folder does not exist: model_{circuit_id}")
+
+        if not os.path.isdir(deployment_folder):
+            raise ValueError(f"Circuit path is not a directory: model_{circuit_id}")
+
         self.paths = CircuitPaths(circuit_id)
         self.metadata = CircuitMetadata.from_file(self.paths.metadata)
         self.id = circuit_id
@@ -380,7 +403,6 @@ class Circuit:
         self.paths.set_proof_system_paths(self.proof_system)
         self.settings = {}
         self.evaluation_data = CircuitEvaluationData(self, self.paths.evaluation_data)
-        # if timeout attribute exists and is not None, else default
         self.timeout = (
             self.metadata.timeout
             if hasattr(self.metadata, "timeout") and self.metadata.timeout is not None

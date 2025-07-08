@@ -326,7 +326,7 @@ def ensure_rust_cargo_installed():
     except (subprocess.CalledProcessError, FileNotFoundError):
         bt.logging.info(f"{RUST_LOG_PREFIX}Rust and/or Cargo not found. Installing...")
         try:
-            rustup_script = requests.get("https://sh.rustup.rs").text
+            rustup_script = requests.get("https://sh.rustup.rs", timeout=10).text
             subprocess.run(
                 ["sh", "-s", "--", "-y"],
                 input=rustup_script.encode(),
