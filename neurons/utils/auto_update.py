@@ -52,7 +52,7 @@ class AutoUpdate:
         try:
             headers = {"Accept": "application/vnd.github.v3+json"}
             api_url = f"{REPO_URL.replace('github.com', 'api.github.com/repos')}/releases/latest"
-            response = requests.get(api_url, headers=headers)
+            response = requests.get(api_url, headers=headers, timeout=10)
             response.raise_for_status()
             latest_release = response.json()
             return latest_release["tag_name"]
