@@ -1,7 +1,6 @@
 import os
 import subprocess
 import git
-import hashlib
 import sys
 import time
 import requests
@@ -27,7 +26,6 @@ class AutoUpdate:
         try:
             if not cli_parser.config.no_auto_update:
                 self.repo = git.Repo(search_parent_directories=True)
-                self.current_requirements_hash = self.get_requirements_hash()
         except Exception as e:
             logging.exception("Failed to initialize the repository", e)
 
@@ -58,20 +56,6 @@ class AutoUpdate:
             return latest_release["tag_name"]
         except requests.RequestException as e:
             logging.exception("Failed to fetch the latest release from GitHub.", e)
-            return None
-
-    def get_requirements_hash(self):
-        """
-        Get the hash of the requirements.txt file
-        """
-        try:
-            local_requirements_path = os.path.join(
-                os.path.dirname(__file__), "..", "..", "requirements.txt"
-            )
-            with open(local_requirements_path, "r", encoding="utf-8") as file:
-                return hashlib.sha256(file.read().encode("utf-8")).hexdigest()
-        except Exception as e:
-            logging.exception("Failed to get the hash of the requirements file", e)
             return None
 
     def attempt_packages_update(self):
@@ -184,8 +168,7 @@ class AutoUpdate:
         if not self.update_to_latest_release():
             return
 
-        if self.current_requirements_hash != self.get_requirements_hash():
-            self.attempt_packages_update()
+        self.attempt_packages_update()
 
         logging.info("Restarting the application...")
         restart_app()
