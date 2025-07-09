@@ -18,7 +18,7 @@ from utils import wandb_logger
 class ResetManager:
     def __init__(self, metagraph: bt.metagraph):
         self.metagraph = metagraph
-        self.reset_tracker = [True for _ in range(len(self.metagraph.uids))]
+        self.reset_tracker = [False for _ in range(len(self.metagraph.uids))]
 
     @with_rate_limit(period=FIVE_MINUTES)
     def log_reset_tracker(self):
@@ -89,10 +89,6 @@ class ResetManager:
                     current_active_group - miner_group + NUM_MINER_GROUPS
                 ) % NUM_MINER_GROUPS
                 most_recent_group_epoch = current_epoch - epochs_since_last
-
-            # Do not penalize miners for resets before deployment
-            if most_recent_group_epoch < 5744188:
-                return False
 
             if most_recent_group_epoch >= 0:
                 epoch_start_block = get_epoch_start_block(
