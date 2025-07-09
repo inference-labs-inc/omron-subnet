@@ -72,7 +72,7 @@ class EMAManager:
                     miner_group == boosted_group
                     and blocks_until_next_epoch <= BOOST_BUFFER
                 ):
-                    self.scores[uid] = self.scores[uid] * 1.2
+                    self.scores[uid] = self.scores[uid] * 1.8
                 else:
                     self.scores[uid] = self.scores[uid] * 0.99
 
