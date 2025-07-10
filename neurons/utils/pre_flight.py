@@ -395,7 +395,7 @@ def ensure_rust_nightly_installed():
             text=True,
         )
         if TOOLCHAIN in result.stdout:
-            result = subprocess.run(
+            subprocess.run(
                 [
                     f"{os.path.expanduser('~')}/.cargo/bin/rustup",
                     "target",
@@ -408,8 +408,11 @@ def ensure_rust_nightly_installed():
                 capture_output=True,
                 text=True,
             )
-    except subprocess.CalledProcessError:
-        pass
+    except subprocess.CalledProcessError as e:
+        bt.logging.error(f"{RUST_LOG_PREFIX}Failed to check Rust toolchain: {e}")
+        raise RuntimeError(
+            f"Rust {TOOLCHAIN} installation failed. Please install it manually."
+        ) from e
 
     bt.logging.info(f"{RUST_LOG_PREFIX}Installing Rust {TOOLCHAIN}...")
     try:
