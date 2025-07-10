@@ -27,6 +27,7 @@ dependencies = [
   "packaging==24.2",
   "pillow>=11.3.0",
   "prometheus_client==0.21.1",
+  "protobuf>=5.29.5",
   "psutil==6.1.1",
   "pydantic==2.10.6",
   "pyopenssl>=25.0.0",
