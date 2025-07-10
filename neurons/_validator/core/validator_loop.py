@@ -321,8 +321,10 @@ class ValidatorLoop:
                             "Received competition complete message, restoring concurrency"
                         )
                         self.current_concurrency = MAX_CONCURRENT_REQUESTS
-                except Exception:
-                    pass
+                except Exception as e:
+                    bt.logging.error(f"Error in competition message handling: {e}")
+                    traceback.print_exc()
+
                 slots_available = self.current_concurrency - len(self.active_tasks)
 
                 if slots_available > 0:
