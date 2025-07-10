@@ -27,6 +27,7 @@ dependencies = [
   "packaging==24.2",
   "pillow>=11.3.0",
   "prometheus_client==0.21.1",
+  "protobuf>=5.29.5",
   "psutil==6.1.1",
   "pydantic==2.10.6",
   "pyopenssl>=25.0.0",
@@ -37,7 +38,7 @@ dependencies = [
   "tqdm>=4.67.1",
   "urllib3>=2.3.0",
   "uvicorn==0.34.0",
-  "wandb==0.19.8",
+  "wandb==0.21.0",
   "websocket-client>=1.8.0",
 ]
 

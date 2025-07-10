@@ -46,6 +46,7 @@ from constants import (
 )
 from _validator.competitions.competition import Competition
 from multiprocessing import Queue as MPQueue
+from queue import Empty
 
 
 class ValidatorLoop:
@@ -321,8 +322,12 @@ class ValidatorLoop:
                             "Received competition complete message, restoring concurrency"
                         )
                         self.current_concurrency = MAX_CONCURRENT_REQUESTS
-                except Exception:
-                    pass
+                except Empty:
+                    bt.logging.trace("No messages in competition queue")
+                except Exception as e:
+                    bt.logging.error(f"Error in competition message handling: {e}")
+                    traceback.print_exc()
+
                 slots_available = self.current_concurrency - len(self.active_tasks)
 
                 if slots_available > 0:

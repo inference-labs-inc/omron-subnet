@@ -282,20 +282,17 @@ def ensure_nodejs_version():
             )
             return
     except (subprocess.CalledProcessError, FileNotFoundError):
-        pass
-
-    bt.logging.error(
-        NODE_LOG_PREFIX + "Node.js is not installed or is not the correct version."
-    )
-    bt.logging.error(
-        NODE_LOG_PREFIX
-        + "\033[91mPlease install Node.js >= 20 using the following command\n./setup.sh --no-install\033[0m"
-    )
-
-    time.sleep(10)
-    raise RuntimeError(
-        "Node.js >= 20 is required but not installed. Please install it manually and restart the process."
-    )
+        bt.logging.error(
+            f"{NODE_LOG_PREFIX}Node.js is not installed or is not the correct version."
+        )
+        bt.logging.error(
+            NODE_LOG_PREFIX
+            + "\033[91mPlease install Node.js >= 20 using the following command\n./setup.sh --no-install\033[0m"
+        )
+        time.sleep(10)
+        raise RuntimeError(
+            "Node.js >= 20 is required but not installed. Please install it manually and restart the process."
+        )
 
 
 def ensure_rust_cargo_installed():
@@ -395,7 +392,7 @@ def ensure_rust_nightly_installed():
             text=True,
         )
         if TOOLCHAIN in result.stdout:
-            result = subprocess.run(
+            subprocess.run(
                 [
                     f"{os.path.expanduser('~')}/.cargo/bin/rustup",
                     "target",
@@ -408,8 +405,11 @@ def ensure_rust_nightly_installed():
                 capture_output=True,
                 text=True,
             )
-    except subprocess.CalledProcessError:
-        pass
+    except subprocess.CalledProcessError as e:
+        bt.logging.error(f"{RUST_LOG_PREFIX}Failed to check Rust toolchain: {e}")
+        raise RuntimeError(
+            f"Rust {TOOLCHAIN} installation failed. Please install it manually."
+        ) from e
 
     bt.logging.info(f"{RUST_LOG_PREFIX}Installing Rust {TOOLCHAIN}...")
     try:

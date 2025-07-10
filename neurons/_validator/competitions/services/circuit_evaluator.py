@@ -956,17 +956,21 @@ class CircuitEvaluator:
                 try:
                     os.unlink(temp_input_path)
                 except OSError:
-                    pass
+                    bt.logging.warning(
+                        f"Failed to delete temp input path: {temp_input_path}"
+                    )
             if witness_path and os.path.exists(witness_path):
                 try:
                     os.unlink(witness_path)
                 except OSError:
-                    pass
+                    bt.logging.warning(f"Failed to delete witness path: {witness_path}")
             if temp_proof_path and os.path.exists(temp_proof_path):
                 try:
                     os.unlink(temp_proof_path)
                 except OSError:
-                    pass
+                    bt.logging.warning(
+                        f"Failed to delete temp proof path: {temp_proof_path}"
+                    )
             return None
 
     def _verify_proof(self, circuit_dir: str, proof_path: str) -> bool:

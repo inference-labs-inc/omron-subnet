@@ -365,7 +365,6 @@ class Competition:
 
     async def process_downloads(self) -> bool:
         try:
-
             async with self.download_lock:
                 if not self.download_queue and not self.current_download:
                     return False
@@ -397,8 +396,6 @@ class Competition:
                     shutil.rmtree(circuit_dir)
 
                 self.current_download = None
-                return False
-
         except Exception as e:
             bt.logging.error(f"Error in download processing: {e}")
             traceback.print_exc()
@@ -408,7 +405,7 @@ class Competition:
                 if os.path.exists(circuit_dir):
                     shutil.rmtree(circuit_dir)
                 self.current_download = None
-            return False
+        return False
 
     def queue_download(self, uid: int, hotkey: str, hash: str) -> None:
         self.download_queue.append((uid, hotkey, hash))
