@@ -81,6 +81,9 @@ class ResetManager:
 
             last_reset_block = last_bonds_submissions[self.metagraph.hotkeys[uid]]
 
+            if last_reset_block < self.metagraph.block_at_registration[uid]:
+                return False
+
             current_active_group = current_epoch % NUM_MINER_GROUPS
             if miner_group == current_active_group:
                 most_recent_group_epoch = current_epoch - NUM_MINER_GROUPS
