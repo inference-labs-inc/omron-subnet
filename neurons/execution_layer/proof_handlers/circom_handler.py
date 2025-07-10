@@ -85,7 +85,8 @@ class CircomHandler(ProofSystemHandler):
                         capture_output=True,
                         text=True,
                     )
-                    return json.load(open(json_path, "r", encoding="utf-8"))
+                    with open(json_path, "r", encoding="utf-8") as f:
+                        return json.load(f)
                 return session.session_storage.witness_path
             bt.logging.error(f"Failed to generate witness. Error: {result.stderr}")
             bt.logging.error(f"Command output: {result.stdout}")
