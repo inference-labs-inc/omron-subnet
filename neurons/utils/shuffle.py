@@ -3,7 +3,7 @@ import random
 import hashlib
 from typing import List
 
-from neurons.utils.epoch import get_epoch_start_block
+from .epoch import get_epoch_start_block
 from constants import NUM_MINER_GROUPS
 
 
