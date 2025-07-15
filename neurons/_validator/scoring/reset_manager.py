@@ -67,7 +67,7 @@ class ResetManager:
         uid: int,
         miner_group: int,
         current_epoch: int,
-        blocks_until_next_epoch: int,
+        last_shuffle_epoch: int,
     ) -> bool:
         """
         Check if a miner missed their required reset submission during their tempo.
@@ -92,6 +92,9 @@ class ResetManager:
                     current_active_group - miner_group + NUM_MINER_GROUPS
                 ) % NUM_MINER_GROUPS
                 most_recent_group_epoch = current_epoch - epochs_since_last
+
+            if most_recent_group_epoch < last_shuffle_epoch:
+                return False
 
             if most_recent_group_epoch >= 0:
                 epoch_start_block = get_epoch_start_block(

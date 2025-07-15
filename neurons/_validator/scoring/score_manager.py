@@ -1,6 +1,8 @@
 from __future__ import annotations
 import torch
 import bittensor as bt
+import random
+import hashlib
 
 from _validator.models.miner_response import MinerResponse
 from _validator.utils.logging import log_scores
@@ -12,7 +14,7 @@ from constants import (
     RESET_PENALTY_ENABLED,
 )
 from execution_layer.circuit import CircuitEvaluationItem
-from utils.epoch import get_current_epoch_info
+from utils.epoch import get_current_epoch_info, get_epoch_start_block
 from _validator.competitions.competition import Competition
 from _validator.scoring.ema_manager import EMAManager
 from _validator.scoring.pow_manager import ProofOfWeightsManager
@@ -41,6 +43,8 @@ class ScoreManager:
         self.score_path = score_path
         self.scores = self.init_scores()
         self.competition = competition
+        self.shuffled_uids = None
+        self.last_shuffle_epoch = -1
 
         self.pow_manager = ProofOfWeightsManager(self.metagraph, self.scores)
         self.reset_manager = ResetManager(self.metagraph)
@@ -141,13 +145,40 @@ class ScoreManager:
         circuit = response.circuit
 
         current_block = self.metagraph.subtensor.get_current_block()
-        miner_group = response.uid % NUM_MINER_GROUPS
-        current_epoch, blocks_until_next_epoch, _ = get_current_epoch_info(
+        current_epoch, _, _ = get_current_epoch_info(
             current_block, self.metagraph.netuid
         )
 
+        if self.last_shuffle_epoch < 0 or (current_epoch // NUM_MINER_GROUPS) > (
+            self.last_shuffle_epoch // NUM_MINER_GROUPS
+        ):
+            bt.logging.info(f"Reshuffling miner UIDs for epoch {current_epoch}")
+            self.last_shuffle_epoch = current_epoch
+
+            cycle_start_epoch = (current_epoch // NUM_MINER_GROUPS) * NUM_MINER_GROUPS
+            seed_block_num = get_epoch_start_block(
+                cycle_start_epoch, self.metagraph.netuid
+            )
+            block_hash = self.metagraph.subtensor.get_block_hash(seed_block_num)
+
+            seed = int(hashlib.sha256(block_hash.encode()).hexdigest(), 16)
+
+            uids = list(range(len(self.metagraph.uids)))
+            random.Random(seed).shuffle(uids)
+            self.shuffled_uids = uids
+
+        if self.shuffled_uids is None:
+            self.shuffled_uids = list(range(len(self.metagraph.uids)))
+            self.last_shuffle_epoch = current_epoch
+
+        uid_index = self.shuffled_uids.index(response.uid)
+        miner_group = uid_index % NUM_MINER_GROUPS
+
         miner_missed_reset = self.reset_manager.miner_missed_reset(
-            response.uid, miner_group, current_epoch, blocks_until_next_epoch
+            response.uid,
+            miner_group,
+            current_epoch,
+            self.last_shuffle_epoch,
         )
         self.reset_manager.set_reset_status(response.uid, miner_missed_reset)
         self.reset_manager.log_reset_tracker()
