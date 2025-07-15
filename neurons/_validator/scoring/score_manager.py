@@ -1,8 +1,6 @@
 from __future__ import annotations
 import torch
 import bittensor as bt
-import random
-import hashlib
 
 from _validator.models.miner_response import MinerResponse
 from _validator.utils.logging import log_scores
@@ -14,11 +12,12 @@ from constants import (
     RESET_PENALTY_ENABLED,
 )
 from execution_layer.circuit import CircuitEvaluationItem
-from utils.epoch import get_current_epoch_info, get_epoch_start_block
+from utils.epoch import get_current_epoch_info
 from _validator.competitions.competition import Competition
 from _validator.scoring.ema_manager import EMAManager
 from _validator.scoring.pow_manager import ProofOfWeightsManager
 from _validator.scoring.reset_manager import ResetManager
+from utils.shuffle import get_shuffled_uids
 
 
 class ScoreManager:
@@ -149,27 +148,13 @@ class ScoreManager:
             current_block, self.metagraph.netuid
         )
 
-        if self.last_shuffle_epoch < 0 or (current_epoch // NUM_MINER_GROUPS) > (
-            self.last_shuffle_epoch // NUM_MINER_GROUPS
-        ):
-            bt.logging.info(f"Reshuffling miner UIDs for epoch {current_epoch}")
-            self.last_shuffle_epoch = current_epoch
-
-            cycle_start_epoch = (current_epoch // NUM_MINER_GROUPS) * NUM_MINER_GROUPS
-            seed_block_num = get_epoch_start_block(
-                cycle_start_epoch, self.metagraph.netuid
-            )
-            block_hash = self.metagraph.subtensor.get_block_hash(seed_block_num)
-
-            seed = int(hashlib.sha256(block_hash.encode()).hexdigest(), 16)
-
-            uids = list(range(len(self.metagraph.uids)))
-            random.Random(seed).shuffle(uids)
-            self.shuffled_uids = uids
-
-        if self.shuffled_uids is None:
-            self.shuffled_uids = list(range(len(self.metagraph.uids)))
-            self.last_shuffle_epoch = current_epoch
+        self.shuffled_uids, self.last_shuffle_epoch = get_shuffled_uids(
+            current_epoch,
+            self.last_shuffle_epoch,
+            self.metagraph,
+            self.metagraph.subtensor,
+            self.shuffled_uids,
+        )
 
         uid_index = self.shuffled_uids.index(response.uid)
         miner_group = uid_index % NUM_MINER_GROUPS
