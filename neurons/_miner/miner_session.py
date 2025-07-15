@@ -35,7 +35,7 @@ from utils import AutoUpdate, clean_temp_files, wandb_logger
 from utils.rate_limiter import with_rate_limit
 from utils.epoch import get_current_epoch_info, get_epoch_start_block
 from .circuit_manager import CircuitManager
-from ..utils.shuffle import get_shuffled_uids
+from utils.shuffle import get_shuffled_uids
 
 COMPETITION_DIR = os.path.join(
     os.path.dirname(__file__), "..", "..", "competition_circuit"
