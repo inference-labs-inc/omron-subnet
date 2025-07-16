@@ -45,7 +45,7 @@ class EMAManager:
         console = Console()
         console.print(table)
 
-    def apply_ema_boost(self, miner_group: int, shuffled_uids: list[int]):
+    def apply_ema_boost(self, shuffled_uids: list[int]):
         current_block = self.metagraph.subtensor.get_current_block()
         current_epoch, blocks_until_next_epoch, _ = get_current_epoch_info(
             current_block, self.metagraph.netuid
@@ -59,6 +59,7 @@ class EMAManager:
 
         for i, uid in enumerate(shuffled_uids):
             if uid >= len(self.scores):
+                bt.logging.warning(f"UID {uid} not found in scores for EMA boost")
                 continue
 
             group = i % NUM_MINER_GROUPS

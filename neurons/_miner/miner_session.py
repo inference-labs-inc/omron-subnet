@@ -187,8 +187,14 @@ class MinerSession:
             self.shuffled_uids,
         )
 
-        uid_index = self.shuffled_uids.index(self.subnet_uid)
-        miner_group = uid_index % NUM_MINER_GROUPS
+        try:
+            uid_index = self.shuffled_uids.index(self.subnet_uid)
+            miner_group = uid_index % NUM_MINER_GROUPS
+        except ValueError:
+            bt.logging.error(
+                f"Miner UID {self.subnet_uid} not found in shuffled UIDs. Skipping reset check."
+            )
+            return
 
         self.log_reset_check(current_block, current_epoch, miner_group)
 
