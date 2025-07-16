@@ -21,12 +21,29 @@ class ResetManager:
         self.reset_tracker = [False for _ in range(len(self.metagraph.uids))]
 
     @with_rate_limit(period=FIVE_MINUTES)
-    def log_reset_tracker(self):
-        table = Table(title="Reset Tracker")
+    def log_reset_tracker(
+        self,
+        shuffled_uids: list[int] | None,
+        seed_block_num: int | None,
+        block_hash: str | None,
+    ):
+        title = "Reset Tracker"
+        if seed_block_num and block_hash:
+            title += f" (Seed Block: {seed_block_num}, Hash: {block_hash[:12]}...)"
+
+        table = Table(title=title)
         table.add_column("UID", justify="center", style="cyan")
+        table.add_column("Group #", justify="center", style="green")
         table.add_column("Reset", justify="center", style="magenta")
+
+        group_map = {}
+        if shuffled_uids:
+            for index, uid in enumerate(shuffled_uids):
+                group_map[uid] = index % NUM_MINER_GROUPS
+
         for uid, reset in enumerate(self.reset_tracker):
-            table.add_row(str(uid), "✅" if not reset else "❌")
+            group_num = group_map.get(uid, "N/A")
+            table.add_row(str(uid), str(group_num), "✅" if not reset else "❌")
         console = Console()
         console.print(table)
         wandb_logger.safe_log(
@@ -67,7 +84,7 @@ class ResetManager:
         uid: int,
         miner_group: int,
         current_epoch: int,
-        blocks_until_next_epoch: int,
+        last_shuffle_epoch: int,
     ) -> bool:
         """
         Check if a miner missed their required reset submission during their tempo.
@@ -92,6 +109,9 @@ class ResetManager:
                     current_active_group - miner_group + NUM_MINER_GROUPS
                 ) % NUM_MINER_GROUPS
                 most_recent_group_epoch = current_epoch - epochs_since_last
+
+            if most_recent_group_epoch < last_shuffle_epoch:
+                return False
 
             if most_recent_group_epoch >= 0:
                 epoch_start_block = get_epoch_start_block(

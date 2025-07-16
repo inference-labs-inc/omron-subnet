@@ -45,14 +45,7 @@ class EMAManager:
         console = Console()
         console.print(table)
 
-    def apply_ema_boost(self, uid: int):
-        if uid >= len(self.scores):
-            bt.logging.warning(
-                f"UID {uid} is out of bounds for scores tensor of size {len(self.scores)}"
-            )
-            return
-
-        miner_group = uid % NUM_MINER_GROUPS
+    def apply_ema_boost(self, shuffled_uids: list[int]):
         current_block = self.metagraph.subtensor.get_current_block()
         current_epoch, blocks_until_next_epoch, _ = get_current_epoch_info(
             current_block, self.metagraph.netuid
@@ -64,16 +57,22 @@ class EMAManager:
             current_epoch, blocks_until_next_epoch, active_group, boosted_group
         )
 
-        if self.scores[uid] is not None:
-            last_ema_epoch = self.last_ema_segment_per_uid.get(uid, -1)
+        for i, uid in enumerate(shuffled_uids):
+            if uid >= len(self.scores):
+                bt.logging.warning(f"UID {uid} not found in scores for EMA boost")
+                continue
 
-            if last_ema_epoch != current_epoch:
-                if (
-                    miner_group == boosted_group
-                    and blocks_until_next_epoch <= BOOST_BUFFER
-                ):
-                    self.scores[uid] = self.scores[uid] * 1.8
-                else:
-                    self.scores[uid] = self.scores[uid] * 0.99
+            group = i % NUM_MINER_GROUPS
+            if self.scores[uid] is not None:
+                last_ema_epoch = self.last_ema_segment_per_uid.get(uid, -1)
 
-                self.last_ema_segment_per_uid[uid] = current_epoch
+                if last_ema_epoch != current_epoch:
+                    if (
+                        group == boosted_group
+                        and blocks_until_next_epoch <= BOOST_BUFFER
+                    ):
+                        self.scores[uid] = self.scores[uid] * 1.8
+                    else:
+                        self.scores[uid] = self.scores[uid] * 0.99
+
+                    self.last_ema_segment_per_uid[uid] = current_epoch

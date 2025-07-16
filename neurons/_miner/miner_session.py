@@ -35,6 +35,7 @@ from utils import AutoUpdate, clean_temp_files, wandb_logger
 from utils.rate_limiter import with_rate_limit
 from utils.epoch import get_current_epoch_info, get_epoch_start_block
 from .circuit_manager import CircuitManager
+from utils.shuffle import get_shuffled_uids
 
 COMPETITION_DIR = os.path.join(
     os.path.dirname(__file__), "..", "..", "competition_circuit"
@@ -50,6 +51,8 @@ class MinerSession:
         self.check_register(should_exit=True)
         self.auto_update = AutoUpdate()
         self.log_batch = []
+        self.shuffled_uids = None
+        self.last_shuffle_epoch = -1
         if cli_parser.config.disable_blacklist:
             bt.logging.warning(
                 "Blacklist disabled, allowing all requests. Consider enabling to filter requests."
@@ -110,9 +113,7 @@ class MinerSession:
         Coordinated reset performed by all miners in
         the same group at synchronized block intervals.
         """
-        bt.logging.info(
-            f"Performing coordinated reset for group {self.subnet_uid % NUM_MINER_GROUPS}"
-        )
+        bt.logging.info("Performing coordinated reset")
         try:
             commitment_info = [{"ResetBondsFlag": b""}]
             call = self.subtensor.substrate.compose_call(
@@ -132,9 +133,7 @@ class MinerSession:
             if not success:
                 bt.logging.error(f"Failed to perform reset: {message}")
             else:
-                bt.logging.success(
-                    f"Successfully performed reset for group {self.subnet_uid % NUM_MINER_GROUPS}"
-                )
+                bt.logging.success("Successfully performed reset")
         except Exception as e:
             bt.logging.error(f"Error performing reset: {e}")
 
@@ -169,12 +168,35 @@ class MinerSession:
             return
 
         current_block = self.subtensor.get_current_block()
-        miner_group = self.subnet_uid % NUM_MINER_GROUPS
         (
             current_epoch,
             blocks_until_next_epoch,
             epoch_start_block,
         ) = get_current_epoch_info(current_block, cli_parser.config.netuid)
+
+        (
+            self.shuffled_uids,
+            self.last_shuffle_epoch,
+            shuffle_block,
+            shuffle_hash,
+        ) = get_shuffled_uids(
+            current_epoch,
+            self.last_shuffle_epoch,
+            self.metagraph,
+            self.subtensor,
+            self.shuffled_uids,
+        )
+
+        bt.logging.info(f"Shuffle block: {shuffle_block}, shuffle hash: {shuffle_hash}")
+
+        try:
+            uid_index = self.shuffled_uids.index(self.subnet_uid)
+            miner_group = uid_index % NUM_MINER_GROUPS
+        except ValueError:
+            bt.logging.error(
+                f"Miner UID {self.subnet_uid} not found in shuffled UIDs. Skipping reset check."
+            )
+            return
 
         self.log_reset_check(current_block, current_epoch, miner_group)
 
