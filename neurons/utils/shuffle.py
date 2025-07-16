@@ -13,7 +13,7 @@ def get_shuffled_uids(
     metagraph: bt.metagraph,
     subtensor: bt.subtensor,
     shuffled_uids: List[int] | None,
-) -> tuple[List[int], int]:
+) -> tuple[List[int], int, int | None, str | None]:
     """
     Get the shuffled UIDs for the current epoch.
 
@@ -25,10 +25,14 @@ def get_shuffled_uids(
         shuffled_uids (List[int] | None): The current list of shuffled UIDs.
 
     Returns:
-        tuple[List[int], int]: A tuple containing:
+        tuple[List[int], int, int | None, str | None]: A tuple containing:
             - shuffled_uids (List[int]): The shuffled list of UIDs.
             - last_shuffle_epoch (int): The epoch number of the last shuffle.
+            - seed_block_num (int | None): The block number used for the seed.
+            - block_hash (str | None): The block hash used for the seed.
     """
+    seed_block_num = None
+    block_hash = None
     if last_shuffle_epoch < 0 or (current_epoch // NUM_MINER_GROUPS) > (
         last_shuffle_epoch // NUM_MINER_GROUPS
     ):
@@ -55,4 +59,4 @@ def get_shuffled_uids(
         shuffled_uids = list(range(len(metagraph.uids)))
         last_shuffle_epoch = current_epoch
 
-    return shuffled_uids, last_shuffle_epoch
+    return shuffled_uids, last_shuffle_epoch, seed_block_num, block_hash

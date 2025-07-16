@@ -21,12 +21,29 @@ class ResetManager:
         self.reset_tracker = [False for _ in range(len(self.metagraph.uids))]
 
     @with_rate_limit(period=FIVE_MINUTES)
-    def log_reset_tracker(self):
-        table = Table(title="Reset Tracker")
+    def log_reset_tracker(
+        self,
+        shuffled_uids: list[int] | None,
+        seed_block_num: int | None,
+        block_hash: str | None,
+    ):
+        title = "Reset Tracker"
+        if seed_block_num and block_hash:
+            title += f" (Seed Block: {seed_block_num}, Hash: {block_hash[:12]}...)"
+
+        table = Table(title=title)
         table.add_column("UID", justify="center", style="cyan")
+        table.add_column("Group #", justify="center", style="green")
         table.add_column("Reset", justify="center", style="magenta")
+
+        group_map = {}
+        if shuffled_uids:
+            for index, uid in enumerate(shuffled_uids):
+                group_map[uid] = index % NUM_MINER_GROUPS
+
         for uid, reset in enumerate(self.reset_tracker):
-            table.add_row(str(uid), "✅" if not reset else "❌")
+            group_num = group_map.get(uid, "N/A")
+            table.add_row(str(uid), str(group_num), "✅" if not reset else "❌")
         console = Console()
         console.print(table)
         wandb_logger.safe_log(
