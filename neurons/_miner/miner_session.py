@@ -177,8 +177,8 @@ class MinerSession:
         (
             self.shuffled_uids,
             self.last_shuffle_epoch,
-            _,
-            _,
+            shuffle_block,
+            shuffle_hash,
         ) = get_shuffled_uids(
             current_epoch,
             self.last_shuffle_epoch,
@@ -186,6 +186,8 @@ class MinerSession:
             self.subtensor,
             self.shuffled_uids,
         )
+
+        bt.logging.info(f"Shuffle block: {shuffle_block}, shuffle hash: {shuffle_hash}")
 
         try:
             uid_index = self.shuffled_uids.index(self.subnet_uid)
