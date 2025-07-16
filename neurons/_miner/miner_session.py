@@ -174,7 +174,12 @@ class MinerSession:
             epoch_start_block,
         ) = get_current_epoch_info(current_block, cli_parser.config.netuid)
 
-        self.shuffled_uids, self.last_shuffle_epoch = get_shuffled_uids(
+        (
+            self.shuffled_uids,
+            self.last_shuffle_epoch,
+            _,
+            _,
+        ) = get_shuffled_uids(
             current_epoch,
             self.last_shuffle_epoch,
             self.metagraph,
