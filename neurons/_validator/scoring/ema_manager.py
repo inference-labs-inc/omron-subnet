@@ -6,7 +6,6 @@ import bittensor as bt
 
 from constants import (
     NUM_MINER_GROUPS,
-    BOOST_BUFFER,
     ONE_MINUTE,
 )
 from utils.epoch import get_current_epoch_info
@@ -67,10 +66,7 @@ class EMAManager:
                 last_ema_epoch = self.last_ema_segment_per_uid.get(uid, -1)
 
                 if last_ema_epoch != current_epoch:
-                    if (
-                        group == boosted_group
-                        and blocks_until_next_epoch <= BOOST_BUFFER
-                    ):
+                    if group == boosted_group:
                         self.scores[uid] = self.scores[uid] * 1.8
                     else:
                         self.scores[uid] = self.scores[uid] * 0.99
