@@ -9,6 +9,7 @@ from _validator.models.request_type import RequestType
 from _validator.scoring.score_manager import ScoreManager
 from execution_layer.generic_input import GenericInput
 from execution_layer.verified_model_session import VerifiedModelSession
+from substrateinterface import Keypair
 
 
 class ResponseProcessor:
@@ -17,7 +18,7 @@ class ResponseProcessor:
         metagraph,
         score_manager: ScoreManager,
         user_uid,
-        hotkey: substrateinterface.Keypair,
+        hotkey: Keypair,
     ):
         self.metagraph = metagraph
         self.score_manager = score_manager
@@ -47,7 +48,7 @@ class ResponseProcessor:
                 miner_response.verification_time = time.time() - start_time
                 miner_response.set_verification_result(verification_result)
                 if not verification_result:
-                    bt.logging.warning(
+                    bt.logging.debug(
                         f"Miner at UID: {miner_response.uid} provided a proof"
                         f" for {str(miner_response.circuit)}"
                         ", but verification failed."
@@ -59,7 +60,7 @@ class ResponseProcessor:
                 traceback.print_exc()
 
             if miner_response.verification_result:
-                bt.logging.success(
+                bt.logging.debug(
                     f"Miner at UID: {miner_response.uid} provided a valid proof "
                     f"for {str(miner_response.circuit)} "
                     f"in {miner_response.response_time} seconds."
