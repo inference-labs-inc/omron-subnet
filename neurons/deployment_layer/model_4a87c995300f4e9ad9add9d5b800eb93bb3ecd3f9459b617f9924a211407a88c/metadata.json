@@ -2,11 +2,11 @@
     "name": "SN2 PoW 256 Circom",
     "description": "Generates one round of weights based on miner evaluation data from SN2.",
     "author": "Inference Labs",
-    "version": "0.0.5",
+    "version": "0.0.6",
     "proof_system": "CIRCOM",
     "type": "proof_of_computation",
     "external_files": {
-        "circuit.zkey": "https://storage.omron.ai/fa0d509d52abe2d1e809124f8aba46258a02f7253582f7b7f5a22e1e0bca0dfb/circuit.zkey"
+        "circuit.zkey": "https://storage.omron.ai/4a87c995300f4e9ad9add9d5b800eb93bb3ecd3f9459b617f9924a211407a88c/circuit.zkey"
     },
     "benchmark_choice_weight": 0.2
 }

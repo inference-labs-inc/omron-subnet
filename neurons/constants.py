@@ -14,7 +14,7 @@ BATCHED_PROOF_OF_WEIGHTS_MODEL_ID = (
 )
 # The model ID for a single proof of weights model
 SINGLE_PROOF_OF_WEIGHTS_MODEL_ID = (
-    "fa0d509d52abe2d1e809124f8aba46258a02f7253582f7b7f5a22e1e0bca0dfb"
+    "4a87c995300f4e9ad9add9d5b800eb93bb3ecd3f9459b617f9924a211407a88c"
 )
 
 IGNORED_MODEL_HASHES = [
@@ -33,6 +33,7 @@ IGNORED_MODEL_HASHES = [
     "a849500803abdbb86a9460e18684a6411dc7ae0b75f1f6330e3028081a497dea",
     "f5b6043594f46ae6bd176ce60c7a099291cc6a3f6436fecd46142b1b1ecca5fb",
     "1e6fcdaea58741e7248b631718dda90398a17b294480beb12ce8232e27ca3bff",
+    "fa0d509d52abe2d1e809124f8aba46258a02f7253582f7b7f5a22e1e0bca0dfb",
 ]
 
 # The maximum timespan allowed for miners to respond to a query
