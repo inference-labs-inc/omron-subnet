@@ -186,8 +186,6 @@ class ScoreManager:
             )
             response.verification_result = False
 
-        self.ema_manager.apply_ema_boost(self.shuffled_uids)
-
         evaluation_data = CircuitEvaluationItem(
             circuit=circuit,
             uid=response.uid,

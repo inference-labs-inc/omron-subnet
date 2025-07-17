@@ -109,6 +109,7 @@ class ValidatorLoop:
             self.config.metagraph,
             self.config.wallet,
             self.config.user_uid,
+            score_manager=self.score_manager,
         )
         self.last_pow_commit_block = 0
         self.api = ValidatorAPI(self.config)
