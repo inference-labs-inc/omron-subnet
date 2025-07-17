@@ -10,7 +10,7 @@ class Roles:
 
 # The model ID for a batched proof of weights model
 BATCHED_PROOF_OF_WEIGHTS_MODEL_ID = (
-    "1e6fcdaea58741e7248b631718dda90398a17b294480beb12ce8232e27ca3bff"
+    "1550853037e01d93c0831e2a4f80de7811b1c6780fb36b3cee89f4ba524df1be"
 )
 # The model ID for a single proof of weights model
 SINGLE_PROOF_OF_WEIGHTS_MODEL_ID = (
@@ -34,6 +34,7 @@ IGNORED_MODEL_HASHES = [
     "e84b2e5f223621fa20078eb9f920d8d4d3a4ff95fa6e2357646fdbb43a2557c9",
     "a849500803abdbb86a9460e18684a6411dc7ae0b75f1f6330e3028081a497dea",
     "f5b6043594f46ae6bd176ce60c7a099291cc6a3f6436fecd46142b1b1ecca5fb",
+    "1e6fcdaea58741e7248b631718dda90398a17b294480beb12ce8232e27ca3bff",
 ]
 
 # The maximum timespan allowed for miners to respond to a query
