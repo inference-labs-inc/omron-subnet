@@ -4,9 +4,6 @@ Entry point for running just preflight checks:
  - Model files are synced up
  - Node.js >= 20 is installed
  - SnarkJS is installed
- - Rust and Cargo are installed
- - Rust nightly toolchain is installed
- - Jolt is installed
 
 This script is created to be called during the Docker image build process
 to ensure that all dependencies are installed.
