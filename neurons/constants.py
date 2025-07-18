@@ -180,3 +180,5 @@ MAX_EVALUATION_ITEMS = 1024
 
 # Maximum circuit size in GB for competitions
 MAX_CIRCUIT_SIZE_GB = 50
+# EMA boost factor
+EMA_BOOST_FACTOR = 1.2
