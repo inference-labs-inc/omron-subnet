@@ -10,11 +10,11 @@ class Roles:
 
 # The model ID for a batched proof of weights model
 BATCHED_PROOF_OF_WEIGHTS_MODEL_ID = (
-    "1e6fcdaea58741e7248b631718dda90398a17b294480beb12ce8232e27ca3bff"
+    "1550853037e01d93c0831e2a4f80de7811b1c6780fb36b3cee89f4ba524df1be"
 )
 # The model ID for a single proof of weights model
 SINGLE_PROOF_OF_WEIGHTS_MODEL_ID = (
-    "fa0d509d52abe2d1e809124f8aba46258a02f7253582f7b7f5a22e1e0bca0dfb"
+    "4a87c995300f4e9ad9add9d5b800eb93bb3ecd3f9459b617f9924a211407a88c"
 )
 
 IGNORED_MODEL_HASHES = [
@@ -24,16 +24,16 @@ IGNORED_MODEL_HASHES = [
     "55de10a6bcf638af4bc79901d63204a9e5b1c6534670aa03010bae6045e3d0e8",
     "9998a12b8194d3e57d332b484ede57c3d871d42a176456c4e10da2995791d181",
     "ed8ba401d709ee31f6b9272163c71451da171c7d71800313fe5db58d0f6c483a",
-    "1d60d545b7c5123fd60524dcbaf57081ca7dc4a9ec36c892927a3153328d17c0",
     "37320fc74fec80805eedc8e92baf3c58842a2cb2a4ae127ad6e930f0c8441c7a",
     "1d60d545b7c5123fd60524dcbaf57081ca7dc4a9ec36c892927a3153328d17c0",
     "33b92394b18412622adad75733a6fc659b4e202b01ee8a5465958a6bad8ded62",
-    "37320fc74fec80805eedc8e92baf3c58842a2cb2a4ae127ad6e930f0c8441c7a",
     "8dcff627a782525ea86196941a694ffbead179905f0cd4550ddc3df9e2b90924",
     "a4bcecaf699fd9212600a1f2fcaa40c444e1aeaab409ea240a38c33ed356f4e2",
     "e84b2e5f223621fa20078eb9f920d8d4d3a4ff95fa6e2357646fdbb43a2557c9",
     "a849500803abdbb86a9460e18684a6411dc7ae0b75f1f6330e3028081a497dea",
     "f5b6043594f46ae6bd176ce60c7a099291cc6a3f6436fecd46142b1b1ecca5fb",
+    "1e6fcdaea58741e7248b631718dda90398a17b294480beb12ce8232e27ca3bff",
+    "fa0d509d52abe2d1e809124f8aba46258a02f7253582f7b7f5a22e1e0bca0dfb",
 ]
 
 # The maximum timespan allowed for miners to respond to a query
