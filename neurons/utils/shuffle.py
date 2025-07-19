@@ -31,17 +31,15 @@ def get_shuffled_uids(
             - seed_block_num (int | None): The block number used for the seed.
             - block_hash (str | None): The block hash used for the seed.
     """
-    seed_block_num = None
-    block_hash = None
+    cycle_start_epoch = (current_epoch // NUM_MINER_GROUPS) * NUM_MINER_GROUPS
+    seed_block_num = get_epoch_start_block(cycle_start_epoch, metagraph.netuid)
+    block_hash = subtensor.get_block_hash(seed_block_num)
+
     if last_shuffle_epoch < 0 or (current_epoch // NUM_MINER_GROUPS) > (
         last_shuffle_epoch // NUM_MINER_GROUPS
     ):
         bt.logging.info(f"Reshuffling miner UIDs for epoch {current_epoch}")
         last_shuffle_epoch = current_epoch
-
-        cycle_start_epoch = (current_epoch // NUM_MINER_GROUPS) * NUM_MINER_GROUPS
-        seed_block_num = get_epoch_start_block(cycle_start_epoch, metagraph.netuid)
-        block_hash = subtensor.get_block_hash(seed_block_num)
 
         if not block_hash:
             bt.logging.warning(
