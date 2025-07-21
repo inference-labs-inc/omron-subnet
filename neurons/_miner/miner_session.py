@@ -347,7 +347,7 @@ class MinerSession:
         except Exception as e:
             bt.logging.error(f"Error performing reset check: {e}")
 
-    @with_rate_limit(10, 60)
+    @with_rate_limit(6.0)
     def proof_blacklist(self, synapse: QueryZkProof) -> Tuple[bool, str]:
         hotkey = synapse.dendrite.hotkey
         if hotkey not in self.metagraph.hotkeys:
@@ -364,7 +364,7 @@ class MinerSession:
 
         return False, "Allowed!"
 
-    @with_rate_limit(10, 60)
+    @with_rate_limit(6.0)
     def pow_blacklist(self, synapse: ProofOfWeightsSynapse) -> Tuple[bool, str]:
         hotkey = synapse.dendrite.hotkey
         if hotkey not in self.metagraph.hotkeys:
@@ -381,7 +381,7 @@ class MinerSession:
 
         return False, "Allowed!"
 
-    @with_rate_limit(10, 60)
+    @with_rate_limit(6.0)
     def competition_blacklist(self, synapse: Competition) -> Tuple[bool, str]:
         hotkey = synapse.dendrite.hotkey
         if hotkey not in self.metagraph.hotkeys:
