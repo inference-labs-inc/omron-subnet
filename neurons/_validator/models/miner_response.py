@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 import bittensor as bt
 import json
+import traceback
 
 from constants import (
     DEFAULT_PROOF_SIZE,
@@ -122,9 +123,11 @@ class MinerResponse:
                 save=response.save,
             )
         except json.JSONDecodeError as e:
+            traceback.print_exc()
             bt.logging.error(f"JSON decoding error: {e}")
             return cls.empty(uid=response.uid, circuit=response.circuit)
         except Exception as e:
+            traceback.print_exc()
             bt.logging.error(f"Error processing miner response: {e}")
             return cls.empty(uid=response.uid, circuit=response.circuit)
 
