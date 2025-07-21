@@ -33,13 +33,14 @@ WORKDIR /opt
 # Install node et al.
 ENV NVM_DIR=/opt/.nvm
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash && \
+    export NVM_DIR="$NVM_DIR" && \
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" && \
-    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" && \
     nvm install 20 && \
+    nvm use 20 && \
     npm install --prefix /opt/.snarkjs snarkjs@0.7.4 && \
     mkdir -p ~/.local/bin && \
-    ln -s $(which node) /home/ubuntu/.local/bin/node && \
-    ln -s $(which npm) /home/ubuntu/.local/bin/npm && \
+    ln -s "$NVM_DIR/versions/node/$(nvm version)/bin/node" /home/ubuntu/.local/bin/node && \
+    ln -s "$NVM_DIR/versions/node/$(nvm version)/bin/npm" /home/ubuntu/.local/bin/npm && \
     chmod -R 775 /opt/.nvm /opt/.npm /opt/.snarkjs
 ENV PATH="/home/ubuntu/.local/bin:${PATH}"
 
