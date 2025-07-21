@@ -110,9 +110,8 @@ class Lightning:
             port=target_axon.port,
             hotkey=target_axon.hotkey,
         )
-
-        message = f"{synapse.dendrite.nonce}.{synapse.dendrite.hotkey}."
-        f" {synapse.axon.hotkey}.{synapse.dendrite.uuid}.{synapse.body_hash}"
+        # flake8: noqa: E501
+        message = f"{synapse.dendrite.nonce}.{synapse.dendrite.hotkey}.{synapse.axon.hotkey}.{synapse.dendrite.uuid}.{synapse.body_hash}"
         synapse.dendrite.signature = f"0x{self.wallet.hotkey.sign(message).hex()}"
 
         return synapse

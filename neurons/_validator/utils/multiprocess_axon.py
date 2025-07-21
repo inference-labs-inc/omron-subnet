@@ -517,6 +517,7 @@ class MultiprocessAxonManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         try:
             self.stop()
+            return False
         except Exception as e:
             bt.logging.error(f"Error during MultiprocessAxonManager context exit: {e}")
             return False
