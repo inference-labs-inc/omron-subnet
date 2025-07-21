@@ -383,7 +383,8 @@ def multiprocess_axon_worker(
                         request_type=serializable_request.request_type,
                     )
                 finally:
-                    lightning_client.close()
+
+                    loop.run_until_complete(lightning_client._async_close())
             else:
 
                 dendrite = _create_dendrite(wallet_config)
@@ -427,18 +428,37 @@ class MultiprocessAxonManager:
     def start(self):
         """Start the multiprocess pool"""
         if self.pool is None:
-            self.pool = multiprocessing.Pool(
-                processes=self.max_workers,
-                initializer=self._worker_init,
-                initargs=(self.wallet_config, self.use_quic),
-            )
+            try:
+                self.pool = multiprocessing.Pool(
+                    processes=self.max_workers,
+                    initializer=self._worker_init,
+                    initargs=(self.wallet_config, self.use_quic),
+                )
+                bt.logging.info(
+                    f"Started multiprocess pool with {self.max_workers} workers"
+                )
+            except Exception as e:
+                bt.logging.error(f"Failed to start multiprocess pool: {e}")
+                raise RuntimeError(
+                    f"Could not initialize multiprocess pool: {str(e)}"
+                ) from e
 
     def stop(self):
         """Stop the multiprocess pool"""
         if self.pool:
-            self.pool.close()
-            self.pool.join()
-            self.pool = None
+            try:
+                self.pool.close()
+                self.pool.join()
+                bt.logging.info("Successfully stopped multiprocess pool")
+            except Exception as e:
+                bt.logging.warning(f"Error while stopping multiprocess pool: {e}")
+                try:
+                    self.pool.terminate()
+                    bt.logging.info("Force terminated multiprocess pool")
+                except Exception as terminate_error:
+                    bt.logging.error(f"Failed to terminate pool: {terminate_error}")
+            finally:
+                self.pool = None
 
     def _worker_init(self, wallet_config: Dict[str, str], use_quic: bool):
         """Initialize worker process"""
@@ -457,13 +477,29 @@ class MultiprocessAxonManager:
 
         request_json = serializable_request.to_json()
 
-        result = await loop.run_in_executor(
-            None,
-            lambda: self.pool.apply(
-                _json_multiprocess_worker,
-                (request_json, self.wallet_config, self.use_quic),
-            ),
-        )
+        def _safe_pool_apply():
+            try:
+                return self.pool.apply(
+                    _json_multiprocess_worker,
+                    (request_json, self.wallet_config, self.use_quic),
+                )
+            except Exception as e:
+                bt.logging.error(f"Pool.apply failed in multiprocess worker: {e}")
+                error_response = SerializableResponse(
+                    uid=serializable_request.uid,
+                    response_time=None,
+                    deserialized=None,
+                    result_data=None,
+                    success=False,
+                    error_message=f"Multiprocess pool error: {str(e)}",
+                    circuit_id=serializable_request.circuit_id,
+                    request_hash=serializable_request.request_hash,
+                    save=serializable_request.save,
+                    request_type=serializable_request.request_type,
+                )
+                return error_response.to_json()
+
+        result = await loop.run_in_executor(None, _safe_pool_apply)
 
         if isinstance(result, str):
             result = SerializableResponse.from_json(result)
@@ -471,11 +507,19 @@ class MultiprocessAxonManager:
         return result
 
     def __enter__(self):
-        self.start()
-        return self
+        try:
+            self.start()
+            return self
+        except Exception as e:
+            bt.logging.error(f"Failed to enter MultiprocessAxonManager context: {e}")
+            raise
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.stop()
+        try:
+            self.stop()
+        except Exception as e:
+            bt.logging.error(f"Error during MultiprocessAxonManager context exit: {e}")
+            return False
 
 
 def _json_multiprocess_worker(

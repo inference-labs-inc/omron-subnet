@@ -68,6 +68,7 @@ class Lightning:
         self.wallet_config = wallet_config
         self.wallet = None
         self._connection_cache: Dict[str, Any] = {}
+        self._cache_lock = asyncio.Lock()
         self._init_wallet()
 
     def _init_wallet(self):
@@ -156,10 +157,11 @@ class Lightning:
         """Establish QUIC connection with caching"""
         connection_key = f"{host}:{port}"
 
-        if connection_key in self._connection_cache:
-            transport, h3_conn = self._connection_cache[connection_key]
-            if not transport.is_closing():
-                return transport, h3_conn
+        async with self._cache_lock:
+            if connection_key in self._connection_cache:
+                transport, h3_conn = self._connection_cache[connection_key]
+                if not transport.is_closing():
+                    return transport, h3_conn
 
         try:
             config = self._create_quic_config()
@@ -173,7 +175,9 @@ class Lightning:
 
             await asyncio.sleep(0.1)
 
-            self._connection_cache[connection_key] = (transport, protocol)
+            async with self._cache_lock:
+                self._connection_cache[connection_key] = (transport, protocol)
+
             return transport, protocol
 
         except Exception as e:
@@ -323,17 +327,46 @@ class Lightning:
                 error_message=str(e),
             )
 
+    async def _async_close(self):
+        """Async cleanup of connections with proper locking"""
+        async with self._cache_lock:
+            for connection_key, (transport, h3_conn) in self._connection_cache.items():
+                try:
+                    if not transport.is_closing():
+                        transport.close()
+                except Exception as e:
+                    bt.logging.warning(
+                        f"Error closing QUIC connection {connection_key}: {e}"
+                    )
+            self._connection_cache.clear()
+
     def close(self):
-        """Clean up connections"""
-        for connection_key, (transport, h3_conn) in self._connection_cache.items():
+        """Clean up connections - sync version for compatibility"""
+        try:
+
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+
+                asyncio.create_task(self._async_close())
+            else:
+
+                loop.run_until_complete(self._async_close())
+        except RuntimeError:
+
             try:
-                if not transport.is_closing():
-                    transport.close()
+                for connection_key, (transport, h3_conn) in list(
+                    self._connection_cache.items()
+                ):
+                    try:
+                        if not transport.is_closing():
+                            transport.close()
+                    except Exception as e:
+                        bt.logging.warning(
+                            f"Error closing QUIC connection {connection_key}: {e}"
+                        )
+                self._connection_cache.clear()
             except Exception as e:
-                bt.logging.warning(
-                    f"Error closing QUIC connection {connection_key}: {e}"
-                )
-        self._connection_cache.clear()
+                bt.logging.warning(f"Error during sync cleanup: {e}")
 
     def __del__(self):
         """Cleanup on deletion"""
