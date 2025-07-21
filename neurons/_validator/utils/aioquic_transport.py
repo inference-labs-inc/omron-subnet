@@ -65,23 +65,14 @@ class Lightning:
     """
 
     def __init__(self, wallet_config: Dict[str, str]):
+        """Initialize Lightning client with wallet configuration"""
         self.wallet_config = wallet_config
-        self.wallet = None
-        self._connection_cache: Dict[str, Any] = {}
-        self._cache_lock = asyncio.Lock()
-        self._init_wallet()
 
-    def _init_wallet(self):
-        """Initialize bittensor wallet for signing"""
-        try:
-            self.wallet = bt.wallet(
-                name=self.wallet_config["name"],
-                hotkey=self.wallet_config["hotkey"],
-                path=self.wallet_config.get("path", "~/.bittensor/wallets"),
-            )
-        except Exception as e:
-            bt.logging.error(f"Failed to initialize wallet in QUIC client: {e}")
-            raise
+        self.wallet = bt.wallet(
+            name=wallet_config["name"],
+            hotkey=wallet_config["hotkey"],
+            path=wallet_config["path"],
+        )
 
     def _preprocess_synapse_for_request(
         self, target_axon: QuicAxonInfo, synapse: Any, timeout: float
@@ -140,14 +131,12 @@ class Lightning:
 
         return base_headers
 
-    def _create_quic_config(
-        self, verify_mode: ssl.VerifyMode = ssl.CERT_NONE
-    ) -> QuicConfiguration:
-        """Create QUIC configuration optimized for bittensor communication"""
+    def _create_quic_config(self) -> QuicConfiguration:
+        """Create QUIC configuration for secure connections"""
         config = QuicConfiguration(
             is_client=True,
             alpn_protocols=["h3"],
-            verify_mode=verify_mode,
+            verify_mode=ssl.CERT_NONE,
         )
 
         config.idle_timeout = 30.0
@@ -156,39 +145,15 @@ class Lightning:
 
         return config
 
-    async def _establish_connection(
-        self, host: str, port: int
-    ) -> Tuple[Any, H3Connection]:
-        """Establish QUIC connection with caching"""
-        connection_key = f"{host}:{port}"
-
-        async with self._cache_lock:
-            if connection_key in self._connection_cache:
-                transport, h3_conn = self._connection_cache[connection_key]
-                if not transport.is_closing():
-                    return transport, h3_conn
-
+    async def _create_connection(self, host: str, port: int):
+        """Create a fresh QUIC connection (no caching)"""
         try:
             config = self._create_quic_config()
 
-            transport, protocol = await connect(
-                host,
-                port,
-                configuration=config,
-                create_protocol=lambda: H3Connection(config),
-            )
-
-            await asyncio.sleep(0.1)
-
-            async with self._cache_lock:
-                self._connection_cache[connection_key] = (transport, protocol)
-
-            return transport, protocol
+            return connect(host, port, configuration=config)
 
         except Exception as e:
-            bt.logging.error(
-                f"Failed to establish QUIC connection to {host}:{port}: {e}"
-            )
+            bt.logging.error(f"Failed to create QUIC connection to {host}:{port}: {e}")
             raise
 
     async def _send_h3_request(
@@ -278,14 +243,19 @@ class Lightning:
             headers["Content-Length"] = str(len(body))
             headers["Host"] = f"{request.axon.ip}:{request.axon.port}"
 
-            transport, h3_conn = await self._establish_connection(
+            connection_manager = await self._create_connection(
                 request.axon.ip, request.axon.port
             )
 
-            status_code, response_headers, response_body = await asyncio.wait_for(
-                self._send_h3_request(h3_conn, "POST", f"/{endpoint}", headers, body),
-                timeout=request.circuit_timeout,
-            )
+            async with connection_manager as protocol:
+                h3_conn = H3Connection(protocol._quic)
+
+                status_code, response_headers, response_body = await asyncio.wait_for(
+                    self._send_h3_request(
+                        h3_conn, "POST", f"/{endpoint}", headers, body
+                    ),
+                    timeout=request.circuit_timeout,
+                )
 
             response_time = time.time() - start_time
 
@@ -332,50 +302,13 @@ class Lightning:
                 error_message=str(e),
             )
 
-    async def _async_close(self):
-        """Async cleanup of connections with proper locking"""
-        async with self._cache_lock:
-            for connection_key, (transport, h3_conn) in self._connection_cache.items():
-                try:
-                    if not transport.is_closing():
-                        transport.close()
-                except Exception as e:
-                    bt.logging.warning(
-                        f"Error closing QUIC connection {connection_key}: {e}"
-                    )
-            self._connection_cache.clear()
-
     def close(self):
-        """Clean up connections - sync version for compatibility"""
-        try:
-
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-
-                asyncio.create_task(self._async_close())
-            else:
-
-                loop.run_until_complete(self._async_close())
-        except RuntimeError:
-
-            try:
-                for connection_key, (transport, h3_conn) in list(
-                    self._connection_cache.items()
-                ):
-                    try:
-                        if not transport.is_closing():
-                            transport.close()
-                    except Exception as e:
-                        bt.logging.warning(
-                            f"Error closing QUIC connection {connection_key}: {e}"
-                        )
-                self._connection_cache.clear()
-            except Exception as e:
-                bt.logging.warning(f"Error during sync cleanup: {e}")
+        """Clean up connections - no longer needed since we don't cache connections"""
+        pass
 
     def __del__(self):
         """Cleanup on deletion"""
-        self.close()
+        pass
 
 
 async def query_axon_quic(lightning_client: Lightning, request) -> Optional[object]:
