@@ -59,10 +59,6 @@ ENV PATH="/opt/omron/.venv/bin:${PATH}"
 WORKDIR /opt/omron/neurons
 ENV OMRON_NO_AUTO_UPDATE=1
 RUN OMRON_DOCKER_BUILD=1 /opt/omron/.venv/bin/python3 miner.py && \
-    rm -rf /opt/omron/neurons/deployment_layer/*/target/release/build && \
-    rm -rf /opt/omron/neurons/deployment_layer/*/target/release/deps && \
-    rm -rf /opt/omron/neurons/deployment_layer/*/target/release/examples && \
-    rm -rf /opt/omron/neurons/deployment_layer/*/target/release/incremental && \
     rm -rf ~/.bittensor && \
     rm -rf /tmp/omron
 USER root
