@@ -60,7 +60,7 @@ class MinerResponse:
         """
         try:
             deserialized_response = response.deserialized
-
+            bt.logging.trace(f"Deserialized response: {deserialized_response}")
             proof_content = None
             public_json = None
             if isinstance(deserialized_response, str):
@@ -81,11 +81,15 @@ class MinerResponse:
                         proof_content = json.loads(proof)
                 else:
                     proof_content = proof
-                if public_signals:
+                if public_signals and str(public_signals).strip():
                     public_json = (
                         json.loads(public_signals)
                         if isinstance(public_signals, str)
                         else public_signals
+                    )
+                else:
+                    bt.logging.debug(
+                        f"Miner at {response.uid} did not return public signals."
                     )
 
             if isinstance(proof_content, str):
