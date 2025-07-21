@@ -27,7 +27,10 @@ from _validator.core.response_processor import ResponseProcessor
 from _validator.models.miner_response import MinerResponse
 from _validator.scoring.score_manager import ScoreManager
 from _validator.scoring.weights import WeightsManager
-from _validator.utils.axon import query_single_axon
+from _validator.utils.multiprocess_axon import (
+    MultiprocessAxonManager,
+    query_single_axon_multiprocess,
+)
 from _validator.models.request_type import RequestType, ValidatorMessage
 from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
@@ -84,7 +87,6 @@ class ValidatorLoop:
                 self.validator_to_competition_queue, self.competition_to_validator_queue
             )
             bt.logging.success("Competition module initialized successfully")
-            # self.clear_sota_state()
         except Exception as e:
             bt.logging.warning(
                 f"Failed to initialize competition, continuing without competition support: {e}"
@@ -125,7 +127,18 @@ class ValidatorLoop:
 
         self._should_run = True
 
-        self.thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=16)
+        wallet_config = {
+            "name": self.config.wallet.name,
+            "hotkey": self.config.wallet.hotkey_str,
+            "path": self.config.wallet.path,
+        }
+
+        # Enable QUIC transport if configured via environment variable
+        use_quic = os.getenv("OMRON_USE_LIGHTNING", "false").lower() == "true"
+
+        self.multiprocess_manager = MultiprocessAxonManager(
+            wallet_config=wallet_config, max_workers=16, use_quic=use_quic
+        )
         self.response_thread_pool = concurrent.futures.ThreadPoolExecutor(
             max_workers=16
         )
@@ -284,7 +297,7 @@ class ValidatorLoop:
                     else 0
                 )
                 _ = await asyncio.get_event_loop().run_in_executor(
-                    self.thread_pool,
+                    self.response_thread_pool,
                     lambda: gc_log_responses(
                         self.config.metagraph,
                         self.config.wallet.hotkey,
@@ -310,7 +323,7 @@ class ValidatorLoop:
             try:
                 try:
                     message = await asyncio.get_event_loop().run_in_executor(
-                        self.thread_pool,
+                        self.response_thread_pool,
                         lambda: self.competition_to_validator_queue.get(timeout=0.1),
                     )
                     if message == ValidatorMessage.WINDDOWN:
@@ -405,6 +418,10 @@ class ValidatorLoop:
             f"Validator started on subnet {self.config.subnet_uid} using UID {self.config.user_uid}"
         )
 
+        bt.logging.info("Starting multiprocess axon manager...")
+        self.multiprocess_manager.start()
+        bt.logging.success("Multiprocess axon manager started")
+
         try:
             await asyncio.gather(
                 self.maintain_request_pool(),
@@ -416,24 +433,27 @@ class ValidatorLoop:
         except Exception as e:
             bt.logging.error(f"Fatal error in validator loop: {e}")
             raise
+        finally:
+            bt.logging.info("Stopping multiprocess axon manager...")
+            self.multiprocess_manager.stop()
+            bt.logging.success("Multiprocess axon manager stopped")
 
     async def _process_single_request(self, request: Request) -> Request:
         """
         Process a single request and return the response.
         """
         try:
-            response = await asyncio.get_event_loop().run_in_executor(
-                self.thread_pool,
-                lambda: query_single_axon(self.config.dendrite, request),
+            response = await query_single_axon_multiprocess(
+                self.multiprocess_manager, request
             )
-            response = await response
-            processed_response = await asyncio.get_event_loop().run_in_executor(
-                self.response_thread_pool,
-                self.response_processor.process_single_response,
-                response,
-            )
-            if processed_response:
-                await self._handle_response(processed_response)
+            if response is not None:
+                processed_response = await asyncio.get_event_loop().run_in_executor(
+                    self.response_thread_pool,
+                    self.response_processor.process_single_response,
+                    response,
+                )
+                if processed_response:
+                    await self._handle_response(processed_response)
         except Exception as e:
             bt.logging.error(f"Error processing request for UID {request.uid}: {e}")
             traceback.print_exc()
@@ -512,6 +532,10 @@ class ValidatorLoop:
         loop.run_until_complete(self.api.stop())
         stop_prometheus_logging()
         clean_temp_files()
+        if hasattr(self, "multiprocess_manager"):
+            bt.logging.info("Stopping multiprocess axon manager...")
+            self.multiprocess_manager.stop()
+            bt.logging.success("Multiprocess axon manager stopped")
         if self.competition:
             self.competition.competition_thread.stop()
             if hasattr(self.competition.circuit_manager, "close"):

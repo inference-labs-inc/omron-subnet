@@ -51,6 +51,28 @@ wheels = [
 ]
 
 [[package]]
+name = "aioquic"
+version = "1.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "certifi" },
+    { name = "cryptography" },
+    { name = "pylsqpack" },
+    { name = "pyopenssl" },
+    { name = "service-identity" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4b/1a/bf10b2c57c06c7452b685368cb1ac90565a6e686e84ec6f84465fb8f78f4/aioquic-1.2.0.tar.gz", hash = "sha256:f91263bb3f71948c5c8915b4d50ee370004f20a416f67fab3dcc90556c7e7199", size = 179891 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/19/03/1c385739e504c70ab2a66a4bc0e7cd95cee084b374dcd4dc97896378400b/aioquic-1.2.0-cp38-abi3-macosx_10_9_x86_64.whl", hash = "sha256:3e23964dfb04526ade6e66f5b7cd0c830421b8138303ab60ba6e204015e7cb0b", size = 1753473 },
+    { url = "https://files.pythonhosted.org/packages/6a/1f/4d1c40714db65be828e1a1e2cce7f8f4b252be67d89f2942f86a1951826c/aioquic-1.2.0-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:84d733332927b76218a3b246216104116f766f5a9b2308ec306cd017b3049660", size = 2083563 },
+    { url = "https://files.pythonhosted.org/packages/15/48/56a8c9083d1deea4ccaf1cbf5a91a396b838b4a0f8650f4e9f45c7879a38/aioquic-1.2.0-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:2466499759b31ea4f1d17f4aeb1f8d4297169e05e3c1216d618c9757f4dd740d", size = 2555697 },
+    { url = "https://files.pythonhosted.org/packages/0f/93/fa4c981a8a8a903648d4cd6e12c0fca7f44e3ef4ba15a8b99a26af05b868/aioquic-1.2.0-cp38-abi3-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:cd75015462ca5070a888110dc201f35a9f4c7459f9201b77adc3c06013611bb8", size = 2149089 },
+    { url = "https://files.pythonhosted.org/packages/b0/0f/4a280923313b831892caaa45348abea89e7dd2e4422a86699bb0e506b1dd/aioquic-1.2.0-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:43ae3b11d43400a620ca0b4b4885d12b76a599c2cbddba755f74bebfa65fe587", size = 2205221 },
+    { url = "https://files.pythonhosted.org/packages/d2/6b/a6a1d1762ce06f13b68f524bb9c5f4d6ca7cda9b072d7e744626b89b77be/aioquic-1.2.0-cp38-abi3-win32.whl", hash = "sha256:910d8c91da86bba003d491d15deaeac3087d1b9d690b9edc1375905d8867b742", size = 1214037 },
+    { url = "https://files.pythonhosted.org/packages/dd/aa/e8a8a75c93dee0ab229df3c2d17f63cd44d0ad5ee8540e2ec42779ce3a39/aioquic-1.2.0-cp38-abi3-win_amd64.whl", hash = "sha256:e3dcfb941004333d477225a6689b55fc7f905af5ee6a556eb5083be0354e653a", size = 1530339 },
+]
+
+[[package]]
 name = "aiosignal"
 version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1308,6 +1330,7 @@ name = "omron"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
+    { name = "aioquic" },
     { name = "async-substrate-interface" },
     { name = "attrs" },
     { name = "bittensor" },
@@ -1357,6 +1380,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.10.11" },
+    { name = "aioquic", specifier = ">=1.2.0" },
     { name = "async-substrate-interface", specifier = ">=1.0.8" },
     { name = "attrs", specifier = "==24.3.0" },
     { name = "bittensor", specifier = "==9.8.0" },
@@ -1728,6 +1752,27 @@ wheels = [
 ]
 
 [[package]]
+name = "pyasn1"
+version = "0.6.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ba/e9/01f1a64245b89f039897cb0130016d79f77d52669aae6ee7b159a6c4c018/pyasn1-0.6.1.tar.gz", hash = "sha256:6f580d2bdd84365380830acf45550f2511469f673cb4a5ae3857a3170128b034", size = 145322 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c8/f1/d6a797abb14f6283c0ddff96bbdd46937f64122b8c925cab503dd37f8214/pyasn1-0.6.1-py3-none-any.whl", hash = "sha256:0d632f46f2ba09143da3a8afe9e33fb6f92fa2320ab7e886e2d0f7672af84629", size = 83135 },
+]
+
+[[package]]
+name = "pyasn1-modules"
+version = "0.4.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyasn1" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e9/e6/78ebbb10a8c8e4b61a59249394a4a594c1a7af95593dc933a349c8d00964/pyasn1_modules-0.4.2.tar.gz", hash = "sha256:677091de870a80aae844b1ca6134f54652fa2c8c5a52aa396440ac3106e941e6", size = 307892 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/47/8d/d529b5d697919ba8c11ad626e835d4039be708a35b0d22de83a269a6682c/pyasn1_modules-0.4.2-py3-none-any.whl", hash = "sha256:29253a9207ce32b64c3ac6600edc75368f98473906e8fd1043bd6b5b1de2c14a", size = 181259 },
+]
+
+[[package]]
 name = "pycparser"
 version = "2.22"
 source = { registry = "https://pypi.org/simple" }
@@ -1813,6 +1858,25 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b0/77/a5b8c569bf593b0140bde72ea885a803b82086995367bf2037de0159d924/pygments-2.19.2.tar.gz", hash = "sha256:636cb2477cec7f8952536970bc533bc43743542f70392ae026374600add5b887", size = 4968631 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c7/21/705964c7812476f378728bdf590ca4b771ec72385c533964653c68e86bdc/pygments-2.19.2-py3-none-any.whl", hash = "sha256:86540386c03d588bb81d44bc3928634ff26449851e99741617ecb9037ee5ec0b", size = 1225217 },
+]
+
+[[package]]
+name = "pylsqpack"
+version = "0.3.22"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/99/07/ea976514a788c8687c3b2cb8f89f5cd08ce8804773e61487323e5e542d80/pylsqpack-0.3.22.tar.gz", hash = "sha256:b67f711b3c8370d9f40f7f7f536aa6018d8900fa09fa49f72f0c3f13886cecda", size = 676356 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/90/a9/d6905ed2967fa8f7ae4fb2886a6e9ffc2566f91935363aabbd2afd6aec87/pylsqpack-0.3.22-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:c24a44357302aca0ed3306d603683df875016d52d1b1a52a6b0caae2b723b334", size = 162458 },
+    { url = "https://files.pythonhosted.org/packages/ad/29/da258885a3d0b3d6ade84a686ce4a91795a4a9714fb74dc0b6a3507dc71c/pylsqpack-0.3.22-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:8dc07b361132f649d7b6918efc94f5a99a9cb3b09736517dd764b34e6875df32", size = 167743 },
+    { url = "https://files.pythonhosted.org/packages/04/9d/0b6468a44595d499a2cb236d22a221caac764572386a39b5b9fda114246c/pylsqpack-0.3.22-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8f4d0741ce866ff12d5b428a999b73260d248fdb368565c5b4280bce408cd93c", size = 248723 },
+    { url = "https://files.pythonhosted.org/packages/51/31/a8b3d72dd4cb3791f7deb41bbfdf8991080be03c457bffd1911390aa2d72/pylsqpack-0.3.22-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a67ed5f7739b9e8ab0fb54cfa8f1475b240454b7806d9b38a526e611c5f14d0c", size = 249681 },
+    { url = "https://files.pythonhosted.org/packages/39/c0/76265bea90e4baf4f641aec9ab314d24826175661df058572b6c52a44cf9/pylsqpack-0.3.22-cp39-abi3-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:44ed9ecfde1f400e7e52ac5fc93936602a2257510e68430cd9da41e296d35848", size = 246663 },
+    { url = "https://files.pythonhosted.org/packages/76/df/d669da27266ff4d8a3b4d4b10452d6f59762e866b5e079a31ffcfcb185bc/pylsqpack-0.3.22-cp39-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:3ccfa072d5dd96236f274ad62604dee4d09fa2a8f805e9b41fc436f843e93064", size = 246035 },
+    { url = "https://files.pythonhosted.org/packages/5d/57/760d265b8700aea50f31d6e80a6a9c0eee57db0792acca899f3d509c3b2e/pylsqpack-0.3.22-cp39-abi3-musllinux_1_2_i686.whl", hash = "sha256:fd4eda3aca5b4a3033ce07cb7efb593cb73a5b327f628aa88528beac42fac397", size = 245930 },
+    { url = "https://files.pythonhosted.org/packages/0d/19/e8745dbea88a1b023a839e67737d6232f4d69eab5939ea174fbfc8867b5e/pylsqpack-0.3.22-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:8e33c9625c3cbfe3a50ccddab60d2f5d13aaacce1682577eadfcab747b75f141", size = 247756 },
+    { url = "https://files.pythonhosted.org/packages/73/b2/c569b2c616ffb6ffa60112f79aed9611195488d214d9d23e4b00f2cc222c/pylsqpack-0.3.22-cp39-abi3-win32.whl", hash = "sha256:5fed26bd2021ef2bd72d81a3c4e2f85cf60bc53d6b994757d87a2bffee86b174", size = 153160 },
+    { url = "https://files.pythonhosted.org/packages/9f/84/f1262ef519692b05a605a1de8654269ff851c16e074894c1021a3072df59/pylsqpack-0.3.22-cp39-abi3-win_amd64.whl", hash = "sha256:cf24e7509564bc08d2f33bf36eb9370b039814d18d5a29d162277e6f0dfadaaa", size = 155771 },
+    { url = "https://files.pythonhosted.org/packages/87/8a/dece0b2f890e3942b95ac703d297bea0417f4d6cd0f26fd845a4b885f392/pylsqpack-0.3.22-cp39-abi3-win_arm64.whl", hash = "sha256:d72287b2519df1fae147485123689b416ac39c37c3a95429835a3ca4c0722602", size = 152985 },
 ]
 
 [[package]]
@@ -2086,6 +2150,21 @@ wheels = [
 ]
 
 [[package]]
+name = "service-identity"
+version = "24.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "attrs" },
+    { name = "cryptography" },
+    { name = "pyasn1" },
+    { name = "pyasn1-modules" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/07/a5/dfc752b979067947261dbbf2543470c58efe735c3c1301dd870ef27830ee/service_identity-24.2.0.tar.gz", hash = "sha256:b8683ba13f0d39c6cd5d625d2c5f65421d6d707b013b375c355751557cbe8e09", size = 39245 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/08/2c/ca6dd598b384bc1ce581e24aaae0f2bed4ccac57749d5c3befbb5e742081/service_identity-24.2.0-py3-none-any.whl", hash = "sha256:6b047fbd8a84fd0bb0d55ebce4031e400562b9196e1e0d3e0fe2b8a59f6d4a85", size = 11364 },
+]
+
+[[package]]
 name = "setuptools"
 version = "70.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2315,6 +2394,7 @@ wheels = [
     { url = "https://download.pytorch.org/whl/cpu/torch-2.7.1%2Bcpu-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:3bf2db5adf77b433844f080887ade049c4705ddf9fe1a32023ff84ff735aa5ad" },
     { url = "https://download.pytorch.org/whl/cpu/torch-2.7.1%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:8f8b3cfc53010a4b4a3c7ecb88c212e9decc4f5eeb6af75c3c803937d2d60947" },
     { url = "https://download.pytorch.org/whl/cpu/torch-2.7.1%2Bcpu-cp312-cp312-win_amd64.whl", hash = "sha256:0bc887068772233f532b51a3e8c8cfc682ae62bef74bf4e0c53526c8b9e4138f" },
+    { url = "https://download.pytorch.org/whl/cpu/torch-2.7.1%2Bcpu-cp312-cp312-win_arm64.whl", hash = "sha256:a2618775f32eb4126c5b2050686da52001a08cffa331637d9cf51c8250931e00" },
 ]
 
 [[package]]

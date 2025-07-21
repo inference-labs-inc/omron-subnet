@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = "==3.12.*"
 dependencies = [
   "aiohttp>=3.10.11",
+  "aioquic>=1.2.0",
   "async-substrate-interface>=1.0.8",
   "attrs==24.3.0",
   "bittensor==9.8.0",
