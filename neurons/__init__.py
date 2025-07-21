@@ -2,4 +2,4 @@
 This version number is used to trigger automatic updates.
 """
 
-__version__ = "10.0.2"
+__version__ = "10.0.3"
