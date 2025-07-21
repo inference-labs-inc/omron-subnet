@@ -1,8 +1,8 @@
 import asyncio
 import multiprocessing
-import pickle
+import json
 import traceback
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Dict, Any, Optional
 
 import bittensor as bt
@@ -15,8 +15,8 @@ from _validator.utils.aioquic_transport import Lightning, query_axon_quic
 
 
 @dataclass
-class PicklableRequest:
-    """Picklable version of Request for multiprocessing"""
+class SerializableRequest:
+    """JSON-serializable version of Request for multiprocessing"""
 
     uid: int
     axon_ip: str
@@ -25,13 +25,26 @@ class PicklableRequest:
     synapse_data: Dict[str, Any]
     synapse_type: str
     circuit_id: str
-    request_type: RequestType
+    request_type: str
     request_hash: Optional[str] = None
     save: bool = False
     timeout: float = 120.0
 
+    def to_json(self) -> str:
+        """Serialize to JSON string"""
+        data = asdict(self)
+        return json.dumps(data)
+
     @classmethod
-    def from_request(cls, request) -> "PicklableRequest":
+    def from_json(cls, json_str: str) -> "SerializableRequest":
+        """Deserialize from JSON string"""
+        data = json.loads(json_str)
+
+        data["request_type"] = RequestType(data["request_type"])
+        return cls(**data)
+
+    @classmethod
+    def from_request(cls, request) -> "SerializableRequest":
         """Convert a Request object to PicklableRequest"""
 
         if isinstance(request.synapse, QueryZkProof):
@@ -65,7 +78,7 @@ class PicklableRequest:
             synapse_data=synapse_data,
             synapse_type=synapse_type,
             circuit_id=request.circuit.id,
-            request_type=request.request_type,
+            request_type=request.request_type.value,
             request_hash=request.request_hash,
             save=request.save,
             timeout=(
@@ -77,8 +90,8 @@ class PicklableRequest:
 
 
 @dataclass
-class PicklableResponse:
-    """Picklable version of Response for multiprocessing"""
+class SerializableResponse:
+    """JSON-serializable version of Response for multiprocessing"""
 
     uid: int
     response_time: Optional[float]
@@ -89,10 +102,24 @@ class PicklableResponse:
     circuit_id: str = ""
     request_hash: Optional[str] = None
     save: bool = False
-    request_type: Optional[RequestType] = None
+    request_type: Optional[str] = None
+
+    def to_json(self) -> str:
+        """Serialize to JSON string"""
+        data = asdict(self)
+        return json.dumps(data)
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "SerializableResponse":
+        """Deserialize from JSON string"""
+        data = json.loads(json_str)
+
+        if data.get("request_type"):
+            data["request_type"] = RequestType(data["request_type"])
+        return cls(**data)
 
     def to_request_like(self, original_request):
-        """Convert PicklableResponse back to a Request-like object"""
+        """Convert SerializableResponse back to a Request-like object"""
         from _validator.core.request import Request
 
         circuit = (
@@ -106,7 +133,11 @@ class PicklableResponse:
             axon=original_request.axon,
             synapse=original_request.synapse,
             circuit=circuit,
-            request_type=self.request_type or original_request.request_type,
+            request_type=(
+                RequestType(self.request_type)
+                if isinstance(self.request_type, str)
+                else self.request_type or original_request.request_type
+            ),
             inputs=original_request.inputs,
             request_hash=self.request_hash,
             response_time=self.response_time,
@@ -173,76 +204,76 @@ def _recreate_synapse(synapse_data: Dict[str, Any], synapse_type: str):
         raise ValueError(f"Unknown synapse type: {synapse_type}")
 
 
-def _create_request_object(picklable_request: PicklableRequest):
-    """Convert PicklableRequest back to a Request-like object for compatibility"""
+def _create_request_object(serializable_request: SerializableRequest):
+    """Convert SerializableRequest back to a Request-like object for compatibility"""
 
     class RequestAxon:
         def __init__(self):
-            self.ip = picklable_request.axon_ip
-            self.port = picklable_request.axon_port
-            self.hotkey = picklable_request.axon_hotkey
+            self.ip = serializable_request.axon_ip
+            self.port = serializable_request.axon_port
+            self.hotkey = serializable_request.axon_hotkey
 
     class RequestCircuit:
         def __init__(self):
-            self.timeout = picklable_request.timeout
-            self.id = picklable_request.circuit_id
+            self.timeout = serializable_request.timeout
+            self.id = serializable_request.circuit_id
 
     class RequestObject:
         def __init__(self):
-            self.uid = picklable_request.uid
+            self.uid = serializable_request.uid
             self.axon = RequestAxon()
             self.synapse = _recreate_synapse(
-                picklable_request.synapse_data, picklable_request.synapse_type
+                serializable_request.synapse_data, serializable_request.synapse_type
             )
             self.circuit = RequestCircuit()
-            self.request_type = picklable_request.request_type
-            self.request_hash = picklable_request.request_hash
-            self.save = picklable_request.save
+            self.request_type = serializable_request.request_type
+            self.request_hash = serializable_request.request_hash
+            self.save = serializable_request.save
             self.dendrite_headers = {}
 
     return RequestObject()
 
 
 async def _query_single_axon_async(
-    dendrite: bt.dendrite, picklable_request: PicklableRequest
-) -> PicklableResponse:
+    dendrite: bt.dendrite, serializable_request: SerializableRequest
+) -> SerializableResponse:
     """Async version of axon query for worker process"""
     try:
         axon = bt.axon(
-            ip=picklable_request.axon_ip,
-            port=picklable_request.axon_port,
-            hotkey=picklable_request.axon_hotkey,
+            ip=serializable_request.axon_ip,
+            port=serializable_request.axon_port,
+            hotkey=serializable_request.axon_hotkey,
         )
 
         synapse = _recreate_synapse(
-            picklable_request.synapse_data, picklable_request.synapse_type
+            serializable_request.synapse_data, serializable_request.synapse_type
         )
 
         result = await dendrite.call(
             target_axon=axon,
             synapse=synapse,
-            timeout=picklable_request.timeout,
+            timeout=serializable_request.timeout,
             deserialize=False,
         )
 
         if not result:
-            return PicklableResponse(
-                uid=picklable_request.uid,
-                response_time=picklable_request.timeout,
+            return SerializableResponse(
+                uid=serializable_request.uid,
+                response_time=serializable_request.timeout,
                 deserialized=None,
                 result_data=None,
                 success=False,
                 error_message="No result from axon",
-                circuit_id=picklable_request.circuit_id,
-                request_hash=picklable_request.request_hash,
-                save=picklable_request.save,
-                request_type=picklable_request.request_type,
+                circuit_id=serializable_request.circuit_id,
+                request_hash=serializable_request.request_hash,
+                save=serializable_request.save,
+                request_type=serializable_request.request_type,
             )
 
         response_time = (
             result.dendrite.process_time
             if result.dendrite.process_time is not None
-            else picklable_request.timeout
+            else serializable_request.timeout
         )
 
         deserialized = result.deserialize()
@@ -251,56 +282,58 @@ async def _query_single_axon_async(
         if hasattr(result, "__dict__"):
             for key, value in result.__dict__.items():
                 try:
-                    pickle.dumps(value)
+
+                    json.dumps(value)
                     result_data[key] = value
-                except (pickle.PicklingError, TypeError):
+                except (TypeError, ValueError):
+
                     continue
 
-        return PicklableResponse(
-            uid=picklable_request.uid,
+        return SerializableResponse(
+            uid=serializable_request.uid,
             response_time=response_time,
             deserialized=deserialized,
             result_data=result_data,
             success=True,
-            circuit_id=picklable_request.circuit_id,
-            request_hash=picklable_request.request_hash,
-            save=picklable_request.save,
-            request_type=picklable_request.request_type,
+            circuit_id=serializable_request.circuit_id,
+            request_hash=serializable_request.request_hash,
+            save=serializable_request.save,
+            request_type=serializable_request.request_type,
         )
 
     except InvalidUrlClientError:
-        return PicklableResponse(
-            uid=picklable_request.uid,
-            response_time=picklable_request.timeout,
+        return SerializableResponse(
+            uid=serializable_request.uid,
+            response_time=serializable_request.timeout,
             deserialized=None,
             result_data=None,
             success=False,
-            error_message=f"Invalid URL for UID {picklable_request.uid}",
-            circuit_id=picklable_request.circuit_id,
-            request_hash=picklable_request.request_hash,
-            save=picklable_request.save,
-            request_type=picklable_request.request_type,
+            error_message=f"Invalid URL for UID {serializable_request.uid}",
+            circuit_id=serializable_request.circuit_id,
+            request_hash=serializable_request.request_hash,
+            save=serializable_request.save,
+            request_type=serializable_request.request_type,
         )
     except Exception as e:
-        return PicklableResponse(
-            uid=picklable_request.uid,
-            response_time=picklable_request.timeout,
+        return SerializableResponse(
+            uid=serializable_request.uid,
+            response_time=serializable_request.timeout,
             deserialized=None,
             result_data=None,
             success=False,
-            error_message=f"Failed to query axon for UID {picklable_request.uid}: {str(e)}",
-            circuit_id=picklable_request.circuit_id,
-            request_hash=picklable_request.request_hash,
-            save=picklable_request.save,
-            request_type=picklable_request.request_type,
+            error_message=f"Failed to query axon for UID {serializable_request.uid}: {str(e)}",
+            circuit_id=serializable_request.circuit_id,
+            request_hash=serializable_request.request_hash,
+            save=serializable_request.save,
+            request_type=serializable_request.request_type,
         )
 
 
 def multiprocess_axon_worker(
-    picklable_request: PicklableRequest,
+    serializable_request: SerializableRequest,
     wallet_config: Dict[str, str],
     use_quic: bool = False,
-) -> PicklableResponse:
+) -> SerializableResponse:
     """Worker function for multiprocess axon queries"""
     try:
         loop = asyncio.new_event_loop()
@@ -310,26 +343,26 @@ def multiprocess_axon_worker(
             if use_quic:
                 lightning_client = Lightning(wallet_config)
                 try:
-                    request_object = _create_request_object(picklable_request)
+                    request_object = _create_request_object(serializable_request)
                     quic_result = loop.run_until_complete(
                         query_axon_quic(lightning_client, request_object)
                     )
 
                     if quic_result is None:
-                        return PicklableResponse(
-                            uid=picklable_request.uid,
-                            response_time=picklable_request.timeout,
+                        return SerializableResponse(
+                            uid=serializable_request.uid,
+                            response_time=serializable_request.timeout,
                             deserialized=None,
                             result_data=None,
                             success=False,
                             error_message="QUIC query failed",
-                            circuit_id=picklable_request.circuit_id,
-                            request_hash=picklable_request.request_hash,
-                            save=picklable_request.save,
-                            request_type=picklable_request.request_type,
+                            circuit_id=serializable_request.circuit_id,
+                            request_hash=serializable_request.request_hash,
+                            save=serializable_request.save,
+                            request_type=serializable_request.request_type,
                         )
 
-                    return PicklableResponse(
+                    return SerializableResponse(
                         uid=quic_result.uid,
                         response_time=quic_result.response_time,
                         deserialized=quic_result.deserialized,
@@ -344,10 +377,10 @@ def multiprocess_axon_worker(
                         ),
                         success=True,
                         error_message=None,
-                        circuit_id=picklable_request.circuit_id,
-                        request_hash=picklable_request.request_hash,
-                        save=picklable_request.save,
-                        request_type=picklable_request.request_type,
+                        circuit_id=serializable_request.circuit_id,
+                        request_hash=serializable_request.request_hash,
+                        save=serializable_request.save,
+                        request_type=serializable_request.request_type,
                     )
                 finally:
                     lightning_client.close()
@@ -355,7 +388,7 @@ def multiprocess_axon_worker(
 
                 dendrite = _create_dendrite(wallet_config)
                 return loop.run_until_complete(
-                    _query_single_axon_async(dendrite, picklable_request)
+                    _query_single_axon_async(dendrite, serializable_request)
                 )
         finally:
             loop.close()
@@ -363,17 +396,17 @@ def multiprocess_axon_worker(
     except Exception as e:
         bt.logging.error(f"Error in multiprocess worker: {e}")
         traceback.print_exc()
-        return PicklableResponse(
-            uid=picklable_request.uid,
-            response_time=picklable_request.timeout,
+        return SerializableResponse(
+            uid=serializable_request.uid,
+            response_time=serializable_request.timeout,
             deserialized=None,
             result_data=None,
             success=False,
             error_message=f"Worker error: {str(e)}",
-            circuit_id=picklable_request.circuit_id,
-            request_hash=picklable_request.request_hash,
-            save=picklable_request.save,
-            request_type=picklable_request.request_type,
+            circuit_id=serializable_request.circuit_id,
+            request_hash=serializable_request.request_hash,
+            save=serializable_request.save,
+            request_type=serializable_request.request_type,
         )
 
 
@@ -413,21 +446,27 @@ class MultiprocessAxonManager:
 
         signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-    async def query_axon(self, request) -> PicklableResponse:
+    async def query_axon(self, request) -> SerializableResponse:
         """Query axon using multiprocessing"""
         if not self.pool:
             raise RuntimeError("Pool not started")
 
-        picklable_request = PicklableRequest.from_request(request)
+        serializable_request = SerializableRequest.from_request(request)
 
         loop = asyncio.get_event_loop()
+
+        request_json = serializable_request.to_json()
+
         result = await loop.run_in_executor(
             None,
             lambda: self.pool.apply(
-                multiprocess_axon_worker,
-                (picklable_request, self.wallet_config, self.use_quic),
+                _json_multiprocess_worker,
+                (request_json, self.wallet_config, self.use_quic),
             ),
         )
+
+        if isinstance(result, str):
+            result = SerializableResponse.from_json(result)
 
         return result
 
@@ -437,6 +476,33 @@ class MultiprocessAxonManager:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop()
+
+
+def _json_multiprocess_worker(
+    request_json: str, wallet_config: Dict[str, str], use_quic: bool = False
+) -> str:
+    """JSON-safe wrapper for multiprocess_axon_worker"""
+    try:
+
+        serializable_request = SerializableRequest.from_json(request_json)
+
+        response = multiprocess_axon_worker(
+            serializable_request, wallet_config, use_quic
+        )
+
+        return response.to_json()
+
+    except Exception as e:
+
+        error_response = SerializableResponse(
+            uid=0,
+            response_time=None,
+            deserialized=None,
+            result_data=None,
+            success=False,
+            error_message=f"JSON worker error: {str(e)}",
+        )
+        return error_response.to_json()
 
 
 async def query_single_axon_multiprocess(
