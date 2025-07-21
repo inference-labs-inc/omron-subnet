@@ -91,7 +91,13 @@ class Lightning:
         This ensures full compatibility with bittensor's authentication system.
         """
         import time
-        from bittensor import __version_as_int__ as version_as_int
+        import bittensor as bt
+
+        try:
+            version_parts = bt.__version__.split(".")
+            version_as_int = int("".join(version_parts))
+        except Exception:
+            version_as_int = 900
 
         synapse.timeout = timeout
 

@@ -10,8 +10,17 @@ from aiohttp.client_exceptions import InvalidUrlClientError
 
 from _validator.models.request_type import RequestType
 from protocol import QueryZkProof, ProofOfWeightsSynapse
+
+
 from deployment_layer.circuit_store import circuit_store
 from _validator.utils.aioquic_transport import Lightning, query_axon_quic
+
+
+def _ensure_request_type_string(request_type):
+    """Helper function to ensure request_type is a string"""
+    if hasattr(request_type, "value"):
+        return request_type.value
+    return request_type
 
 
 @dataclass
@@ -33,6 +42,8 @@ class SerializableRequest:
     def to_json(self) -> str:
         """Serialize to JSON string"""
         data = asdict(self)
+        # Convert RequestType enum to string for JSON serialization
+        data["request_type"] = _ensure_request_type_string(self.request_type)
         return json.dumps(data)
 
     @classmethod
@@ -107,6 +118,8 @@ class SerializableResponse:
     def to_json(self) -> str:
         """Serialize to JSON string"""
         data = asdict(self)
+        # Convert RequestType enum to string for JSON serialization
+        data["request_type"] = _ensure_request_type_string(self.request_type)
         return json.dumps(data)
 
     @classmethod
@@ -267,7 +280,9 @@ async def _query_single_axon_async(
                 circuit_id=serializable_request.circuit_id,
                 request_hash=serializable_request.request_hash,
                 save=serializable_request.save,
-                request_type=serializable_request.request_type,
+                request_type=_ensure_request_type_string(
+                    serializable_request.request_type
+                ),
             )
 
         response_time = (
@@ -298,7 +313,7 @@ async def _query_single_axon_async(
             circuit_id=serializable_request.circuit_id,
             request_hash=serializable_request.request_hash,
             save=serializable_request.save,
-            request_type=serializable_request.request_type,
+            request_type=_ensure_request_type_string(serializable_request.request_type),
         )
 
     except InvalidUrlClientError:
@@ -312,7 +327,7 @@ async def _query_single_axon_async(
             circuit_id=serializable_request.circuit_id,
             request_hash=serializable_request.request_hash,
             save=serializable_request.save,
-            request_type=serializable_request.request_type,
+            request_type=_ensure_request_type_string(serializable_request.request_type),
         )
     except Exception as e:
         return SerializableResponse(
@@ -325,7 +340,7 @@ async def _query_single_axon_async(
             circuit_id=serializable_request.circuit_id,
             request_hash=serializable_request.request_hash,
             save=serializable_request.save,
-            request_type=serializable_request.request_type,
+            request_type=_ensure_request_type_string(serializable_request.request_type),
         )
 
 
@@ -359,7 +374,9 @@ def multiprocess_axon_worker(
                             circuit_id=serializable_request.circuit_id,
                             request_hash=serializable_request.request_hash,
                             save=serializable_request.save,
-                            request_type=serializable_request.request_type,
+                            request_type=_ensure_request_type_string(
+                                serializable_request.request_type
+                            ),
                         )
 
                     return SerializableResponse(
@@ -380,7 +397,9 @@ def multiprocess_axon_worker(
                         circuit_id=serializable_request.circuit_id,
                         request_hash=serializable_request.request_hash,
                         save=serializable_request.save,
-                        request_type=serializable_request.request_type,
+                        request_type=_ensure_request_type_string(
+                            serializable_request.request_type
+                        ),
                     )
                 finally:
 
@@ -407,7 +426,7 @@ def multiprocess_axon_worker(
             circuit_id=serializable_request.circuit_id,
             request_hash=serializable_request.request_hash,
             save=serializable_request.save,
-            request_type=serializable_request.request_type,
+            request_type=_ensure_request_type_string(serializable_request.request_type),
         )
 
 
@@ -495,7 +514,9 @@ class MultiprocessAxonManager:
                     circuit_id=serializable_request.circuit_id,
                     request_hash=serializable_request.request_hash,
                     save=serializable_request.save,
-                    request_type=serializable_request.request_type,
+                    request_type=_ensure_request_type_string(
+                        serializable_request.request_type
+                    ),
                 )
                 return error_response.to_json()
 
