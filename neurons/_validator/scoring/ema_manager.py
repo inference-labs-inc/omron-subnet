@@ -7,6 +7,7 @@ import bittensor as bt
 from constants import (
     NUM_MINER_GROUPS,
     ONE_MINUTE,
+    EMA_BOOST_FACTOR,
 )
 from utils.epoch import get_current_epoch_info
 from utils.rate_limiter import with_rate_limit
@@ -67,7 +68,7 @@ class EMAManager:
 
                 if last_ema_epoch != current_epoch:
                     if group == boosted_group:
-                        self.scores[uid] = self.scores[uid] * 1.8
+                        self.scores[uid] = self.scores[uid] * EMA_BOOST_FACTOR
                     else:
                         self.scores[uid] = self.scores[uid] * 0.99
 
