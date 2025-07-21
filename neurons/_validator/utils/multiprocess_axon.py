@@ -413,10 +413,6 @@ class MultiprocessAxonManager:
 
         signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-        global _worker_wallet_config, _worker_use_quic
-        _worker_wallet_config = wallet_config
-        _worker_use_quic = use_quic
-
     async def query_axon(self, request) -> PicklableResponse:
         """Query axon using multiprocessing"""
         if not self.pool:
