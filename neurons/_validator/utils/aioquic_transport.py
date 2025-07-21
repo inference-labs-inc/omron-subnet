@@ -12,8 +12,8 @@ from aioquic.h3.connection import H3Connection
 from aioquic.h3.events import (
     DataReceived,
     HeadersReceived,
-    StreamReset,
 )
+from aioquic.quic.events import StreamReset
 from aioquic.quic.configuration import QuicConfiguration
 
 from _validator.models.request_type import RequestType
