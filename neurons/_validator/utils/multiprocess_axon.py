@@ -403,7 +403,7 @@ def multiprocess_axon_worker(
                     )
                 finally:
 
-                    loop.run_until_complete(lightning_client._async_close())
+                    lightning_client.close()
             else:
 
                 dendrite = _create_dendrite(wallet_config)
