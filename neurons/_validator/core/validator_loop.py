@@ -133,8 +133,7 @@ class ValidatorLoop:
             "path": self.config.wallet.path,
         }
 
-        # Enable QUIC transport if configured via environment variable
-        use_quic = os.getenv("OMRON_USE_LIGHTNING", "false").lower() == "true"
+        use_quic = True
 
         self.multiprocess_manager = MultiprocessAxonManager(
             wallet_config=wallet_config, max_workers=16, use_quic=use_quic
