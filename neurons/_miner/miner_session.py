@@ -31,7 +31,7 @@ from utils import AutoUpdate, clean_temp_files, wandb_logger
 from utils.rate_limiter import with_rate_limit
 from utils.epoch import get_current_epoch_info, get_epoch_start_block
 from .circuit_manager import CircuitManager
-from .quic_server import LightningServer
+from .lightning_server import LightningServer
 from utils.shuffle import get_shuffled_uids
 
 COMPETITION_DIR = os.path.join(
@@ -42,7 +42,7 @@ COMPETITION_DIR = os.path.join(
 class MinerSession:
 
     axon: Union[bt.axon, None] = None
-    quic_server: Union[LightningServer, None] = None
+    lightning_server: Union[LightningServer, None] = None
 
     def __init__(self):
         self.configure()
@@ -106,86 +106,54 @@ class MinerSession:
 
         self.axon = axon
 
-    def start_quic_server(self):
-        try:
-            quic_port = getattr(cli_parser.config.axon, "port", 8091) + 1
-            external_ip = (
-                getattr(self.axon, "external_ip", "0.0.0.0") if self.axon else "0.0.0.0"
-            )
+    def start_lightning_server(self):
+        """Initialize the Rust Lightning server"""
+        lightning_port = getattr(cli_parser.config.axon, "port", 8091) + 1
+        external_ip = (
+            getattr(self.axon, "external_ip", "0.0.0.0") if self.axon else "0.0.0.0"
+        )
 
-            self.quic_server = LightningServer(
-                miner_session=self, host=external_ip, port=quic_port
-            )
+        self.lightning_server = LightningServer(
+            miner_session=self, host=external_ip, port=lightning_port
+        )
 
-            bt.logging.info(
-                f"Lightning server will be available at {external_ip}:{quic_port}"
-            )
-            bt.logging.info("Lightning server provides Lightning client compatibility")
+        bt.logging.success(
+            f"⚡ Lightning server initialized on {external_ip}:{lightning_port}"
+        )
+        bt.logging.info("🔥 Using Rust Lightning server for maximum performance!")
+        bt.logging.info("⚡ Persistent connections enabled for validators")
+        bt.logging.info("🤝 Optimized handshake protocol active")
 
-        except Exception as e:
-            bt.logging.error(f"Failed to initialize Lightning server: {e}")
-            traceback.print_exc()
-            self.quic_server = None
+    async def _start_lightning_server_async(self):
+        """Start the Lightning server asynchronously"""
+        await self.lightning_server.start()
+        bt.logging.success("⚡ Lightning server started with persistent connections")
+        bt.logging.info("🚀 Ready for high-throughput validator communication")
 
-    async def _start_quic_server_async(self):
-        if self.quic_server:
-            try:
-                await self.quic_server.start()
-            except Exception as e:
-                bt.logging.error(f"Failed to start Lightning server: {e}")
-                traceback.print_exc()
-
-    async def _stop_quic_server_async(self):
-        if self.quic_server:
-            try:
-                await self.quic_server.stop()
-            except Exception as e:
-                bt.logging.error(f"Error stopping Lightning server: {e}")
-
-    def perform_reset(self):
-        bt.logging.info("Performing coordinated reset")
-        try:
-            commitment_info = [{"ResetBondsFlag": b""}]
-            call = self.subtensor.substrate.compose_call(
-                call_module="Commitments",
-                call_function="set_commitment",
-                call_params={
-                    "netuid": cli_parser.config.netuid,
-                    "info": {"fields": [commitment_info]},
-                },
-            )
-            success, message = self.subtensor.sign_and_send_extrinsic(
-                call=call,
-                wallet=self.wallet,
-                sign_with="hotkey",
-                period=MINER_RESET_WINDOW_BLOCKS,
-            )
-            if not success:
-                bt.logging.error(f"Failed to perform reset: {message}")
-            else:
-                bt.logging.success("Successfully performed reset")
-        except Exception as e:
-            bt.logging.error(f"Error performing reset: {e}")
+    async def _stop_lightning_server_async(self):
+        """Stop the Lightning server asynchronously"""
+        await self.lightning_server.stop()
+        bt.logging.info("🔌 Lightning server stopped successfully")
 
     def run(self):
         bt.logging.info("Starting miner...")
         self.start_axon()
-        self.start_quic_server()
+        self.start_lightning_server()
 
-        quic_task = None
-        if self.quic_server:
+        lightning_task = None
+        try:
             try:
-                try:
-                    loop = asyncio.get_event_loop()
-                except RuntimeError:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
 
-                quic_task = loop.create_task(self._run_quic_server())
-                bt.logging.success("Lightning server task started")
-            except Exception as e:
-                bt.logging.error(f"Failed to start Lightning server task: {e}")
-                quic_task = None
+            lightning_task = loop.create_task(self._run_lightning_server())
+            bt.logging.success("⚡ Lightning server task started with Rust backend")
+
+        except Exception as e:
+            bt.logging.error(f"❌ Failed to start Lightning server task: {e}")
+            lightning_task = None
 
         step = 0
 
@@ -238,6 +206,14 @@ class MinerSession:
                         )
                         console = Console()
                         console.print(table)
+
+                    if step % 500 == 0:
+                        stats = self.lightning_server.get_connection_stats()
+                        connections = stats.get("verified_connections", 0)
+                        bt.logging.info(
+                            f"⚡ Lightning server: {connections} active validator connections"
+                        )
+
                     self.sync_metagraph()
 
                     time.sleep(1)
@@ -253,25 +229,25 @@ class MinerSession:
             bt.logging.info("Shutting down miner...")
             clean_temp_files()
 
-            if quic_task and self.quic_server:
+            if lightning_task:
                 try:
                     bt.logging.info("Stopping Lightning server...")
                     loop = asyncio.get_event_loop()
-                    loop.run_until_complete(self._stop_quic_server_async())
-                    quic_task.cancel()
+                    loop.run_until_complete(self._stop_lightning_server_async())
+                    lightning_task.cancel()
                     bt.logging.success("Lightning server stopped")
                 except Exception as e:
-                    bt.logging.error(f"Error stopping Lightning server: {e}")
+                    bt.logging.error(f"❌ Error stopping Lightning server: {e}")
 
-    async def _run_quic_server(self):
+    async def _run_lightning_server(self):
+        """Run the Lightning server asynchronously"""
         try:
-            await self._start_quic_server_async()
-            if self.quic_server and self.quic_server.server:
-                await self.quic_server.serve_forever()
+            await self._start_lightning_server_async()
+            await self.lightning_server.serve_forever()
         except asyncio.CancelledError:
             bt.logging.debug("Lightning server task cancelled")
         except Exception as e:
-            bt.logging.error(f"Lightning server error: {e}")
+            bt.logging.error(f"❌ Lightning server error: {e}")
             traceback.print_exc()
 
     def check_register(self, should_exit=False):
@@ -522,3 +498,26 @@ class MinerSession:
             synapse.commitment = f"Error: {str(e)}"
 
         return synapse
+
+    def perform_reset(self):
+        bt.logging.info("🔄 Performing miner reset")
+
+        try:
+            bt.logging.info("🧹 Cleaning temporary files...")
+            clean_temp_files()
+
+            bt.logging.info("♻️ Clearing circuit store...")
+            if hasattr(circuit_store, "circuits"):
+                circuit_store.circuits.clear()
+
+            if hasattr(circuit_store, "clear_cache"):
+                circuit_store.clear_cache()
+
+            bt.logging.info("🔄 Syncing metagraph after reset...")
+            self.sync_metagraph()
+
+            bt.logging.success("✅ Miner reset completed successfully")
+
+        except Exception as e:
+            bt.logging.error(f"❌ Error during miner reset: {e}")
+            traceback.print_exc()

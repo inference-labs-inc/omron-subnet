@@ -1,387 +1,131 @@
-import asyncio
-import json
-import ssl
 import time
-import traceback
-from dataclasses import dataclass
-from typing import Dict, Any, Optional, Tuple
-
+from typing import Dict, Any
 import bittensor as bt
-from aioquic.asyncio import connect
-from aioquic.h3.connection import H3Connection
-from aioquic.h3.events import (
-    DataReceived,
-    HeadersReceived,
-)
-from aioquic.quic.events import StreamReset
-from aioquic.quic.configuration import QuicConfiguration
-
-from _validator.models.request_type import RequestType
-from protocol import QueryZkProof, ProofOfWeightsSynapse
+from lightning.lightning import RustLightning
 
 
-@dataclass
-class QuicAxonInfo:
-    """QUIC-compatible axon information"""
+class LightningTransport:
+    """Pure Rust Lightning transport - no Python fallback"""
 
-    ip: str
-    port: int
-    hotkey: str
-    protocol: int = 4
+    def __init__(self, wallet):
+        self.wallet = wallet
+        self.connection_stats_log_interval = 60
+        self.last_stats_log = 0
 
+        wallet_hotkey = getattr(wallet.hotkey, "ss58_address", "unknown_hotkey")
+        self.lightning_client = RustLightning(wallet_hotkey)
+        bt.logging.success("⚡ Rust Lightning client initialized")
 
-@dataclass
-class QuicRequest:
-    """QUIC request data structure preserving bittensor semantics"""
+    async def initialize_persistent_connections(self, metagraph):
+        """Initialize persistent connections to all miners on startup"""
+        miners = []
+        for uid, axon in enumerate(metagraph.axons):
+            if axon and hasattr(axon, "ip") and hasattr(axon, "port"):
+                miner_info = {
+                    "hotkey": (
+                        axon.hotkey if hasattr(axon, "hotkey") else f"miner_{uid}"
+                    ),
+                    "ip": axon.ip,
+                    "port": int(axon.port) + 1,
+                    "protocol": 4,
+                    "placeholder1": 0,
+                    "placeholder2": 0,
+                }
+                miners.append(miner_info)
 
-    uid: int
-    axon: QuicAxonInfo
-    synapse: QueryZkProof | ProofOfWeightsSynapse
-    circuit_timeout: float
-    dendrite_headers: Dict[str, str]
-    request_type: RequestType
-    request_hash: Optional[str] = None
-    save: bool = False
+        if miners:
+            self.lightning_client.initialize_connections(miners)
+            bt.logging.success(
+                f"⚡ Initialized persistent connections to {len(miners)} miners"
+            )
 
+            stats = self.lightning_client.get_connection_stats()
+            bt.logging.info(f"📊 Lightning connection stats: {stats}")
 
-@dataclass
-class QuicResponse:
-    """QUIC response preserving bittensor response structure"""
+    async def update_miner_registry(self, metagraph, force=False):
+        """Update miner registry and manage persistent connections"""
+        current_time = time.time()
+        if (
+            not force
+            and current_time - getattr(self, "last_miner_registry_update", 0) < 30
+        ):
+            return
 
-    uid: int
-    success: bool
-    response_time: Optional[float]
-    status_code: int
-    headers: Dict[str, str]
-    body: bytes
-    deserialized: Optional[Dict[str, Any]] = None
-    error_message: Optional[str] = None
+        miners = []
+        for uid, axon in enumerate(metagraph.axons):
+            if axon and hasattr(axon, "ip") and hasattr(axon, "port"):
+                miner_info = {
+                    "hotkey": (
+                        axon.hotkey if hasattr(axon, "hotkey") else f"miner_{uid}"
+                    ),
+                    "ip": axon.ip,
+                    "port": int(axon.port) + 1,
+                    "protocol": 4,
+                    "placeholder1": 0,
+                    "placeholder2": 0,
+                }
+                miners.append(miner_info)
 
+        self.lightning_client.update_miner_registry(miners)
+        self.last_miner_registry_update = current_time
 
-class Lightning:
-    """
-    Lightning-fast QUIC-based client for communicating with bittensor axons.
-    Preserves all bittensor authentication headers and signatures.
-    """
+        if current_time - self.last_stats_log > self.connection_stats_log_interval:
+            stats = self.lightning_client.get_connection_stats()
+            bt.logging.debug(
+                f"⚡ Lightning connections: {stats.get('total_connections', 0)} active"
+            )
+            self.last_stats_log = current_time
 
-    def __init__(self, wallet_config: Dict[str, str]):
-        """Initialize Lightning client with wallet configuration"""
-        self.wallet_config = wallet_config
-
-        self.wallet = bt.wallet(
-            name=wallet_config["name"],
-            hotkey=wallet_config["hotkey"],
-            path=wallet_config["path"],
-        )
-
-    def _preprocess_synapse_for_request(
-        self, target_axon: QuicAxonInfo, synapse: Any, timeout: float
-    ) -> Any:
-        """
-        Preprocess synapse exactly like bittensor dendrite does.
-        This ensures full compatibility with bittensor's authentication system.
-        """
-        import time
-        import bittensor as bt
-
-        try:
-            version_parts = bt.__version__.split(".")
-            version_as_int = int("".join(version_parts))
-        except Exception:
-            version_as_int = 900
-
-        synapse.timeout = timeout
-
-        from bittensor.core.synapse import TerminalInfo
-
-        synapse.dendrite = TerminalInfo(
-            ip=getattr(self.wallet, "external_ip", "127.0.0.1"),
-            version=version_as_int,
-            nonce=time.time_ns(),
-            uuid=str(getattr(self.wallet, "uuid", f"lightning-{int(time.time())}")),
-            hotkey=self.wallet.hotkey.ss58_address,
-        )
-
-        synapse.axon = TerminalInfo(
-            ip=target_axon.ip,
-            port=target_axon.port,
-            hotkey=target_axon.hotkey,
-        )
-        # flake8: noqa: E501
-        message = f"{synapse.dendrite.nonce}.{synapse.dendrite.hotkey}.{synapse.axon.hotkey}.{synapse.dendrite.uuid}.{synapse.body_hash}"
-        synapse.dendrite.signature = f"0x{self.wallet.hotkey.sign(message).hex()}"
-
-        return synapse
-
-    def _create_bittensor_headers(self, synapse: Any) -> Dict[str, str]:
-        """
-        Create headers using bittensor's built-in to_headers method.
-        This ensures perfect compatibility with bittensor's serialization.
-        """
-        base_headers = {
-            "Content-Type": "application/json",
-            "User-Agent": f"Bittensor/{bt.__version__}",
-            "Accept": "application/json",
-            "Accept-Encoding": "gzip, deflate",
+    async def query_axon(
+        self, axon, synapse_dict: Dict[str, Any], timeout: float = 12.0
+    ) -> Dict[str, Any]:
+        """Query axon using Rust Lightning with persistent connections"""
+        axon_info = {
+            "hotkey": axon.hotkey if hasattr(axon, "hotkey") else "unknown",
+            "ip": axon.ip,
+            "port": int(axon.port) + 1,
+            "protocol": 4,
+            "placeholder1": 0,
+            "placeholder2": 0,
         }
 
-        synapse_headers = synapse.to_headers()
+        synapse_type = synapse_dict.get("synapse_type", "Unknown")
 
-        base_headers.update(synapse_headers)
+        request = {"synapse_type": synapse_type, "data": synapse_dict.get("data", {})}
 
-        return base_headers
-
-    def _create_quic_config(self) -> QuicConfiguration:
-        """Create QUIC configuration for secure connections"""
-        config = QuicConfiguration(
-            is_client=True,
-            alpn_protocols=["h3"],
-            verify_mode=ssl.CERT_NONE,
-        )
-
-        config.idle_timeout = 30.0
-        config.max_stream_data = 1048576
-        config.max_data = 10485760
-
-        return config
-
-    async def _create_connection(self, host: str, port: int):
-        """Create a fresh QUIC connection (no caching)"""
-        try:
-            config = self._create_quic_config()
-
-            return connect(host, port, configuration=config)
-
-        except Exception as e:
-            bt.logging.error(f"Failed to create QUIC connection to {host}:{port}: {e}")
-            raise
-
-    async def _send_h3_request(
-        self,
-        h3_conn: H3Connection,
-        method: str,
-        path: str,
-        headers: Dict[str, str],
-        body: bytes = b"",
-    ) -> Tuple[int, Dict[str, str], bytes]:
-        """Send HTTP/3 request over QUIC"""
-
-        h3_headers = [
-            (":method", method),
-            (":path", path),
-            (":scheme", "https"),
-            (":authority", f"{headers.get('Host', 'localhost')}"),
-        ]
-
-        for key, value in headers.items():
-            if not key.startswith(":") and key.lower() != "host":
-                h3_headers.append((key.lower(), value))
-
-        stream_id = h3_conn.get_next_available_stream_id()
-        h3_conn.send_headers(stream_id=stream_id, headers=h3_headers)
-
-        if body:
-            h3_conn.send_data(stream_id=stream_id, data=body, end_stream=True)
-        else:
-            h3_conn.end_stream(stream_id)
-
-        response_headers = {}
-        response_body = b""
-        status_code = 200
-
-        while True:
-            events = h3_conn.next_event()
-            if not events:
-                await asyncio.sleep(0.01)
-                continue
-
-            for event in events:
-                if isinstance(event, HeadersReceived) and event.stream_id == stream_id:
-                    for name, value in event.headers:
-                        if name == b":status":
-                            status_code = int(value.decode())
-                        else:
-                            response_headers[name.decode()] = value.decode()
-
-                elif isinstance(event, DataReceived) and event.stream_id == stream_id:
-                    response_body += event.data
-                    if event.stream_ended:
-                        return status_code, response_headers, response_body
-
-                elif isinstance(event, StreamReset) and event.stream_id == stream_id:
-                    raise Exception(f"Stream reset: {event.error_code}")
-
-            if len(response_body) > 0 and not any(
-                isinstance(e, DataReceived) and e.stream_ended for e in events
-            ):
-                continue
-
-            break
-
-        return status_code, response_headers, response_body
-
-    async def query_axon(self, request: QuicRequest) -> QuicResponse:
-        """
-        Query axon using QUIC while preserving bittensor authentication.
-        This is the main entry point that replaces the original HTTP dendrite call.
-        """
         start_time = time.time()
+        response = self.lightning_client.query_axon(axon_info, request)
+        latency = time.time() - start_time
 
-        try:
-
-            preprocessed_synapse = self._preprocess_synapse_for_request(
-                request.axon, request.synapse, request.circuit_timeout
+        if response.get("success", False):
+            bt.logging.trace(
+                f"⚡ Lightning query to {axon.hotkey[:8]}... completed in {latency:.3f}s"
             )
 
-            headers = self._create_bittensor_headers(preprocessed_synapse)
-            headers.update(request.dendrite_headers)
+            result = {
+                "success": True,
+                "latency_ms": response.get("latency_ms", latency * 1000),
+                "status_code": 200,
+                "connection_type": "lightning_persistent",
+            }
 
-            endpoint = preprocessed_synapse.__class__.__name__
+            for key, value in response.items():
+                if key not in ["success", "latency_ms"]:
+                    result[key] = value
 
-            body_data = preprocessed_synapse.model_dump()
-            body = json.dumps(body_data).encode()
-            headers["Content-Length"] = str(len(body))
-            headers["Host"] = f"{request.axon.ip}:{request.axon.port}"
-
-            connection_manager = await self._create_connection(
-                request.axon.ip, request.axon.port
+            return result
+        else:
+            bt.logging.error(f"❌ Lightning query failed for {axon.hotkey[:8]}...")
+            raise Exception(
+                f"Lightning query failed: {response.get('error', 'Unknown error')}"
             )
 
-            async with connection_manager as protocol:
-                h3_conn = H3Connection(protocol._quic)
-
-                status_code, response_headers, response_body = await asyncio.wait_for(
-                    self._send_h3_request(
-                        h3_conn, "POST", f"/{endpoint}", headers, body
-                    ),
-                    timeout=request.circuit_timeout,
-                )
-
-            response_time = time.time() - start_time
-
-            deserialized = None
-            if response_body:
-                try:
-                    deserialized = json.loads(response_body.decode())
-                except json.JSONDecodeError as e:
-                    bt.logging.warning(f"Failed to decode response JSON: {e}")
-
-            return QuicResponse(
-                uid=request.uid,
-                success=200 <= status_code < 300,
-                response_time=response_time,
-                status_code=status_code,
-                headers=response_headers,
-                body=response_body,
-                deserialized=deserialized,
-                error_message=(
-                    None if 200 <= status_code < 300 else f"HTTP {status_code}"
-                ),
-            )
-
-        except asyncio.TimeoutError:
-            return QuicResponse(
-                uid=request.uid,
-                success=False,
-                response_time=request.circuit_timeout,
-                status_code=408,
-                headers={},
-                body=b"",
-                error_message="Request timeout",
-            )
-        except Exception as e:
-            response_time = time.time() - start_time
-            bt.logging.error(f"QUIC request failed for UID {request.uid}: {e}")
-            return QuicResponse(
-                uid=request.uid,
-                success=False,
-                response_time=response_time,
-                status_code=500,
-                headers={},
-                body=b"",
-                error_message=str(e),
-            )
-
-    def close(self):
-        """Clean up connections - no longer needed since we don't cache connections"""
-        pass
-
-    def __del__(self):
-        """Cleanup on deletion"""
-        pass
+    async def close_connections(self):
+        """Close all persistent connections"""
+        self.lightning_client.close_all_connections()
+        bt.logging.info("🔌 Closed all Lightning persistent connections")
 
 
-async def query_axon_quic(lightning_client: Lightning, request) -> Optional[object]:
-    """
-    Drop-in replacement for query_single_axon using QUIC transport.
-    Preserves all bittensor signatures and headers while using QUIC for transport.
-    """
-    try:
-
-        quic_axon = QuicAxonInfo(
-            ip=request.axon.ip,
-            port=request.axon.port,
-            hotkey=request.axon.hotkey,
-            protocol=4,
-        )
-
-        dendrite_headers = {}
-        if hasattr(request, "dendrite_headers"):
-            dendrite_headers = request.dendrite_headers
-
-        quic_request = QuicRequest(
-            uid=request.uid,
-            axon=quic_axon,
-            synapse=request.synapse,
-            circuit_timeout=request.circuit.timeout,
-            dendrite_headers=dendrite_headers,
-            request_type=request.request_type,
-            request_hash=request.request_hash,
-            save=request.save,
-        )
-
-        quic_response = await lightning_client.query_axon(quic_request)
-
-        if not quic_response.success:
-            if "Invalid URL" in (quic_response.error_message or ""):
-                bt.logging.warning(
-                    f"Ignoring UID as axon is not reachable via QUIC: {request.uid}."
-                    f" {request.axon.ip}:{request.axon.port}"
-                )
-            else:
-                bt.logging.warning(
-                    f"Failed to query axon via QUIC for UID: {request.uid}. "
-                    f"Error: {quic_response.error_message}"
-                )
-            return None
-
-        class BittensorResult:
-            def __init__(self):
-                self.dendrite = BittensorDendrite()
-
-            def deserialize(self):
-                return quic_response.deserialized
-
-        class BittensorDendrite:
-            def __init__(self):
-                self.process_time = quic_response.response_time
-                self.status_code = quic_response.status_code
-                self.status_message = (
-                    "Success" if quic_response.success else quic_response.error_message
-                )
-
-                for key, value in quic_response.headers.items():
-                    setattr(self, key.replace("-", "_"), value)
-
-        request.result = BittensorResult()
-        request.response_time = quic_response.response_time
-        request.deserialized = quic_response.deserialized
-
-        return request
-
-    except Exception as e:
-        bt.logging.warning(
-            f"Failed to query axon via QUIC for UID: {request.uid}. Error: {e}"
-        )
-        traceback.print_exc()
-        return None
+def create_lightning_transport(wallet):
+    """Factory function to create Lightning transport"""
+    return LightningTransport(wallet)
