@@ -8,12 +8,10 @@ from typing import Dict, Any, Optional
 import bittensor as bt
 from aiohttp.client_exceptions import InvalidUrlClientError
 
-from _validator.models.request_type import RequestType
-from protocol import QueryZkProof, ProofOfWeightsSynapse
-
-
-from deployment_layer.circuit_store import circuit_store
-from _validator.utils.aioquic_transport import Lightning, query_axon_quic
+from ..models.request_type import RequestType
+from ...protocol import QueryZkProof, ProofOfWeightsSynapse
+from ...deployment_layer.circuit_store import circuit_store
+from .aioquic_transport import Lightning, query_axon_quic
 
 
 def _ensure_request_type_string(request_type):
