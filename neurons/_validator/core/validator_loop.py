@@ -27,10 +27,7 @@ from _validator.core.response_processor import ResponseProcessor
 from _validator.models.miner_response import MinerResponse
 from _validator.scoring.score_manager import ScoreManager
 from _validator.scoring.weights import WeightsManager
-from _validator.utils.multiprocess_axon import (
-    MultiprocessAxonManager,
-    query_single_axon_multiprocess,
-)
+from _validator.utils.aioquic_transport import LightningTransport
 from _validator.models.request_type import RequestType, ValidatorMessage
 from _validator.utils.proof_of_weights import save_proof_of_weights
 from _validator.utils.uid import get_queryable_uids
@@ -127,17 +124,8 @@ class ValidatorLoop:
 
         self._should_run = True
 
-        wallet_config = {
-            "name": self.config.wallet.name,
-            "hotkey": self.config.wallet.hotkey_str,
-            "path": self.config.wallet.path,
-        }
-
-        use_quic = True
-
-        self.multiprocess_manager = MultiprocessAxonManager(
-            wallet_config=wallet_config, max_workers=16, use_quic=use_quic
-        )
+        # Initialize Lightning transport for direct, high-performance queries
+        self.lightning_transport = LightningTransport(self.config.wallet)
         self.response_thread_pool = concurrent.futures.ThreadPoolExecutor(
             max_workers=16
         )
@@ -399,6 +387,10 @@ class ValidatorLoop:
                 self.update_competition_metrics()
                 self.update_queryable_uids()
                 self.update_processed_uids()
+                # Update Lightning miner registry to maintain persistent connections
+                await self.lightning_transport.update_miner_registry(
+                    self.config.metagraph
+                )
                 self.log_health()
                 await self.log_responses()
                 if self.current_concurrency:
@@ -417,9 +409,13 @@ class ValidatorLoop:
             f"Validator started on subnet {self.config.subnet_uid} using UID {self.config.user_uid}"
         )
 
-        bt.logging.info("Starting multiprocess axon manager...")
-        self.multiprocess_manager.start()
-        bt.logging.success("Multiprocess axon manager started")
+        bt.logging.info("Initializing Lightning persistent connections...")
+        await self.lightning_transport.initialize_persistent_connections(
+            self.config.metagraph
+        )
+        bt.logging.success(
+            "Lightning transport initialized with persistent connections"
+        )
 
         try:
             await asyncio.gather(
@@ -433,18 +429,16 @@ class ValidatorLoop:
             bt.logging.error(f"Fatal error in validator loop: {e}")
             raise
         finally:
-            bt.logging.info("Stopping multiprocess axon manager...")
-            self.multiprocess_manager.stop()
-            bt.logging.success("Multiprocess axon manager stopped")
+            bt.logging.info("Closing Lightning connections...")
+            await self.lightning_transport.close_connections()
+            bt.logging.success("Lightning connections closed")
 
     async def _process_single_request(self, request: Request) -> Request:
         """
         Process a single request and return the response.
         """
         try:
-            response = await query_single_axon_multiprocess(
-                self.multiprocess_manager, request
-            )
+            response = await self._query_single_axon_lightning(request)
             if response is not None:
                 processed_response = await asyncio.get_event_loop().run_in_executor(
                     self.response_thread_pool,
@@ -458,6 +452,65 @@ class ValidatorLoop:
             traceback.print_exc()
             log_error("request_processing", "axon_query", str(e))
         return request
+
+    async def _query_single_axon_lightning(self, request: Request) -> Request | None:
+        """
+        Query a single axon using Lightning transport with persistent connections.
+        """
+        try:
+            # Convert synapse to dict format expected by Lightning
+            synapse_dict = {
+                "synapse_type": type(request.synapse).__name__,
+                "data": request.synapse.__dict__,
+            }
+
+            # Query using Lightning with persistent connection
+            timeout = (
+                getattr(request.circuit, "timeout", 12.0)
+                if hasattr(request, "circuit")
+                else 12.0
+            )
+            start_time = time.time()
+
+            response = await self.lightning_transport.query_axon(
+                request.axon, synapse_dict, timeout=timeout
+            )
+
+            response_time = time.time() - start_time
+
+            if response.get("success", False):
+                # Create a mock result object for backward compatibility
+                class MockResult:
+                    def __init__(self):
+                        self.dendrite = MockDendrite()
+
+                    def deserialize(self):
+                        return response.get("deserialized", {})
+
+                class MockDendrite:
+                    def __init__(self):
+                        self.process_time = response_time
+                        self.status_code = response.get("status_code", 200)
+                        self.status_message = "Success"
+
+                # Update request with response data
+                request.result = MockResult()
+                request.response_time = response_time
+                request.deserialized = response.get("deserialized", {})
+
+                bt.logging.trace(
+                    f"⚡ Lightning query to UID {request.uid} completed in {response_time:.3f}s"
+                )
+                return request
+            else:
+                bt.logging.warning(
+                    f"❌ Lightning query failed for UID {request.uid}: {response.get('error', 'Unknown error')}"
+                )
+                return None
+
+        except Exception as e:
+            bt.logging.warning(f"Failed to query axon for UID {request.uid}: {e}")
+            return None
 
     async def _handle_response(self, response: MinerResponse) -> None:
         """
@@ -531,10 +584,10 @@ class ValidatorLoop:
         loop.run_until_complete(self.api.stop())
         stop_prometheus_logging()
         clean_temp_files()
-        if hasattr(self, "multiprocess_manager"):
-            bt.logging.info("Stopping multiprocess axon manager...")
-            self.multiprocess_manager.stop()
-            bt.logging.success("Multiprocess axon manager stopped")
+        if hasattr(self, "lightning_transport"):
+            bt.logging.info("Closing Lightning connections...")
+            loop.run_until_complete(self.lightning_transport.close_connections())
+            bt.logging.success("Lightning connections closed")
         if self.competition:
             self.competition.competition_thread.stop()
             if hasattr(self.competition.circuit_manager, "close"):
