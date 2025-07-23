@@ -3,21 +3,34 @@ Rust Lightning QUIC Client - Python bindings for ultra-fast miner communication
 """
 
 from typing import Dict, Any, Optional
-import sys
-import os
-
-# Add the extension to the path
-sys.path.insert(
-    0, os.path.join(os.path.dirname(__file__), "..", "..", "target", "wheels")
-)
 
 try:
-    from lightning import lightning  # Import the Rust module
+    # Import the compiled Rust module - try multiple import paths
+    lightning_rust = None
 
-    LIGHTNING_AVAILABLE = True
-except ImportError:
-    print("Warning: Rust Lightning module not found. Using fallback implementation.")
-    lightning = None
+    # Try relative import first
+    try:
+        from . import lightning as lightning_rust
+    except ImportError:
+        pass
+
+    # Try absolute import as fallback
+    if lightning_rust is None:
+        try:
+            from lightning.python.lightning import lightning as lightning_rust
+        except ImportError:
+            pass
+
+    if lightning_rust is not None:
+        LIGHTNING_AVAILABLE = True
+    else:
+        raise ImportError("Could not import lightning module from any path")
+
+except ImportError as e:
+    print(
+        f"Warning: Rust Lightning module not found: {e}. Using fallback implementation."
+    )
+    lightning_rust = None
     LIGHTNING_AVAILABLE = False
 
 
@@ -29,9 +42,9 @@ class Lightning:
 
     def __init__(self, wallet_config: Dict[str, str]):
         """Initialize Lightning client with wallet configuration"""
-        if lightning is None:
+        if lightning_rust is None:
             raise ImportError("Rust Lightning module not available")
-        self._rust_client = lightning.RustLightning(wallet_config)
+        self._rust_client = lightning_rust.RustLightning(wallet_config)
         self.wallet_config = wallet_config
 
     async def query_axon(self, request: Dict[str, Any]) -> Dict[str, Any]:
@@ -120,5 +133,12 @@ async def query_axon_quic(lightning_client: Lightning, request) -> Optional[obje
         return None
 
 
-# Export the main classes
+# Export the main classes including Rust classes
 __all__ = ["Lightning", "query_axon_quic", "LIGHTNING_AVAILABLE"]
+
+# Make Rust classes available directly
+if LIGHTNING_AVAILABLE and lightning_rust:
+    RustLightning = lightning_rust.RustLightning
+    RustLightningServer = lightning_rust.RustLightningServer
+    QuicAxonInfo = lightning_rust.QuicAxonInfo
+    __all__.extend(["RustLightning", "RustLightningServer", "QuicAxonInfo"])

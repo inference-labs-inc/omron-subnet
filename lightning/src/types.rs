@@ -32,17 +32,6 @@ impl QuicAxonInfo {
             placeholder2,
         }
     }
-
-    pub fn to_dict(&self) -> HashMap<String, String> {
-        let mut dict = HashMap::new();
-        dict.insert("hotkey".to_string(), self.hotkey.clone());
-        dict.insert("ip".to_string(), self.ip.clone());
-        dict.insert("port".to_string(), self.port.to_string());
-        dict.insert("protocol".to_string(), self.protocol.to_string());
-        dict.insert("placeholder1".to_string(), self.placeholder1.to_string());
-        dict.insert("placeholder2".to_string(), self.placeholder2.to_string());
-        dict
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,16 +54,6 @@ pub struct QuicResponse {
     pub success: bool,
     pub data: HashMap<String, serde_json::Value>,
     pub latency_ms: f64,
-}
-
-impl QuicResponse {
-    pub fn new(success: bool, data: HashMap<String, serde_json::Value>, latency_ms: f64) -> Self {
-        Self {
-            success,
-            data,
-            latency_ms,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

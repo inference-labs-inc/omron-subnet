@@ -243,7 +243,8 @@ class MinerSession:
         """Run the Lightning server asynchronously"""
         try:
             await self._start_lightning_server_async()
-            await self.lightning_server.serve_forever()
+            # Start the real QUIC server listening loop
+            self.lightning_server.rust_server.serve_forever()
         except asyncio.CancelledError:
             bt.logging.debug("Lightning server task cancelled")
         except Exception as e:

@@ -8,10 +8,11 @@ name = "lightning"
 crate-type = ["cdylib"]
 
 [dependencies]
-# QUIC dependencies disabled for initial build
-# quinn = "0.10"
-# rustls = "0.21"
-# rustls-pemfile = "1.0"
+# Real QUIC networking
+quinn = "0.10"
+rustls = { version = "0.21", features = ["dangerous_configuration"] }
+rustls-pemfile = "1.0"
+rcgen = "0.12"
 
 # Python bindings
 pyo3 = { version = "0.20", features = ["extension-module", "abi3-py38"] }
@@ -30,8 +31,14 @@ anyhow = "1.0"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 uuid = { version = "1.0", features = ["v4"] }
-base64 = "0.22"
+base64 = "0.21"
 hex = "0.4"
+
+# Cryptography for signature verification
+ed25519-dalek = "1.0"
+bs58 = "0.4"
+sha2 = "0.10"
+rand = "0.7"
 
 # Networking
 socket2 = "0.5"

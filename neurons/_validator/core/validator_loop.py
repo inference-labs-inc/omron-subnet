@@ -459,7 +459,7 @@ class ValidatorLoop:
 
     async def _query_single_axon_lightning(self, request: Request) -> Request | None:
         """
-        Query a single axon using Lightning transport with persistent connections.
+        Query a single axon using pure Rust Lightning QUIC transport with persistent connections.
         """
         try:
             # Convert synapse to dict format expected by Lightning
@@ -522,7 +522,7 @@ class ValidatorLoop:
                 return None
 
         except Exception as e:
-            bt.logging.warning(f"Failed to query axon for UID {request.uid}: {e}")
+            bt.logging.error(f"Lightning QUIC query failed for UID {request.uid}: {e}")
             return None
 
     def _is_valid_response(self, deserialized: dict) -> bool:
