@@ -447,10 +447,14 @@ class ValidatorLoop:
                 )
                 if processed_response:
                     await self._handle_response(processed_response)
+            # Note: None responses are silently ignored as they represent
+            # incomplete/null responses which are common and expected
         except Exception as e:
-            bt.logging.error(f"Error processing request for UID {request.uid}: {e}")
-            traceback.print_exc()
-            log_error("request_processing", "axon_query", str(e))
+            # Only log unexpected processing errors, not empty response issues
+            if "proof" not in str(e).lower() and "empty" not in str(e).lower():
+                bt.logging.error(f"Error processing request for UID {request.uid}: {e}")
+                traceback.print_exc()
+                log_error("request_processing", "axon_query", str(e))
         return request
 
     async def _query_single_axon_lightning(self, request: Request) -> Request | None:
@@ -520,6 +524,36 @@ class ValidatorLoop:
         except Exception as e:
             bt.logging.warning(f"Failed to query axon for UID {request.uid}: {e}")
             return None
+
+    def _is_valid_response(self, deserialized: dict) -> bool:
+        """
+        Check if a response has meaningful content worth processing.
+        Silently filters out incomplete/null responses to avoid downstream errors.
+        """
+        if not isinstance(deserialized, dict):
+            return False
+
+        # For proof-based responses, check if they have the minimum required fields
+        if "proof" in deserialized:
+            proof = deserialized["proof"]
+            # Reject empty or very short proofs (likely incomplete)
+            if not proof or (isinstance(proof, str) and len(proof.strip()) < 10):
+                return False
+
+        # For QueryZkProof responses, check for query_output
+        if "query_output" in deserialized:
+            query_output = deserialized["query_output"]
+            if not query_output:
+                return False
+
+        # Reject responses that are just empty dicts or have no meaningful content
+        meaningful_keys = [
+            k for k, v in deserialized.items() if v is not None and v != ""
+        ]
+        if len(meaningful_keys) == 0:
+            return False
+
+        return True
 
     async def _handle_response(self, response: MinerResponse) -> None:
         """

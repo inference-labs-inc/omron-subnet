@@ -109,7 +109,12 @@ class MinerResponse:
                         else DEFAULT_PROOF_SIZE
                     )
                 elif response.circuit.proof_system == ProofSystem.EZKL:
-                    proof_size = len(proof_content["proof"])
+                    # Safely handle missing "proof" field in EZKL responses
+                    proof_size = (
+                        len(proof_content.get("proof", ""))
+                        if proof_content and "proof" in proof_content
+                        else DEFAULT_PROOF_SIZE
+                    )
                 else:
                     proof_size = DEFAULT_PROOF_SIZE
 
@@ -130,9 +135,12 @@ class MinerResponse:
             traceback.print_exc()
             bt.logging.error(f"JSON decoding error: {e}")
             return cls.empty(uid=response.uid, circuit=response.circuit)
+        except KeyError:
+            return cls.empty(uid=response.uid, circuit=response.circuit)
         except Exception as e:
-            traceback.print_exc()
-            bt.logging.error(f"Error processing miner response: {e}")
+            if "proof" not in str(e) and "public_signals" not in str(e):
+                traceback.print_exc()
+                bt.logging.error(f"Unexpected error processing miner response: {e}")
             return cls.empty(uid=response.uid, circuit=response.circuit)
 
     @classmethod
