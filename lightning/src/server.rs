@@ -87,7 +87,7 @@ impl LightningServer {
     pub async fn register_synapse_handler(&self, synapse_type: String, handler: PyObject) -> PyResult<()> {
         let mut handlers = self.synapse_handlers.write().await;
         handlers.insert(synapse_type.clone(), handler);
-        println!("📝 Registered synapse handler for: {}", synapse_type);
+        // println!("📝 Registered synapse handler for: {}", synapse_type);
         Ok(())
     }
 
@@ -409,7 +409,7 @@ impl LightningServer {
         connections: Arc<RwLock<HashMap<String, ValidatorConnection>>>,
         synapse_handlers: Arc<RwLock<HashMap<String, PyObject>>>,
     ) -> SynapseResponse {
-        println!("📦 Processing {} synapse packet", packet.synapse_type);
+        // println!("📦 Processing {} synapse packet", packet.synapse_type);
 
         // Extract validator hotkey from packet data (should be set by client)
         let validator_hotkey = packet.data.get("validator_hotkey")
@@ -422,7 +422,6 @@ impl LightningServer {
             let mut connections_guard = connections.write().await;
             if let Some(connection) = connections_guard.get_mut(&validator_hotkey) {
                 if !connection.verified {
-                    println!("❌ Connection not verified for validator: {}", validator_hotkey);
                     return SynapseResponse {
                         success: false,
                         data: HashMap::new(),
@@ -430,19 +429,14 @@ impl LightningServer {
                         error: Some("Connection not verified".to_string()),
                     };
                 }
-                connection.update_activity();
-                println!("✅ Connection verified and activity updated for validator: {}", validator_hotkey);
-            } else {
-                println!("⚠️ No connection found for validator {}, allowing request to proceed", validator_hotkey);
-                // Allow the request to proceed even without a verified connection
-                // This is useful for development and initial testing
+                connection.last_activity = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
             }
         }
 
         // Process synapse using registered handlers
         let handlers = synapse_handlers.read().await;
         if let Some(handler) = handlers.get(&packet.synapse_type) {
-            println!("📞 Calling Python handler for synapse type: {}", packet.synapse_type);
+            // println!("📞 Calling Python handler for synapse type: {}", packet.synapse_type);
 
             // Call the Python handler with the synapse data
             match pyo3::Python::with_gil(|py| -> PyResult<HashMap<String, serde_json::Value>> {
@@ -507,7 +501,7 @@ impl LightningServer {
                 Ok(response_data)
             }) {
                 Ok(response_data) => {
-                    println!("✅ Python handler executed successfully for {}", packet.synapse_type);
+                    // println!("✅ Python handler executed successfully for {}", packet.synapse_type);
                     SynapseResponse {
                         success: true,
                         data: response_data,
@@ -530,7 +524,7 @@ impl LightningServer {
                 }
             }
         } else {
-            println!("❌ No handler registered for synapse type: {}", packet.synapse_type);
+            // println!("❌ No handler registered for synapse type: {}", packet.synapse_type);
             SynapseResponse {
                 success: false,
                 data: HashMap::new(),

@@ -245,8 +245,8 @@ impl RustLightningServer {
         Ok(pyo3::Python::with_gil(|py| py.None()))
     }
 
-    pub fn handle_synapse_packet(&self, synapse_type: String, _packet_data: PyObject) -> PyResult<PyObject> {
-        println!("📦 Handling synapse packet: {}", synapse_type);
+    pub fn handle_synapse_packet(&self, _synapse_type: String, _packet_data: PyObject) -> PyResult<PyObject> {
+        // println!("📦 Handling synapse packet: {}", _synapse_type);
         // Placeholder for synapse packet handling
         Ok(pyo3::Python::with_gil(|py| py.None()))
     }
