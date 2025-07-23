@@ -479,13 +479,19 @@ class ValidatorLoop:
             response_time = time.time() - start_time
 
             if response.get("success", False):
+                # Check if response has meaningful content before processing
+                deserialized = response.get("deserialized", {})
+                if not deserialized or not self._is_valid_response(deserialized):
+                    # Silently ignore incomplete/null responses - don't log as these are common
+                    return None
+
                 # Create a mock result object for backward compatibility
                 class MockResult:
                     def __init__(self):
                         self.dendrite = MockDendrite()
 
                     def deserialize(self):
-                        return response.get("deserialized", {})
+                        return deserialized
 
                 class MockDendrite:
                     def __init__(self):
@@ -496,16 +502,19 @@ class ValidatorLoop:
                 # Update request with response data
                 request.result = MockResult()
                 request.response_time = response_time
-                request.deserialized = response.get("deserialized", {})
+                request.deserialized = deserialized
 
                 bt.logging.trace(
                     f"⚡ Lightning query to UID {request.uid} completed in {response_time:.3f}s"
                 )
                 return request
             else:
-                bt.logging.warning(
-                    f"❌ Lightning query failed for UID {request.uid}: {response.get('error', 'Unknown error')}"
-                )
+                # Only log actual connection/transport errors, not empty responses
+                error_msg = response.get("error", "Unknown error")
+                if "connection" in error_msg.lower() or "timeout" in error_msg.lower():
+                    bt.logging.debug(
+                        f"Connection issue for UID {request.uid}: {error_msg}"
+                    )
                 return None
 
         except Exception as e:
