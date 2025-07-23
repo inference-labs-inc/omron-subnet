@@ -354,7 +354,14 @@ def multiprocess_axon_worker(
 
         try:
             if use_quic:
-                lightning_client = Lightning(wallet_config)
+                # Create wallet to extract hotkey
+                wallet = bt.wallet(
+                    name=wallet_config["name"],
+                    hotkey=wallet_config["hotkey"],
+                    path=wallet_config.get("path", "~/.bittensor/wallets"),
+                )
+                wallet_hotkey = getattr(wallet.hotkey, "ss58_address", "unknown_hotkey")
+                lightning_client = Lightning(wallet_hotkey)
                 try:
                     request_object = _create_request_object(serializable_request)
                     quic_result = loop.run_until_complete(
