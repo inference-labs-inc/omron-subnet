@@ -3,6 +3,8 @@ import json
 import os
 import tempfile
 import functools
+import time
+import uuid
 from typing import Dict, Any
 import bittensor as bt
 from aioquic.asyncio import serve
@@ -146,7 +148,7 @@ class LightningMinerProtocol(QuicConnectionProtocol):
             elif synapse_type == "Competition":
                 response = await self.handle_competition_request(synapse_data)
             elif synapse_type == "Handshake":
-                response = self.handle_handshake()
+                response = self.handle_handshake(synapse_data)
             else:
                 response = {
                     "error": f"Unknown synapse type: {synapse_type}",
@@ -174,20 +176,32 @@ class LightningMinerProtocol(QuicConnectionProtocol):
             except Exception:
                 bt.logging.error("Failed to send error response")
 
-    def handle_handshake(self) -> Dict[str, Any]:
+    def handle_handshake(self, synapse_data: Dict[str, Any]) -> Dict[str, Any]:
         bt.logging.info("🤝 Handling Handshake")
         try:
             miner_hotkey = self.miner_session.wallet.hotkey.ss58_address
             signature = self.miner_session.wallet.hotkey.sign(miner_hotkey).hex()
+            connection_id = str(uuid.uuid4())
             return {
                 "miner_hotkey": miner_hotkey,
+                "timestamp": int(time.time()),
                 "signature": signature,
-                "version": bt.__version__,
-                "success": True,
+                "accepted": True,
+                "connection_id": connection_id,
             }
         except Exception as e:
             bt.logging.error(f"Error in Handshake handler: {e}")
-            return {"error": str(e), "success": False}
+            return {
+                "miner_hotkey": (
+                    self.miner_session.wallet.hotkey.ss58_address
+                    if self.miner_session
+                    else ""
+                ),
+                "timestamp": int(time.time()),
+                "signature": "",
+                "accepted": False,
+                "connection_id": "",
+            }
 
     async def handle_query_zk_proof(
         self, synapse_data: Dict[str, Any]
