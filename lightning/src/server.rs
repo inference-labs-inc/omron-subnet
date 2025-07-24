@@ -435,8 +435,11 @@ impl LightningServer {
 
             // Call the Python handler with the synapse data
             match pyo3::Python::with_gil(|py| -> PyResult<HashMap<String, serde_json::Value>> {
+                println!("🐍 Python GIL acquired, converting data to Python dict");
+                
                 // Convert packet data to Python dict
                 let py_dict = pyo3::types::PyDict::new(py);
+                println!("🐍 Created Python dict, converting {} data fields", packet.data.len());
 
                 for (key, value) in &packet.data {
                     let py_value = match value {
@@ -467,8 +470,12 @@ impl LightningServer {
                     py_dict.set_item(key, py_value)?;
                 }
 
+                println!("🐍 Data conversion complete, attempting Python handler call");
+                
                 // Call the Python handler function
                 let result = handler.call1(py, (py_dict,))?;
+
+                println!("🐍 Python handler call successful, converting result back to Rust");
 
                 // Convert result back to HashMap
                 let result_dict: &pyo3::types::PyDict = result.extract(py)?;
@@ -493,6 +500,7 @@ impl LightningServer {
                     response_data.insert(key_str, value_json);
                 }
 
+                println!("🐍 Result conversion complete, returning {} response fields", response_data.len());
                 Ok(response_data)
             }) {
                 Ok(response_data) => {
@@ -506,6 +514,15 @@ impl LightningServer {
                 },
                 Err(e) => {
                     println!("❌ Python handler error for {}: {}", packet.synapse_type, e);
+                    println!("❌ Python error details: {:?}", e);
+                    
+                    // Try to get more detailed error information
+                    if let Some(traceback) = e.traceback(pyo3::Python::with_gil(|py| py)) {
+                        if let Ok(tb_str) = traceback.format() {
+                            println!("❌ Python traceback: {}", tb_str);
+                        }
+                    }
+                    
                     let mut error_data = HashMap::new();
                     error_data.insert("error".to_string(),
                         serde_json::Value::String(format!("Python handler error: {}", e)));
