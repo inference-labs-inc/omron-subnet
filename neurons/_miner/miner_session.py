@@ -373,116 +373,147 @@ class MinerSession:
         return False, "Allowed!"
 
     def queryZkProof(self, synapse: QueryZkProof) -> QueryZkProof:
+        """Process a zero-knowledge proof query request."""
+        model_id = self._extract_model_id(synapse)
+
         try:
-            if hasattr(circuit_store, "circuits") and circuit_store.circuits:
-                model_id = None
-                if synapse.query_input and "model_id" in synapse.query_input:
-                    model_id = synapse.query_input["model_id"]
+            if not self._is_circuit_store_available():
+                self._set_error_response(
+                    synapse, "Circuit store is empty or not initialized"
+                )
+                return self._log_and_return(synapse, model_id)
 
-                if model_id is None:
-                    synapse.query_output = ""
-                    bt.logging.warning("No model_id found in query_input")
-                    return synapse
+            if model_id is None:
+                self._set_error_response(synapse, "No model_id found in query_input")
+                return self._log_and_return(synapse, model_id)
 
-                circuit = circuit_store.circuits.get(model_id)
-                if circuit:
+            circuit = circuit_store.circuits.get(model_id)
+            if not circuit:
+                self._set_error_response(
+                    synapse, f"Model {model_id} not found in circuit store"
+                )
+                return self._log_and_return(synapse, model_id)
 
-                    should_store_proof = getattr(synapse, "save", False)
+            public_inputs = synapse.query_input.get("public_inputs")
+            if not public_inputs:
+                self._set_error_response(
+                    synapse, f"No public_inputs found for model {model_id}"
+                )
+                return self._log_and_return(synapse, model_id)
 
-                    verified_model_session = VerifiedModelSession(
-                        circuit=circuit,
-                        model_timeout=CIRCUIT_TIMEOUT_SECONDS,
-                        should_store_proof=should_store_proof,
-                    )
+            generic_input = GenericInput(RequestType.POC, public_inputs)
+            verified_model_session = VerifiedModelSession(generic_input, circuit)
 
-                    result = verified_model_session.query(
-                        GenericInput(
-                            RequestType.POC, synapse.query_input["public_inputs"]
-                        )
-                    )
+            result = verified_model_session.query(generic_input)
 
-                    if result.is_success:
-                        synapse.query_output = result.data
-                        bt.logging.info(f"Successfully processed proof for {model_id}")
-                    else:
-                        synapse.query_output = ""
-                        bt.logging.warning(
-                            f"Failed to process proof for {model_id}: {result.error_message}"
-                        )
-                else:
-                    synapse.query_output = ""
-                    bt.logging.warning(f"Model {model_id} not found in circuit store")
+            if result.is_success:
+                synapse.query_output = result.data
+                bt.logging.info(f"Successfully processed proof for {model_id}")
             else:
-                synapse.query_output = ""
-                bt.logging.warning("Circuit store is empty or not initialized")
-
-            # Use model_id from query_input for logging
-            log_model_id = None
-            if synapse.query_input and "model_id" in synapse.query_input:
-                log_model_id = synapse.query_input["model_id"]
-
-            self.log_batch.append(
-                {
-                    "model_id": log_model_id,
-                    "query_output": synapse.query_output,
-                    "timestamp": time.time(),
-                }
-            )
+                self._set_error_response(
+                    synapse,
+                    f"Failed to process proof for {model_id}: {result.error_message}",
+                )
 
         except Exception as e:
-            bt.logging.error(f"Error in queryZkProof: {e}")
-            synapse.query_output = ""
+            bt.logging.error(f"Error in queryZkProof for model {model_id}: {e}")
+            self._set_error_response(
+                synapse, f"Internal error processing model {model_id}"
+            )
 
+        return self._log_and_return(synapse, model_id)
+
+    def _extract_model_id(self, synapse: QueryZkProof) -> str | None:
+        """Extract model_id from synapse query_input."""
+        if not synapse.query_input or "model_id" not in synapse.query_input:
+            return None
+        return synapse.query_input["model_id"]
+
+    def _is_circuit_store_available(self) -> bool:
+        """Check if circuit store is available and has circuits."""
+        return hasattr(circuit_store, "circuits") and circuit_store.circuits
+
+    def _set_error_response(self, synapse: QueryZkProof, error_message: str) -> None:
+        """Set error response and log warning."""
+        synapse.query_output = ""
+        bt.logging.warning(error_message)
+
+    def _log_and_return(
+        self, synapse: QueryZkProof, model_id: str | None
+    ) -> QueryZkProof:
+        """Log the query result and return the synapse."""
+        self.log_batch.append(
+            {
+                "model_id": model_id,
+                "query_output": synapse.query_output,
+                "timestamp": time.time(),
+            }
+        )
         return synapse
 
     def handle_pow_request(
         self, synapse: ProofOfWeightsSynapse
     ) -> ProofOfWeightsSynapse:
+        """Process a proof-of-weights request."""
+        verification_key_hash = synapse.verification_key_hash
+
         try:
-            if hasattr(circuit_store, "circuits") and circuit_store.circuits:
-                circuit = circuit_store.circuits.get(synapse.verification_key_hash)
-                if circuit:
-                    verified_model_session = VerifiedModelSession(
-                        circuit=circuit,
-                        model_timeout=CIRCUIT_TIMEOUT_SECONDS,
-                        should_store_proof=True,
-                    )
+            if not self._is_circuit_store_available():
+                self._set_pow_error_response(
+                    synapse, "Circuit store is empty or not initialized"
+                )
+                return synapse
 
-                    input_data = json.loads(synapse.inputs)
+            circuit = circuit_store.circuits.get(verification_key_hash)
+            if not circuit:
+                self._set_pow_error_response(
+                    synapse,
+                    f"Circuit {verification_key_hash} not found in circuit store",
+                )
+                return synapse
 
-                    result = verified_model_session.query(
-                        GenericInput(RequestType.POW, input_data)
-                    )
+            try:
+                input_data = json.loads(synapse.inputs)
+            except json.JSONDecodeError as e:
+                self._set_pow_error_response(
+                    synapse, f"Invalid JSON in inputs for {verification_key_hash}: {e}"
+                )
+                return synapse
 
-                    if result.is_success:
-                        synapse.proof = result.data.get("proof", "")
-                        synapse.public_signals = result.data.get("public_signals", "")
-                        bt.logging.info(
-                            f"Successfully processed PoW for {synapse.verification_key_hash}"
-                        )
-                    else:
-                        synapse.proof = ""
-                        synapse.public_signals = ""
-                        bt.logging.warning(
-                            f"Failed to process PoW for {synapse.verification_key_hash}: {result.error_message}"
-                        )
-                else:
-                    synapse.proof = ""
-                    synapse.public_signals = ""
-                    bt.logging.warning(
-                        f"Circuit {synapse.verification_key_hash} not found in circuit store"
-                    )
+            generic_input = GenericInput(RequestType.POW, input_data)
+            verified_model_session = VerifiedModelSession(generic_input, circuit)
+
+            result = verified_model_session.query(generic_input)
+
+            if result.is_success:
+                synapse.proof = result.data.get("proof", "")
+                synapse.public_signals = result.data.get("public_signals", "")
+                bt.logging.info(
+                    f"Successfully processed PoW for {verification_key_hash}"
+                )
             else:
-                synapse.proof = ""
-                synapse.public_signals = ""
-                bt.logging.warning("Circuit store is empty or not initialized")
+                self._set_pow_error_response(
+                    synapse,
+                    f"Failed to process PoW for {verification_key_hash}: {result.error_message}",
+                )
 
         except Exception as e:
-            bt.logging.error(f"Error in handle_pow_request: {e}")
-            synapse.proof = ""
-            synapse.public_signals = ""
+            bt.logging.error(
+                f"Error in handle_pow_request for {verification_key_hash}: {e}"
+            )
+            self._set_pow_error_response(
+                synapse, f"Internal error processing PoW for {verification_key_hash}"
+            )
 
         return synapse
+
+    def _set_pow_error_response(
+        self, synapse: ProofOfWeightsSynapse, error_message: str
+    ) -> None:
+        """Set error response for PoW requests and log warning."""
+        synapse.proof = ""
+        synapse.public_signals = ""
+        bt.logging.warning(error_message)
 
     def handleCompetitionRequest(self, synapse: Competition) -> Competition:
         try:
