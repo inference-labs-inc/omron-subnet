@@ -428,22 +428,22 @@ class MinerSession:
             generic_input = GenericInput(RequestType.RWR, public_inputs)
             verified_model_session = VerifiedModelSession(generic_input, circuit)
 
-            result = verified_model_session.query(generic_input)
+            proof, public_signals, _ = verified_model_session.gen_proof()
 
-            if result.is_success:
-                synapse.query_output = result.data
+            if proof and public_signals:
+                synapse.query_output = {
+                    "proof": proof,
+                    "public_signals": public_signals,
+                }
                 bt.logging.info(f"Successfully processed proof for {model_id}")
             else:
                 self._set_error_response(
                     synapse,
-                    f"Failed to process proof for {model_id}: {result.error_message}",
+                    f"Failed to process proof for {model_id}: Proof generation failed",
                 )
 
         except Exception as e:
-            bt.logging.error(f"Error in queryZkProof for model {model_id}: {e}")
-            self._set_error_response(
-                synapse, f"Internal error processing model {model_id}"
-            )
+            self._set_error_response(synapse, f"An error occurred: {e}")
 
         return self._log_and_return(synapse, model_id)
 
@@ -506,20 +506,19 @@ class MinerSession:
             generic_input = GenericInput(RequestType.RWR, input_data)
             verified_model_session = VerifiedModelSession(generic_input, circuit)
 
-            result = verified_model_session.query(generic_input)
+            proof, public_signals, _ = verified_model_session.gen_proof()
 
-            if result.is_success:
-                synapse.proof = result.data.get("proof", "")
-                synapse.public_signals = result.data.get("public_signals", "")
+            if proof and public_signals:
+                synapse.proof = proof
+                synapse.public_signals = public_signals
                 bt.logging.info(
                     f"Successfully processed PoW for {verification_key_hash}"
                 )
             else:
                 self._set_pow_error_response(
                     synapse,
-                    f"Failed to process PoW for {verification_key_hash}: {result.error_message}",
+                    f"Failed to process PoW for {verification_key_hash}: Proof generation failed",
                 )
-
         except Exception as e:
             bt.logging.error(
                 f"Error in handle_pow_request for {verification_key_hash}: {e}"
