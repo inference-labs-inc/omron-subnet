@@ -225,7 +225,7 @@ class LightningMinerProtocol(QuicConnectionProtocol):
 
             # Call miner session handler
             if self.miner_session:
-                result = await self.miner_session.queryZkProof(synapse)
+                result = self.miner_session.queryZkProof(synapse)
                 return {
                     "query_output": (
                         result.query_output if hasattr(result, "query_output") else ""
