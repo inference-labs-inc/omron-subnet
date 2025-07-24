@@ -259,7 +259,7 @@ class LightningMinerProtocol(QuicConnectionProtocol):
                         setattr(synapse, key, value)
 
             if self.miner_session:
-                result = await self.miner_session.handle_pow_request(synapse)
+                result = self.miner_session.handle_pow_request(synapse)
                 return {
                     "proof": result.proof if hasattr(result, "proof") else "",
                     "success": True,
@@ -293,7 +293,7 @@ class LightningMinerProtocol(QuicConnectionProtocol):
                         setattr(synapse, key, value)
 
             if self.miner_session:
-                result = await self.miner_session.handleCompetitionRequest(synapse)
+                result = self.miner_session.handleCompetitionRequest(synapse)
                 return {
                     "signals": result.signals if hasattr(result, "signals") else [],
                     "success": True,
