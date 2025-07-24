@@ -436,7 +436,7 @@ impl LightningServer {
             // Call the Python handler with the synapse data
             match pyo3::Python::with_gil(|py| -> PyResult<HashMap<String, serde_json::Value>> {
                 println!("🐍 Python GIL acquired, converting data to Python dict");
-                
+
                 // Convert packet data to Python dict
                 let py_dict = pyo3::types::PyDict::new(py);
                 println!("🐍 Created Python dict, converting {} data fields", packet.data.len());
@@ -471,7 +471,7 @@ impl LightningServer {
                 }
 
                 println!("🐍 Data conversion complete, attempting Python handler call");
-                
+
                 // Call the Python handler function
                 let result = handler.call1(py, (py_dict,))?;
 
@@ -515,14 +515,7 @@ impl LightningServer {
                 Err(e) => {
                     println!("❌ Python handler error for {}: {}", packet.synapse_type, e);
                     println!("❌ Python error details: {:?}", e);
-                    
-                    // Try to get more detailed error information
-                    if let Some(traceback) = e.traceback(pyo3::Python::with_gil(|py| py)) {
-                        if let Ok(tb_str) = traceback.format() {
-                            println!("❌ Python traceback: {}", tb_str);
-                        }
-                    }
-                    
+
                     let mut error_data = HashMap::new();
                     error_data.insert("error".to_string(),
                         serde_json::Value::String(format!("Python handler error: {}", e)));
