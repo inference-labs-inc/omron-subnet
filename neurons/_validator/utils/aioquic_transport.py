@@ -16,46 +16,36 @@ class LightningTransport:
         self.lightning_client = RustLightning(wallet_hotkey)
 
         # Configure validator keypair for real signature generation
-        try:
-            # Extract seed from bittensor wallet for signing
-            if hasattr(wallet.hotkey, "seed_hex"):
-                # Get seed from hex string
-                seed_hex = wallet.hotkey.seed_hex
-                if seed_hex and len(seed_hex) == 64:  # 32 bytes as hex
-                    seed_bytes = bytes.fromhex(seed_hex)
-                    self.lightning_client.set_validator_keypair(list(seed_bytes))
-                    bt.logging.success(
-                        "🔑 Validator keypair configured for Lightning signatures"
-                    )
-                else:
-                    bt.logging.warning("⚠️ Invalid seed format - using dummy signatures")
-            elif hasattr(wallet.hotkey, "private_key_bytes"):
-                # Try accessing private key bytes directly
-                private_key_bytes = wallet.hotkey.private_key_bytes
-                if (
-                    isinstance(private_key_bytes, bytes)
-                    and len(private_key_bytes) == 32
-                ):
-                    self.lightning_client.set_validator_keypair(list(private_key_bytes))
-                    bt.logging.success(
-                        "🔑 Validator keypair configured for Lightning signatures"
-                    )
-                else:
-                    bt.logging.warning(
-                        "⚠️ Invalid private key format - using dummy signatures"
-                    )
-            else:
-                bt.logging.warning(
-                    "⚠️ No seed/private key available - using dummy signatures"
-                )
-                bt.logging.debug(
-                    f"Available wallet.hotkey attributes: {dir(wallet.hotkey)}"
-                )
-        except Exception as e:
-            bt.logging.warning(f"⚠️ Failed to configure validator keypair: {e}")
-            import traceback
+        bt.logging.info("🔍 Configuring Lightning signatures with bittensor wallet...")
 
-            bt.logging.debug(f"Keypair extraction error: {traceback.format_exc()}")
+        # Store reference to bittensor wallet for signing
+        self.bittensor_wallet = wallet
+
+        # Create a signing function that uses the bittensor wallet
+        def bittensor_sign(message: str) -> bytes:
+            """Sign a message using the bittensor wallet"""
+            try:
+                # Convert message to bytes and sign with bittensor wallet
+                message_bytes = message.encode("utf-8")
+                signature = wallet.hotkey.sign(message_bytes)
+                # signature is already bytes from bittensor
+                return signature
+            except Exception as e:
+                bt.logging.error(f"Bittensor signing failed: {e}")
+                raise
+
+        # Set the Python signer in the Lightning client
+        try:
+            self.lightning_client.set_python_signer(bittensor_sign)
+            bt.logging.success(
+                "🔑 Lightning client configured to use bittensor wallet signing"
+            )
+            bt.logging.debug(
+                "Lightning will use wallet.hotkey.sign() for handshake signatures"
+            )
+        except Exception as e:
+            bt.logging.warning(f"⚠️ Failed to configure bittensor signer: {e}")
+            bt.logging.debug("Lightning will fall back to dummy signatures")
 
         bt.logging.success("⚡ Rust Lightning client initialized")
 

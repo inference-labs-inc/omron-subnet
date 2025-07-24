@@ -41,6 +41,12 @@ impl RustLightning {
         Ok(())
     }
 
+    pub fn set_python_signer(&self, signer: PyObject) -> PyResult<()> {
+        let mut client = self.client.lock().unwrap();
+        client.set_python_signer(signer);
+        Ok(())
+    }
+
     pub fn initialize_connections(&self, miners: Vec<PyObject>) -> PyResult<()> {
         pyo3::Python::with_gil(|py| {
             let mut quic_miners = Vec::new();

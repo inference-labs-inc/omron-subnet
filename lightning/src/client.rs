@@ -15,6 +15,7 @@ use base64::{Engine, prelude::BASE64_STANDARD};
 pub struct LightningClient {
     wallet_hotkey: String,
     validator_keypair: Option<ed25519_dalek::Keypair>,
+    python_signer: Option<PyObject>,
     connection_pool: Arc<RwLock<ConnectionPool>>,
     active_miners: Arc<RwLock<HashMap<String, QuicAxonInfo>>>,
     established_connections: Arc<RwLock<HashMap<String, Connection>>>,
@@ -26,6 +27,7 @@ impl LightningClient {
         Self {
             wallet_hotkey,
             validator_keypair: None,
+            python_signer: None,
             connection_pool: Arc::new(RwLock::new(ConnectionPool::new())),
             active_miners: Arc::new(RwLock::new(HashMap::new())),
             established_connections: Arc::new(RwLock::new(HashMap::new())),
@@ -39,6 +41,26 @@ impl LightningClient {
         let keypair = Keypair { secret: secret_key, public: public_key };
         self.validator_keypair = Some(keypair);
         println!("🔑 Validator keypair configured for signing");
+    }
+
+    pub fn set_python_signer(&mut self, signer: PyObject) {
+        self.python_signer = Some(signer);
+        println!("🔑 Python signer configured for bittensor wallet signing");
+    }
+
+    async fn call_python_signer(&self, signer: &PyObject, message: &str) -> Result<String, String> {
+        Python::with_gil(|py| {
+            // Call the Python signing function with the message
+            let result = signer.call1(py, (message,))
+                .map_err(|e| format!("Python signer call failed: {}", e))?;
+
+            // Extract the signature as bytes
+            let signature_bytes: Vec<u8> = result.extract(py)
+                .map_err(|e| format!("Failed to extract signature bytes: {}", e))?;
+
+            // Encode as base64 to match expected format
+            Ok(BASE64_STANDARD.encode(&signature_bytes))
+        })
     }
 
     pub async fn initialize_connections(&mut self, miners: Vec<QuicAxonInfo>) -> PyResult<()> {
@@ -176,10 +198,25 @@ impl LightningClient {
                 Ok(BASE64_STANDARD.encode(&signature_bytes))
             }
             None => {
-                println!("⚠️ No validator keypair configured, using dummy signature");
-                // Use base64 format to match server expectations
-                let dummy_bytes = &message.as_bytes()[..8];
-                Ok(BASE64_STANDARD.encode(dummy_bytes))
+                // Try to use Python signing callback if available
+                if let Some(ref python_signer) = self.python_signer {
+                    match self.call_python_signer(python_signer, &message).await {
+                        Ok(signature) => {
+                            println!("✅ Used bittensor wallet for handshake signature");
+                            Ok(signature)
+                        }
+                        Err(e) => {
+                            println!("⚠️ Python signing failed: {}, using dummy signature", e);
+                            let dummy_bytes = &message.as_bytes()[..8];
+                            Ok(BASE64_STANDARD.encode(dummy_bytes))
+                        }
+                    }
+                } else {
+                    println!("⚠️ No validator keypair configured, using dummy signature");
+                    // Use base64 format to match server expectations
+                    let dummy_bytes = &message.as_bytes()[..8];
+                    Ok(BASE64_STANDARD.encode(dummy_bytes))
+                }
             }
         }
     }
