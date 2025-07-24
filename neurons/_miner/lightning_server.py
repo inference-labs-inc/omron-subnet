@@ -215,7 +215,7 @@ class LightningMinerProtocol(QuicConnectionProtocol):
             # Create synapse object
             synapse = QueryZkProof()
             for key, value in synapse_data.items():
-                if hasattr(synapse, key):
+                if hasattr(synapse, key) and key != "computed_body_hash":
                     setattr(synapse, key, value)
 
             # Call miner session handler
