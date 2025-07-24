@@ -166,13 +166,14 @@ class RequestPipeline:
         circuit: Circuit,
         request: any | None = None,
     ) -> tuple[ProofOfWeightsSynapse | QueryZkProof, bool]:
-        if request_type == RequestType.BENCHMARK:
-            inputs = circuit.input_handler.generate()
-        else:
-            inputs = circuit.input_handler(
+        inputs = (
+            circuit.input_handler(request_type)
+            if request_type == RequestType.BENCHMARK
+            else circuit.input_handler(
                 RequestType.RWR,
                 copy.deepcopy(request.inputs),
             )
+        )
 
         if request_type == RequestType.RWR:
             if circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS:
@@ -194,19 +195,6 @@ class RequestPipeline:
                     query_output="",
                 ),
                 True,
-            )
-
-        if circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS:
-            return (
-                ProofOfWeightsSynapse(
-                    subnet_uid=circuit.metadata.netuid,
-                    verification_key_hash=circuit.id,
-                    proof_system=circuit.proof_system,
-                    inputs=inputs if isinstance(inputs, dict) else inputs.to_json(),
-                    proof="",
-                    public_signals="",
-                ),
-                False,
             )
 
         if circuit.id in [
