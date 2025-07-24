@@ -141,6 +141,8 @@ class LightningMinerProtocol(QuicConnectionProtocol):
             synapse_type = message.get("synapse_type")
             synapse_data = message.get("data", {})
 
+            bt.logging.debug(f"Raw synapse data: {synapse_data}")
+
             if synapse_type == "QueryZkProof":
                 response = await self.handle_query_zk_proof(synapse_data)
             elif synapse_type == "ProofOfWeightsSynapse":
@@ -215,7 +217,7 @@ class LightningMinerProtocol(QuicConnectionProtocol):
             # Create synapse object
             synapse = QueryZkProof()
             for key, value in synapse_data.items():
-                if hasattr(synapse, key) and key != "computed_body_hash":
+                if hasattr(synapse, key) and key not in ["computed_body_hash", "axon"]:
                     setattr(synapse, key, value)
 
             # Call miner session handler
@@ -247,7 +249,7 @@ class LightningMinerProtocol(QuicConnectionProtocol):
 
             synapse = ProofOfWeightsSynapse()
             for key, value in synapse_data.items():
-                if hasattr(synapse, key) and key != "computed_body_hash":
+                if hasattr(synapse, key) and key not in ["computed_body_hash", "axon"]:
                     setattr(synapse, key, value)
 
             if self.miner_session:
@@ -278,7 +280,7 @@ class LightningMinerProtocol(QuicConnectionProtocol):
 
             synapse = Competition()
             for key, value in synapse_data.items():
-                if hasattr(synapse, key) and key != "computed_body_hash":
+                if hasattr(synapse, key) and key not in ["computed_body_hash", "axon"]:
                     setattr(synapse, key, value)
 
             if self.miner_session:
