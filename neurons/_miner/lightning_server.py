@@ -214,17 +214,28 @@ class LightningMinerProtocol(QuicConnectionProtocol):
         try:
             from protocol import QueryZkProof
 
-            # Create synapse object
-            synapse = QueryZkProof()
+            # Process the data before creating synapse
+            processed_data = {}
             for key, value in synapse_data.items():
-                if hasattr(synapse, key) and key not in ["computed_body_hash", "axon"]:
+                if key not in [
+                    "computed_body_hash",
+                    "axon",
+                    "dendrite",
+                    "name",
+                    "timeout",
+                    "header_size",
+                    "total_size",
+                ]:
                     if value == "":
                         if key == "query_input":
-                            setattr(synapse, key, {})
+                            processed_data[key] = {}
                         else:
-                            setattr(synapse, key, None)
+                            processed_data[key] = None
                     else:
-                        setattr(synapse, key, value)
+                        processed_data[key] = value
+
+            # Create synapse with processed data
+            synapse = QueryZkProof(**processed_data)
 
             # Call miner session handler
             if self.miner_session:
@@ -253,16 +264,28 @@ class LightningMinerProtocol(QuicConnectionProtocol):
         try:
             from protocol import ProofOfWeightsSynapse
 
-            synapse = ProofOfWeightsSynapse()
+            # Process the data before creating synapse
+            processed_data = {}
             for key, value in synapse_data.items():
-                if hasattr(synapse, key) and key not in ["computed_body_hash", "axon"]:
+                if key not in [
+                    "computed_body_hash",
+                    "axon",
+                    "dendrite",
+                    "name",
+                    "timeout",
+                    "header_size",
+                    "total_size",
+                ]:
                     if value == "":
                         if key == "inputs":
-                            setattr(synapse, key, {})
+                            processed_data[key] = {}
                         else:
-                            setattr(synapse, key, None)
+                            processed_data[key] = None
                     else:
-                        setattr(synapse, key, value)
+                        processed_data[key] = value
+
+            # Create synapse with processed data
+            synapse = ProofOfWeightsSynapse(**processed_data)
 
             if self.miner_session:
                 result = self.miner_session.handle_pow_request(synapse)
@@ -290,13 +313,25 @@ class LightningMinerProtocol(QuicConnectionProtocol):
         try:
             from protocol import Competition
 
-            synapse = Competition()
+            # Process the data before creating synapse
+            processed_data = {}
             for key, value in synapse_data.items():
-                if hasattr(synapse, key) and key not in ["computed_body_hash", "axon"]:
+                if key not in [
+                    "computed_body_hash",
+                    "axon",
+                    "dendrite",
+                    "name",
+                    "timeout",
+                    "header_size",
+                    "total_size",
+                ]:
                     if value == "":
-                        setattr(synapse, key, None)
+                        processed_data[key] = None
                     else:
-                        setattr(synapse, key, value)
+                        processed_data[key] = value
+
+            # Create synapse with processed data
+            synapse = Competition(**processed_data)
 
             if self.miner_session:
                 result = self.miner_session.handleCompetitionRequest(synapse)
