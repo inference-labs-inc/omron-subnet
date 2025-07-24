@@ -2,6 +2,8 @@ import asyncio
 import time
 import traceback
 from typing import Dict, Any
+from concurrent.futures import ThreadPoolExecutor
+import threading
 import bittensor as bt
 from lightning.lightning import RustLightningServer
 
@@ -17,6 +19,15 @@ class LightningServer:
         self.stats_log_interval = 120
         self.last_stats_log = 0
 
+        # Create thread pool for handling synapse requests asynchronously
+        self.thread_pool = ThreadPoolExecutor(
+            max_workers=min(4, threading.active_count() + 2),
+            thread_name_prefix="lightning_synapse",
+        )
+        bt.logging.info(
+            f"🔄 Created thread pool with {self.thread_pool._max_workers} workers for synapse processing"
+        )
+
         miner_hotkey = getattr(
             miner_session.wallet.hotkey, "ss58_address", "unknown_miner"
         )
@@ -27,15 +38,102 @@ class LightningServer:
     def _register_synapse_handlers(self):
         """Register synapse handlers with the Lightning server"""
         self.rust_server.register_synapse_handler(
-            "QueryZkProof", self._handle_query_zk_proof
+            "QueryZkProof", self._handle_query_zk_proof_async
         )
         self.rust_server.register_synapse_handler(
-            "ProofOfWeightsSynapse", self._handle_pow_request
+            "ProofOfWeightsSynapse", self._handle_pow_request_async
         )
         self.rust_server.register_synapse_handler(
-            "Competition", self._handle_competition_request
+            "Competition", self._handle_competition_request_async
         )
-        bt.logging.success("📝 Registered all synapse handlers with Lightning server")
+        bt.logging.success(
+            "📝 Registered all synapse handlers with Lightning server (using threading)"
+        )
+
+    async def _handle_query_zk_proof_async(
+        self, synapse_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Async wrapper for QueryZkProof synapse handling"""
+        try:
+            # Get current event loop and submit to thread pool
+            loop = asyncio.get_event_loop()
+            future = loop.run_in_executor(
+                self.thread_pool, self._handle_query_zk_proof, synapse_data
+            )
+            # Wait for the result with timeout
+            return await asyncio.wait_for(future, timeout=10.0)
+        except asyncio.TimeoutError:
+            bt.logging.error("❌ QueryZkProof handler timed out after 10 seconds")
+            return {
+                "query_output": "",
+                "success": False,
+                "error": "Handler timeout",
+                "processed_via": "lightning_server_timeout",
+            }
+        except Exception as e:
+            bt.logging.error(f"❌ QueryZkProof async wrapper error: {e}")
+            return {
+                "query_output": "",
+                "success": False,
+                "error": str(e),
+                "processed_via": "lightning_server_error",
+            }
+
+    async def _handle_pow_request_async(
+        self, synapse_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Async wrapper for ProofOfWeightsSynapse handling"""
+        try:
+            loop = asyncio.get_event_loop()
+            future = loop.run_in_executor(
+                self.thread_pool, self._handle_pow_request, synapse_data
+            )
+            return await asyncio.wait_for(future, timeout=10.0)
+        except asyncio.TimeoutError:
+            bt.logging.error("❌ PoW handler timed out after 10 seconds")
+            return {
+                "proof": "",
+                "public_signals": "",
+                "success": False,
+                "error": "Handler timeout",
+                "processed_via": "lightning_server_timeout",
+            }
+        except Exception as e:
+            bt.logging.error(f"❌ PoW async wrapper error: {e}")
+            return {
+                "proof": "",
+                "public_signals": "",
+                "success": False,
+                "error": str(e),
+                "processed_via": "lightning_server_error",
+            }
+
+    async def _handle_competition_request_async(
+        self, synapse_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Async wrapper for Competition synapse handling"""
+        try:
+            loop = asyncio.get_event_loop()
+            future = loop.run_in_executor(
+                self.thread_pool, self._handle_competition_request, synapse_data
+            )
+            return await asyncio.wait_for(future, timeout=10.0)
+        except asyncio.TimeoutError:
+            bt.logging.error("❌ Competition handler timed out after 10 seconds")
+            return {
+                "commitment": "",
+                "success": False,
+                "error": "Handler timeout",
+                "processed_via": "lightning_server_timeout",
+            }
+        except Exception as e:
+            bt.logging.error(f"❌ Competition async wrapper error: {e}")
+            return {
+                "commitment": "",
+                "success": False,
+                "error": str(e),
+                "processed_via": "lightning_server_error",
+            }
 
     def _handle_query_zk_proof(self, synapse_data: Dict[str, Any]) -> Dict[str, Any]:
         """Handle QueryZkProof synapse through Lightning server"""
@@ -152,6 +250,11 @@ class LightningServer:
 
     async def stop(self) -> None:
         """Stop the Lightning server"""
+        # Shutdown thread pool first
+        if hasattr(self, "thread_pool"):
+            self.thread_pool.shutdown(wait=True)
+            bt.logging.info("🔄 Thread pool shutdown completed")
+
         self.rust_server.stop()
         bt.logging.info("🔌 Lightning server stopped, all connections closed")
 
