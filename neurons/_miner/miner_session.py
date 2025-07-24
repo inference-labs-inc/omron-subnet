@@ -161,8 +161,6 @@ class MinerSession:
             while True:
                 step += 1
                 try:
-                    if step % 10 == 0:
-                        self.perform_reset_check()
 
                     if step % 100 == 0:
                         if not cli_parser.config.no_auto_update:
