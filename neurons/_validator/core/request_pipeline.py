@@ -147,7 +147,7 @@ class RequestPipeline:
         circuits = [
             c
             for c in circuit_store.circuits.values()
-            if InputRegistry.get(c.id) is not GenericInput
+            if InputRegistry.get_handler(c.id) is not GenericInput
         ]
 
         if not circuits:
