@@ -425,7 +425,7 @@ class MinerSession:
                 )
                 return self._log_and_return(synapse, model_id)
 
-            generic_input = GenericInput(RequestType.POC, public_inputs)
+            generic_input = GenericInput(RequestType.RWR, public_inputs)
             verified_model_session = VerifiedModelSession(generic_input, circuit)
 
             result = verified_model_session.query(generic_input)
