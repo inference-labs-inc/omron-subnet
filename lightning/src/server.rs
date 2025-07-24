@@ -369,16 +369,16 @@ impl LightningServer {
 
         match miner_keypair {
             Some(keypair_seed) => {
-                let secret_key = SecretKey::from_bytes(keypair_seed).expect("Valid seed");
-                let public_key = PublicKey::from(&secret_key);
-                let keypair = Keypair { secret: secret_key, public: public_key };
-                let signature = keypair.sign(message.as_bytes());
-                let signature_bytes = signature.to_bytes();
+                // Create SR25519 pair from seed
+                let pair = sr25519::Pair::from_seed(keypair_seed);
+                let signature = pair.sign(message.as_bytes());
+                let signature_bytes = signature.0;
                 BASE64_STANDARD.encode(signature_bytes)
             }
             None => {
                 println!("⚠️ No miner keypair configured, using dummy signature");
-                format!("0x{}", hex::encode(&message.as_bytes()[..8]))
+                let dummy_bytes = &message.as_bytes()[..8];
+                BASE64_STANDARD.encode(dummy_bytes)
             }
         }
     }
