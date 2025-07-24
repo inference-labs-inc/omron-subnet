@@ -140,7 +140,6 @@ class MinerSession:
         bt.logging.info("Starting miner...")
         self.start_lightning_server()
 
-        lightning_task = None
         try:
             try:
                 loop = asyncio.get_event_loop()
@@ -148,13 +147,45 @@ class MinerSession:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
 
-            lightning_task = loop.create_task(self._run_lightning_server())
+            bt.logging.success(
+                "⚡ Starting Lightning server and main loop concurrently"
+            )
+            loop.run_until_complete(self._run_async())
+
+        except KeyboardInterrupt:
+            bt.logging.success("Miner killed via keyboard interrupt.")
+        except Exception as e:
+            bt.logging.error(f"❌ Failed to start miner: {e}")
+            traceback.print_exc()
+        finally:
+            bt.logging.info("Shutting down miner...")
+            clean_temp_files()
+
+    async def _run_async(self):
+        """Run both lightning server and main loop concurrently"""
+        try:
+            lightning_task = asyncio.create_task(self._run_lightning_server())
+            main_loop_task = asyncio.create_task(self._main_loop())
+
             bt.logging.success("⚡ Lightning server task started with Rust backend")
 
-        except Exception as e:
-            bt.logging.error(f"❌ Failed to start Lightning server task: {e}")
-            lightning_task = None
+            await asyncio.gather(lightning_task, main_loop_task)
 
+        except asyncio.CancelledError:
+            bt.logging.info("Async tasks cancelled")
+        except Exception as e:
+            bt.logging.error(f"❌ Error in async main: {e}")
+            traceback.print_exc()
+        finally:
+            try:
+                bt.logging.info("Stopping Lightning server...")
+                await self._stop_lightning_server_async()
+                bt.logging.success("Lightning server stopped")
+            except Exception as e:
+                bt.logging.error(f"❌ Error stopping Lightning server: {e}")
+
+    async def _main_loop(self):
+        """Main monitoring and stats loop"""
         step = 0
 
         try:
@@ -214,28 +245,17 @@ class MinerSession:
 
                     self.sync_metagraph()
 
-                    time.sleep(1)
+                    await asyncio.sleep(1)
 
-                except KeyboardInterrupt:
-                    bt.logging.success("Miner killed via keyboard interrupt.")
+                except asyncio.CancelledError:
+                    bt.logging.debug("Main loop cancelled")
                     break
                 except Exception:
                     bt.logging.error(traceback.format_exc())
                     continue
 
-        finally:
-            bt.logging.info("Shutting down miner...")
-            clean_temp_files()
-
-            if lightning_task:
-                try:
-                    bt.logging.info("Stopping Lightning server...")
-                    loop = asyncio.get_event_loop()
-                    loop.run_until_complete(self._stop_lightning_server_async())
-                    lightning_task.cancel()
-                    bt.logging.success("Lightning server stopped")
-                except Exception as e:
-                    bt.logging.error(f"❌ Error stopping Lightning server: {e}")
+        except asyncio.CancelledError:
+            bt.logging.debug("Main loop task cancelled")
 
     async def _run_lightning_server(self):
         """Run the Lightning server asynchronously"""
