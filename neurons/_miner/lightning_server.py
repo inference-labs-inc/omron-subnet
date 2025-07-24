@@ -49,6 +49,9 @@ class LightningServer:
         self, synapse_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Multiprocess wrapper for QueryZkProof handling"""
+        print("🔥 HANDLER CALLED - Python handler actually executing!")
+        bt.logging.critical("🔥 CRITICAL: Python handler is executing!")
+
         start_time = time.time()
         bt.logging.info("🚀 Handler START: QueryZkProof processing begins")
         bt.logging.debug(f"📊 Query synapse data keys: {list(synapse_data.keys())}")
@@ -198,6 +201,9 @@ class LightningServer:
 
     def _handle_query_zk_proof(self, synapse_data: Dict[str, Any]) -> Dict[str, Any]:
         """Handle QueryZkProof synapse through Lightning server"""
+        print("🔥 CORE HANDLER CALLED - Core Python handler executing!")
+        bt.logging.critical("🔥 CRITICAL: Core Python handler is executing!")
+
         start_time = time.time()
         bt.logging.info("🔧 Query Handler: Starting core processing")
 
