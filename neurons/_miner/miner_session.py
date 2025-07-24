@@ -496,11 +496,10 @@ class MinerSession:
                 )
                 return synapse
 
-            try:
-                input_data = json.loads(synapse.inputs)
-            except json.JSONDecodeError as e:
+            input_data = synapse.inputs
+            if not isinstance(input_data, dict):
                 self._set_pow_error_response(
-                    synapse, f"Invalid JSON in inputs for {verification_key_hash}: {e}"
+                    synapse, f"Inputs for {verification_key_hash} must be a dictionary"
                 )
                 return synapse
 
