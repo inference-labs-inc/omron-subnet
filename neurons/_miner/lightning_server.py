@@ -218,7 +218,10 @@ class LightningMinerProtocol(QuicConnectionProtocol):
             synapse = QueryZkProof()
             for key, value in synapse_data.items():
                 if hasattr(synapse, key) and key not in ["computed_body_hash", "axon"]:
-                    setattr(synapse, key, value)
+                    if value == "":
+                        setattr(synapse, key, None)
+                    else:
+                        setattr(synapse, key, value)
 
             # Call miner session handler
             if self.miner_session:
