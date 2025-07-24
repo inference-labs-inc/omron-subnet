@@ -503,7 +503,7 @@ class MinerSession:
                 )
                 return synapse
 
-            generic_input = GenericInput(RequestType.POW, input_data)
+            generic_input = GenericInput(RequestType.RWR, input_data)
             verified_model_session = VerifiedModelSession(generic_input, circuit)
 
             result = verified_model_session.query(generic_input)
