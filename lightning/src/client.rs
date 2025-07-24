@@ -33,8 +33,6 @@ impl LightningClient {
         }
     }
 
-    // Temporarily comment out unused methods to remove warnings
-    /*
     pub fn set_validator_keypair(&mut self, keypair_seed: [u8; 32]) {
         let secret_key = SecretKey::from_bytes(&keypair_seed).expect("Valid seed");
         let public_key = ed25519_dalek::PublicKey::from(&secret_key);
@@ -42,7 +40,6 @@ impl LightningClient {
         self.validator_keypair = Some(keypair);
         println!("🔑 Validator keypair configured for signing");
     }
-    */
 
     pub async fn initialize_connections(&mut self, miners: Vec<QuicAxonInfo>) -> PyResult<()> {
         // Create QUIC client endpoint
@@ -180,7 +177,9 @@ impl LightningClient {
             }
             None => {
                 println!("⚠️ No validator keypair configured, using dummy signature");
-                Ok(format!("0x{}", hex::encode(&message.as_bytes()[..8])))
+                // Use base64 format to match server expectations
+                let dummy_bytes = &message.as_bytes()[..8];
+                Ok(BASE64_STANDARD.encode(dummy_bytes))
             }
         }
     }

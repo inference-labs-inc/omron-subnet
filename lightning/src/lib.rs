@@ -35,6 +35,12 @@ impl RustLightning {
         })
     }
 
+    pub fn set_validator_keypair(&self, keypair_seed: [u8; 32]) -> PyResult<()> {
+        let mut client = self.client.lock().unwrap();
+        client.set_validator_keypair(keypair_seed);
+        Ok(())
+    }
+
     pub fn initialize_connections(&self, miners: Vec<PyObject>) -> PyResult<()> {
         pyo3::Python::with_gil(|py| {
             let mut quic_miners = Vec::new();

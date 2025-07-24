@@ -14,6 +14,49 @@ class LightningTransport:
 
         wallet_hotkey = getattr(wallet.hotkey, "ss58_address", "unknown_hotkey")
         self.lightning_client = RustLightning(wallet_hotkey)
+
+        # Configure validator keypair for real signature generation
+        try:
+            # Extract seed from bittensor wallet for signing
+            if hasattr(wallet.hotkey, "seed_hex"):
+                # Get seed from hex string
+                seed_hex = wallet.hotkey.seed_hex
+                if seed_hex and len(seed_hex) == 64:  # 32 bytes as hex
+                    seed_bytes = bytes.fromhex(seed_hex)
+                    self.lightning_client.set_validator_keypair(list(seed_bytes))
+                    bt.logging.success(
+                        "🔑 Validator keypair configured for Lightning signatures"
+                    )
+                else:
+                    bt.logging.warning("⚠️ Invalid seed format - using dummy signatures")
+            elif hasattr(wallet.hotkey, "private_key_bytes"):
+                # Try accessing private key bytes directly
+                private_key_bytes = wallet.hotkey.private_key_bytes
+                if (
+                    isinstance(private_key_bytes, bytes)
+                    and len(private_key_bytes) == 32
+                ):
+                    self.lightning_client.set_validator_keypair(list(private_key_bytes))
+                    bt.logging.success(
+                        "🔑 Validator keypair configured for Lightning signatures"
+                    )
+                else:
+                    bt.logging.warning(
+                        "⚠️ Invalid private key format - using dummy signatures"
+                    )
+            else:
+                bt.logging.warning(
+                    "⚠️ No seed/private key available - using dummy signatures"
+                )
+                bt.logging.debug(
+                    f"Available wallet.hotkey attributes: {dir(wallet.hotkey)}"
+                )
+        except Exception as e:
+            bt.logging.warning(f"⚠️ Failed to configure validator keypair: {e}")
+            import traceback
+
+            bt.logging.debug(f"Keypair extraction error: {traceback.format_exc()}")
+
         bt.logging.success("⚡ Rust Lightning client initialized")
 
     async def initialize_persistent_connections(self, metagraph):
