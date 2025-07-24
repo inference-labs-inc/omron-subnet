@@ -12,6 +12,7 @@ from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 import datetime
+import ipaddress
 
 
 def generate_self_signed_cert():
@@ -45,7 +46,7 @@ def generate_self_signed_cert():
             x509.SubjectAlternativeName(
                 [
                     x509.DNSName("localhost"),
-                    x509.IPAddress("127.0.0.1"),
+                    x509.IPAddress(ipaddress.ip_address("127.0.0.1")),
                 ]
             ),
             critical=False,
