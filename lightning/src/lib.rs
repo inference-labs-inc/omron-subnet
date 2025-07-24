@@ -110,10 +110,18 @@ impl RustLightning {
             let mut data = HashMap::new();
             if let Some(data_obj) = request_dict.get("data") {
                 let data_dict = data_obj.extract::<HashMap<String, PyObject>>(py)?;
+                let json_module = py.import("json")?;
                 for (key, value) in data_dict {
-                    let json_str = format!("{}", value.as_ref(py).repr()?);
+                    let json_str = json_module
+                        .call_method1("dumps", (value,))?
+                        .extract::<String>()?;
                     let json_value: serde_json::Value = serde_json::from_str(&json_str)
-                        .unwrap_or_else(|_| serde_json::Value::String(value.extract::<String>(py).unwrap_or_default()));
+                        .map_err(|e| {
+                            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                                "Failed to parse JSON from Python: {}",
+                                e
+                            ))
+                        })?;
                     data.insert(key, json_value);
                 }
             }
