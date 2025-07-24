@@ -465,7 +465,11 @@ class ValidatorLoop:
             # Convert synapse to dict format expected by Lightning
             synapse_dict = {
                 "synapse_type": type(request.synapse).__name__,
-                "data": request.synapse.__dict__,
+                "data": (
+                    request.synapse.model_dump()
+                    if hasattr(request.synapse, "model_dump")
+                    else request.synapse.__dict__
+                ),
             }
 
             # Query using Lightning with persistent connection

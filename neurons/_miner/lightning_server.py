@@ -141,7 +141,7 @@ class LightningMinerProtocol(QuicConnectionProtocol):
             synapse_type = message.get("synapse_type")
             synapse_data = message.get("data", {})
 
-            bt.logging.debug(f"Raw synapse data: {synapse_data}")
+            bt.logging.info(f"Raw synapse data: {synapse_data}")
 
             if synapse_type == "QueryZkProof":
                 response = await self.handle_query_zk_proof(synapse_data)
