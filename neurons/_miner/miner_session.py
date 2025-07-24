@@ -108,10 +108,8 @@ class MinerSession:
 
     def start_lightning_server(self):
         """Initialize the Rust Lightning server"""
-        lightning_port = getattr(cli_parser.config.axon, "port", 8091) + 1
-        external_ip = (
-            getattr(self.axon, "external_ip", "0.0.0.0") if self.axon else "0.0.0.0"
-        )
+        lightning_port = getattr(cli_parser.config.axon, "port", 8091)
+        external_ip = "0.0.0.0"
 
         self.lightning_server = LightningServer(
             miner_session=self, host=external_ip, port=lightning_port
@@ -137,7 +135,6 @@ class MinerSession:
 
     def run(self):
         bt.logging.info("Starting miner...")
-        self.start_axon()
         self.start_lightning_server()
 
         lightning_task = None
@@ -242,7 +239,7 @@ class MinerSession:
         try:
             await self._start_lightning_server_async()
             # Start the real QUIC server listening loop
-            self.lightning_server.rust_server.serve_forever()
+            await self.lightning_server.serve_forever()
         except asyncio.CancelledError:
             bt.logging.debug("Lightning server task cancelled")
         except Exception as e:
