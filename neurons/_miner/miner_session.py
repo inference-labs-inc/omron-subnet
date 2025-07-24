@@ -115,7 +115,7 @@ class MinerSession:
         )
 
         self.lightning_server = LightningServer(
-            miner_session=self, host=external_ip, port=lightning_port
+            miner_session=self, bind_address=external_ip, port=lightning_port
         )
 
         bt.logging.success(
