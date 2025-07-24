@@ -50,18 +50,20 @@ class LightningServer:
             "📝 Registered all synapse handlers with Lightning server (using threading)"
         )
 
-    async def _handle_query_zk_proof_async(
+    def _handle_query_zk_proof_async(
         self, synapse_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Async wrapper for QueryZkProof synapse handling"""
         try:
-            # Get current event loop and submit to thread pool
-            loop = asyncio.get_event_loop()
-            future = loop.run_in_executor(
-                self.thread_pool, self._handle_query_zk_proof, synapse_data
-            )
-            # Wait for the result with timeout
-            return await asyncio.wait_for(future, timeout=10.0)
+            # Run async operation in thread pool using asyncio.run
+            async def _async_handler():
+                loop = asyncio.get_event_loop()
+                future = loop.run_in_executor(
+                    self.thread_pool, self._handle_query_zk_proof, synapse_data
+                )
+                return await asyncio.wait_for(future, timeout=10.0)
+
+            return asyncio.run(_async_handler())
         except asyncio.TimeoutError:
             bt.logging.error("❌ QueryZkProof handler timed out after 10 seconds")
             return {
@@ -79,16 +81,18 @@ class LightningServer:
                 "processed_via": "lightning_server_error",
             }
 
-    async def _handle_pow_request_async(
-        self, synapse_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _handle_pow_request_async(self, synapse_data: Dict[str, Any]) -> Dict[str, Any]:
         """Async wrapper for ProofOfWeightsSynapse handling"""
         try:
-            loop = asyncio.get_event_loop()
-            future = loop.run_in_executor(
-                self.thread_pool, self._handle_pow_request, synapse_data
-            )
-            return await asyncio.wait_for(future, timeout=10.0)
+
+            async def _async_handler():
+                loop = asyncio.get_event_loop()
+                future = loop.run_in_executor(
+                    self.thread_pool, self._handle_pow_request, synapse_data
+                )
+                return await asyncio.wait_for(future, timeout=10.0)
+
+            return asyncio.run(_async_handler())
         except asyncio.TimeoutError:
             bt.logging.error("❌ PoW handler timed out after 10 seconds")
             return {
@@ -108,16 +112,20 @@ class LightningServer:
                 "processed_via": "lightning_server_error",
             }
 
-    async def _handle_competition_request_async(
+    def _handle_competition_request_async(
         self, synapse_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Async wrapper for Competition synapse handling"""
         try:
-            loop = asyncio.get_event_loop()
-            future = loop.run_in_executor(
-                self.thread_pool, self._handle_competition_request, synapse_data
-            )
-            return await asyncio.wait_for(future, timeout=10.0)
+
+            async def _async_handler():
+                loop = asyncio.get_event_loop()
+                future = loop.run_in_executor(
+                    self.thread_pool, self._handle_competition_request, synapse_data
+                )
+                return await asyncio.wait_for(future, timeout=10.0)
+
+            return asyncio.run(_async_handler())
         except asyncio.TimeoutError:
             bt.logging.error("❌ Competition handler timed out after 10 seconds")
             return {

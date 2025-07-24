@@ -59,7 +59,7 @@ class LightningTransport:
                         axon.hotkey if hasattr(axon, "hotkey") else f"miner_{uid}"
                     ),
                     "ip": axon.ip,
-                    "port": int(axon.port) + 1,
+                    "port": int(axon.port),
                     "protocol": 4,
                     "placeholder1": 0,
                     "placeholder2": 0,
@@ -92,7 +92,7 @@ class LightningTransport:
                         axon.hotkey if hasattr(axon, "hotkey") else f"miner_{uid}"
                     ),
                     "ip": axon.ip,
-                    "port": int(axon.port) + 1,
+                    "port": int(axon.port),
                     "protocol": 4,
                     "placeholder1": 0,
                     "placeholder2": 0,
@@ -116,7 +116,7 @@ class LightningTransport:
         axon_info = {
             "hotkey": axon.hotkey if hasattr(axon, "hotkey") else "unknown",
             "ip": axon.ip,
-            "port": int(axon.port) + 1,
+            "port": int(axon.port),
             "protocol": 4,
             "placeholder1": 0,
             "placeholder2": 0,
