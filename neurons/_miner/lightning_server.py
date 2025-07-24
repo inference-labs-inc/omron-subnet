@@ -279,6 +279,8 @@ class LightningMinerProtocol(QuicConnectionProtocol):
                     if value == "":
                         if key == "inputs":
                             processed_data[key] = {}
+                        elif key in ["proof", "public_signals"]:
+                            processed_data[key] = ""
                         else:
                             processed_data[key] = None
                     else:
@@ -326,7 +328,10 @@ class LightningMinerProtocol(QuicConnectionProtocol):
                     "total_size",
                 ]:
                     if value == "":
-                        processed_data[key] = None
+                        if key in ["hash", "file_name"]:
+                            processed_data[key] = ""
+                        else:
+                            processed_data[key] = None
                     else:
                         processed_data[key] = value
 
