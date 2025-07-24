@@ -39,6 +39,7 @@ ed25519-dalek = "1.0"
 bs58 = "0.4"
 sha2 = "0.10"
 rand = "0.7"
+sp-core = "21.0"
 
 # Networking
 socket2 = "0.5"

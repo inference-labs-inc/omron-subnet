@@ -8,9 +8,9 @@ use quinn::{Endpoint, ServerConfig, Connection, RecvStream, SendStream};
 use rustls::{Certificate, PrivateKey, ServerConfig as RustlsServerConfig};
 use std::net::SocketAddr;
 use serde_json;
-use ed25519_dalek::{Keypair, PublicKey, Signature, Verifier, Signer, SecretKey};
+use ed25519_dalek::{Keypair, Signer, SecretKey};
 use base64::{Engine, prelude::BASE64_STANDARD};
-use bs58;
+use sp_core::{sr25519, Pair, crypto::Ss58Codec};
 
 // Maximum age for signature timestamps (5 minutes in seconds)
 const MAX_SIGNATURE_AGE: u64 = 300;
@@ -321,58 +321,37 @@ impl LightningServer {
         let expected_message = format!("handshake:{}:{}", request.validator_hotkey, request.timestamp);
         println!("🔍 Verifying signature for message: {}", expected_message);
 
-        // Parse validator hotkey as SS58 address and extract public key
-        match bs58::decode(&request.validator_hotkey).into_vec() {
-            Ok(decoded_bytes) => {
-                // SS58 addresses have additional metadata, we need to extract the 32-byte public key
-                if decoded_bytes.len() < 32 {
-                    println!("❌ Invalid SS58 address length: {}", decoded_bytes.len());
-                    return false;
-                }
+        // Parse SS58 address to extract public key using substrate's SS58 codec
+        match sr25519::Public::from_ss58check(&request.validator_hotkey) {
+            Ok(public_key) => {
+                // Decode base64 signature
+                match BASE64_STANDARD.decode(&request.signature) {
+                    Ok(signature_bytes) => {
+                        if signature_bytes.len() != 64 {
+                            println!("❌ Invalid signature length: {}", signature_bytes.len());
+                            return false;
+                        }
 
-                // For SS58, the public key is typically the first 32 bytes after the prefix
-                let public_key_bytes = &decoded_bytes[1..33];
+                        // Convert signature bytes to sr25519::Signature
+                        let mut signature_array = [0u8; 64];
+                        signature_array.copy_from_slice(&signature_bytes);
+                        let signature = sr25519::Signature::from_raw(signature_array);
 
-                match PublicKey::from_bytes(public_key_bytes) {
-                    Ok(public_key) => {
-                        // Decode base64 signature
-                        match BASE64_STANDARD.decode(&request.signature) {
-                            Ok(signature_bytes) => {
-                                if signature_bytes.len() != 64 {
-                                    println!("❌ Invalid signature length: {}", signature_bytes.len());
-                                    return false;
-                                }
+                        let message_bytes = expected_message.as_bytes();
 
-                                match Signature::from_bytes(&signature_bytes) {
-                                    Ok(signature) => {
-                                        let message_bytes = expected_message.as_bytes();
+                        // Verify the signature using SR25519 verification
+                        let verification_result = sr25519::Pair::verify(&signature, message_bytes, &public_key);
 
-                                        // Verify the signature using ed25519 verification
-                                        match public_key.verify(message_bytes, &signature) {
-                                            Ok(()) => {
-                                                println!("✅ Signature verification successful for {}", request.validator_hotkey);
-                                                true
-                                            }
-                                            Err(e) => {
-                                                println!("❌ Signature verification failed for {}: {}", request.validator_hotkey, e);
-                                                false
-                                            }
-                                        }
-                                    }
-                                    Err(e) => {
-                                        println!("❌ Invalid signature format: {}", e);
-                                        false
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                println!("❌ Failed to decode base64 signature: {}", e);
-                                false
-                            }
+                        if verification_result {
+                            println!("✅ SR25519 signature verification successful for {}", request.validator_hotkey);
+                            true
+                        } else {
+                            println!("❌ SR25519 signature verification failed for {}", request.validator_hotkey);
+                            false
                         }
                     }
                     Err(e) => {
-                        println!("❌ Invalid public key bytes: {}", e);
+                        println!("❌ Failed to decode base64 signature: {}", e);
                         false
                     }
                 }
