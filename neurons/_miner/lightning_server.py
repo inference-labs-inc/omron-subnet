@@ -48,25 +48,46 @@ class LightningServer:
     def _handle_query_zk_proof_async(
         self, synapse_data: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Multiprocess wrapper for QueryZkProof synapse handling"""
+        """Multiprocess wrapper for QueryZkProof handling"""
+        start_time = time.time()
+        bt.logging.info("🚀 Handler START: QueryZkProof processing begins")
+        bt.logging.debug(f"📊 Query synapse data keys: {list(synapse_data.keys())}")
+
         try:
             if self.process_pool is not None:
-                # Submit to process pool and wait for result with timeout
+                bt.logging.debug("🔄 Using multiprocess execution for Query")
                 future = self.process_pool.submit(
                     _handle_query_zk_proof_worker, synapse_data
                 )
-                return future.result(timeout=10.0)
+                result = future.result(timeout=10.0)
+                bt.logging.info(
+                    f"✅ Multiprocess Query completed in {time.time() - start_time:.3f}s"
+                )
+                return result
             else:
-                # Fall back to synchronous processing
-                bt.logging.debug("Using synchronous processing for QueryZkProof")
-                return self._handle_query_zk_proof(synapse_data)
+                bt.logging.debug("🔄 Using synchronous processing for Query")
+                result = self._handle_query_zk_proof(synapse_data)
+                bt.logging.info(
+                    f"✅ Sync Query completed in {time.time() - start_time:.3f}s"
+                )
+                return result
         except Exception as e:
-            bt.logging.error(f"❌ QueryZkProof processing error: {e}")
-            # Fall back to sync on any error
+            bt.logging.error(f"❌ Query processing error: {e}")
+            bt.logging.info("🔄 Attempting fallback processing...")
             try:
-                return self._handle_query_zk_proof(synapse_data)
+                result = self._handle_query_zk_proof(synapse_data)
+                bt.logging.info(
+                    f"✅ Fallback Query completed in {time.time() - start_time:.3f}s"
+                )
+                return result
             except Exception as fallback_e:
-                bt.logging.error(f"❌ Fallback processing also failed: {fallback_e}")
+                bt.logging.error(
+                    f"❌ Query fallback processing also failed: {fallback_e}"
+                )
+                elapsed = time.time() - start_time
+                bt.logging.error(
+                    f"💥 Handler FAILED: QueryZkProof failed after {elapsed:.3f}s"
+                )
                 return {
                     "query_output": "",
                     "success": False,
@@ -76,22 +97,44 @@ class LightningServer:
 
     def _handle_pow_request_async(self, synapse_data: Dict[str, Any]) -> Dict[str, Any]:
         """Multiprocess wrapper for ProofOfWeightsSynapse handling"""
+        start_time = time.time()
+        bt.logging.info("🚀 Handler START: ProofOfWeightsSynapse processing begins")
+        bt.logging.debug(f"📊 PoW synapse data keys: {list(synapse_data.keys())}")
+
         try:
             if self.process_pool is not None:
+                bt.logging.debug("🔄 Using multiprocess execution for PoW")
                 future = self.process_pool.submit(
                     _handle_pow_request_worker, synapse_data
                 )
-                return future.result(timeout=10.0)
+                result = future.result(timeout=10.0)
+                bt.logging.info(
+                    f"✅ Multiprocess PoW completed in {time.time() - start_time:.3f}s"
+                )
+                return result
             else:
-                bt.logging.debug("Using synchronous processing for PoW")
-                return self._handle_pow_request(synapse_data)
+                bt.logging.debug("🔄 Using synchronous processing for PoW")
+                result = self._handle_pow_request(synapse_data)
+                bt.logging.info(
+                    f"✅ Sync PoW completed in {time.time() - start_time:.3f}s"
+                )
+                return result
         except Exception as e:
             bt.logging.error(f"❌ PoW processing error: {e}")
+            bt.logging.info("🔄 Attempting fallback processing...")
             try:
-                return self._handle_pow_request(synapse_data)
+                result = self._handle_pow_request(synapse_data)
+                bt.logging.info(
+                    f"✅ Fallback PoW completed in {time.time() - start_time:.3f}s"
+                )
+                return result
             except Exception as fallback_e:
                 bt.logging.error(
                     f"❌ PoW fallback processing also failed: {fallback_e}"
+                )
+                elapsed = time.time() - start_time
+                bt.logging.error(
+                    f"💥 Handler FAILED: ProofOfWeightsSynapse failed after {elapsed:.3f}s"
                 )
                 return {
                     "proof": "",
@@ -105,22 +148,46 @@ class LightningServer:
         self, synapse_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Multiprocess wrapper for Competition synapse handling"""
+        start_time = time.time()
+        bt.logging.info("🚀 Handler START: Competition processing begins")
+        bt.logging.debug(
+            f"📊 Competition synapse data keys: {list(synapse_data.keys())}"
+        )
+
         try:
             if self.process_pool is not None:
+                bt.logging.debug("🔄 Using multiprocess execution for Competition")
                 future = self.process_pool.submit(
                     _handle_competition_request_worker, synapse_data
                 )
-                return future.result(timeout=10.0)
+                result = future.result(timeout=10.0)
+                bt.logging.info(
+                    f"✅ Multiprocess Competition completed in {time.time() - start_time:.3f}s"
+                )
+                return result
             else:
-                bt.logging.debug("Using synchronous processing for Competition")
-                return self._handle_competition_request(synapse_data)
+                bt.logging.debug("🔄 Using synchronous processing for Competition")
+                result = self._handle_competition_request(synapse_data)
+                bt.logging.info(
+                    f"✅ Sync Competition completed in {time.time() - start_time:.3f}s"
+                )
+                return result
         except Exception as e:
             bt.logging.error(f"❌ Competition processing error: {e}")
+            bt.logging.info("🔄 Attempting fallback processing...")
             try:
-                return self._handle_competition_request(synapse_data)
+                result = self._handle_competition_request(synapse_data)
+                bt.logging.info(
+                    f"✅ Fallback Competition completed in {time.time() - start_time:.3f}s"
+                )
+                return result
             except Exception as fallback_e:
                 bt.logging.error(
                     f"❌ Competition fallback processing also failed: {fallback_e}"
+                )
+                elapsed = time.time() - start_time
+                bt.logging.error(
+                    f"💥 Handler FAILED: Competition failed after {elapsed:.3f}s"
                 )
                 return {
                     "commitment": "",
@@ -131,23 +198,51 @@ class LightningServer:
 
     def _handle_query_zk_proof(self, synapse_data: Dict[str, Any]) -> Dict[str, Any]:
         """Handle QueryZkProof synapse through Lightning server"""
+        start_time = time.time()
+        bt.logging.info("🔧 Query Handler: Starting core processing")
+
         try:
             from protocol import QueryZkProof
 
+            bt.logging.debug("📦 Query Handler: Protocol imported successfully")
+
             synapse = QueryZkProof()
+            bt.logging.debug("📦 Query Handler: Synapse object created")
+
             for key, value in synapse_data.items():
                 if hasattr(synapse, key):
                     setattr(synapse, key, value)
+            bt.logging.debug(
+                f"📦 Query Handler: Synapse populated with {len(synapse_data)} fields"
+            )
 
+            bt.logging.info("🚀 Query Handler: Calling miner_session.queryZkProof")
             result_synapse = self.miner_session.queryZkProof(synapse)
+            bt.logging.info(
+                f"✅ Query Handler: miner_session completed in {time.time() - start_time:.3f}s"
+            )
 
-            return {
+            result = {
                 "query_output": getattr(result_synapse, "query_output", ""),
                 "success": True,
                 "processed_via": "lightning_server",
             }
+
+            output_length = len(result["query_output"]) if result["query_output"] else 0
+            bt.logging.info(f"📊 Query Handler: Result output={output_length} chars")
+            bt.logging.success(
+                f"🎉 Query Handler: SUCCESS in {time.time() - start_time:.3f}s"
+            )
+
+            return result
         except Exception as e:
-            bt.logging.error(f"❌ Lightning QueryZkProof handler error: {e}")
+            elapsed = time.time() - start_time
+            bt.logging.error(
+                f"❌ Lightning QueryZkProof handler error after {elapsed:.3f}s: {e}"
+            )
+            import traceback
+
+            bt.logging.debug(f"❌ Query Handler traceback: {traceback.format_exc()}")
             return {
                 "query_output": "",
                 "success": False,
@@ -157,24 +252,57 @@ class LightningServer:
 
     def _handle_pow_request(self, synapse_data: Dict[str, Any]) -> Dict[str, Any]:
         """Handle ProofOfWeightsSynapse through Lightning server"""
+        start_time = time.time()
+        bt.logging.info("🔧 PoW Handler: Starting core processing")
+
         try:
             from protocol import ProofOfWeightsSynapse
 
+            bt.logging.debug("📦 PoW Handler: Protocol imported successfully")
+
             synapse = ProofOfWeightsSynapse()
+            bt.logging.debug("📦 PoW Handler: Synapse object created")
+
             for key, value in synapse_data.items():
                 if hasattr(synapse, key):
                     setattr(synapse, key, value)
+            bt.logging.debug(
+                f"📦 PoW Handler: Synapse populated with {len(synapse_data)} fields"
+            )
 
+            bt.logging.info("🚀 PoW Handler: Calling miner_session.handle_pow_request")
             result_synapse = self.miner_session.handle_pow_request(synapse)
+            bt.logging.info(
+                f"✅ PoW Handler: miner_session completed in {time.time() - start_time:.3f}s"
+            )
 
-            return {
+            result = {
                 "proof": getattr(result_synapse, "proof", ""),
                 "public_signals": getattr(result_synapse, "public_signals", ""),
                 "success": True,
                 "processed_via": "lightning_server",
             }
+
+            proof_length = len(result["proof"]) if result["proof"] else 0
+            signals_length = (
+                len(result["public_signals"]) if result["public_signals"] else 0
+            )
+            bt.logging.info(
+                f"📊 PoW Handler: Result proof={proof_length} chars, signals={signals_length} chars"
+            )
+            bt.logging.success(
+                f"🎉 PoW Handler: SUCCESS in {time.time() - start_time:.3f}s"
+            )
+
+            return result
         except Exception as e:
-            bt.logging.error(f"❌ Lightning PoW handler error: {e}")
+            elapsed = time.time() - start_time
+            bt.logging.error(
+                f"❌ Lightning PoW handler error after {elapsed:.3f}s: {e}"
+            )
+            import traceback
+
+            bt.logging.debug(f"❌ PoW Handler traceback: {traceback.format_exc()}")
             return {
                 "proof": "",
                 "public_signals": "",
@@ -187,23 +315,57 @@ class LightningServer:
         self, synapse_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Handle Competition synapse through Lightning server"""
+        start_time = time.time()
+        bt.logging.info("🔧 Competition Handler: Starting core processing")
+
         try:
             from protocol import Competition
 
+            bt.logging.debug("📦 Competition Handler: Protocol imported successfully")
+
             synapse = Competition()
+            bt.logging.debug("📦 Competition Handler: Synapse object created")
+
             for key, value in synapse_data.items():
                 if hasattr(synapse, key):
                     setattr(synapse, key, value)
+            bt.logging.debug(
+                f"📦 Competition Handler: Synapse populated with {len(synapse_data)} fields"
+            )
 
+            bt.logging.info(
+                "🚀 Competition Handler: Calling miner_session.handleCompetitionRequest"
+            )
             result_synapse = self.miner_session.handleCompetitionRequest(synapse)
+            bt.logging.info(
+                f"✅ Competition Handler: miner_session completed in {time.time() - start_time:.3f}s"
+            )
 
-            return {
+            result = {
                 "commitment": getattr(result_synapse, "commitment", ""),
                 "success": True,
                 "processed_via": "lightning_server",
             }
+
+            commitment_length = len(result["commitment"]) if result["commitment"] else 0
+            bt.logging.info(
+                f"📊 Competition Handler: Result commitment={commitment_length} chars"
+            )
+            bt.logging.success(
+                f"🎉 Competition Handler: SUCCESS in {time.time() - start_time:.3f}s"
+            )
+
+            return result
         except Exception as e:
-            bt.logging.error(f"❌ Lightning Competition handler error: {e}")
+            elapsed = time.time() - start_time
+            bt.logging.error(
+                f"❌ Lightning Competition handler error after {elapsed:.3f}s: {e}"
+            )
+            import traceback
+
+            bt.logging.debug(
+                f"❌ Competition Handler traceback: {traceback.format_exc()}"
+            )
             return {
                 "commitment": "",
                 "success": False,
