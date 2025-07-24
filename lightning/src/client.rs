@@ -82,10 +82,13 @@ impl LightningClient {
         let _root_store = RootCertStore::empty();
 
         // Configure to accept any certificate (for self-signed certs)
-        let client_config = RustlsClientConfig::builder()
+        let mut client_config = RustlsClientConfig::builder()
             .with_safe_defaults()
             .with_custom_certificate_verifier(Arc::new(AcceptAnyCertVerifier))
             .with_no_client_auth();
+
+        // Set ALPN protocol to match server
+        client_config.alpn_protocols = vec![b"lightning-quic".to_vec()];
 
         let client_config = ClientConfig::new(Arc::new(client_config));
         let mut endpoint = Endpoint::client("0.0.0.0:0".parse().unwrap()).unwrap();
