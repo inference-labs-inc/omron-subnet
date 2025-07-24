@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import tempfile
+import functools
 from typing import Dict, Any
 import bittensor as bt
 from aioquic.asyncio import serve
@@ -79,9 +80,9 @@ def generate_self_signed_cert():
 class LightningMinerProtocol(QuicConnectionProtocol):
     """Pure Python QUIC protocol handler for miner"""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, miner_session=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.miner_session = kwargs.get("miner_session")
+        self.miner_session = miner_session
         self._stream_data = {}
 
     def quic_event_received(self, event):
@@ -296,16 +297,16 @@ class LightningServer:
             # Load the dynamically generated certificates
             configuration.load_cert_chain(cert_path, key_path)
 
-            # Start server
-            def create_protocol(*args, **kwargs):
-                kwargs["miner_session"] = self.miner_session
-                return LightningMinerProtocol(*args, **kwargs)
+            # Start server using a partial to pass the miner_session
+            protocol_factory = functools.partial(
+                LightningMinerProtocol, miner_session=self.miner_session
+            )
 
             self.server = await serve(
                 self.bind_address,
                 self.port,
                 configuration=configuration,
-                create_protocol=create_protocol,
+                create_protocol=protocol_factory,
             )
 
             self._running = True
