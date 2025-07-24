@@ -2,7 +2,6 @@ import asyncio
 import time
 import traceback
 from typing import Dict, Any
-from concurrent.futures import ProcessPoolExecutor
 import bittensor as bt
 from lightning.lightning import RustLightningServer
 
@@ -18,16 +17,11 @@ class LightningServer:
         self.stats_log_interval = 120
         self.last_stats_log = 0
 
-        # Create process pool for handling synapse requests
-        try:
-            self.process_pool = ProcessPoolExecutor(max_workers=2)
-            bt.logging.info(
-                "🔄 Created process pool with 2 workers for synapse processing"
-            )
-        except Exception as e:
-            bt.logging.error(f"❌ Failed to create process pool: {e}")
-            bt.logging.info("🔄 Falling back to synchronous processing")
-            self.process_pool = None
+        # Temporarily disable multiprocessing to debug startup issues
+        bt.logging.info(
+            "🔄 Using synchronous processing (multiprocessing disabled for debugging)"
+        )
+        self.process_pool = None
 
         miner_hotkey = getattr(
             miner_session.wallet.hotkey, "ss58_address", "unknown_miner"
@@ -259,13 +253,15 @@ class LightningServer:
         bt.logging.info("🔌 Lightning server stopped, all connections closed")
 
     async def serve_forever(self) -> None:
-        """Serve forever (for compatibility with existing code)"""
+        """Start the actual Rust QUIC server listening loop"""
         bt.logging.info("⚡ Lightning server running in persistent connection mode")
         bt.logging.info("🚀 Ready to handle high-throughput validator requests")
 
         try:
-            while True:
-                await asyncio.sleep(1)
+            # Call the Rust server's serve_forever method (blocking call)
+            await asyncio.get_event_loop().run_in_executor(
+                None, self.rust_server.serve_forever
+            )
         except asyncio.CancelledError:
             bt.logging.debug("Lightning server serve_forever cancelled")
         except Exception as e:
