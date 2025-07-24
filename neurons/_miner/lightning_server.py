@@ -3,7 +3,6 @@ import time
 import traceback
 from typing import Dict, Any
 from concurrent.futures import ProcessPoolExecutor
-import multiprocessing as mp
 import bittensor as bt
 from lightning.lightning import RustLightningServer
 
@@ -20,12 +19,15 @@ class LightningServer:
         self.last_stats_log = 0
 
         # Create process pool for handling synapse requests
-        self.process_pool = ProcessPoolExecutor(
-            max_workers=min(4, mp.cpu_count()), mp_context=mp.get_context("spawn")
-        )
-        bt.logging.info(
-            f"🔄 Created process pool with {self.process_pool._max_workers} workers for synapse processing"
-        )
+        try:
+            self.process_pool = ProcessPoolExecutor(max_workers=2)
+            bt.logging.info(
+                "🔄 Created process pool with 2 workers for synapse processing"
+            )
+        except Exception as e:
+            bt.logging.error(f"❌ Failed to create process pool: {e}")
+            bt.logging.info("🔄 Falling back to synchronous processing")
+            self.process_pool = None
 
         miner_hotkey = getattr(
             miner_session.wallet.hotkey, "ss58_address", "unknown_miner"
@@ -54,52 +56,84 @@ class LightningServer:
     ) -> Dict[str, Any]:
         """Multiprocess wrapper for QueryZkProof synapse handling"""
         try:
-            # Submit to process pool and wait for result with timeout
-            future = self.process_pool.submit(
-                _handle_query_zk_proof_worker, synapse_data
-            )
-            return future.result(timeout=10.0)
+            if self.process_pool is not None:
+                # Submit to process pool and wait for result with timeout
+                future = self.process_pool.submit(
+                    _handle_query_zk_proof_worker, synapse_data
+                )
+                return future.result(timeout=10.0)
+            else:
+                # Fall back to synchronous processing
+                bt.logging.debug("Using synchronous processing for QueryZkProof")
+                return self._handle_query_zk_proof(synapse_data)
         except Exception as e:
-            bt.logging.error(f"❌ QueryZkProof multiprocess error: {e}")
-            return {
-                "query_output": "",
-                "success": False,
-                "error": str(e),
-                "processed_via": "lightning_multiprocess_error",
-            }
+            bt.logging.error(f"❌ QueryZkProof processing error: {e}")
+            # Fall back to sync on any error
+            try:
+                return self._handle_query_zk_proof(synapse_data)
+            except Exception as fallback_e:
+                bt.logging.error(f"❌ Fallback processing also failed: {fallback_e}")
+                return {
+                    "query_output": "",
+                    "success": False,
+                    "error": str(e),
+                    "processed_via": "lightning_fallback_error",
+                }
 
     def _handle_pow_request_async(self, synapse_data: Dict[str, Any]) -> Dict[str, Any]:
         """Multiprocess wrapper for ProofOfWeightsSynapse handling"""
         try:
-            future = self.process_pool.submit(_handle_pow_request_worker, synapse_data)
-            return future.result(timeout=10.0)
+            if self.process_pool is not None:
+                future = self.process_pool.submit(
+                    _handle_pow_request_worker, synapse_data
+                )
+                return future.result(timeout=10.0)
+            else:
+                bt.logging.debug("Using synchronous processing for PoW")
+                return self._handle_pow_request(synapse_data)
         except Exception as e:
-            bt.logging.error(f"❌ PoW multiprocess error: {e}")
-            return {
-                "proof": "",
-                "public_signals": "",
-                "success": False,
-                "error": str(e),
-                "processed_via": "lightning_multiprocess_error",
-            }
+            bt.logging.error(f"❌ PoW processing error: {e}")
+            try:
+                return self._handle_pow_request(synapse_data)
+            except Exception as fallback_e:
+                bt.logging.error(
+                    f"❌ PoW fallback processing also failed: {fallback_e}"
+                )
+                return {
+                    "proof": "",
+                    "public_signals": "",
+                    "success": False,
+                    "error": str(e),
+                    "processed_via": "lightning_fallback_error",
+                }
 
     def _handle_competition_request_async(
         self, synapse_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Multiprocess wrapper for Competition synapse handling"""
         try:
-            future = self.process_pool.submit(
-                _handle_competition_request_worker, synapse_data
-            )
-            return future.result(timeout=10.0)
+            if self.process_pool is not None:
+                future = self.process_pool.submit(
+                    _handle_competition_request_worker, synapse_data
+                )
+                return future.result(timeout=10.0)
+            else:
+                bt.logging.debug("Using synchronous processing for Competition")
+                return self._handle_competition_request(synapse_data)
         except Exception as e:
-            bt.logging.error(f"❌ Competition multiprocess error: {e}")
-            return {
-                "commitment": "",
-                "success": False,
-                "error": str(e),
-                "processed_via": "lightning_multiprocess_error",
-            }
+            bt.logging.error(f"❌ Competition processing error: {e}")
+            try:
+                return self._handle_competition_request(synapse_data)
+            except Exception as fallback_e:
+                bt.logging.error(
+                    f"❌ Competition fallback processing also failed: {fallback_e}"
+                )
+                return {
+                    "commitment": "",
+                    "success": False,
+                    "error": str(e),
+                    "processed_via": "lightning_fallback_error",
+                }
 
     def _handle_query_zk_proof(self, synapse_data: Dict[str, Any]) -> Dict[str, Any]:
         """Handle QueryZkProof synapse through Lightning server"""
@@ -217,7 +251,7 @@ class LightningServer:
     async def stop(self) -> None:
         """Stop the Lightning server"""
         # Shutdown process pool first
-        if hasattr(self, "process_pool"):
+        if hasattr(self, "process_pool") and self.process_pool is not None:
             self.process_pool.shutdown(wait=True)
             bt.logging.info("🔄 Process pool shutdown completed")
 
