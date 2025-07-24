@@ -8,7 +8,7 @@ use quinn::{Endpoint, ServerConfig, Connection, RecvStream, SendStream};
 use rustls::{Certificate, PrivateKey, ServerConfig as RustlsServerConfig};
 use std::net::SocketAddr;
 use serde_json;
-use ed25519_dalek::{Keypair, Signer, SecretKey};
+// No longer need ed25519_dalek imports since we're using SR25519
 use base64::{Engine, prelude::BASE64_STANDARD};
 use sp_core::{sr25519, Pair, crypto::Ss58Codec};
 
@@ -235,7 +235,7 @@ impl LightningServer {
                 // Try to parse as synapse packet
                 if let Ok(synapse_packet) = serde_json::from_str::<SynapsePacket>(&message) {
                     let response = Self::process_synapse_packet(
-                        synapse_packet, connections, synapse_handlers
+                        synapse_packet, connection.clone(), connections, synapse_handlers
                     ).await;
 
                     if let Ok(response_json) = serde_json::to_string(&response) {
@@ -385,16 +385,26 @@ impl LightningServer {
 
     async fn process_synapse_packet(
         packet: SynapsePacket,
+        connection: Arc<quinn::Connection>,
         connections: Arc<RwLock<HashMap<String, ValidatorConnection>>>,
         synapse_handlers: Arc<RwLock<HashMap<String, PyObject>>>,
     ) -> SynapseResponse {
         println!("📦 Processing {} synapse packet", packet.synapse_type);
 
-        // Extract validator hotkey from packet data (should be set by client)
-        let validator_hotkey = packet.data.get("validator_hotkey")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown_validator")
-            .to_string();
+        // Find validator hotkey by matching the connection object
+        let validator_hotkey = {
+            let connections_guard = connections.read().await;
+            connections_guard.iter()
+                .find(|(_, validator_conn)| {
+                    // Compare connection remote addresses since Arc<Connection> doesn't implement Eq
+                    validator_conn.connection.remote_address() == connection.remote_address()
+                })
+                .map(|(hotkey, _)| hotkey.clone())
+                .unwrap_or_else(|| {
+                    println!("⚠️ No validator found for connection from {}", connection.remote_address());
+                    "unknown_validator".to_string()
+                })
+        };
 
         // Verify connection exists and is verified
         {
