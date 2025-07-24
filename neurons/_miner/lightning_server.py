@@ -247,7 +247,7 @@ class LightningMinerProtocol(QuicConnectionProtocol):
 
             synapse = ProofOfWeightsSynapse()
             for key, value in synapse_data.items():
-                if hasattr(synapse, key):
+                if hasattr(synapse, key) and key != "computed_body_hash":
                     setattr(synapse, key, value)
 
             if self.miner_session:
@@ -278,7 +278,7 @@ class LightningMinerProtocol(QuicConnectionProtocol):
 
             synapse = Competition()
             for key, value in synapse_data.items():
-                if hasattr(synapse, key):
+                if hasattr(synapse, key) and key != "computed_body_hash":
                     setattr(synapse, key, value)
 
             if self.miner_session:
