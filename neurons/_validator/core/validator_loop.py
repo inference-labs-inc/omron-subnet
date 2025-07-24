@@ -467,8 +467,8 @@ class ValidatorLoop:
             synapse_dict = {
                 "synapse_type": type(request.synapse).__name__,
                 "data": (
-                    request.synapse.model_dump()
-                    if hasattr(request.synapse, "model_dump")
+                    request.synapse.dict()
+                    if hasattr(request.synapse, "dict")
                     else request.synapse.__dict__
                 ),
             }

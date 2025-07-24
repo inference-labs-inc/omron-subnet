@@ -59,46 +59,46 @@ class CircuitInput(BaseInput):
     @staticmethod
     def generate() -> dict[str, object]:
 
-        minimum_response_time = [
-            int(random.random() * ONE_MINUTE * SCALING) for _ in range(BATCH_SIZE)
-        ]
-        maximum_response_time = [
-            minimum_response_time[i] + int(random.random() * ONE_MINUTE * SCALING)
-            for i in range(BATCH_SIZE)
-        ]
-        response_time = [
-            int(random.random() * (maximum_response_time[i] - minimum_response_time[i]))
-            + minimum_response_time[i]
-            for i in range(BATCH_SIZE)
-        ]
-        max_score = [int(1 / 256 * SCALING) for _ in range(BATCH_SIZE)]
+        minimum_response_time = int(random.random() * ONE_MINUTE * SCALING)
 
+        maximum_response_time = minimum_response_time + int(
+            random.random() * ONE_MINUTE * SCALING
+        )
+
+        response_time = (
+            int(random.random() * (maximum_response_time - minimum_response_time))
+            + minimum_response_time
+        )
+        max_score = int(1 / 256 * SCALING)
         return {
-            "in": [
-                *max_score,
-                *[int(random.random() * s) for s in max_score],
-                *[
-                    int(b)
-                    for b in [random.choice([True, False]) for _ in range(BATCH_SIZE)]
-                ],
-                *[int(random.randint(0, 5000) * SCALING) for _ in range(BATCH_SIZE)],
-                *response_time,
-                *[int(random.random() * SCALING) for _ in range(BATCH_SIZE)],
-                *maximum_response_time,
-                *minimum_response_time,
-                *[random.randint(3000000, 10000000) for _ in range(BATCH_SIZE)],
-                *[random.randint(0, 255) for _ in range(BATCH_SIZE)],
-                *[random.randint(0, 255) for _ in range(BATCH_SIZE)],
-                SCALING,
-                int(RATE_OF_DECAY * SCALING),
-                int(RATE_OF_RECOVERY * SCALING),
-                int(FLATTENING_COEFFICIENT * SCALING),
-                int(COMPETITION_WEIGHT * SCALING),
-                int(PROOF_SIZE_WEIGHT * SCALING),
-                int(PROOF_SIZE_THRESHOLD * SCALING),
-                int(RESPONSE_TIME_WEIGHT * SCALING),
-                int(MAXIMUM_RESPONSE_TIME_DECIMAL * SCALING),
-            ]
+            "maximum_score": [max_score for _ in range(BATCH_SIZE)],
+            "previous_score": [
+                int(random.random() * max_score) for _ in range(BATCH_SIZE)
+            ],
+            "verified": [random.choice([True, False]) for _ in range(BATCH_SIZE)],
+            "proof_size": [
+                int(random.randint(0, 5000) * SCALING) for _ in range(BATCH_SIZE)
+            ],
+            "validator_uid": [random.randint(0, 255) for _ in range(BATCH_SIZE)],
+            "block_number": [
+                random.randint(3000000, 10000000) for _ in range(BATCH_SIZE)
+            ],
+            "miner_uid": [random.randint(0, 255) for _ in range(BATCH_SIZE)],
+            "minimum_response_time": [minimum_response_time for _ in range(BATCH_SIZE)],
+            "maximum_response_time": [maximum_response_time for _ in range(BATCH_SIZE)],
+            "response_time": [response_time for _ in range(BATCH_SIZE)],
+            "competition": [int(random.random() * SCALING) for _ in range(BATCH_SIZE)],
+            "scaling": SCALING,
+            "RATE_OF_DECAY": int(RATE_OF_DECAY * SCALING),
+            "RATE_OF_RECOVERY": int(RATE_OF_RECOVERY * SCALING),
+            "FLATTENING_COEFFICIENT": int(FLATTENING_COEFFICIENT * SCALING),
+            "PROOF_SIZE_WEIGHT": int(PROOF_SIZE_WEIGHT * SCALING),
+            "PROOF_SIZE_THRESHOLD": int(PROOF_SIZE_THRESHOLD * SCALING),
+            "COMPETITION_WEIGHT": int(COMPETITION_WEIGHT * SCALING),
+            "RESPONSE_TIME_WEIGHT": int(RESPONSE_TIME_WEIGHT * SCALING),
+            "MAXIMUM_RESPONSE_TIME_DECIMAL": int(
+                MAXIMUM_RESPONSE_TIME_DECIMAL * SCALING
+            ),
         }
 
     @staticmethod
