@@ -47,6 +47,7 @@ from constants import (
 from _validator.competitions.competition import Competition
 from multiprocessing import Queue as MPQueue
 from queue import Empty
+from protocol import ProofOfWeightsSynapse
 
 
 class ValidatorLoop:
@@ -471,6 +472,20 @@ class ValidatorLoop:
                     else request.synapse.__dict__
                 ),
             }
+
+            # Validate synapse data before sending
+            if isinstance(request.synapse, ProofOfWeightsSynapse):
+                if not request.synapse.inputs or request.synapse.inputs == "":
+                    bt.logging.warning(
+                        f"ProofOfWeightsSynapse has empty inputs for UID {request.uid}"
+                    )
+                    return None
+            elif hasattr(request.synapse, "query_input"):
+                if not request.synapse.query_input or request.synapse.query_input == "":
+                    bt.logging.warning(
+                        f"QueryZkProof has empty query_input for UID {request.uid}"
+                    )
+                    return None
 
             # Query using Lightning with persistent connection
             timeout = (

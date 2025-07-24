@@ -219,7 +219,10 @@ class LightningMinerProtocol(QuicConnectionProtocol):
             for key, value in synapse_data.items():
                 if hasattr(synapse, key) and key not in ["computed_body_hash", "axon"]:
                     if value == "":
-                        setattr(synapse, key, None)
+                        if key == "query_input":
+                            setattr(synapse, key, {})
+                        else:
+                            setattr(synapse, key, None)
                     else:
                         setattr(synapse, key, value)
 
@@ -254,7 +257,10 @@ class LightningMinerProtocol(QuicConnectionProtocol):
             for key, value in synapse_data.items():
                 if hasattr(synapse, key) and key not in ["computed_body_hash", "axon"]:
                     if value == "":
-                        setattr(synapse, key, None)
+                        if key == "inputs":
+                            setattr(synapse, key, {})
+                        else:
+                            setattr(synapse, key, None)
                     else:
                         setattr(synapse, key, value)
 
