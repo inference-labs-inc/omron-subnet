@@ -1,10 +1,78 @@
 import asyncio
 import json
+import os
+import tempfile
 from typing import Dict, Any
 import bittensor as bt
 from aioquic.asyncio import serve
 from aioquic.quic.configuration import QuicConfiguration
 from aioquic.asyncio.protocol import QuicConnectionProtocol
+from cryptography import x509
+from cryptography.x509.oid import NameOID
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+import datetime
+
+
+def generate_self_signed_cert():
+    """Generate a self-signed certificate for QUIC"""
+    # Generate private key
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+
+    # Create certificate
+    subject = issuer = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "State"),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, "City"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Omron"),
+            x509.NameAttribute(NameOID.COMMON_NAME, "localhost"),
+        ]
+    )
+
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(private_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.datetime.utcnow())
+        .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=365))
+        .add_extension(
+            x509.SubjectAlternativeName(
+                [
+                    x509.DNSName("localhost"),
+                    x509.IPAddress("127.0.0.1"),
+                ]
+            ),
+            critical=False,
+        )
+        .sign(private_key, hashes.SHA256())
+    )
+
+    # Write to temporary files
+    cert_path = os.path.join(tempfile.gettempdir(), "lightning_cert.pem")
+    key_path = os.path.join(tempfile.gettempdir(), "lightning_key.pem")
+
+    with open(cert_path, "wb") as f:
+        f.write(cert.public_bytes(serialization.Encoding.PEM))
+
+    with open(key_path, "wb") as f:
+        f.write(
+            private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption(),
+            )
+        )
+
+    bt.logging.debug(f"🔐 Generated SSL certificate: {cert_path}")
+    bt.logging.debug(f"🔑 Generated SSL private key: {key_path}")
+
+    return cert_path, key_path
 
 
 class LightningMinerProtocol(QuicConnectionProtocol):
@@ -13,17 +81,48 @@ class LightningMinerProtocol(QuicConnectionProtocol):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.miner_session = kwargs.get("miner_session")
+        self._stream_data = {}
 
     def quic_event_received(self, event):
         """Handle QUIC events"""
         try:
-            if hasattr(event, "data"):
-                # Received synapse data
-                asyncio.create_task(self.handle_synapse_data(event.data))
+            # Handle different types of QUIC events
+            from aioquic.quic.events import StreamDataReceived, StreamReset
+
+            if isinstance(event, StreamDataReceived):
+                bt.logging.debug(f"📥 Received stream data on stream {event.stream_id}")
+                asyncio.create_task(
+                    self.handle_stream_data(
+                        event.stream_id, event.data, event.end_stream
+                    )
+                )
+            elif isinstance(event, StreamReset):
+                bt.logging.debug(f"🔄 Stream {event.stream_id} reset")
+                if event.stream_id in self._stream_data:
+                    del self._stream_data[event.stream_id]
+            else:
+                bt.logging.debug(f"📦 Received QUIC event: {type(event).__name__}")
         except Exception as e:
             bt.logging.error(f"Error handling QUIC event: {e}")
 
-    async def handle_synapse_data(self, data: bytes):
+    async def handle_stream_data(self, stream_id: int, data: bytes, end_stream: bool):
+        """Handle incoming stream data"""
+        try:
+            # Accumulate stream data
+            if stream_id not in self._stream_data:
+                self._stream_data[stream_id] = b""
+
+            self._stream_data[stream_id] += data
+
+            # Process complete message when stream ends
+            if end_stream:
+                complete_data = self._stream_data.pop(stream_id, b"")
+                if complete_data:
+                    await self.handle_synapse_data(complete_data, stream_id)
+        except Exception as e:
+            bt.logging.error(f"Error handling stream data: {e}")
+
+    async def handle_synapse_data(self, data: bytes, stream_id: int):
         """Handle incoming synapse data"""
         try:
             # Parse JSON message
@@ -31,7 +130,7 @@ class LightningMinerProtocol(QuicConnectionProtocol):
             message = json.loads(message_str)
 
             bt.logging.info(
-                f"📨 Received {message.get('synapse_type', 'Unknown')} synapse"
+                f"📨 Received {message.get('synapse_type', 'Unknown')} synapse on stream {stream_id}"
             )
 
             # Process synapse based on type
@@ -53,16 +152,23 @@ class LightningMinerProtocol(QuicConnectionProtocol):
             # Send response
             response_json = json.dumps(response)
             self._quic.send_stream_data(
-                0, response_json.encode("utf-8"), end_stream=True
+                stream_id, response_json.encode("utf-8"), end_stream=True
             )
 
-            bt.logging.info(f"✅ Sent response for {synapse_type}")
+            bt.logging.info(
+                f"✅ Sent response for {synapse_type} on stream {stream_id}"
+            )
 
         except Exception as e:
             bt.logging.error(f"Error processing synapse: {e}")
             error_response = {"error": str(e), "success": False}
             error_json = json.dumps(error_response)
-            self._quic.send_stream_data(0, error_json.encode("utf-8"), end_stream=True)
+            try:
+                self._quic.send_stream_data(
+                    stream_id, error_json.encode("utf-8"), end_stream=True
+                )
+            except Exception:
+                bt.logging.error("Failed to send error response")
 
     async def handle_query_zk_proof(
         self, synapse_data: Dict[str, Any]
@@ -177,14 +283,17 @@ class LightningServer:
                 f"🚀 Starting Python Lightning QUIC server on {self.bind_address}:{self.port}"
             )
 
+            # Generate SSL certificates dynamically
+            cert_path, key_path = generate_self_signed_cert()
+
             # Create QUIC configuration
             configuration = QuicConfiguration(
                 alpn_protocols=["lightning-quic"],
                 is_client=False,
             )
 
-            # Create self-signed certificate for QUIC
-            configuration.load_cert_chain("cert.pem", "key.pem")
+            # Load the dynamically generated certificates
+            configuration.load_cert_chain(cert_path, key_path)
 
             # Start server
             def create_protocol(*args, **kwargs):
