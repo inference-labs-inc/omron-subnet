@@ -165,12 +165,20 @@ impl LightningClient {
         let (mut send, mut recv) = connection.open_bi().await
             .map_err(|e| format!("Failed to open bidirectional stream: {}", e))?;
 
-        // Send handshake request
-        let request_json = serde_json::to_string(&request)
-            .map_err(|e| format!("Failed to serialize handshake: {}", e))?;
+        let handshake_data = serde_json::to_value(&request)
+            .map_err(|e| format!("Failed to serialize handshake data: {}", e))?;
 
-        send.write_all(request_json.as_bytes()).await
-            .map_err(|e| format!("Failed to send handshake: {}", e))?;
+        let synapse_packet = SynapsePacket {
+            synapse_type: "Handshake".to_string(),
+            data: handshake_data.as_object().unwrap().clone(),
+            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+        };
+
+        let packet_json = serde_json::to_string(&synapse_packet)
+            .map_err(|e| format!("Failed to serialize synapse packet: {}", e))?;
+
+        send.write_all(packet_json.as_bytes()).await
+            .map_err(|e| format!("Failed to send handshake packet: {}", e))?;
         send.finish().await
             .map_err(|e| format!("Failed to finish sending handshake: {}", e))?;
 
