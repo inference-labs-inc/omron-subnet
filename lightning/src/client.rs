@@ -170,7 +170,7 @@ impl LightningClient {
 
         let synapse_packet = SynapsePacket {
             synapse_type: "Handshake".to_string(),
-            data: handshake_data.as_object().unwrap().clone(),
+            data: handshake_data.as_object().unwrap().clone().into_iter().collect(),
             timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
         };
 
