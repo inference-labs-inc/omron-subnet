@@ -82,15 +82,17 @@ impl LightningClient {
         let _root_store = RootCertStore::empty();
 
         // Configure to accept any certificate (for self-signed certs)
-        let mut client_config = RustlsClientConfig::builder()
+        let mut tls_config = RustlsClientConfig::builder()
             .with_safe_defaults()
             .with_custom_certificate_verifier(Arc::new(AcceptAnyCertVerifier))
             .with_no_client_auth();
 
-        // Set ALPN protocol to match server
-        client_config.alpn_protocols = vec![b"lightning-quic".to_vec()];
+        // Set ALPN protocol to match server - CRITICAL for protocol negotiation
+        tls_config.alpn_protocols = vec![b"lightning-quic".to_vec()];
 
-        let client_config = ClientConfig::new(Arc::new(client_config));
+        println!("🔧 Client TLS config created with ALPN: lightning-quic");
+
+        let client_config = ClientConfig::new(Arc::new(tls_config));
         let mut endpoint = Endpoint::client("0.0.0.0:0".parse().unwrap()).unwrap();
         endpoint.set_default_client_config(client_config);
         self.endpoint = Some(endpoint);
@@ -108,6 +110,7 @@ impl LightningClient {
             println!("🔗 Connecting to miner at {}", addr);
 
             // Establish QUIC connection
+            println!("🔧 Client ALPN protocols configured: lightning-quic");
             let connection = endpoint.connect(addr, "localhost")
                 .map_err(|e| format!("Connection failed: {}", e))?
                 .await
