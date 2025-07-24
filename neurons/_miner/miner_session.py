@@ -377,12 +377,24 @@ class MinerSession:
     def queryZkProof(self, synapse: QueryZkProof) -> QueryZkProof:
         try:
             if hasattr(circuit_store, "circuits") and circuit_store.circuits:
-                circuit = circuit_store.circuits.get(synapse.model_id)
+                model_id = None
+                if synapse.query_input and "model_id" in synapse.query_input:
+                    model_id = synapse.query_input["model_id"]
+
+                if model_id is None:
+                    synapse.query_output = ""
+                    bt.logging.warning("No model_id found in query_input")
+                    return synapse
+
+                circuit = circuit_store.circuits.get(model_id)
                 if circuit:
+
+                    should_store_proof = getattr(synapse, "save", False)
+
                     verified_model_session = VerifiedModelSession(
                         circuit=circuit,
                         model_timeout=CIRCUIT_TIMEOUT_SECONDS,
-                        should_store_proof=synapse.save,
+                        should_store_proof=should_store_proof,
                     )
 
                     result = verified_model_session.query(
@@ -393,26 +405,27 @@ class MinerSession:
 
                     if result.is_success:
                         synapse.query_output = result.data
-                        bt.logging.info(
-                            f"Successfully processed proof for {synapse.model_id}"
-                        )
+                        bt.logging.info(f"Successfully processed proof for {model_id}")
                     else:
                         synapse.query_output = ""
                         bt.logging.warning(
-                            f"Failed to process proof for {synapse.model_id}: {result.error_message}"
+                            f"Failed to process proof for {model_id}: {result.error_message}"
                         )
                 else:
                     synapse.query_output = ""
-                    bt.logging.warning(
-                        f"Model {synapse.model_id} not found in circuit store"
-                    )
+                    bt.logging.warning(f"Model {model_id} not found in circuit store")
             else:
                 synapse.query_output = ""
                 bt.logging.warning("Circuit store is empty or not initialized")
 
+            # Use model_id from query_input for logging
+            log_model_id = None
+            if synapse.query_input and "model_id" in synapse.query_input:
+                log_model_id = synapse.query_input["model_id"]
+
             self.log_batch.append(
                 {
-                    "model_id": synapse.model_id,
+                    "model_id": log_model_id,
                     "query_output": synapse.query_output,
                     "timestamp": time.time(),
                 }
