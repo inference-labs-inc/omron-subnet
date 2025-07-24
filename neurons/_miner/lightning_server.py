@@ -145,6 +145,8 @@ class LightningMinerProtocol(QuicConnectionProtocol):
                 response = await self.handle_pow_request(synapse_data)
             elif synapse_type == "Competition":
                 response = await self.handle_competition_request(synapse_data)
+            elif synapse_type == "Handshake":
+                response = self.handle_handshake()
             else:
                 response = {
                     "error": f"Unknown synapse type: {synapse_type}",
@@ -171,6 +173,21 @@ class LightningMinerProtocol(QuicConnectionProtocol):
                 )
             except Exception:
                 bt.logging.error("Failed to send error response")
+
+    def handle_handshake(self) -> Dict[str, Any]:
+        bt.logging.info("🤝 Handling Handshake")
+        try:
+            miner_hotkey = self.miner_session.wallet.hotkey.ss58_address
+            signature = self.miner_session.wallet.hotkey.sign(miner_hotkey).hex()
+            return {
+                "miner_hotkey": miner_hotkey,
+                "signature": signature,
+                "version": bt.__version__,
+                "success": True,
+            }
+        except Exception as e:
+            bt.logging.error(f"Error in Handshake handler: {e}")
+            return {"error": str(e), "success": False}
 
     async def handle_query_zk_proof(
         self, synapse_data: Dict[str, Any]
