@@ -45,6 +45,7 @@ from constants import (
     DEFAULT_PROOF_SIZE,
 )
 from _validator.competitions.competition import Competition
+from _validator.core.capacity_manager import CapacityManager
 from multiprocessing import Queue as MPQueue
 from queue import Empty
 
@@ -70,7 +71,7 @@ class ValidatorLoop:
         self.validator_to_competition_queue = MPQueue()  # Messages TO competition
         self.competition_to_validator_queue = MPQueue()  # Messages FROM competition
         self.current_concurrency = MAX_CONCURRENT_REQUESTS
-
+        self.capacity_manager = CapacityManager(self.config)
         try:
             competition_id = 1
             bt.logging.info("Initializing competition module...")
@@ -168,6 +169,12 @@ class ValidatorLoop:
     @with_rate_limit(period=ONE_HOUR)
     def sync_metagraph(self):
         self.config.metagraph.sync(subtensor=self.config.subtensor)
+
+    @with_rate_limit(period=ONE_HOUR)
+    async def sync_capacities(self, axons: list[bt.Axon]):
+        capacities = await self.capacity_manager.sync_capacities(axons)
+        bt.logging.debug(f"Synced capacities: {capacities}")
+        return capacities
 
     @with_rate_limit(period=FIVE_MINUTES)
     def check_auto_update(self):
@@ -380,12 +387,16 @@ class ValidatorLoop:
     async def run_periodic_tasks(self):
         while self._should_run:
             try:
+
                 self.check_auto_update()
                 self.sync_metagraph()
                 self.sync_scores_uids()
                 self.update_weights()
                 self.update_competition_metrics()
                 self.update_queryable_uids()
+                await self.sync_capacities(
+                    [self.config.metagraph.axons[uid] for uid in self.queryable_uids]
+                )
                 self.update_processed_uids()
                 self.log_health()
                 await self.log_responses()
