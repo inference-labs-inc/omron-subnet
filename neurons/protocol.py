@@ -108,10 +108,11 @@ class QueryForCapacities(bt.Synapse):
         try:
             with open(config_path, "r") as f:
                 config = toml.load(f)
-                circuits = config.get("miner", {}).get("circuits", {})
+                circuits = config.get("miner", {}).get("circuits", [])
                 return {
-                    k.split(".")[-1]: v.get("compute_units", 0)
-                    for k, v in circuits.items()
+                    circuit.get("id"): circuit.get("compute_units", 0)
+                    for circuit in circuits
+                    if "id" in circuit
                 }
         except Exception as e:
             bt.logging.error(f"Error loading capacities from config: {e}")
