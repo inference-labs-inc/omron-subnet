@@ -212,7 +212,17 @@ class RequestPipeline:
         """
         Select a circuit for benchmarking using weighted random selection.
         """
-        circuits = list(circuit_store.circuits.values())
+        circuits = [
+            c
+            for c in circuit_store.circuits.values()
+            if c.input_handler is not GenericInput
+        ]
+
+        if not circuits:
+            bt.logging.warning(
+                "No circuits with registered input handlers found for benchmarking."
+            )
+            return None
 
         return random.choices(
             circuits,
