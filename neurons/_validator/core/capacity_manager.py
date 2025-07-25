@@ -8,6 +8,6 @@ class CapacityManager:
         self.config = config
         self.dendrite = bt.dendrite(wallet=self.config.wallet)
 
-    async def sync_capacities(self, axons: list[bt.Axon]):
+    def sync_capacities(self, axons: list[bt.Axon]):
         bt.logging.info(f"Syncing capacities for {len(axons)} axons")
-        return await self.dendrite.query(axons, QueryForCapacities())
+        return self.dendrite.query(axons, QueryForCapacities())
