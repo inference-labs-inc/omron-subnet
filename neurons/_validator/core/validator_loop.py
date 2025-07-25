@@ -172,7 +172,9 @@ class ValidatorLoop:
 
     @with_rate_limit(period=ONE_HOUR)
     def sync_capacities(self, axons: list[bt.Axon]):
-        return self.capacity_manager.sync_capacities(axons)
+        capacities = self.capacity_manager.sync_capacities(axons)
+        bt.logging.info(f"Synced capacities: {capacities}")
+        return capacities
 
     @with_rate_limit(period=FIVE_MINUTES)
     def check_auto_update(self):
