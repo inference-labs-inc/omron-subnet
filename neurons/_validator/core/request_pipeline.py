@@ -145,6 +145,11 @@ class RequestPipeline:
         circuit: Circuit,
         request: any | None = None,
     ) -> tuple[ProofOfWeightsSynapse | QueryZkProof, bool]:
+        # flake8: noqa: E501
+        bt.logging.debug(
+            f"Getting synapse request for circuit {circuit.id} ({circuit.metadata.name}) with request_type {request_type}"
+        )
+
         inputs = (
             circuit.input_handler(request_type)
             if request_type == RequestType.BENCHMARK
@@ -152,6 +157,10 @@ class RequestPipeline:
                 RequestType.RWR,
                 copy.deepcopy(request.inputs),
             )
+        )
+
+        bt.logging.debug(
+            f"Generated inputs for circuit {circuit.id}: {inputs.to_json() if hasattr(inputs, 'to_json') else inputs}"
         )
 
         if request_type == RequestType.RWR:
@@ -187,10 +196,14 @@ class RequestPipeline:
                 return synapse_request, save
 
         if circuit.metadata.type == CircuitType.PROOF_OF_COMPUTATION:
+            formatted_input = self.format_for_query(inputs, circuit)
+            bt.logging.debug(
+                f"Formatted query input for {circuit.id}: {formatted_input}"
+            )
             return (
                 QueryZkProof(
                     model_id=circuit.id,
-                    query_input=self.format_for_query(inputs, circuit),
+                    query_input=formatted_input,
                     query_output="",
                 ),
                 False,
@@ -212,11 +225,21 @@ class RequestPipeline:
         """
         Select a circuit for benchmarking using weighted random selection.
         """
+        all_circuits = list(circuit_store.circuits.values())
+        # flake8: noqa: E501
+        bt.logging.debug(
+            f"All available circuits: {[c.id + ' (' + c.metadata.name + ', handler: ' + str(type(c.input_handler).__name__) + ')' for c in all_circuits]}"
+        )
+
         circuits = [
             c
             for c in circuit_store.circuits.values()
             if c.input_handler is not GenericInput
         ]
+
+        bt.logging.debug(
+            f"Filtered circuits for benchmarking: {[c.id + ' (' + c.metadata.name + ')' for c in circuits]}"
+        )
 
         if not circuits:
             bt.logging.warning(
@@ -224,13 +247,18 @@ class RequestPipeline:
             )
             return None
 
-        return random.choices(
+        selected = random.choices(
             circuits,
             weights=[
                 (circuit.metadata.benchmark_choice_weight or 0) for circuit in circuits
             ],
             k=1,
         )[0]
+
+        bt.logging.info(
+            f"Selected circuit for benchmarking: {selected.id} ({selected.metadata.name})"
+        )
+        return selected
 
     def format_for_query(
         self, inputs: dict[str, object] | BaseInput, circuit: Circuit
