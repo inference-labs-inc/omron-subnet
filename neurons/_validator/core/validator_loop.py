@@ -463,6 +463,15 @@ class ValidatorLoop:
         Query a single axon using pure Rust Lightning QUIC transport with persistent connections.
         """
         try:
+            bt.logging.info(
+                f"Lightning query for UID {request.uid}: synapse type {type(request.synapse).__name__}"
+            )
+            bt.logging.info(f"Synapse content: {request.synapse}")
+            if hasattr(request.synapse, "query_input"):
+                bt.logging.info(
+                    f"QueryZkProof query_input: {repr(request.synapse.query_input)}"
+                )
+
             # Convert synapse to dict format expected by Lightning
             synapse_dict = {
                 "synapse_type": type(request.synapse).__name__,
@@ -472,6 +481,8 @@ class ValidatorLoop:
                     else request.synapse.__dict__
                 ),
             }
+
+            bt.logging.info(f"Serialized synapse_dict: {synapse_dict}")
 
             # Validate synapse data before sending
             if isinstance(request.synapse, ProofOfWeightsSynapse):

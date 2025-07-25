@@ -146,7 +146,7 @@ class RequestPipeline:
         request: any | None = None,
     ) -> tuple[ProofOfWeightsSynapse | QueryZkProof, bool]:
         # flake8: noqa: E501
-        bt.logging.debug(
+        bt.logging.info(
             f"Getting synapse request for circuit {circuit.id} ({circuit.metadata.name}) with request_type {request_type}"
         )
 
@@ -159,7 +159,7 @@ class RequestPipeline:
             )
         )
 
-        bt.logging.debug(
+        bt.logging.info(
             f"Generated inputs for circuit {circuit.id}: {inputs.to_json() if hasattr(inputs, 'to_json') else inputs}"
         )
 
@@ -197,7 +197,7 @@ class RequestPipeline:
 
         if circuit.metadata.type == CircuitType.PROOF_OF_COMPUTATION:
             formatted_input = self.format_for_query(inputs, circuit)
-            bt.logging.debug(
+            bt.logging.info(
                 f"Formatted query input for {circuit.id}: {formatted_input}"
             )
             return (
@@ -227,7 +227,7 @@ class RequestPipeline:
         """
         all_circuits = list(circuit_store.circuits.values())
         # flake8: noqa: E501
-        bt.logging.debug(
+        bt.logging.info(
             f"All available circuits: {[c.id + ' (' + c.metadata.name + ', handler: ' + str(type(c.input_handler).__name__) + ')' for c in all_circuits]}"
         )
 
@@ -237,7 +237,7 @@ class RequestPipeline:
             if c.input_handler is not GenericInput
         ]
 
-        bt.logging.debug(
+        bt.logging.info(
             f"Filtered circuits for benchmarking: {[c.id + ' (' + c.metadata.name + ')' for c in circuits]}"
         )
 
