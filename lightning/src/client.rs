@@ -4,8 +4,8 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
-use quinn::{ClientConfig, Endpoint, Connection};
+use std::time::{SystemTime, UNIX_EPOCH, Duration};
+use quinn::{ClientConfig, Endpoint, Connection, TransportConfig, IdleTimeout};
 use rustls::{RootCertStore, ClientConfig as RustlsClientConfig};
 use std::net::SocketAddr;
 use serde_json;
@@ -111,7 +111,24 @@ impl LightningClient {
 
         println!("🔧 Client TLS config created with ALPN: lightning-quic");
 
-        let client_config = ClientConfig::new(Arc::new(tls_config));
+        // Configure transport with appropriate timeouts for proof generation
+        let mut transport_config = TransportConfig::default();
+        
+        // Set idle timeout to 150 seconds to allow for proof generation (120s + buffer)
+        let idle_timeout = IdleTimeout::try_from(Duration::from_secs(150))
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                format!("Failed to set idle timeout: {}", e)
+            ))?;
+        transport_config.max_idle_timeout(Some(idle_timeout));
+
+        // Set keep-alive to 30 seconds to maintain connection during long operations
+        transport_config.keep_alive_interval(Some(Duration::from_secs(30)));
+
+        println!("🔧 Transport config set with 150s idle timeout and 30s keep-alive");
+
+        let mut client_config = ClientConfig::new(Arc::new(tls_config));
+        client_config.transport_config(Arc::new(transport_config));
+        
         let mut endpoint = Endpoint::client("0.0.0.0:0".parse().unwrap()).unwrap();
         endpoint.set_default_client_config(client_config);
         self.endpoint = Some(endpoint);

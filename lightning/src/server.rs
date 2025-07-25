@@ -3,8 +3,8 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use std::time::{SystemTime, UNIX_EPOCH};
-use quinn::{Endpoint, ServerConfig, Connection, RecvStream, SendStream};
+use std::time::{SystemTime, UNIX_EPOCH, Duration};
+use quinn::{Endpoint, ServerConfig, Connection, RecvStream, SendStream, TransportConfig, IdleTimeout};
 use rustls::{Certificate, PrivateKey, ServerConfig as RustlsServerConfig};
 use std::net::SocketAddr;
 use serde_json;
@@ -122,7 +122,23 @@ impl LightningServer {
 
         server_config.alpn_protocols = vec![b"lightning-quic".to_vec()];
 
-        let server_config = ServerConfig::with_crypto(Arc::new(server_config));
+        // Configure transport with appropriate timeouts for proof generation
+        let mut transport_config = TransportConfig::default();
+        
+        // Set idle timeout to 150 seconds to allow for proof generation (120s + buffer)
+        let idle_timeout = IdleTimeout::try_from(Duration::from_secs(150))
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                format!("Failed to set idle timeout: {}", e)
+            ))?;
+        transport_config.max_idle_timeout(Some(idle_timeout));
+
+        // Set keep-alive to 30 seconds to maintain connection during long operations
+        transport_config.keep_alive_interval(Some(Duration::from_secs(30)));
+
+        println!("🔧 Server transport config set with 150s idle timeout and 30s keep-alive");
+
+        let mut server_config = ServerConfig::with_crypto(Arc::new(server_config));
+        server_config.transport_config(Arc::new(transport_config));
 
         // Bind to address
         let addr: SocketAddr = format!("{}:{}", self.host, self.port)
