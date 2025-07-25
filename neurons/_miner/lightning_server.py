@@ -158,14 +158,23 @@ class LightningMinerProtocol(QuicConnectionProtocol):
                 }
 
             # Send response
-            response_packet = {
-                "success": response.get("success", True),
-                "data": response if response.get("success", True) else {},
-                "timestamp": int(time.time()),
-                "error": (
-                    response.get("error") if not response.get("success", True) else None
-                ),
-            }
+            if isinstance(response, dict) and response.get("success") is False:
+                # Error response
+                response_packet = {
+                    "success": False,
+                    "data": {},
+                    "timestamp": int(time.time()),
+                    "error": response.get("error", "Unknown error"),
+                }
+            else:
+                # Success response - put the synapse data in the data field
+                response_packet = {
+                    "success": True,
+                    "data": response,
+                    "timestamp": int(time.time()),
+                    "error": None,
+                }
+
             response_json = json.dumps(response_packet)
             self._quic.send_stream_data(
                 stream_id, response_json.encode("utf-8"), end_stream=True
