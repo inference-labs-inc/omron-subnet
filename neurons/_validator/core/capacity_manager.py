@@ -1,5 +1,6 @@
 import bittensor as bt
 from _validator.config import ValidatorConfig
+import asyncio
 from protocol import QueryForCapacities
 
 
@@ -10,4 +11,4 @@ class CapacityManager:
 
     def sync_capacities(self, axons: list[bt.Axon]):
         bt.logging.info(f"Syncing capacities for {len(axons)} axons")
-        return self.dendrite.query(axons, QueryForCapacities())
+        return asyncio.run(self.dendrite.query(axons, QueryForCapacities()))
