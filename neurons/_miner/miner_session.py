@@ -444,7 +444,8 @@ class MinerSession:
         """
         Handle capacity request from validators.
         """
-        return synapse.from_config()
+        synapse.capacities = QueryForCapacities.from_config()
+        return synapse
 
     def handleCompetitionRequest(self, synapse: Competition) -> Competition:
         """
