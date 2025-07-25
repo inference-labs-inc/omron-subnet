@@ -45,6 +45,7 @@ from constants import (
     DEFAULT_PROOF_SIZE,
 )
 from _validator.competitions.competition import Competition
+from _validator.core.capacity_manager import CapacityManager
 from multiprocessing import Queue as MPQueue
 from queue import Empty
 
@@ -70,7 +71,7 @@ class ValidatorLoop:
         self.validator_to_competition_queue = MPQueue()  # Messages TO competition
         self.competition_to_validator_queue = MPQueue()  # Messages FROM competition
         self.current_concurrency = MAX_CONCURRENT_REQUESTS
-
+        self.capacity_manager = CapacityManager(self.config)
         try:
             competition_id = 1
             bt.logging.info("Initializing competition module...")
