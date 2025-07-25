@@ -133,15 +133,9 @@ class LightningMinerProtocol(QuicConnectionProtocol):
             message_str = data.decode("utf-8")
             message = json.loads(message_str)
 
-            bt.logging.info(
-                f"📨 Received {message.get('synapse_type', 'Unknown')} synapse on stream {stream_id}"
-            )
-
             # Process synapse based on type
             synapse_type = message.get("synapse_type")
             synapse_data = message.get("data", {})
-
-            bt.logging.info(f"Raw synapse data: {synapse_data}")
 
             if synapse_type == "QueryZkProof":
                 response = await self.handle_query_zk_proof(synapse_data)
@@ -183,10 +177,6 @@ class LightningMinerProtocol(QuicConnectionProtocol):
 
             self._quic.send_stream_data(
                 stream_id, response_json.encode("utf-8"), end_stream=True
-            )
-
-            bt.logging.info(
-                f"✅ Sent response for {synapse_type} on stream {stream_id}"
             )
 
         except Exception as e:
@@ -236,7 +226,6 @@ class LightningMinerProtocol(QuicConnectionProtocol):
         self, synapse_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Handle QueryZkProof synapse"""
-        bt.logging.info("🔧 Processing QueryZkProof")
 
         try:
             from protocol import QueryZkProof
@@ -265,9 +254,6 @@ class LightningMinerProtocol(QuicConnectionProtocol):
 
                             parsed_query_input = json.loads(value)
                             processed_data[key] = parsed_query_input
-                            bt.logging.info(
-                                f"Parsed query_input JSON string back to dict: len={len(str(parsed_query_input))}"
-                            )
                             continue
                         except (json.JSONDecodeError, ValueError) as e:
                             bt.logging.warning(

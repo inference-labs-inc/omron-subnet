@@ -464,16 +464,12 @@ class ValidatorLoop:
         Query a single axon using pure Rust Lightning QUIC transport with persistent connections.
         """
         try:
-            bt.logging.info(
-                f"Lightning query UID {request.uid}: {type(request.synapse).__name__}"
-            )
             if hasattr(request.synapse, "query_input"):
                 query_summary = (
                     "empty"
                     if not request.synapse.query_input
                     else f"len={len(str(request.synapse.query_input))}"
                 )
-                bt.logging.info(f"QueryZkProof query_input: {query_summary}")
 
             # Log inputs field for ProofOfWeightsSynapse
             if hasattr(request.synapse, "inputs"):
@@ -521,15 +517,9 @@ class ValidatorLoop:
                         and isinstance(synapse_data[field_name], dict)
                         and synapse_data[field_name]
                     ):
-                        bt.logging.info(
-                            f"Converting {field_name} dict to JSON string for Lightning transport"
-                        )
                         try:
                             synapse_data[field_name] = json.dumps(
                                 synapse_data[field_name]
-                            )
-                            bt.logging.info(
-                                f"Successfully converted {field_name}: len={len(synapse_data[field_name])}"
                             )
                         except Exception as json_err:
                             bt.logging.error(
@@ -576,8 +566,6 @@ class ValidatorLoop:
                     "data": synapse_data,
                 }
             # flake8: noqa: E501
-            data_summary = f"keys={list(synapse_dict['data'].keys()) if isinstance(synapse_dict.get('data'), dict) else 'not_dict'}"
-            bt.logging.info(f"Serialized synapse: {data_summary}")
 
             # Validate synapse data before sending
             if isinstance(request.synapse, ProofOfWeightsSynapse):
