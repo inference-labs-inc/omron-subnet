@@ -11,4 +11,5 @@ class CapacityManager:
 
     def sync_capacities(self, axons: list[bt.Axon]):
         bt.logging.info(f"Syncing capacities for {len(axons)} axons")
-        return asyncio.run(self.dendrite.query(axons, QueryForCapacities()))
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(self.dendrite.query(axons, QueryForCapacities()))
