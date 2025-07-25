@@ -145,9 +145,8 @@ class RequestPipeline:
         circuit: Circuit,
         request: any | None = None,
     ) -> tuple[ProofOfWeightsSynapse | QueryZkProof, bool]:
-        # flake8: noqa: E501
         bt.logging.info(
-            f"Getting synapse request for circuit {circuit.id} ({circuit.metadata.name}) with request_type {request_type}"
+            f"Getting synapse for {circuit.id[:8]}... ({circuit.metadata.name}) type={request_type}"
         )
 
         inputs = (
@@ -158,10 +157,9 @@ class RequestPipeline:
                 copy.deepcopy(request.inputs),
             )
         )
-
-        bt.logging.info(
-            f"Generated inputs for circuit {circuit.id}: {inputs.to_json() if hasattr(inputs, 'to_json') else inputs}"
-        )
+        # flake8: noqa: E501
+        inputs_summary = f"keys={list(inputs.to_json().keys()) if hasattr(inputs, 'to_json') else 'no_to_json'}, len={len(str(inputs))}"
+        bt.logging.info(f"Generated inputs for {circuit.id[:8]}...: {inputs_summary}")
 
         if request_type == RequestType.RWR:
             if circuit.metadata.type == CircuitType.PROOF_OF_WEIGHTS:
@@ -197,9 +195,9 @@ class RequestPipeline:
 
         if circuit.metadata.type == CircuitType.PROOF_OF_COMPUTATION:
             formatted_input = self.format_for_query(inputs, circuit)
-            bt.logging.info(
-                f"Formatted query input for {circuit.id}: {formatted_input}"
-            )
+            # flake8: noqa: E501
+            query_summary = f"keys={list(formatted_input.keys()) if isinstance(formatted_input, dict) else 'not_dict'}, len={len(str(formatted_input))}"
+            bt.logging.info(f"Formatted query for {circuit.id[:8]}...: {query_summary}")
             return (
                 QueryZkProof(
                     model_id=circuit.id,
@@ -226,11 +224,6 @@ class RequestPipeline:
         Select a circuit for benchmarking using weighted random selection.
         """
         all_circuits = list(circuit_store.circuits.values())
-        # flake8: noqa: E501
-        bt.logging.info(
-            f"All available circuits: {[c.id + ' (' + c.metadata.name + ', handler: ' + str(type(c.input_handler).__name__) + ')' for c in all_circuits]}"
-        )
-
         circuits = [
             c
             for c in circuit_store.circuits.values()
@@ -238,7 +231,7 @@ class RequestPipeline:
         ]
 
         bt.logging.info(
-            f"Filtered circuits for benchmarking: {[c.id + ' (' + c.metadata.name + ')' for c in circuits]}"
+            f"Available circuits: {len(all_circuits)}, filtered: {len(circuits)}"
         )
 
         if not circuits:
@@ -256,7 +249,7 @@ class RequestPipeline:
         )[0]
 
         bt.logging.info(
-            f"Selected circuit for benchmarking: {selected.id} ({selected.metadata.name})"
+            f"Selected circuit: {selected.id[:8]}... ({selected.metadata.name})"
         )
         return selected
 

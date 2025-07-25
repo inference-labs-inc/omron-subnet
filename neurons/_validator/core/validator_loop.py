@@ -464,13 +464,15 @@ class ValidatorLoop:
         """
         try:
             bt.logging.info(
-                f"Lightning query for UID {request.uid}: synapse type {type(request.synapse).__name__}"
+                f"Lightning query UID {request.uid}: {type(request.synapse).__name__}"
             )
-            bt.logging.info(f"Synapse content: {request.synapse}")
             if hasattr(request.synapse, "query_input"):
-                bt.logging.info(
-                    f"QueryZkProof query_input: {repr(request.synapse.query_input)}"
+                query_summary = (
+                    "empty"
+                    if not request.synapse.query_input
+                    else f"len={len(str(request.synapse.query_input))}"
                 )
+                bt.logging.info(f"QueryZkProof query_input: {query_summary}")
 
             # Convert synapse to dict format expected by Lightning
             synapse_dict = {
@@ -481,8 +483,9 @@ class ValidatorLoop:
                     else request.synapse.__dict__
                 ),
             }
-
-            bt.logging.info(f"Serialized synapse_dict: {synapse_dict}")
+            # flake8: noqa: E501
+            data_summary = f"keys={list(synapse_dict['data'].keys()) if isinstance(synapse_dict.get('data'), dict) else 'not_dict'}"
+            bt.logging.info(f"Serialized synapse: {data_summary}")
 
             # Validate synapse data before sending
             if isinstance(request.synapse, ProofOfWeightsSynapse):
