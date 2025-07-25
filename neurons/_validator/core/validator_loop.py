@@ -475,6 +475,15 @@ class ValidatorLoop:
                 )
                 bt.logging.info(f"QueryZkProof query_input: {query_summary}")
 
+            # Log inputs field for ProofOfWeightsSynapse
+            if hasattr(request.synapse, "inputs"):
+                inputs_summary = (
+                    "empty"
+                    if not request.synapse.inputs
+                    else f"len={len(str(request.synapse.inputs))}, type={type(request.synapse.inputs).__name__}"
+                )
+                bt.logging.info(f"ProofOfWeightsSynapse inputs: {inputs_summary}")
+
             # Convert synapse to dict format expected by Lightning
             synapse_dict = {
                 "synapse_type": type(request.synapse).__name__,
