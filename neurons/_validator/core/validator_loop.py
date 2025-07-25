@@ -170,8 +170,8 @@ class ValidatorLoop:
         self.config.metagraph.sync(subtensor=self.config.subtensor)
 
     @with_rate_limit(period=ONE_HOUR)
-    def sync_capacities(self):
-        return self.capacity_manager.sync_capacities()
+    def sync_capacities(self, axons: list[bt.Axon]):
+        return self.capacity_manager.sync_capacities(axons)
 
     @with_rate_limit(period=FIVE_MINUTES)
     def check_auto_update(self):
@@ -384,7 +384,9 @@ class ValidatorLoop:
     async def run_periodic_tasks(self):
         while self._should_run:
             try:
-                self.sync_capacities()
+                self.sync_capacities(
+                    [self.config.metagraph.axons[uid] for uid in self.queryable_uids]
+                )
                 self.check_auto_update()
                 self.sync_metagraph()
                 self.sync_scores_uids()
