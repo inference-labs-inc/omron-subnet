@@ -253,6 +253,27 @@ class LightningMinerProtocol(QuicConnectionProtocol):
                     "header_size",
                     "total_size",
                 ]:
+                    # Parse JSON string fields back to dictionaries
+                    if (
+                        key == "query_input"
+                        and isinstance(value, str)
+                        and value
+                        and value != ""
+                    ):
+                        try:
+                            import json
+
+                            parsed_query_input = json.loads(value)
+                            processed_data[key] = parsed_query_input
+                            bt.logging.info(
+                                f"Parsed query_input JSON string back to dict: len={len(str(parsed_query_input))}"
+                            )
+                            continue
+                        except (json.JSONDecodeError, ValueError) as e:
+                            bt.logging.warning(
+                                f"Failed to parse query_input as JSON, using as-is: {e}"
+                            )
+
                     if value == "":
                         if key == "query_input":
                             processed_data[key] = {}
