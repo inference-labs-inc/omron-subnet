@@ -338,6 +338,7 @@ class ValidatorLoop:
                         for uid in self.queryable_uids
                         if uid not in self.processed_uids
                         and uid not in self.active_tasks
+                        and uid == 177  # DEBUG: Only query UID 177
                     ]
 
                     for uid in available_uids[:slots_available]:
