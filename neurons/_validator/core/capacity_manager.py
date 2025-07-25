@@ -6,14 +6,8 @@ from protocol import QueryForCapacities
 class CapacityManager:
     def __init__(self, config: ValidatorConfig):
         self.config = config
-        self.dendrite = bt.dendrite(wallet=self.config.wallet)
+        self.dendrite = self.config.dendrite
 
     async def sync_capacities(self, axons: list[bt.Axon]):
         bt.logging.info(f"Syncing capacities for {len(axons)} axons")
-        query_coroutine = self.dendrite.query(axons, QueryForCapacities())
-        if query_coroutine is None:
-            bt.logging.warning(
-                "Dendrite query returned None, possibly not running. Returning empty list."
-            )
-            return []
-        return await query_coroutine
+        return await self.dendrite.forward(axons, QueryForCapacities())
