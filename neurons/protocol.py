@@ -3,6 +3,7 @@ from typing import Dict, Optional
 
 import bittensor as bt
 
+import toml
 from execution_layer.circuit import ProofSystem
 
 
@@ -104,10 +105,14 @@ class QueryForCapacities(bt.Synapse):
 
     @staticmethod
     def from_config(config_path: str = "miner.config.toml") -> dict[str, int]:
-        import toml
-
-        config = toml.load(config_path)
-        circuits = config.get("miner", {}).get("circuits", {})
-        return {
-            k.split(".")[-1]: v.get("compute_units", 0) for k, v in circuits.items()
-        }
+        try:
+            with open(config_path, "r") as f:
+                config = toml.load(f)
+                circuits = config.get("miner", {}).get("circuits", {})
+                return {
+                    k.split(".")[-1]: v.get("compute_units", 0)
+                    for k, v in circuits.items()
+                }
+        except Exception as e:
+            bt.logging.error(f"Error loading capacities from config: {e}")
+            return {}
