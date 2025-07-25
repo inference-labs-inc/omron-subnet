@@ -484,6 +484,17 @@ class ValidatorLoop:
                 )
                 bt.logging.info(f"ProofOfWeightsSynapse inputs: {inputs_summary}")
 
+                # Log the actual content if it's not empty
+                if request.synapse.inputs:
+                    inputs_preview = (
+                        str(request.synapse.inputs)[:200]
+                        if len(str(request.synapse.inputs)) > 200
+                        else str(request.synapse.inputs)
+                    )
+                    bt.logging.info(
+                        f"ProofOfWeightsSynapse inputs content preview: {inputs_preview}"
+                    )
+
             # Convert synapse to dict format expected by Lightning
             synapse_dict = {
                 "synapse_type": type(request.synapse).__name__,
