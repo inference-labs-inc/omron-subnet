@@ -288,10 +288,19 @@ class LightningMinerProtocol(QuicConnectionProtocol):
             # Call miner session handler
             if self.miner_session:
                 result = self.miner_session.queryZkProof(synapse)
+
+                # Convert query_output to JSON string if it's a dict
+                query_output = ""
+                if hasattr(result, "query_output") and result.query_output:
+                    if isinstance(result.query_output, dict):
+                        import json
+
+                        query_output = json.dumps(result.query_output)
+                    else:
+                        query_output = str(result.query_output)
+
                 return {
-                    "query_output": (
-                        result.query_output if hasattr(result, "query_output") else ""
-                    ),
+                    "query_output": query_output,
                     "success": True,
                     "processed_via": "python_quic_server",
                 }

@@ -113,7 +113,7 @@ impl LightningClient {
 
         // Configure transport with appropriate timeouts for proof generation
         let mut transport_config = TransportConfig::default();
-        
+
         // Set idle timeout to 150 seconds to allow for proof generation (120s + buffer)
         let idle_timeout = IdleTimeout::try_from(Duration::from_secs(150))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -128,7 +128,7 @@ impl LightningClient {
 
         let mut client_config = ClientConfig::new(Arc::new(tls_config));
         client_config.transport_config(Arc::new(transport_config));
-        
+
         let mut endpoint = Endpoint::client("0.0.0.0:0".parse().unwrap()).unwrap();
         endpoint.set_default_client_config(client_config);
         self.endpoint = Some(endpoint);

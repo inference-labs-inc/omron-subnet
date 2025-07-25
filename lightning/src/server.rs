@@ -124,7 +124,7 @@ impl LightningServer {
 
         // Configure transport with appropriate timeouts for proof generation
         let mut transport_config = TransportConfig::default();
-        
+
         // Set idle timeout to 150 seconds to allow for proof generation (120s + buffer)
         let idle_timeout = IdleTimeout::try_from(Duration::from_secs(150))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(

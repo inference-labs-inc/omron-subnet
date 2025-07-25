@@ -431,10 +431,14 @@ class MinerSession:
             proof, public_signals, _ = verified_model_session.gen_proof()
 
             if proof and public_signals:
-                synapse.query_output = {
-                    "proof": proof,
-                    "public_signals": public_signals,
-                }
+                import json
+
+                synapse.query_output = json.dumps(
+                    {
+                        "proof": proof,
+                        "public_signals": public_signals,
+                    }
+                )
                 bt.logging.info(f"Successfully processed proof for {model_id}")
             else:
                 self._set_error_response(
