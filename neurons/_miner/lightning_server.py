@@ -158,7 +158,15 @@ class LightningMinerProtocol(QuicConnectionProtocol):
                 }
 
             # Send response
-            response_json = json.dumps(response)
+            response_packet = {
+                "success": response.get("success", True),
+                "data": response if response.get("success", True) else {},
+                "timestamp": int(time.time()),
+                "error": (
+                    response.get("error") if not response.get("success", True) else None
+                ),
+            }
+            response_json = json.dumps(response_packet)
             self._quic.send_stream_data(
                 stream_id, response_json.encode("utf-8"), end_stream=True
             )
@@ -169,7 +177,12 @@ class LightningMinerProtocol(QuicConnectionProtocol):
 
         except Exception as e:
             bt.logging.error(f"Error processing synapse: {e}")
-            error_response = {"error": str(e), "success": False}
+            error_response = {
+                "success": False,
+                "data": {},
+                "timestamp": int(time.time()),
+                "error": str(e),
+            }
             error_json = json.dumps(error_response)
             try:
                 self._quic.send_stream_data(
