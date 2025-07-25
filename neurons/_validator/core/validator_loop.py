@@ -496,14 +496,48 @@ class ValidatorLoop:
                     )
 
             # Convert synapse to dict format expected by Lightning
-            synapse_dict = {
-                "synapse_type": type(request.synapse).__name__,
-                "data": (
-                    request.synapse.model_dump()
-                    if hasattr(request.synapse, "model_dump")
-                    else request.synapse.__dict__
-                ),
-            }
+            try:
+                # Try Pydantic V2 serialization first
+                if hasattr(request.synapse, "model_dump"):
+                    synapse_data = request.synapse.model_dump(mode="json")
+                # Fall back to Pydantic V1 serialization
+                elif hasattr(request.synapse, "dict"):
+                    synapse_data = request.synapse.dict()
+                # Manual extraction as last resort
+                else:
+                    synapse_data = {
+                        key: getattr(request.synapse, key)
+                        for key in dir(request.synapse)
+                        if not key.startswith("_")
+                        and not callable(getattr(request.synapse, key))
+                    }
+
+                synapse_dict = {
+                    "synapse_type": type(request.synapse).__name__,
+                    "data": synapse_data,
+                }
+            except Exception as e:
+                bt.logging.error(f"Failed to serialize synapse: {e}")
+                # Emergency fallback - manual field extraction
+                synapse_data = {}
+                for field_name in [
+                    "query_input",
+                    "query_output",
+                    "model_id",
+                    "inputs",
+                    "proof",
+                    "public_signals",
+                    "verification_key_hash",
+                    "subnet_uid",
+                    "proof_system",
+                ]:
+                    if hasattr(request.synapse, field_name):
+                        synapse_data[field_name] = getattr(request.synapse, field_name)
+
+                synapse_dict = {
+                    "synapse_type": type(request.synapse).__name__,
+                    "data": synapse_data,
+                }
             # flake8: noqa: E501
             data_summary = f"keys={list(synapse_dict['data'].keys()) if isinstance(synapse_dict.get('data'), dict) else 'not_dict'}"
             bt.logging.info(f"Serialized synapse: {data_summary}")
