@@ -26,10 +26,10 @@ from deployment_layer.circuit_store import circuit_store
 from execution_layer.generic_input import GenericInput
 from execution_layer.verified_model_session import VerifiedModelSession
 from protocol import (
-    QueryForProofAggregation,
     QueryZkProof,
     ProofOfWeightsSynapse,
     Competition,
+    QueryForCapacities,
 )
 from utils import AutoUpdate, clean_temp_files, wandb_logger
 from utils.rate_limiter import with_rate_limit
@@ -78,6 +78,10 @@ class MinerSession:
         axon.attach(
             forward_fn=self.handleCompetitionRequest,
             blacklist_fn=self.competition_blacklist,
+        )
+        axon.attach(
+            forward_fn=self.handleCapacityRequest,
+            blacklist_fn=self.capacity_blacklist,
         )
 
         bt.logging.info("Attached forward functions to axon")
@@ -363,14 +367,6 @@ class MinerSession:
         """
         return self._blacklist(synapse)
 
-    def aggregation_blacklist(
-        self, synapse: QueryForProofAggregation
-    ) -> Tuple[bool, str]:
-        """
-        Blacklist method for the aggregation endpoint
-        """
-        return self._blacklist(synapse)
-
     def pow_blacklist(self, synapse: ProofOfWeightsSynapse) -> Tuple[bool, str]:
         """
         Blacklist method for the proof generation endpoint
@@ -383,9 +379,20 @@ class MinerSession:
         """
         return self._blacklist(synapse)
 
+    def capacity_blacklist(self, synapse: QueryForCapacities) -> Tuple[bool, str]:
+        """
+        Blacklist method for the capacity request endpoint
+        """
+        return self._blacklist(synapse)
+
     def _blacklist(
         self,
-        synapse: Union[QueryZkProof, QueryForProofAggregation, ProofOfWeightsSynapse],
+        synapse: Union[
+            QueryZkProof,
+            ProofOfWeightsSynapse,
+            QueryForCapacities,
+            Competition,
+        ],
     ) -> Tuple[bool, str]:
         """
         Filters requests if any of the following conditions are met:
@@ -432,6 +439,12 @@ class MinerSession:
         except Exception as e:
             bt.logging.error(f"Error during blacklist {e}")
             return True, "An error occurred while filtering the request"
+
+    def handleCapacityRequest(self, synapse: QueryForCapacities) -> QueryForCapacities:
+        """
+        Handle capacity request from validators.
+        """
+        return synapse.from_config()
 
     def handleCompetitionRequest(self, synapse: Competition) -> Competition:
         """
@@ -677,11 +690,3 @@ class MinerSession:
                 "This indicates your hardware is not processing the requests in time."
             )
         return synapse
-
-    def aggregateProof(
-        self, synapse: QueryForProofAggregation
-    ) -> QueryForProofAggregation:
-        """
-        Generates an aggregate proof for the provided proofs.
-        """
-        raise NotImplementedError("Proof aggregation not supported at this time.")

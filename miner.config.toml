@@ -1,5 +1,6 @@
 [miner]
 
+# Specify details around each circuit. For now only compute units can be specified.
 [[miner.circuits]]
 id = "4a87c995300f4e9ad9add9d5b800eb93bb3ecd3f9459b617f9924a211407a88c"
 compute_units = 400
