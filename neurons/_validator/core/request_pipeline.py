@@ -23,7 +23,6 @@ from execution_layer.generic_input import GenericInput
 from protocol import ProofOfWeightsSynapse, QueryZkProof
 from utils.wandb_logger import safe_log
 from execution_layer.base_input import BaseInput
-from execution_layer.input_registry import InputRegistry
 
 
 class RequestPipeline:
@@ -140,37 +139,6 @@ class RequestPipeline:
                 requests.append(request)
         return requests
 
-    def select_circuit_for_benchmark(self) -> Circuit:
-        """
-        Select a circuit for benchmarking using weighted random selection.
-        """
-        circuits = [
-            c
-            for c in circuit_store.circuits.values()
-            if InputRegistry.get_handler(c.id) is not GenericInput
-        ]
-
-        if not circuits:
-            bt.logging.warning(
-                "No circuits with registered input handlers found for benchmarking."
-            )
-            return None
-
-        return random.choices(
-            circuits,
-            weights=[
-                (circuit.metadata.benchmark_choice_weight or 0) for circuit in circuits
-            ],
-            k=1,
-        )[0]
-
-    def format_for_query(
-        self, inputs: dict[str, object] | BaseInput, circuit: Circuit
-    ) -> dict[str, object]:
-        if hasattr(inputs, "to_json"):
-            inputs = inputs.to_json()
-        return {"public_inputs": inputs, "model_id": circuit.id}
-
     def get_synapse_request(
         self,
         request_type: RequestType,
@@ -239,6 +207,27 @@ class RequestPipeline:
             ),
             False,
         )
+
+    def select_circuit_for_benchmark(self) -> Circuit:
+        """
+        Select a circuit for benchmarking using weighted random selection.
+        """
+        circuits = list(circuit_store.circuits.values())
+
+        return random.choices(
+            circuits,
+            weights=[
+                (circuit.metadata.benchmark_choice_weight or 0) for circuit in circuits
+            ],
+            k=1,
+        )[0]
+
+    def format_for_query(
+        self, inputs: dict[str, object] | BaseInput, circuit: Circuit
+    ) -> dict[str, object]:
+        if hasattr(inputs, "to_json"):
+            inputs = inputs.to_json()
+        return {"public_inputs": inputs, "model_id": circuit.id}
 
     def prepare_single_request(self, uid: int) -> Request | None:
         """
