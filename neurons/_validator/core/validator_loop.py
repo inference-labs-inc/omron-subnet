@@ -516,6 +516,19 @@ class ValidatorLoop:
                     "synapse_type": type(request.synapse).__name__,
                     "data": synapse_data,
                 }
+
+                # Log the actual inputs content in the serialized data
+                if "inputs" in synapse_data:
+                    inputs_in_serialized = synapse_data["inputs"]
+                    bt.logging.info(
+                        f"Serialized inputs field: empty={inputs_in_serialized == ''}, len={len(str(inputs_in_serialized))}, type={type(inputs_in_serialized).__name__}"
+                    )
+                    if inputs_in_serialized and len(str(inputs_in_serialized)) > 0:
+                        bt.logging.info(
+                            f"Serialized inputs preview: {str(inputs_in_serialized)[:100]}..."
+                        )
+                    else:
+                        bt.logging.error("CRITICAL: Serialized inputs is empty!")
             except Exception as e:
                 bt.logging.error(f"Failed to serialize synapse: {e}")
                 # Emergency fallback - manual field extraction
