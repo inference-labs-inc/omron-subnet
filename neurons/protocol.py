@@ -88,17 +88,26 @@ class Competition(bt.Synapse):
         }
 
 
-class QueryForProofAggregation(bt.Synapse):
+# Note these are going to need to change to lighting.Synapse
+class QueryForCapacities(bt.Synapse):
     """
-    Query for aggregation of multiple proofs into a single proof
+    Query for capacities allocated to each circuit
     """
 
-    proofs: list[str] = []
-    model_id: str or int
-    aggregation_proof: Optional[str] = None
+    capacities: Optional[dict[str, int]] = None
 
-    def deserialize(self) -> str | None:
+    def deserialize(self) -> dict[str, int]:
         """
-        Return the aggregation proof
+        Return the capacities
         """
-        return self.aggregation_proof
+        return self.capacities
+
+    @staticmethod
+    def from_config(config_path: str = "miner.config.toml") -> dict[str, int]:
+        import toml
+
+        config = toml.load(config_path)
+        circuits = config.get("miner", {}).get("circuits", {})
+        return {
+            k.split(".")[-1]: v.get("compute_units", 0) for k, v in circuits.items()
+        }
