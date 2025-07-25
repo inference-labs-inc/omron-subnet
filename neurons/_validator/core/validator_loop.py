@@ -512,6 +512,30 @@ class ValidatorLoop:
                         and not callable(getattr(request.synapse, key))
                     }
 
+                # Workaround: Convert complex dict fields to JSON strings to avoid Rust serialization issues
+                import json
+
+                for field_name in ["inputs", "query_input"]:
+                    if (
+                        field_name in synapse_data
+                        and isinstance(synapse_data[field_name], dict)
+                        and synapse_data[field_name]
+                    ):
+                        bt.logging.info(
+                            f"Converting {field_name} dict to JSON string for Lightning transport"
+                        )
+                        try:
+                            synapse_data[field_name] = json.dumps(
+                                synapse_data[field_name]
+                            )
+                            bt.logging.info(
+                                f"Successfully converted {field_name}: len={len(synapse_data[field_name])}"
+                            )
+                        except Exception as json_err:
+                            bt.logging.error(
+                                f"Failed to JSON-convert {field_name}: {json_err}"
+                            )
+
                 synapse_dict = {
                     "synapse_type": type(request.synapse).__name__,
                     "data": synapse_data,
