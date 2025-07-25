@@ -387,15 +387,16 @@ class ValidatorLoop:
     async def run_periodic_tasks(self):
         while self._should_run:
             try:
-                self.sync_capacities(
-                    [self.config.metagraph.axons[uid] for uid in self.queryable_uids]
-                )
+
                 self.check_auto_update()
                 self.sync_metagraph()
                 self.sync_scores_uids()
                 self.update_weights()
                 self.update_competition_metrics()
                 self.update_queryable_uids()
+                self.sync_capacities(
+                    [self.config.metagraph.axons[uid] for uid in self.queryable_uids]
+                )
                 self.update_processed_uids()
                 self.log_health()
                 await self.log_responses()
