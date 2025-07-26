@@ -8,6 +8,7 @@ from constants import (
     NUM_MINER_GROUPS,
     ONE_MINUTE,
     EMA_BOOST_FACTOR,
+    EMA_ENABLED,
 )
 from utils.epoch import get_current_epoch_info
 from utils.rate_limiter import with_rate_limit
@@ -66,7 +67,7 @@ class EMAManager:
             if self.scores[uid] is not None:
                 last_ema_epoch = self.last_ema_segment_per_uid.get(uid, -1)
 
-                if last_ema_epoch != current_epoch:
+                if last_ema_epoch != current_epoch and EMA_ENABLED:
                     if group == boosted_group:
                         self.scores[uid] = self.scores[uid] * EMA_BOOST_FACTOR
                     else:
