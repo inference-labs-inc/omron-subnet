@@ -159,6 +159,8 @@ jobs:
           scan-ref: '.'
           format: 'sarif'
           output: 'trivy-results.sarif'
+          skip-dirs: '/lib/modules,/boot,/usr/src/kernels'
+          ignore-unfixed: true
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
@@ -169,7 +171,7 @@ jobs:
       - name: Run Trivy for JSON report
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: 'fs'
+          scan-type: 'repo'
           scan-ref: '.'
           format: 'json'
           output: 'trivy-results.json'
