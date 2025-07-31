@@ -183,4 +183,4 @@ MAX_CIRCUIT_SIZE_GB = 50
 # EMA boost factor
 EMA_BOOST_FACTOR = 1.2
 # EMA enabled flag
-EMA_ENABLED = False
+EMA_ENABLED = True
