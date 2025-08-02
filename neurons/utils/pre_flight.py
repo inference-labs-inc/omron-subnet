@@ -23,8 +23,7 @@ LOCAL_SNARKJS_PATH = os.path.join(
     LOCAL_SNARKJS_INSTALL_DIR, "node_modules", ".bin", "snarkjs"
 )
 LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")
-TOOLCHAIN = "nightly-2024-09-30"
-JOLT_VERSION = "dd9e5c4bcf36ffeb75a576351807f8d86c33ec66"
+
 
 MINER_EXTERNAL_FILES = [
     "circuit.zkey",

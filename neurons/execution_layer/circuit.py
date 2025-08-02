@@ -38,10 +38,9 @@ class ProofSystem(str, Enum):
     Enum representing supported proof systems.
     """
 
-    # ZK Proof Systems
+    # Supported provers
     ZKML = "ZKML"
     CIRCOM = "CIRCOM"
-    JOLT = "JOLT"
     EZKL = "EZKL"
     DCAP = "DCAP"
 
@@ -122,14 +121,12 @@ class CircuitPaths:
             self.pk = os.path.join(self.external_base_path, "circuit.zkey")
             self.vk = os.path.join(self.base_path, "verification_key.json")
             self.compiled_model = os.path.join(self.base_path, "circuit.wasm")
-        elif proof_system == ProofSystem.JOLT:
-            self.compiled_model = os.path.join(
-                self.base_path, "target", "release", "circuit"
-            )
         elif proof_system == ProofSystem.EZKL:
             self.pk = os.path.join(self.external_base_path, "pk.key")
             self.vk = os.path.join(self.base_path, "vk.key")
             self.compiled_model = os.path.join(self.base_path, "model.compiled")
+        elif proof_system == ProofSystem.DCAP:
+            self.compiled_model = os.path.join(self.base_path, "model.onnx")
         else:
             raise ValueError(f"Proof system {proof_system} not supported")
 
