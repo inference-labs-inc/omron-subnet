@@ -43,6 +43,7 @@ class ProofSystem(str, Enum):
     CIRCOM = "CIRCOM"
     JOLT = "JOLT"
     EZKL = "EZKL"
+    DCAP = "DCAP"
 
     def __str__(self):
         return self.value
@@ -143,7 +144,7 @@ class CircuitMetadata:
     description: str
     author: str
     version: str
-    proof_system: str
+    proof_system: ProofSystem
     type: CircuitType
     external_files: dict[str, str]
     netuid: int | None = None
@@ -164,6 +165,12 @@ class CircuitMetadata:
         """
         with open(metadata_path, "r", encoding="utf-8") as f:
             metadata = json.load(f)
+
+        if "proof_system" in metadata:
+            metadata["proof_system"] = ProofSystem(metadata["proof_system"])
+        if "type" in metadata:
+            metadata["type"] = CircuitType(metadata["type"])
+
         return cls(**metadata)
 
 

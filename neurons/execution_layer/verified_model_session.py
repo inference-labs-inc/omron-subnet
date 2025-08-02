@@ -12,7 +12,7 @@ from attr import define, field
 from execution_layer.circuit import Circuit
 from execution_layer.proof_handlers.base_handler import ProofSystemHandler
 from execution_layer.proof_handlers.factory import ProofSystemFactory
-from execution_layer.session_storage import SessionStorage
+from execution_layer.session_storage import SessionStorage, SessionStorageFactory
 from execution_layer.base_input import BaseInput
 from execution_layer.generic_input import GenericInput
 
@@ -55,7 +55,9 @@ class VerifiedModelSession:
         self.model = model
         self.inputs = inputs
         self.session_id = str(uuid.uuid4())
-        self.session_storage = SessionStorage(self.model.id, self.session_id)
+        self.session_storage = SessionStorageFactory.create_storage(
+            self.model.metadata.proof_system, self.model.id, self.session_id
+        )
         self.proof_handler = ProofSystemFactory.get_handler(
             self.model.metadata.proof_system
         )
