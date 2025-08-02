@@ -47,6 +47,9 @@ def run_shared_preflight_checks(role: Optional[Roles] = None):
     - Node.js >= 20 is installed
     - SnarkJS is installed
 
+    Conditionals:
+    - If role is miner, check docker is installed
+
     Raises:
         Exception: If any of the pre-flight checks fail.
     """
@@ -57,6 +60,9 @@ def run_shared_preflight_checks(role: Optional[Roles] = None):
             "Checking SnarkJS installation": ensure_snarkjs_installed,
             "Checking EZKL installation": ensure_ezkl_installed,
             "Syncing model files": partial(sync_model_files, role=role),
+            "Checking Docker installation": (
+                ensure_docker_installed if role == Roles.MINER else None
+            ),
         }
     )
 
@@ -68,6 +74,9 @@ def run_shared_preflight_checks(role: Optional[Roles] = None):
         _ = preflight_checks.pop("Syncing model files")
 
     for check_name, check_function in preflight_checks.items():
+        if check_function is None:
+            bt.logging.info(f" PreFlight | Skipping {check_name} check for {role}")
+            continue
         bt.logging.info(f" PreFlight | {check_name}")
         try:
             check_function()
@@ -79,6 +88,23 @@ def run_shared_preflight_checks(role: Optional[Roles] = None):
             raise e
 
     bt.logging.info(" PreFlight | Pre-flight checks completed.")
+
+
+def ensure_docker_installed():
+    """
+    Ensure docker is installed
+    """
+    try:
+        subprocess.run(
+            ["docker", "--version"], check=True, capture_output=True, text=True
+        )
+        bt.logging.info("Docker is already installed")
+        return True
+    except subprocess.CalledProcessError as e:
+        bt.logging.error(f"Failed to install/verify Docker: {e}")
+        raise RuntimeError(
+            "Docker installation failed. Please install it manually."
+        ) from e
 
 
 def ensure_ezkl_installed():
