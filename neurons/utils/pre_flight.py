@@ -120,8 +120,7 @@ def ensure_docker_installed():
             ["docker", "--version"], check=True, capture_output=True, text=True
         )
         bt.logging.info("Docker is already installed")
-        return True
-    except subprocess.CalledProcessError as e:
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
         bt.logging.error(f"Failed to install/verify Docker: {e}")
         raise RuntimeError(
             "Docker installation failed. Please install it manually."
