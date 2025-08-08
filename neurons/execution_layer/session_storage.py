@@ -75,7 +75,7 @@ class DCAPSessionStorage(SessionStorage):
             self.base_path, f"output_{self.model_id}_{self.session_uuid}.json"
         )
         self.quote_path = os.path.join(
-            self.base_path, f"quote_{self.model_id}_{self.session_uuid}.json"
+            self.base_path, f"quote_{self.model_id}_{self.session_uuid}.bin"
         )
         bt.logging.trace(f"DCAPSessionStorage: Output path: {self.output_path}")
         bt.logging.trace(f"DCAPSessionStorage: Quote path: {self.quote_path}")
