@@ -98,7 +98,7 @@ def ensure_teeonnx_installed():
 
         # trunk-ignore(bandit/B605)
         subprocess.run(
-            "wget https://github.com/zkonduit/teeonnx-p/releases/latest/download/teeonnx-zk-cpu-linux -O "
+            "wget https://github.com/zkonduit/teeonnx-p/releases/v23/download/teeonnx-zk-cpu-linux -O "
             f"{LOCAL_TEEONNX_PATH}",
             shell=True,
             check=True,
