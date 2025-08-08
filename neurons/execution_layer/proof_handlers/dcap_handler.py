@@ -26,8 +26,8 @@ EXPECTED_MRENCLAVE = "[97, 230, 108, 244, 156, 207, 32, 252, 33, 179, 107, 145, 
 
 class DCAPHandler(ProofSystemHandler):
     """
-    Handler for the EZKL proof system.
-    This class provides methods for generating and verifying proofs using EZKL.
+    Handler for the DCAP proof system.
+    This class provides methods for generating and verifying proofs using DCAP (teeonnx).
     """
 
     def gen_input_file(self, session: VerifiedModelSession):
