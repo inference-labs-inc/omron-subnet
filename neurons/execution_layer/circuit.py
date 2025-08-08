@@ -130,7 +130,7 @@ class CircuitPaths:
             self.vk = os.path.join(self.base_path, "vk.key")
             self.compiled_model = os.path.join(self.base_path, "model.compiled")
         elif proof_system == ProofSystem.DCAP:
-            self.compiled_model = os.path.join(self.base_path, "model.onnx")
+            self.compiled_model = os.path.join(self.external_base_path, "network.onnx")
         else:
             raise ValueError(f"Proof system {proof_system} not supported")
 
