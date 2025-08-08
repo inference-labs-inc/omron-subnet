@@ -39,6 +39,8 @@ def run_shared_preflight_checks(role: Optional[Roles] = None):
     - Model files are synced up
     - Node.js >= 20 is installed
     - SnarkJS is installed
+    - Docker is installed if role is miner (for DCAP)
+    - teeonnx is installed (for DCAP)
 
     Conditionals:
     - If role is miner, check docker is installed
