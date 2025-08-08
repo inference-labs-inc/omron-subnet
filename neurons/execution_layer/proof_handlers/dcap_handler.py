@@ -122,7 +122,7 @@ class DCAPHandler(ProofSystemHandler):
             result = subprocess.run(
                 [
                     LOCAL_TEEONNX_PATH,
-                    "--verify",
+                    "verify",
                     session.session_storage.proof_path,
                     "--input-hash",
                     input_hash,
