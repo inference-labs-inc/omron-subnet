@@ -166,7 +166,6 @@ class VerifiedModelSession:
             self.session_storage.input_path,
             self.session_storage.witness_path,
             self.session_storage.proof_path,
-            self.session_storage.public_path,
         ):
             if os.path.exists(path):
                 os.remove(path)

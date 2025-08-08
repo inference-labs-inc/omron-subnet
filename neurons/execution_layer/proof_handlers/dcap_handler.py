@@ -1,4 +1,5 @@
 from __future__ import annotations
+import hashlib
 import json
 import os
 from typing import TYPE_CHECKING
@@ -8,12 +9,19 @@ import traceback
 
 from execution_layer.proof_handlers.base_handler import ProofSystemHandler
 from execution_layer.generic_input import GenericInput
+from constants import LOCAL_TEEONNX_PATH
+from execution_layer.session_storage import DCAPSessionStorage
 
 if TYPE_CHECKING:
     from execution_layer.verified_model_session import VerifiedModelSession
 
-
-DCAP_BINARY_PATH = os.path.join(os.path.expanduser("~"), ".teeonnx", "teeonnx")
+SGX_ENCLAVE_PATH = "/dev/sgx_enclave"
+SGX_PROVISION_PATH = "/dev/sgx_provision"
+WORKSPACE_PATH = "/workspace/user"
+IMAGE_TAG = "sha-edeb481"
+SGX_IMAGE = f"ghcr.io/zkonduit/teeonnx-sgx:{IMAGE_TAG}"
+# flake8: noqa: E501
+EXPECTED_MRENCLAVE = "[97, 230, 108, 244, 156, 207, 32, 252, 33, 179, 107, 145, 201, 52, 165, 254, 21, 175, 13, 164, 221, 23, 245, 161, 243, 141, 134, 177, 89, 36, 102, 4]"
 
 
 class DCAPHandler(ProofSystemHandler):
@@ -24,15 +32,10 @@ class DCAPHandler(ProofSystemHandler):
 
     def gen_input_file(self, session: VerifiedModelSession):
         bt.logging.trace("Generating input file")
-        if isinstance(session.inputs.data, list):
-            input_data = session.inputs.data
-        else:
-            input_data = session.inputs.to_array()
-        data = {"input_data": input_data}
         os.makedirs(os.path.dirname(session.session_storage.input_path), exist_ok=True)
         with open(session.session_storage.input_path, "w", encoding="utf-8") as f:
-            json.dump(data, f)
-        bt.logging.trace(f"Generated input.json with data: {data}")
+            json.dump(session.inputs.data, f)
+        bt.logging.trace(f"Generated input.json with data: {session.inputs.data}")
 
     def gen_proof(self, session: VerifiedModelSession) -> tuple[str, str]:
         try:
@@ -43,7 +46,8 @@ class DCAPHandler(ProofSystemHandler):
 
             result = subprocess.run(
                 [
-                    DCAP_BINARY_PATH,
+                    LOCAL_TEEONNX_PATH,
+                    "prove",
                     "--quote",
                     session.session_storage.witness_path,
                     "--proof",
@@ -82,29 +86,35 @@ class DCAPHandler(ProofSystemHandler):
         else:
             proof_json = proof
 
-        input_instances = self.translate_inputs_to_instances(session, validator_inputs)
-
-        proof_json["instances"] = [
-            input_instances[:] + proof_json["instances"][0][len(input_instances) :]
-        ]
-
-        proof_json["transcript_type"] = "EVM"
-
         with open(session.session_storage.proof_path, "w", encoding="utf-8") as f:
             json.dump(proof_json, f)
+
+        input_hash = hashlib.sha256(
+            open(session.session_storage.input_path, "rb").read()
+        ).hexdigest()[:64]
+
+        model_hash = hashlib.sha256(
+            open(session.model.paths.compiled_model, "rb").read()
+        ).hexdigest()[:64]
+
+        witness_hash = hashlib.sha256(
+            open(session.session_storage.witness_path, "rb").read()
+        ).hexdigest()[:64]
 
         try:
             result = subprocess.run(
                 [
-                    DCAP_BINARY_PATH,
+                    LOCAL_TEEONNX_PATH,
                     "--verify",
                     session.session_storage.proof_path,
                     "--input-hash",
-                    session.session_storage.input_path,
+                    input_hash,
                     "--model-hash",
-                    session.model.paths.compiled_model,
+                    model_hash,
                     "--output-hash",
-                    session.session_storage.witness_path,
+                    witness_hash,
+                    "--mrenclave",
+                    EXPECTED_MRENCLAVE,
                 ],
                 check=True,
                 capture_output=True,
@@ -128,21 +138,35 @@ class DCAPHandler(ProofSystemHandler):
                 "docker",
                 "run",
                 "--device",
-                "/dev/sgx_enclave",
+                SGX_ENCLAVE_PATH,
                 "--device",
-                "/dev/sgx_provision",
+                SGX_PROVISION_PATH,
                 "-v",
-                f"{session.session_storage.base_path}:/workspace",
-                "ghcr.io/zkonduit/teeonnx-sgx:latest",
+                f"{session.session_storage.base_path}:{WORKSPACE_PATH}",
+                SGX_IMAGE,
                 "gen-output",
                 "--input",
-                f"/workspace/{os.path.basename(session.session_storage.input_path)}",
+                os.path.join(
+                    WORKSPACE_PATH, os.path.basename(session.session_storage.input_path)
+                ),
                 "--model",
-                f"/workspace/{os.path.basename(session.model.paths.compiled_model)}",
+                os.path.join(
+                    WORKSPACE_PATH, os.path.basename(session.model.paths.compiled_model)
+                ),
                 "--output",
-                f"/workspace/{os.path.basename(session.session_storage.witness_path)}",
+                os.path.join(
+                    WORKSPACE_PATH,
+                    os.path.basename(session.session_storage.witness_path),
+                ),
                 "--quote",
-                f"/workspace/{os.path.basename(session.session_storage.proof_path)}",
+                os.path.join(
+                    WORKSPACE_PATH,
+                    os.path.basename(
+                        session.session_storage.quote_path
+                        if isinstance(session.session_storage, DCAPSessionStorage)
+                        else ValueError("Session storage is not a DCAPSessionStorage")
+                    ),
+                ),
             ],
             check=True,
             capture_output=True,
