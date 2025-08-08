@@ -13,26 +13,18 @@ import ezkl
 import requests
 
 import cli_parser
-from constants import IGNORED_MODEL_HASHES
+from constants import (
+    IGNORED_MODEL_HASHES,
+    LOCAL_EZKL_PATH,
+    LOCAL_TEEONNX_PATH,
+    LOCAL_SNARKJS_PATH,
+    LOCAL_SNARKJS_INSTALL_DIR,
+    MINER_EXTERNAL_FILES,
+    VALIDATOR_EXTERNAL_FILES,
+)
 
 from functools import partial
 from collections import OrderedDict
-
-LOCAL_SNARKJS_INSTALL_DIR = os.path.join(os.path.expanduser("~"), ".snarkjs")
-LOCAL_SNARKJS_PATH = os.path.join(
-    LOCAL_SNARKJS_INSTALL_DIR, "node_modules", ".bin", "snarkjs"
-)
-LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")
-TOOLCHAIN = "nightly-2024-09-30"
-JOLT_VERSION = "dd9e5c4bcf36ffeb75a576351807f8d86c33ec66"
-
-MINER_EXTERNAL_FILES = [
-    "circuit.zkey",
-    "pk.key",
-]
-VALIDATOR_EXTERNAL_FILES = [
-    "circuit.zkey",
-]
 
 
 async def download_srs(logrows):
@@ -47,6 +39,10 @@ def run_shared_preflight_checks(role: Optional[Roles] = None):
     - Model files are synced up
     - Node.js >= 20 is installed
     - SnarkJS is installed
+    - teeonnx is installed (for DCAP)
+
+    Conditionals:
+    - If role is miner, check docker is installed
 
     Raises:
         Exception: If any of the pre-flight checks fail.
@@ -58,6 +54,10 @@ def run_shared_preflight_checks(role: Optional[Roles] = None):
             "Checking SnarkJS installation": ensure_snarkjs_installed,
             "Checking EZKL installation": ensure_ezkl_installed,
             "Syncing model files": partial(sync_model_files, role=role),
+            "Checking Docker installation": (
+                ensure_docker_installed if role == Roles.MINER else None
+            ),
+            "Checking teeonnx installation": ensure_teeonnx_installed,
         }
     )
 
@@ -69,6 +69,9 @@ def run_shared_preflight_checks(role: Optional[Roles] = None):
         _ = preflight_checks.pop("Syncing model files")
 
     for check_name, check_function in preflight_checks.items():
+        if check_function is None:
+            bt.logging.info(f" PreFlight | Skipping {check_name} check for {role}")
+            continue
         bt.logging.info(f" PreFlight | {check_name}")
         try:
             check_function()
@@ -80,6 +83,48 @@ def run_shared_preflight_checks(role: Optional[Roles] = None):
             raise e
 
     bt.logging.info(" PreFlight | Pre-flight checks completed.")
+
+
+def ensure_teeonnx_installed():
+    """
+    Ensure teeonnx prover / verifier binary is installed
+    """
+    try:
+        if os.path.exists(LOCAL_TEEONNX_PATH):
+            bt.logging.info("teeonnx is already installed")
+            return
+
+        os.makedirs(os.path.dirname(LOCAL_TEEONNX_PATH), exist_ok=True)
+
+        # trunk-ignore(bandit/B605)
+        subprocess.run(
+            "wget https://github.com/zkonduit/teeonnx-p/releases/v23/download/teeonnx-zk-cpu-linux -O "
+            f"{LOCAL_TEEONNX_PATH}",
+            check=True,
+        )
+        os.chmod(LOCAL_TEEONNX_PATH, 0o755)
+        bt.logging.info("teeonnx installed successfully")
+    except subprocess.CalledProcessError as e:
+        bt.logging.error(f"Failed to install teeonnx: {e}")
+        raise RuntimeError(
+            "teeonnx installation failed. Please install it manually."
+        ) from e
+
+
+def ensure_docker_installed():
+    """
+    Ensure docker is installed
+    """
+    try:
+        subprocess.run(
+            ["docker", "--version"], check=True, capture_output=True, text=True
+        )
+        bt.logging.info("Docker is already installed")
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        bt.logging.error(f"Failed to install/verify Docker: {e}")
+        raise RuntimeError(
+            "Docker installation failed. Please install it manually."
+        ) from e
 
 
 def ensure_ezkl_installed():

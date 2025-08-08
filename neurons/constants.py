@@ -162,6 +162,23 @@ TESTNET_PPS_URL = os.getenv(
 )
 # EZKL path
 LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")
+# TEEONNX path
+LOCAL_TEEONNX_PATH = os.path.join(os.path.expanduser("~"), ".teeonnx", "teeonnx")
+# SNARKJS paths
+LOCAL_SNARKJS_INSTALL_DIR = os.path.join(os.path.expanduser("~"), ".snarkjs")
+LOCAL_SNARKJS_PATH = os.path.join(
+    LOCAL_SNARKJS_INSTALL_DIR, "node_modules", ".bin", "snarkjs"
+)
+# External files required by miners and validators
+MINER_EXTERNAL_FILES = [
+    "circuit.zkey",
+    "pk.key",
+    "network.onnx",
+]
+VALIDATOR_EXTERNAL_FILES = [
+    "circuit.zkey",
+    "network.onnx",
+]
 # GitHub repository URL
 REPO_URL = "https://github.com/inference-labs-inc/omron-subnet"
 # Various time constants in seconds

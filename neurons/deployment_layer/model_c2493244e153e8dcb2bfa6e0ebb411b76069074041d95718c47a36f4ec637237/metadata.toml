@@ -1,0 +1,11 @@
+name = "Honest Advisor"
+description = "An honest advisor which provides generic cryptocurrency advise (NFA)"
+author = "Inference Labs"
+version = "0.0.1"
+proof_system = "DCAP"
+type = "proof_of_computation"
+benchmark_choice_weight = 0.2
+network_weight = 0.1
+
+[external_files]
+network.onnx = "https://storage.omron.ai/c2493244e153e8dcb2bfa6e0ebb411b76069074041d95718c47a36f4ec637237/network.onnx"
