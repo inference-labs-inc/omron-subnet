@@ -89,9 +89,7 @@ class DCAPHandler(ProofSystemHandler):
         with open(session.session_storage.proof_path, "w", encoding="utf-8") as f:
             json.dump(proof_json, f)
 
-        input_hash = hashlib.sha256(
-            open(session.session_storage.input_path, "rb").read()
-        ).hexdigest()[:64]
+        input_hash = hashlib.sha256(validator_inputs.data).hexdigest()[:64]
 
         model_hash = hashlib.sha256(
             open(session.model.paths.compiled_model, "rb").read()
