@@ -13,26 +13,18 @@ import ezkl
 import requests
 
 import cli_parser
-from constants import IGNORED_MODEL_HASHES
+from constants import (
+    IGNORED_MODEL_HASHES,
+    LOCAL_EZKL_PATH,
+    LOCAL_TEEONNX_PATH,
+    LOCAL_SNARKJS_PATH,
+    LOCAL_SNARKJS_INSTALL_DIR,
+    MINER_EXTERNAL_FILES,
+    VALIDATOR_EXTERNAL_FILES,
+)
 
 from functools import partial
 from collections import OrderedDict
-
-LOCAL_SNARKJS_INSTALL_DIR = os.path.join(os.path.expanduser("~"), ".snarkjs")
-LOCAL_SNARKJS_PATH = os.path.join(
-    LOCAL_SNARKJS_INSTALL_DIR, "node_modules", ".bin", "snarkjs"
-)
-LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")
-LOCAL_TEEONNX_PATH = os.path.join(os.path.expanduser("~"), ".teeonnx", "teeonnx")
-
-
-MINER_EXTERNAL_FILES = [
-    "circuit.zkey",
-    "pk.key",
-]
-VALIDATOR_EXTERNAL_FILES = [
-    "circuit.zkey",
-]
 
 
 async def download_srs(logrows):
@@ -64,6 +56,7 @@ def run_shared_preflight_checks(role: Optional[Roles] = None):
             "Checking Docker installation": (
                 ensure_docker_installed if role == Roles.MINER else None
             ),
+            "Checking teeonnx installation": ensure_teeonnx_installed,
         }
     )
 
