@@ -49,7 +49,11 @@ class DCAPHandler(ProofSystemHandler):
                     LOCAL_TEEONNX_PATH,
                     "prove",
                     "--quote",
-                    session.session_storage.witness_path,
+                    (
+                        session.session_storage.quote_path
+                        if isinstance(session.session_storage, DCAPSessionStorage)
+                        else ValueError("Session storage is not a DCAPSessionStorage")
+                    ),
                     "--proof",
                     session.session_storage.proof_path,
                 ],
