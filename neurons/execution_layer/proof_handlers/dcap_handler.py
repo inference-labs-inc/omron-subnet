@@ -32,6 +32,8 @@ class DCAPHandler(ProofSystemHandler):
 
     def gen_input_file(self, session: VerifiedModelSession):
         bt.logging.trace("Generating input file")
+        if session.inputs is None:
+            raise ValueError("Session inputs cannot be None when generating input file")
         os.makedirs(os.path.dirname(session.session_storage.input_path), exist_ok=True)
         with open(session.session_storage.input_path, "w", encoding="utf-8") as f:
             json.dump(session.inputs.data, f)
