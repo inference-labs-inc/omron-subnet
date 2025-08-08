@@ -10,9 +10,11 @@ bt.logging.on()
 bt.logging.set_console()
 
 
-async def verify_validator_cert(netuid: int, validator_ss58: str):
+async def verify_validator_cert(
+    netuid: int, validator_ss58: str, network: str = "test"
+):
 
-    subtensor = bt.subtensor(network="test")
+    subtensor = bt.subtensor(network=network)
 
     try:
         metagraph = subtensor.metagraph(netuid)
@@ -100,9 +102,17 @@ def main():
     parser.add_argument(
         "--validator", type=str, required=True, help="Validator SS58 address"
     )
+    parser.add_argument(
+        "--network",
+        type=str,
+        default="test",
+        help="Subtensor network (test, finney, local...)",
+    )
     args = parser.parse_args()
 
-    asyncio.run(verify_validator_cert(args.netuid, args.validator))
+    result = asyncio.run(verify_validator_cert(args.netuid, args.validator))
+    if not result:
+        exit(1)
 
 
 if __name__ == "__main__":
