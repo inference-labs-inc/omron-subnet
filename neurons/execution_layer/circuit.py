@@ -19,6 +19,7 @@ from constants import (
 from utils import with_rate_limit
 import time
 import re
+import toml
 
 # trunk-ignore(pylint/E0611)
 from bittensor import logging, subtensor, Wallet
@@ -101,7 +102,10 @@ class CircuitPaths:
                 f"model_{self.model_id}",
             )
         self.input = os.path.join(self.base_path, "input.json")
-        self.metadata = os.path.join(self.base_path, "metadata.json")
+        if os.path.exists(os.path.join(self.base_path, "metadata.toml")):
+            self.metadata = os.path.join(self.base_path, "metadata.toml")
+        else:
+            self.metadata = os.path.join(self.base_path, "metadata.json")
         self.compiled_model = os.path.join(self.base_path, "model.compiled")
         self.settings = os.path.join(self.base_path, "settings.json")
         self.witness = os.path.join(self.base_path, "witness.json")
@@ -161,7 +165,12 @@ class CircuitMetadata:
             ModelMetadata: An instance of ModelMetadata.
         """
         with open(metadata_path, "r", encoding="utf-8") as f:
-            metadata = json.load(f)
+            if metadata_path.endswith(".json"):
+                metadata = json.load(f)
+            elif metadata_path.endswith(".toml"):
+                metadata = toml.load(f)
+            else:
+                metadata = {}
 
         if "proof_system" in metadata:
             metadata["proof_system"] = ProofSystem(metadata["proof_system"])
