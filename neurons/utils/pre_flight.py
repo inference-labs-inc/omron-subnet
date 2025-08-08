@@ -100,10 +100,9 @@ def ensure_teeonnx_installed():
         subprocess.run(
             "wget https://github.com/zkonduit/teeonnx-p/releases/v23/download/teeonnx-zk-cpu-linux -O "
             f"{LOCAL_TEEONNX_PATH}",
-            shell=True,
             check=True,
         )
-        os.chmod(LOCAL_TEEONNX_PATH, 0o755)
+        os.chmod(LOCAL_TEEONNX_PATH, 0o700)
         bt.logging.info("teeonnx installed successfully")
     except subprocess.CalledProcessError as e:
         bt.logging.error(f"Failed to install teeonnx: {e}")
