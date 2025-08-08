@@ -69,7 +69,13 @@ class DCAPHandler(ProofSystemHandler):
             )
 
             with open(session.session_storage.proof_path, "r", encoding="utf-8") as f:
-                proof = json.load(f)
+                try:
+                    proof = json.load(f)
+                except json.JSONDecodeError:
+                    bt.logging.error(
+                        f"Failed to load proof from {session.session_storage.proof_path}"
+                    )
+                    raise
 
             return json.dumps(proof), json.dumps(proof["instances"])
 
@@ -98,10 +104,18 @@ class DCAPHandler(ProofSystemHandler):
         input_hash = hashlib.sha256(validator_inputs.data).hexdigest()[:64]
 
         with open(session.model.paths.compiled_model, "rb") as f:
-            model_hash = hashlib.sha256(f.read()).hexdigest()[:64]
+            try:
+                model_hash = hashlib.sha256(f.read()).hexdigest()[:64]
+            except Exception as e:
+                bt.logging.error(f"Failed to hash model: {e}")
+                raise
 
         with open(session.session_storage.witness_path, "rb") as f:
-            witness_hash = hashlib.sha256(f.read()).hexdigest()[:64]
+            try:
+                witness_hash = hashlib.sha256(f.read()).hexdigest()[:64]
+            except Exception as e:
+                bt.logging.error(f"Failed to hash witness: {e}")
+                raise
 
         try:
             result = subprocess.run(
