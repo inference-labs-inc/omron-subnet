@@ -102,7 +102,7 @@ def ensure_teeonnx_installed():
             f"{LOCAL_TEEONNX_PATH}",
             check=True,
         )
-        os.chmod(LOCAL_TEEONNX_PATH, 0o700)
+        os.chmod(LOCAL_TEEONNX_PATH, 0o755)
         bt.logging.info("teeonnx installed successfully")
     except subprocess.CalledProcessError as e:
         bt.logging.error(f"Failed to install teeonnx: {e}")
