@@ -100,7 +100,9 @@ class DCAPHandler(ProofSystemHandler):
         with open(session.session_storage.proof_path, "w", encoding="utf-8") as f:
             json.dump(proof_json, f)
 
-        input_hash = hashlib.sha256(validator_inputs.data).hexdigest()[:64]
+        input_hash = hashlib.sha256(
+            json.dumps(validator_inputs.data, sort_keys=True).encode("utf-8")
+        ).hexdigest()[:64]
 
         with open(session.model.paths.compiled_model, "rb") as f:
             try:
