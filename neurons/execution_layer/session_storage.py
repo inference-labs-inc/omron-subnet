@@ -70,16 +70,31 @@ class DCAPSessionStorage(SessionStorage):
     quote_path: str = field(init=False)
 
     def __post_init__(self):
-        super().__post_init__()
+        # Initialize base path directory (from parent's __post_init__)
+        if not os.path.exists(self.base_path):
+            os.makedirs(self.base_path)
+        # Initialize paths required by base class, excluding witness_path (handled by property)
+        self.input_path = os.path.join(
+            self.base_path, f"input_{self.model_id}_{self.session_uuid}.json"
+        )
+        self.proof_path = os.path.join(
+            self.base_path, f"proof_{self.model_id}_{self.session_uuid}.json"
+        )
+        # Initialize DCAP-specific paths
         self.output_path = os.path.join(
             self.base_path, f"output_{self.model_id}_{self.session_uuid}.json"
         )
         self.quote_path = os.path.join(
             self.base_path, f"quote_{self.model_id}_{self.session_uuid}.bin"
         )
+        bt.logging.debug(
+            f"DCAPSessionStorage initialized with model_id: {self.model_id} and session_uuid: {self.session_uuid}"
+        )
+        bt.logging.trace(f"DCAPSessionStorage: Input path: {self.input_path}")
         bt.logging.trace(f"DCAPSessionStorage: Output path: {self.output_path}")
         bt.logging.trace(f"DCAPSessionStorage: Quote path: {self.quote_path}")
         bt.logging.trace(f"DCAPSessionStorage: Proof path: {self.proof_path}")
+        bt.logging.trace(f"DCAPSessionStorage: Witness path: {self.witness_path}")
 
     @property
     def witness_path(self) -> str:
