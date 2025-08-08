@@ -23,6 +23,7 @@ LOCAL_SNARKJS_PATH = os.path.join(
     LOCAL_SNARKJS_INSTALL_DIR, "node_modules", ".bin", "snarkjs"
 )
 LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")
+LOCAL_TEEONNX_PATH = os.path.join(os.path.expanduser("~"), ".teeonnx", "teeonnx")
 
 
 MINER_EXTERNAL_FILES = [
@@ -88,6 +89,33 @@ def run_shared_preflight_checks(role: Optional[Roles] = None):
             raise e
 
     bt.logging.info(" PreFlight | Pre-flight checks completed.")
+
+
+def ensure_teeonnx_installed():
+    """
+    Ensure teeonnx prover / verifier binary is installed
+    """
+    try:
+        if os.path.exists(LOCAL_TEEONNX_PATH):
+            bt.logging.info("teeonnx is already installed")
+            return
+
+        os.makedirs(os.path.dirname(LOCAL_TEEONNX_PATH), exist_ok=True)
+
+        # trunk-ignore(bandit/B605)
+        subprocess.run(
+            "wget https://github.com/zkonduit/teeonnx-p/releases/latest/download/teeonnx-zk-cpu-linux -O "
+            f"{LOCAL_TEEONNX_PATH}",
+            shell=True,
+            check=True,
+        )
+        os.chmod(LOCAL_TEEONNX_PATH, 0o755)
+        bt.logging.info("teeonnx installed successfully")
+    except subprocess.CalledProcessError as e:
+        bt.logging.error(f"Failed to install teeonnx: {e}")
+        raise RuntimeError(
+            "teeonnx installation failed. Please install it manually."
+        ) from e
 
 
 def ensure_docker_installed():
