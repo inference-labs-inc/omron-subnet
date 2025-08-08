@@ -55,9 +55,17 @@ class VerifiedModelSession:
         self.model = model
         self.inputs = inputs
         self.session_id = str(uuid.uuid4())
-        self.session_storage = SessionStorageFactory.create_storage(
-            self.model.metadata.proof_system, self.model.id, self.session_id
-        )
+        try:
+            self.session_storage = SessionStorageFactory.create_storage(
+                self.model.metadata.proof_system, self.model.id, self.session_id
+            )
+        except KeyError:
+            bt.logging.error(
+                f"Unsupported proof system: {self.model.metadata.proof_system}"
+            )
+            raise ValueError(
+                f"Unsupported proof system '{self.model.metadata.proof_system}' in model metadata"
+            )
         self.proof_handler = ProofSystemFactory.get_handler(
             self.model.metadata.proof_system
         )
