@@ -91,13 +91,11 @@ class DCAPHandler(ProofSystemHandler):
 
         input_hash = hashlib.sha256(validator_inputs.data).hexdigest()[:64]
 
-        model_hash = hashlib.sha256(
-            open(session.model.paths.compiled_model, "rb").read()
-        ).hexdigest()[:64]
+        with open(session.model.paths.compiled_model, "rb") as f:
+            model_hash = hashlib.sha256(f.read()).hexdigest()[:64]
 
-        witness_hash = hashlib.sha256(
-            open(session.session_storage.witness_path, "rb").read()
-        ).hexdigest()[:64]
+        with open(session.session_storage.witness_path, "rb") as f:
+            witness_hash = hashlib.sha256(f.read()).hexdigest()[:64]
 
         try:
             result = subprocess.run(
