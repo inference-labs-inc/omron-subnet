@@ -46,16 +46,15 @@ class DCAPHandler(ProofSystemHandler):
             self.generate_witness(session)
             bt.logging.trace("Generating proof")
 
+            if not isinstance(session.session_storage, DCAPSessionStorage):
+                raise TypeError("Session storage must be a DCAPSessionStorage instance")
+
             result = subprocess.run(
                 [
                     LOCAL_TEEONNX_PATH,
                     "prove",
                     "--quote",
-                    (
-                        session.session_storage.quote_path
-                        if isinstance(session.session_storage, DCAPSessionStorage)
-                        else ValueError("Session storage is not a DCAPSessionStorage")
-                    ),
+                    session.session_storage.quote_path,
                     "--proof",
                     session.session_storage.proof_path,
                 ],
@@ -149,6 +148,9 @@ class DCAPHandler(ProofSystemHandler):
     ) -> list | dict:
         bt.logging.trace("Generating witness")
 
+        if not isinstance(session.session_storage, DCAPSessionStorage):
+            raise TypeError("Session storage must be a DCAPSessionStorage instance")
+
         result = subprocess.run(
             [
                 "docker",
@@ -176,12 +178,7 @@ class DCAPHandler(ProofSystemHandler):
                 ),
                 "--quote",
                 os.path.join(
-                    WORKSPACE_PATH,
-                    os.path.basename(
-                        session.session_storage.quote_path
-                        if isinstance(session.session_storage, DCAPSessionStorage)
-                        else ValueError("Session storage is not a DCAPSessionStorage")
-                    ),
+                    WORKSPACE_PATH, os.path.basename(session.session_storage.quote_path)
                 ),
             ],
             check=True,
