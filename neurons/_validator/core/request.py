@@ -23,3 +23,4 @@ class Request:
     response_time: float | None = None
     deserialized: dict[str, object] | None = None
     result: bt.Synapse | None = None
+    save: bool = False

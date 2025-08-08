@@ -42,11 +42,23 @@ Instructions for configuring a PM2 ecosystem file which allows for streamlined s
 
 [View PM2 Configuration →]
 
+## [Prometheus and Grafana Configuration]
+
+Instructions for configuring Prometheus and Grafana to monitor your validator.
+
+[View Prometheus and Grafana Configuration →]
+
 ## [Versioning]
 
 Information about Omron's versioning system and how to stay up-to-date with the latest releases.
 
 [View versioning →]
+
+## [Custom Circuit Integrations]
+
+Instructions for how to integrate your own zero-knowledge circuits into the Omron subnet.
+
+[View Custom Circuit Integrations →]
 
 [Setup instructions]: ./shared_setup_steps.md
 [Running on Mainnet]: ./running_on_mainnet.md
@@ -60,6 +72,10 @@ Information about Omron's versioning system and how to stay up-to-date with the 
 [View mainnet instructions →]: ./running_on_mainnet.md
 [View testnet instructions →]: ./running_on_testnet.md
 [View local instructions →]: ./running_on_staging.md
+[Prometheus and Grafana Configuration]: ./prometheus.md
+[View Prometheus and Grafana Configuration →]: ./prometheus.md
+[Custom Circuit Integrations]: ./custom_circuit_integrations.md
+[View Custom Circuit Integrations →]: ./custom_circuit_integrations.md
 [Versioning]: ./versioning.md
 [View versioning →]: ./versioning.md
 [← Back to home]: ../

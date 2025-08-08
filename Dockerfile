@@ -3,11 +3,11 @@ FROM --platform=linux/amd64 ubuntu:noble
 # Install dependencies
 RUN apt update && \
     apt install -y \
-    python3-dev \
-    python3-venv \
+    pipx \
     build-essential \
     jq \
     git \
+    aria2 \
     curl \
     make \
     clang \
@@ -16,60 +16,74 @@ RUN apt update && \
     llvm \
     libudev-dev \
     protobuf-compiler \
+    ffmpeg \
+    gosu \
     && apt clean && rm -rf /var/lib/apt/lists/*
 
-# Install Rust
-ENV RUST_TOOLCHAIN=nightly-2024-09-30
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
-    /root/.cargo/bin/rustup toolchain install ${RUST_TOOLCHAIN} && \
-    /root/.cargo/bin/rustup default ${RUST_TOOLCHAIN} && \
-    /root/.cargo/bin/rustup toolchain remove stable
-ENV PATH="/root/.cargo/bin:${PATH}"
+# Make directories under opt and set owner to ubuntu
+RUN mkdir -p /opt/.cargo /opt/.nvm /opt/.npm /opt/.snarkjs /opt/omron/neurons && \
+    chown -R ubuntu:ubuntu /opt && \
+    chmod -R 775 /opt/omron && \
+    chown root:root /opt
 
-# Install Jolt
-#ENV JOLT_VERSION=dd9e5c4bcf36ffeb75a576351807f8d86c33ec66
-#RUN cargo +${RUST_TOOLCHAIN} install --git https://github.com/a16z/jolt --rev ${JOLT_VERSION} --force --bins jolt
+# Use ubuntu user
+USER ubuntu
+WORKDIR /opt
 
 # Install node et al.
+ENV NVM_DIR=/opt/.nvm
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash && \
-    export NVM_DIR="/root/.nvm" && \
+    export NVM_DIR="$NVM_DIR" && \
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" && \
-    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" && \
     nvm install 20 && \
-    npm install --prefix /root/.snarkjs snarkjs@0.7.4 && \
-    ln -s $(which node) /usr/bin/node && \
-    ln -s $(which npm) /usr/bin/npm
+    nvm use 20 && \
+    npm install --prefix /opt/.snarkjs snarkjs@0.7.4 && \
+    mkdir -p ~/.local/bin && \
+    ln -s "$NVM_DIR/versions/node/$(nvm version)/bin/node" /home/ubuntu/.local/bin/node && \
+    ln -s "$NVM_DIR/versions/node/$(nvm version)/bin/npm" /home/ubuntu/.local/bin/npm && \
+    chmod -R 775 /opt/.nvm /opt/.npm /opt/.snarkjs
+ENV PATH="/home/ubuntu/.local/bin:${PATH}"
 
-# Use a venv because of https://peps.python.org/pep-0668/
-RUN python3 -m venv /opt/venv && \
-    /opt/venv/bin/python3 -m pip install --upgrade pip && \
-    rm -rf /root/.cache/pip && \
-    echo "source /opt/venv/bin/activate" >> ~/.bashrc
-ENV PATH="/opt/venv/bin:${PATH}"
-
-# Install Python dependencies
-COPY requirements.txt /opt/omron/requirements.txt
-RUN TORCH_VERSION=$(grep "^torch" /opt/omron/requirements.txt) && \
-    pip3 install $TORCH_VERSION --index-url https://download.pytorch.org/whl/cpu && \
-    pip3 install -r /opt/omron/requirements.txt && \
-    rm -rf /root/.cache/pip
-
-# Copy omron
-COPY neurons /opt/omron/neurons
+# Copy omron and install Python dependencies (make sure owner is ubuntu)
+COPY --chown=ubuntu:ubuntu --chmod=775 neurons /opt/omron/neurons
+COPY --chown=ubuntu:ubuntu --chmod=775 pyproject.toml /opt/omron/pyproject.toml
+COPY --chown=ubuntu:ubuntu --chmod=775 uv.lock /opt/omron/uv.lock
+RUN pipx install uv && \
+    cd /opt/omron && \
+    ~/.local/bin/uv sync --frozen --no-dev --compile-bytecode && \
+    ~/.local/bin/uv cache clean && \
+    echo "source /opt/omron/.venv/bin/activate" >> ~/.bashrc && \
+    chmod -R 775 /opt/omron/.venv
+ENV PATH="/opt/omron/.venv/bin:${PATH}"
 
 # Set workdir for running miner.py or validator.py and compile circuits
 WORKDIR /opt/omron/neurons
 ENV OMRON_NO_AUTO_UPDATE=1
-RUN OMRON_DOCKER_BUILD=1 python3 miner.py && \
-    rm -rf /opt/omron/neurons/deployment_layer/*/target/release/build && \
-    rm -rf /opt/omron/neurons/deployment_layer/*/target/release/deps && \
-    rm -rf /opt/omron/neurons/deployment_layer/*/target/release/examples && \
-    rm -rf /opt/omron/neurons/deployment_layer/*/target/release/incremental && \
-    rm -rf /root/.bittensor
-ENTRYPOINT ["/opt/venv/bin/python3"]
+RUN OMRON_DOCKER_BUILD=1 /opt/omron/.venv/bin/python3 miner.py && \
+    rm -rf ~/.bittensor && \
+    rm -rf /tmp/omron
+USER root
+RUN cat <<'EOF' > /entrypoint.sh
+#!/usr/bin/env bash
+set -e
+if [ -n "$PUID" ]; then
+    if [ "$PUID" = "0" ]; then
+        echo "Running as root user"
+        /opt/omron/.venv/bin/python3 "$@"
+    else
+        echo "Changing ubuntu user id to $PUID"
+        usermod -u "$PUID" ubuntu
+        gosu ubuntu /opt/omron/.venv/bin/python3 "$@"
+    fi
+else
+    gosu ubuntu /opt/omron/.venv/bin/python3 "$@"
+fi
+EOF
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["-c", "import subprocess; \
-    subprocess.run(['/opt/venv/bin/python3', '/opt/omron/neurons/miner.py', '--help']); \
-    subprocess.run(['/opt/venv/bin/python3', '/opt/omron/neurons/validator.py', '--help']);" \
+    subprocess.run(['/opt/omron/.venv/bin/python3', '/opt/omron/neurons/miner.py', '--help']); \
+    subprocess.run(['/opt/omron/.venv/bin/python3', '/opt/omron/neurons/validator.py', '--help']);" \
     ]
 # Axon server
 EXPOSE 8091/tcp

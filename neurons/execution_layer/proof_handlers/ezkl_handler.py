@@ -100,7 +100,7 @@ class EZKLHandler(ProofSystemHandler):
         input_instances = self.translate_inputs_to_instances(session, validator_inputs)
 
         proof_json["instances"] = [
-            (input_instances[:] + proof_json["instances"][0][len(input_instances) :])
+            input_instances[:] + proof_json["instances"][0][len(input_instances) :]
         ]
 
         proof_json["transcript_type"] = "EVM"
@@ -123,8 +123,12 @@ class EZKLHandler(ProofSystemHandler):
                 check=True,
                 capture_output=True,
                 text=True,
+                timeout=60,
             )
             return "verified: true" in result.stdout
+        except subprocess.TimeoutExpired:
+            bt.logging.error("Verification process timed out after 60 seconds")
+            return False
         except subprocess.CalledProcessError:
             return False
 
@@ -162,7 +166,7 @@ class EZKLHandler(ProofSystemHandler):
         self, session: VerifiedModelSession, validator_inputs: GenericInput
     ) -> list[int]:
         scale_map = session.model.settings.get("model_input_scales", [])
-        type_map = session.model.settings.get("model_input_types", [])
+        type_map = session.model.settings.get("input_types", [])
         return [
             ezkl.float_to_felt(x, scale_map[i], EZKLInputType[type_map[i]].value)
             for i, arr in enumerate(validator_inputs.to_array())
