@@ -28,7 +28,10 @@ class CircuitManager:
             ]
             for f in temp_files:
                 if os.path.exists(f):
-                    os.remove(f)
+                    try:
+                        os.remove(f)
+                    except Exception as e:
+                        bt.logging.warning(f"Failed to delete temp file {f}: {e}")
         except Exception as e:
             bt.logging.warning(f"Error cleaning up temp files: {e}")
 
@@ -84,7 +87,9 @@ class CircuitManager:
                 os.remove(file_path)
             return False
 
-    async def download_files(self, axon: bt.axon, hash: str, circuit_dir: str) -> bool:
+    async def download_files(
+        self, axon: bt.axon, expected_sha256: str, circuit_dir: str
+    ) -> bool:
         try:
             bt.logging.info(
                 f"Starting download of circuit files from miner {axon.ip}:{axon.port}"
@@ -96,7 +101,7 @@ class CircuitManager:
 
             synapse = Competition(
                 id=self.competition_id,
-                hash=hash,
+                hash=expected_sha256,
                 file_name="commitment",
             )
 
@@ -167,28 +172,33 @@ class CircuitManager:
             if all_files_downloaded:
                 try:
                     model_path = os.path.join(circuit_dir, "model.compiled")
-                    with open(model_path, "rb") as f:
-                        downloaded_hash = hashlib.sha256(f.read()).hexdigest()
-                    if downloaded_hash != hash:
-                        bt.logging.error(
-                            f"Downloaded model hash mismatch: expected {hash[:8]}, got {downloaded_hash[:8]}"
-                        )
-                        for fn in ["model.compiled", "settings.json"]:
-                            fp = os.path.join(circuit_dir, fn)
-                            if os.path.exists(fp):
-                                try:
-                                    os.remove(fp)
-                                except Exception:
-                                    pass
+                    if not os.path.exists(model_path):
+                        bt.logging.error("model.compiled not found after download")
                         return False
-                except Exception as e:
-                    bt.logging.error(f"Failed to verify downloaded model hash: {e}")
-                    return False
 
-                bt.logging.success(f"Successfully downloaded all files for {hash[:8]}")
-                return True
+                    sha256 = hashlib.sha256()
+                    with open(model_path, "rb") as fp:
+                        for chunk in iter(lambda: fp.read(8 * 1024 * 1024), b""):
+                            sha256.update(chunk)
+                    computed = sha256.hexdigest()
+
+                    if computed != expected_sha256:
+                        bt.logging.error(
+                            f"SHA256 mismatch for model.compiled: expected {expected_sha256[:8]}, got {computed[:8]}"
+                        )
+                        return False
+
+                    bt.logging.success(
+                        f"Successfully downloaded and verified files for {expected_sha256[:8]}"
+                    )
+                    return True
+                except Exception as e:
+                    bt.logging.error(f"Error verifying downloaded model hash: {e}")
+                    return False
             else:
-                bt.logging.error(f"Failed to download all files for {hash[:8]}")
+                bt.logging.error(
+                    f"Failed to download all files for {expected_sha256[:8]}"
+                )
                 return False
 
         except Exception as e:
