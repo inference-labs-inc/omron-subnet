@@ -8,6 +8,7 @@ import traceback
 from constants import ONE_HOUR
 from protocol import Competition
 import asyncio
+import hashlib
 
 
 class CircuitManager:
@@ -164,6 +165,26 @@ class CircuitManager:
                     )
 
             if all_files_downloaded:
+                try:
+                    model_path = os.path.join(circuit_dir, "model.compiled")
+                    with open(model_path, "rb") as f:
+                        downloaded_hash = hashlib.sha256(f.read()).hexdigest()
+                    if downloaded_hash != hash:
+                        bt.logging.error(
+                            f"Downloaded model hash mismatch: expected {hash[:8]}, got {downloaded_hash[:8]}"
+                        )
+                        for fn in ["model.compiled", "settings.json"]:
+                            fp = os.path.join(circuit_dir, fn)
+                            if os.path.exists(fp):
+                                try:
+                                    os.remove(fp)
+                                except Exception:
+                                    pass
+                        return False
+                except Exception as e:
+                    bt.logging.error(f"Failed to verify downloaded model hash: {e}")
+                    return False
+
                 bt.logging.success(f"Successfully downloaded all files for {hash[:8]}")
                 return True
             else:
