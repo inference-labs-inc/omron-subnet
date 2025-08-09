@@ -131,7 +131,7 @@ class CircuitManager:
                 return False
 
             signed_urls = commitment["signed_urls"]
-            required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
+            required_files = ["settings.json", "model.compiled"]
             all_files_downloaded = True
 
             timeout = aiohttp.ClientTimeout(total=ONE_HOUR, connect=60)

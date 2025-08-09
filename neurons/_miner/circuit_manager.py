@@ -126,7 +126,7 @@ class CircuitManager:
 
         if existing_vk_hash and self._calculate_vk_hash() == existing_vk_hash:
             try:
-                required_files = ["vk.key", "pk.key", "model.compiled", "settings.json"]
+                required_files = ["model.compiled", "settings.json"]
                 self._current_object_keys = {
                     fname: f"{existing_vk_hash}/{fname}" for fname in required_files
                 }
@@ -169,8 +169,6 @@ class CircuitManager:
             Dict[str, str]: Map of filenames to object keys
         """
         required_files = [
-            "vk.key",
-            "pk.key",
             "model.compiled",
             "settings.json",
         ]
