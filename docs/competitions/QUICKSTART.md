@@ -143,7 +143,7 @@ The maximum proof time is a configurable property and is subject to change over 
 
 ### Do I need to upload `vk.key`/`pk.key`?
 
-No. Only `model.compiled` and `settings.json` are required. During evaluation, the validator generates `vk.key` and `pk.key` locally using `ezkl setup`. This setup step is limited to 5 minutes and memory-capped; if it fails or times out, the submission receives no score for that evaluation.
+No. Only `model.compiled` and `settings.json` are required. During evaluation, the validator generates `vk.key` and `pk.key` locally using `ezkl setup`. This setup step is limited to exactly 5 minutes (timeout) and capped at 16 GiB of address space. If it fails or times out, the submission receives no score for that evaluation. See the canonical implementation of these limits in `neurons/_validator/competitions/services/circuit_evaluator.py` within the `_ensure_keys` function (the `set_limits` inner function and the `timeout=FIVE_MINUTES` argument).
 
 ### When does the competition end?
 
