@@ -18,7 +18,7 @@ class CircuitCommitment(BaseModel):
     Represents a circuit commitment with signed URLs for validator access.
 
     Attributes:
-        vk_hash (str): SHA256 hash of vk.key - this is committed on-chain
+        vk_hash (str): SHA256 hash of model.compiled - this is committed on-chain
         file_urls (Dict[str, str]): Map of filenames to signed URLs for validator download
         expiry (int): Unix timestamp when URLs expire
         signature (str): Hotkey signature of commitment data
@@ -126,7 +126,7 @@ class CircuitManager:
 
         if existing_vk_hash and self._calculate_vk_hash() == existing_vk_hash:
             try:
-                required_files = ["vk.key", "pk.key", "model.compiled", "settings.json"]
+                required_files = ["model.compiled", "settings.json"]
                 self._current_object_keys = {
                     fname: f"{existing_vk_hash}/{fname}" for fname in required_files
                 }
@@ -149,12 +149,12 @@ class CircuitManager:
 
     def _calculate_vk_hash(self) -> Optional[str]:
         """
-        Calculate SHA256 hash of vk.key.
+        Calculate SHA256 hash of model.compiled.
 
         Returns:
             str: Hex digest of hash, or None if file not found
         """
-        vk_path = self.circuit_dir / "vk.key"
+        vk_path = self.circuit_dir / "model.compiled"
         if not vk_path.exists():
             return None
 
@@ -169,8 +169,6 @@ class CircuitManager:
             Dict[str, str]: Map of filenames to object keys
         """
         required_files = [
-            "vk.key",
-            "pk.key",
             "model.compiled",
             "settings.json",
         ]

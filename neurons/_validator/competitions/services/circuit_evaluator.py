@@ -7,7 +7,7 @@ import torch
 import numpy as np
 import bittensor as bt
 from typing import Tuple, List, Optional
-from constants import LOCAL_EZKL_PATH
+from constants import LOCAL_EZKL_PATH, FIVE_MINUTES
 from _validator.competitions.services.sota_manager import SotaManager
 from _validator.competitions.services.data_source import (
     CompetitionDataSource,
@@ -62,6 +62,54 @@ class CircuitEvaluator:
                 bt.logging.debug(f"Using existing ONNX environment at {self.onnx_venv}")
 
         self.data_source = self._setup_data_source()
+
+    def _ensure_keys(self, circuit_dir: str) -> bool:
+        try:
+            model_path = os.path.join(circuit_dir, "model.compiled")
+            settings_path = os.path.join(circuit_dir, "settings.json")
+            vk_path = os.path.join(circuit_dir, "vk.key")
+            pk_path = os.path.join(circuit_dir, "pk.key")
+            if os.path.exists(vk_path) and os.path.exists(pk_path):
+                return True
+            if not os.path.exists(model_path) or not os.path.exists(settings_path):
+                return False
+
+            def set_limits():
+                try:
+                    import resource
+
+                    limit_gb = int(os.getenv("OMRON_EZKL_SETUP_MEMORY_GB", "16"))
+                    limit_bytes = limit_gb * 1024 * 1024 * 1024
+                    resource.setrlimit(resource.RLIMIT_AS, (limit_bytes, limit_bytes))
+                except Exception:
+                    pass
+
+            result = subprocess.run(
+                [
+                    LOCAL_EZKL_PATH,
+                    "setup",
+                    "--compiled-circuit",
+                    model_path,
+                    "--vk-path",
+                    vk_path,
+                    "--pk-path",
+                    pk_path,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=FIVE_MINUTES,
+                preexec_fn=set_limits,
+            )
+            if result.returncode != 0:
+                bt.logging.error(f"EZKL setup failed: {result.stderr}")
+                return False
+            return os.path.exists(vk_path) and os.path.exists(pk_path)
+        except subprocess.TimeoutExpired:
+            bt.logging.error("EZKL setup timed out")
+            return False
+        except Exception as e:
+            bt.logging.error(f"Error during EZKL setup: {e}")
+            return False
 
     def _get_python_path(self):
         python_path = os.path.join(self.onnx_venv, "bin", "python")
@@ -436,6 +484,9 @@ class CircuitEvaluator:
         )
         all_collected_outputs_for_constancy_check = []
 
+        if not self._ensure_keys(circuit_dir):
+            bt.logging.error("Failed to prepare proving and verification keys")
+            return 0.0, float("inf"), float("inf"), False, 0.0
         input_shape = self._get_input_shape(circuit_dir)
         bt.logging.debug(f"Got input shape: {input_shape}")
 

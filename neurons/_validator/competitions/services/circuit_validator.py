@@ -6,8 +6,6 @@ from constants import MAX_CIRCUIT_SIZE_GB
 
 class CircuitValidator:
     REQUIRED_FILES = [
-        "vk.key",
-        "pk.key",
         "settings.json",
         "model.compiled",
     ]
