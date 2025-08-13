@@ -70,7 +70,7 @@ Required files in your circuit directory:
 For an example of how to compile this circuit, see the following.
 
 > [!NOTE]
-> This script generates it's own model and is for demonstration purposes only. To compile your own model based on the competition template ONNX, please find it within `neurons/_validator/competitions/1/age.onnx` along with an example `input.json` file.
+> This script generates its own model and is for demonstration purposes only. To compile your own model based on the competition template ONNX, please find it within `neurons/_validator/competitions/1/age.onnx` along with an example `input.json` file.
 
 ```bash
 ./neurons/scripts/create_competition_circuit.py
