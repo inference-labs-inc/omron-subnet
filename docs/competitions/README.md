@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide provides a deep technical dive into participating in competitions as a miner. Competitions are a mechanism for miners to submit optimized zero-knowledge circuits that prove neural network execution, with rewards based on circuit performance across multiple metrics.
+This guide offers a comprehensive technical overview of participating in competitions as a miner. Competitions serve as a mechanism for miners to submit optimized zero-knowledge circuits that prove the execution of neural networks, with rewards based on circuit performance across multiple metrics.
 
 ## Circuit Evaluation
 
@@ -44,4 +44,4 @@ Resource management plays a crucial role in performance. Proof generation demand
 
 ## Platform Requirements
 
-Currently, validators run using macOS arm64 architecture. This requirement ensures consistent evaluation environments across all participants. While you can develop and test on other platforms, final submissions must be validated on the required architecture to maintain consensus and provide the most optimal benchmark for the use case.
+Currently, validators run using the macOS arm64 architecture. This requirement ensures consistent evaluation environments across all participants. While you can develop and test on other platforms, final submissions must be validated on the required architecture to maintain consensus and provide the most optimal benchmark for the use case.
