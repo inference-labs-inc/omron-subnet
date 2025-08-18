@@ -22,7 +22,7 @@ score = exp(-(
 
 Your circuit must process inputs matching the competition config shape and produce a matching output shape.
 
-The submission package must include several key files: a compiled circuit (model.compiled), proving and verification keys (pk.key and vk.key), and a settings.json configuration file. These files work together to enable proof generation and verification.
+The submission package must include a compiled circuit (`model.compiled`) and a `settings.json` configuration file. Validators will generate proving and verification keys locally during evaluation via `ezkl setup` within a 5-minute, memory-capped setup step.
 
 ## Evaluation Process
 
@@ -34,7 +34,7 @@ Your circuit must generate valid proofs that verify successfully. The system mea
 
 The competition system uses cloud storage (R2/S3) for circuit file management. When validators request your circuit, they receive signed URLs for secure file access.
 
-The commitment process anchors your verification key hash on-chain. This creates an immutable record of your submission and prevents tampering. The system verifies that local and chain commitments match before proceeding with evaluation.
+The commitment process anchors the SHA256 hash of your `model.compiled` on-chain. This creates an immutable record of your submission and prevents tampering. The system verifies that local and chain commitments match before proceeding with evaluation.
 
 ## Optimization Guidelines
 

@@ -504,7 +504,7 @@ class MinerSession:
                 )
 
             bt.logging.info("Generating signed URLs for required files")
-            required_files = ["vk.key", "pk.key", "settings.json", "model.compiled"]
+            required_files = ["settings.json", "model.compiled"]
             object_keys = {}
             for file_name in required_files:
                 object_keys[file_name] = f"{commitment.vk_hash}/{file_name}"
