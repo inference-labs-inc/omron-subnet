@@ -36,8 +36,16 @@ class DCAPHandler(ProofSystemHandler):
         if session.inputs is None:
             raise ValueError("Session inputs cannot be None when generating input file")
         os.makedirs(os.path.dirname(session.session_storage.input_path), exist_ok=True)
+
+        input_data = session.inputs.data
+        teeonnx_format = {
+            "data": input_data.get("input_ids", input_data.get("data", [])),
+            "shapes": input_data.get("shapes", []),
+            "variables": input_data.get("variables", []),
+        }
+
         with open(session.session_storage.input_path, "w", encoding="utf-8") as f:
-            json.dump(session.inputs.data, f)
+            json.dump(teeonnx_format, f)
 
         model_dest = os.path.join(
             session.session_storage.base_path, f"network_{session.model.id}.onnx"
