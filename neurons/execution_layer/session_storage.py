@@ -2,7 +2,7 @@ import os
 import bittensor as bt
 from dataclasses import dataclass, field
 from utils.system import get_temp_folder
-from execution_layer.circuit import ProofSystem
+from execution_layer.circuit_metadata import ProofSystem
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
