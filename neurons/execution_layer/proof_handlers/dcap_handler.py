@@ -179,7 +179,7 @@ class DCAPHandler(ProofSystemHandler):
                     WORKSPACE_PATH, os.path.basename(session.session_storage.input_path)
                 ),
                 "--model",
-                os.path.join(WORKSPACE_PATH, f"network_{session.model_id}.onnx"),
+                os.path.join(WORKSPACE_PATH, f"network_{session.model.id}.onnx"),
                 "--output",
                 os.path.join(
                     WORKSPACE_PATH,
