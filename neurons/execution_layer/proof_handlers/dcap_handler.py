@@ -164,6 +164,7 @@ class DCAPHandler(ProofSystemHandler):
 
         result = subprocess.run(
             [
+                "sudo",
                 "docker",
                 "run",
                 "--device",
