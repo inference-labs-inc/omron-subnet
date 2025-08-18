@@ -1,12 +1,12 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from enum import Enum
 import torch
 import os
 import json
 import cli_parser
 from execution_layer.input_registry import InputRegistry
 from execution_layer.base_input import BaseInput
+from execution_layer.circuit_metadata import CircuitMetadata, ProofSystem
 from utils.metrics_logger import log_circuit_metrics
 from utils.gc_logging import gc_log_eval_metrics
 from constants import (
@@ -19,47 +19,9 @@ from constants import (
 from utils import with_rate_limit
 import time
 import re
-import toml
 
 # trunk-ignore(pylint/E0611)
 from bittensor import logging, subtensor, Wallet
-
-
-class CircuitType(str, Enum):
-    """
-    Enum representing the type of circuit.
-    """
-
-    PROOF_OF_WEIGHTS = "proof_of_weights"
-    PROOF_OF_COMPUTATION = "proof_of_computation"
-
-
-class ProofSystem(str, Enum):
-    """
-    Enum representing supported proof systems.
-    """
-
-    # Supported provers
-    ZKML = "ZKML"
-    CIRCOM = "CIRCOM"
-    EZKL = "EZKL"
-    DCAP = "DCAP"
-
-    def __str__(self):
-        return self.value
-
-    @classmethod
-    def _missing_(cls, value):
-        if isinstance(value, str):
-            return cls(value.upper())
-        raise ValueError(f"Cannot convert {value} to {cls.__name__}")
-
-    def to_json(self):
-        return self.value
-
-    @classmethod
-    def from_json(cls, value):
-        return cls(value)
 
 
 @dataclass
@@ -133,51 +95,6 @@ class CircuitPaths:
             self.compiled_model = os.path.join(self.external_base_path, "network.onnx")
         else:
             raise ValueError(f"Proof system {proof_system} not supported")
-
-
-@dataclass
-class CircuitMetadata:
-    """
-    Metadata for a specific model, such as name, version, description, etc.
-    """
-
-    name: str
-    description: str
-    author: str
-    version: str
-    proof_system: ProofSystem
-    type: CircuitType
-    external_files: dict[str, str]
-    netuid: int | None = None
-    weights_version: int | None = None
-    timeout: int | None = None
-    benchmark_choice_weight: float | None = None
-
-    @classmethod
-    def from_file(cls, metadata_path: str) -> CircuitMetadata:
-        """
-        Create a ModelMetadata instance from a JSON file.
-
-        Args:
-            metadata_path (str): Path to the metadata JSON file.
-
-        Returns:
-            ModelMetadata: An instance of ModelMetadata.
-        """
-        with open(metadata_path, "r", encoding="utf-8") as f:
-            if metadata_path.endswith(".json"):
-                metadata = json.load(f)
-            elif metadata_path.endswith(".toml"):
-                metadata = toml.load(f)
-            else:
-                metadata = {}
-
-        if "proof_system" in metadata:
-            metadata["proof_system"] = ProofSystem(metadata["proof_system"])
-        if "type" in metadata:
-            metadata["type"] = CircuitType(metadata["type"])
-
-        return cls(**metadata)
 
 
 @dataclass

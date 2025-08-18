@@ -21,7 +21,7 @@ from constants import (
     MINER_EXTERNAL_FILES,
     VALIDATOR_EXTERNAL_FILES,
 )
-from execution_layer.circuit import CircuitMetadata
+from execution_layer.circuit_metadata import CircuitMetadata
 
 from functools import partial
 from collections import OrderedDict
@@ -266,9 +266,7 @@ def sync_model_files(role: Optional[Roles] = None):
 
         try:
             circuit_metadata = CircuitMetadata.from_file(metadata_file)
-            metadata = {
-                "external_files": getattr(circuit_metadata, "external_files", {})
-            }
+            metadata = {"external_files": circuit_metadata.external_files}
         except Exception as e:
             bt.logging.error(
                 SYNC_LOG_PREFIX + f"Failed to parse metadata from {metadata_file}: {e}"
