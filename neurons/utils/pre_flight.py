@@ -221,6 +221,8 @@ def sync_model_files(role: Optional[Roles] = None):
 
     loop = asyncio.get_event_loop()
     for logrows in range(1, 26):
+        if role == Roles.MINER:
+            break
         if os.path.exists(
             os.path.join(os.path.expanduser("~"), ".ezkl", "srs", f"kzg{logrows}.srs")
         ):
