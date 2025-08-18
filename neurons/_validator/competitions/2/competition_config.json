@@ -1,0 +1,46 @@
+{
+    "id": 2,
+    "name": "MiVoLo Age + Gender Detection Competition",
+    "description": "Age + Gender detection model evaluation with 224x224x3 inputs",
+    "version": "1.0.0",
+    "start_timestamp": 0,
+    "end_timestamp": 0,
+    "baseline_model_path": "network.onnx",
+    "circuit_settings": {
+        "input_shape": [
+            1,
+            3,
+            224,
+            224
+        ],
+        "output_names": [
+            "output"
+        ],
+        "output_shapes": {
+            "output": [
+                1,
+                3
+            ]
+        }
+    },
+    "data_source": {
+        "url": "https://storage.omron.ai/mivolo.zip",
+        "format": "zip",
+        "type": "remote"
+    },
+    "evaluation": {
+        "metric": "mean_squared_error",
+        "num_iterations": 10,
+        "num_total_evaluations": 100,
+        "num_proof_evaluations": 10,
+        "scoring_weights": {
+            "accuracy": 0.95,
+            "proof_size": 0.0,
+            "response_time": 0.05
+        },
+        "output_shape": [
+            1,
+            3
+        ]
+    }
+}
