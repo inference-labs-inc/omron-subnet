@@ -256,25 +256,30 @@ def sync_model_files(role: Optional[Roles] = None):
             )
             continue
 
-        metadata_file = os.path.join(MODEL_DIR, model_hash, "metadata.json")
-        if not os.path.isfile(metadata_file):
+        model_dir = os.path.join(MODEL_DIR, model_hash)
+
+        circuit_metadata = None
+        for filename in ["metadata.json", "metadata.toml"]:
+            metadata_path = os.path.join(model_dir, filename)
+            if os.path.isfile(metadata_path):
+                try:
+                    circuit_metadata = CircuitMetadata.from_file(metadata_path)
+                    break
+                except Exception as e:
+                    bt.logging.error(
+                        SYNC_LOG_PREFIX
+                        + f"Failed to parse metadata from {metadata_path}: {e}"
+                    )
+                    continue
+
+        if circuit_metadata is None:
             bt.logging.error(
                 SYNC_LOG_PREFIX
-                + f"Metadata file not found at {metadata_file} for {model_hash}. Skipping sync for this model."
+                + f"No valid metadata file found in {model_dir} for {model_hash}. Skipping sync for this model."
             )
             continue
 
-        try:
-            circuit_metadata = CircuitMetadata.from_file(metadata_file)
-            metadata = {"external_files": circuit_metadata.external_files}
-        except Exception as e:
-            bt.logging.error(
-                SYNC_LOG_PREFIX + f"Failed to parse metadata from {metadata_file}: {e}"
-            )
-            continue
-
-        external_files = metadata.get("external_files", {})
-        for key, url in external_files.items():
+        for key, url in circuit_metadata.external_files.items():
             if (role == Roles.VALIDATOR and key not in VALIDATOR_EXTERNAL_FILES) or (
                 role == Roles.MINER and key not in MINER_EXTERNAL_FILES
             ):
