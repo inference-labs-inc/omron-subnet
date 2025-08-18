@@ -2,6 +2,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 from typing import TYPE_CHECKING
 import subprocess
 import bittensor as bt
@@ -37,6 +38,14 @@ class DCAPHandler(ProofSystemHandler):
         os.makedirs(os.path.dirname(session.session_storage.input_path), exist_ok=True)
         with open(session.session_storage.input_path, "w", encoding="utf-8") as f:
             json.dump(session.inputs.data, f)
+
+        model_dest = os.path.join(
+            session.session_storage.base_path, f"network_{session.model_id}.onnx"
+        )
+        if not os.path.exists(model_dest):
+            shutil.copy2(session.model.paths.compiled_model, model_dest)
+            bt.logging.trace(f"Copied model to {model_dest}")
+
         bt.logging.trace(f"Generated input.json with data: {session.inputs.data}")
 
     def gen_proof(self, session: VerifiedModelSession) -> tuple[str, str]:
@@ -170,9 +179,7 @@ class DCAPHandler(ProofSystemHandler):
                     WORKSPACE_PATH, os.path.basename(session.session_storage.input_path)
                 ),
                 "--model",
-                os.path.join(
-                    WORKSPACE_PATH, os.path.basename(session.model.paths.compiled_model)
-                ),
+                os.path.join(WORKSPACE_PATH, f"network_{session.model_id}.onnx"),
                 "--output",
                 os.path.join(
                     WORKSPACE_PATH,
