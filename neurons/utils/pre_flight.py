@@ -100,7 +100,7 @@ def ensure_teeonnx_installed():
         subprocess.run(
             [
                 "wget",
-                "https://github.com/zkonduit/teeonnx-p/releases/v23/download/teeonnx-zk-cpu-linux",
+                "https://github.com/zkonduit/teeonnx-p/releases/download/v23/teeonnx-zk-cpu-linux",
                 "-O",
                 f"{LOCAL_TEEONNX_PATH}",
             ],
