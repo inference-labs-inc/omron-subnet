@@ -91,6 +91,7 @@ def ensure_teeonnx_installed():
     """
     try:
         if os.path.exists(LOCAL_TEEONNX_PATH):
+            os.chmod(LOCAL_TEEONNX_PATH, 0o755)
             bt.logging.info("teeonnx is already installed")
             return
 
