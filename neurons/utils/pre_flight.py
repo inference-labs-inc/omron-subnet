@@ -98,8 +98,12 @@ def ensure_teeonnx_installed():
 
         # trunk-ignore(bandit/B605)
         subprocess.run(
-            "wget https://github.com/zkonduit/teeonnx-p/releases/v23/download/teeonnx-zk-cpu-linux -O "
-            f"{LOCAL_TEEONNX_PATH}",
+            [
+                "wget",
+                "https://github.com/zkonduit/teeonnx-p/releases/v23/download/teeonnx-zk-cpu-linux",
+                "-O",
+                f"{LOCAL_TEEONNX_PATH}",
+            ],
             check=True,
         )
         os.chmod(LOCAL_TEEONNX_PATH, 0o755)
