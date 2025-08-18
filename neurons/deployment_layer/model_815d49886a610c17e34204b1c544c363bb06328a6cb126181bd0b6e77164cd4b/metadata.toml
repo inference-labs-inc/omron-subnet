@@ -8,4 +8,4 @@ benchmark_choice_weight = 0.2
 
 
 [external_files]
-network.onnx = "https://storage.omron.ai/815d49886a610c17e34204b1c544c363bb06328a6cb126181bd0b6e77164cd4b/network.onnx"
+"network.onnx" = "https://storage.omron.ai/815d49886a610c17e34204b1c544c363bb06328a6cb126181bd0b6e77164cd4b/network.onnx"
