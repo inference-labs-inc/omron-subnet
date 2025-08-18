@@ -40,7 +40,7 @@ class DCAPHandler(ProofSystemHandler):
             json.dump(session.inputs.data, f)
 
         model_dest = os.path.join(
-            session.session_storage.base_path, f"network_{session.model_id}.onnx"
+            session.session_storage.base_path, f"network_{session.model.id}.onnx"
         )
         if not os.path.exists(model_dest):
             shutil.copy2(session.model.paths.compiled_model, model_dest)
