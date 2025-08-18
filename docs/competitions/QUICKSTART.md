@@ -52,8 +52,6 @@ pm2 start neurons/miner.py --name omron_miner -- --netuid 2 --wallet.name your_w
 
 Required files in your circuit directory:
 
-- `vk.key` - Verification key
-- `pk.key` - Proving key - **must be less than 50GB**
 - `settings.json` - Circuit configuration with required settings:
   ```json
   {
@@ -89,7 +87,7 @@ The miner will automatically:
 
 - Monitor circuit directory for changes
 - Upload modified files to R2/S3
-- Create on-chain commitment using the hash of the `vk.key` file
+- Create on-chain commitment using the SHA256 hash of the `model.compiled` file
 - Generate time-limited signed URLs for validators upon request
 
 ### Monitor Evaluation
@@ -143,9 +141,9 @@ For specific hardware requirements, please refer to the main [README] document.
 
 The maximum proof time is a configurable property and is subject to change over time, however as it stands this value is set at 300 seconds (5 minutes).
 
-### What is the maximum `pk.key` size allowed for a circuit?
+### Do I need to upload `vk.key`/`pk.key`?
 
-The maximum `pk.key` size is a configurable property and is subject to change over time, however as it stands this value is set at 50GB.
+No. Only `model.compiled` and `settings.json` are required. During evaluation, the validator generates `vk.key` and `pk.key` locally using `ezkl setup`. This setup step is limited to exactly 5 minutes (timeout) and capped at 16 GiB of address space. If it fails or times out, the submission receives no score for that evaluation. See the canonical implementation of these limits in `neurons/_validator/competitions/services/circuit_evaluator.py` within the `_ensure_keys` function (the `set_limits` inner function and the `timeout=FIVE_MINUTES` argument).
 
 ### When does the competition end?
 
