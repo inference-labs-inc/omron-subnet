@@ -6,7 +6,6 @@ import asyncio
 import aiohttp
 import concurrent.futures
 import os
-from itertools import repeat
 from typing import Union, List
 
 import bittensor as bt
@@ -81,12 +80,22 @@ def process_server_response(
     local_synapse: bt.Synapse,
 ):
     if server_response.status == 200:
-        server_synapse = local_synapse.__class__(**json_response)
-        for key in local_synapse.model_dump().keys():
-            try:
-                setattr(local_synapse, key, getattr(server_synapse, key))
-            except Exception:
-                pass
+        try:
+            server_synapse = local_synapse.__class__(**json_response)
+            for key in local_synapse.model_dump().keys():
+                try:
+                    setattr(local_synapse, key, getattr(server_synapse, key))
+                except Exception:
+                    pass
+        except Exception as e:
+            bt.logging.debug(f"Failed to create server synapse from response: {e}")
+            # If we can't create the server synapse, try to extract individual fields
+            for key, value in json_response.items():
+                if hasattr(local_synapse, key):
+                    try:
+                        setattr(local_synapse, key, value)
+                    except Exception:
+                        pass
     else:
         if local_synapse.axon is None:
             local_synapse.axon = bt.TerminalInfo()
@@ -201,6 +210,12 @@ async def call(
             f"dendrite | <-- | {synapse.get_total_size()} B | {synapse.name} | {synapse.axon.hotkey} | {synapse.axon.ip}:{str(synapse.axon.port)} | {synapse.dendrite.status_code} | {synapse.dendrite.status_message}"
         )
 
+        # Debug logging for response content
+        if hasattr(synapse, "query_output") and synapse.query_output is None:
+            bt.logging.debug(
+                f"Warning: synapse.query_output is None for {synapse.name}"
+            )
+
     return synapse
 
 
@@ -268,8 +283,31 @@ def run_chunk(
                 request_name,
             )
         )
-    except EOFError:
-        return None
+    except Exception as e:
+        error_synapses = []
+        for axon_dict, _ in axon_sig_pairs:
+            try:
+                error_synapse = synapse_class(**synapse_body).from_headers(
+                    synapse_headers
+                )
+                error_synapse.dendrite = bt.TerminalInfo(
+                    status_code="500", status_message=f"Process error: {str(e)}"
+                )
+                error_synapse.axon = bt.TerminalInfo(
+                    ip=axon_dict.get("ip", "unknown"),
+                    port=axon_dict.get("port", 0),
+                    hotkey=axon_dict.get("hotkey", "unknown"),
+                    status_code="500",
+                    status_message=f"Process error: {str(e)}",
+                )
+                error_synapses.append(error_synapse)
+            except Exception:
+                error_synapse = synapse_class(**synapse_body)
+                error_synapse.dendrite = bt.TerminalInfo(
+                    status_code="500", status_message="Process execution failed"
+                )
+                error_synapses.append(error_synapse)
+        return error_synapses
 
 
 def sign(synapse: bt.Synapse, keypair: bt.Keypair):
@@ -350,21 +388,18 @@ def mp_forward(
         for future, chunk in chunk_futures:
             try:
                 chunk_results = future.result()
-                if chunk_results:
-                    results.extend(chunk_results)
-                else:
-                    # Create error synapses for failed chunk
-                    for axon_dict, _ in chunk:
-                        error_synapse = synapse.model_copy()
-                        error_synapse.dendrite = bt.TerminalInfo(
-                            status_code="500", status_message="Process execution failed"
-                        )
-                        results.append(error_synapse)
+                results.extend(chunk_results)
             except Exception as e:
-                # Create error synapses for exception in chunk
                 for axon_dict, _ in chunk:
                     error_synapse = synapse.model_copy()
                     error_synapse.dendrite = bt.TerminalInfo(
+                        status_code="500",
+                        status_message=f"Process execution error: {str(e)}",
+                    )
+                    error_synapse.axon = bt.TerminalInfo(
+                        ip=axon_dict.get("ip", "unknown"),
+                        port=axon_dict.get("port", 0),
+                        hotkey=axon_dict.get("hotkey", "unknown"),
                         status_code="500",
                         status_message=f"Process execution error: {str(e)}",
                     )
