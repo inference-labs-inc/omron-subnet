@@ -19,6 +19,7 @@ dependencies = [
   "fastapi==0.110.3",
   "gitpython>=3.1.44",
   "jsonrpcserver>=5.0.9",
+  "maturin>=1.0.0",
   "matplotlib>=3.10.1",
   "numpy==2.0.2",
   "onnxruntime>=1.21.0",
@@ -40,6 +41,7 @@ dependencies = [
   "uvicorn==0.34.0",
   "wandb==0.21.0",
   "websocket-client>=1.8.0",
+  "lightning",
 ]
 
 [dependency-groups]
@@ -72,6 +74,7 @@ pythonpath = [".", "neurons"]
 
 [tool.uv.sources]
 torch = { index = "pytorch" }
+lightning = { path = "neurons/utils/lightning" }
 
 [[tool.uv.index]]
 name = "pytorch"
