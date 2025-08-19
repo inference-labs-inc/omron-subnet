@@ -9,6 +9,7 @@ from substrateinterface import Keypair
 from pathlib import Path
 from botocore.config import Config
 import bittensor as bt
+from constants import ACTIVE_COMPETITION
 from pydantic import BaseModel
 import cli_parser
 
@@ -253,6 +254,10 @@ class CircuitManager:
         while not self._stop_event.is_set():
             try:
                 with self._lock:
+                    if not ACTIVE_COMPETITION:
+                        time.sleep(self.check_interval)
+                        continue
+
                     new_vk_hash = self._calculate_vk_hash()
                     if not new_vk_hash:
                         bt.logging.warning(
