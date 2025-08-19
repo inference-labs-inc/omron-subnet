@@ -254,8 +254,12 @@ class CircuitManager:
         while not self._stop_event.is_set():
             try:
                 with self._lock:
+                    if not ACTIVE_COMPETITION:
+                        time.sleep(self.check_interval)
+                        continue
+
                     new_vk_hash = self._calculate_vk_hash()
-                    if not new_vk_hash and ACTIVE_COMPETITION:
+                    if not new_vk_hash:
                         bt.logging.warning(
                             "No verification key found. This means you are not participating in the competition.\n"
                             "See https://accelerate.omron.ai for details."
