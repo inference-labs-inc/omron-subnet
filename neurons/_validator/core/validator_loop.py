@@ -330,7 +330,7 @@ class ValidatorLoop:
                 if VIZTRACER_AVAILABLE:
                     tracer = get_tracer()
                     if tracer:
-                        tracer.add_instant("request_pool_iteration_start")
+                        tracer.start_duration("request_pool_iteration")
 
                 try:
                     message = await asyncio.get_event_loop().run_in_executor(
@@ -407,7 +407,18 @@ class ValidatorLoop:
                             )
 
                 await asyncio.sleep(0)
+
+                if VIZTRACER_AVAILABLE:
+                    tracer = get_tracer()
+                    if tracer:
+                        tracer.stop_duration("request_pool_iteration")
+
             except Exception as e:
+                if VIZTRACER_AVAILABLE:
+                    tracer = get_tracer()
+                    if tracer:
+                        tracer.stop_duration("request_pool_iteration")
+
                 bt.logging.error(f"Error maintaining request pool: {e}")
                 traceback.print_exc()
                 await asyncio.sleep(EXCEPTION_DELAY_SECONDS)
@@ -484,10 +495,7 @@ class ValidatorLoop:
         if VIZTRACER_AVAILABLE:
             tracer = get_tracer()
             if tracer:
-                tracer.add_instant(
-                    "process_request_start",
-                    {"uid": request.uid, "request_type": str(request.request_type)},
-                )
+                tracer.start_duration(f"process_request_uid_{request.uid}")
 
         try:
             if VIZTRACER_AVAILABLE:
@@ -541,6 +549,11 @@ class ValidatorLoop:
             bt.logging.error(f"Error processing request for UID {request.uid}: {e}")
             traceback.print_exc()
             log_error("request_processing", "axon_query", str(e))
+        finally:
+            if VIZTRACER_AVAILABLE:
+                tracer = get_tracer()
+                if tracer:
+                    tracer.stop_duration(f"process_request_uid_{request.uid}")
         return request
 
     async def _handle_response(self, response: MinerResponse) -> None:
