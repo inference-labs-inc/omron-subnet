@@ -9,6 +9,7 @@ from substrateinterface import Keypair
 from pathlib import Path
 from botocore.config import Config
 import bittensor as bt
+from constants import ACTIVE_COMPETITION
 from pydantic import BaseModel
 import cli_parser
 
@@ -254,7 +255,7 @@ class CircuitManager:
             try:
                 with self._lock:
                     new_vk_hash = self._calculate_vk_hash()
-                    if not new_vk_hash:
+                    if not new_vk_hash and ACTIVE_COMPETITION:
                         bt.logging.warning(
                             "No verification key found. This means you are not participating in the competition.\n"
                             "See https://accelerate.omron.ai for details."
