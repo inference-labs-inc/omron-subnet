@@ -12,7 +12,8 @@ from constants import (
 )
 from deployment_layer.circuit_store import circuit_store
 from _validator.core.request import Request
-from execution_layer.circuit import ProofSystem, Circuit
+from execution_layer.circuit import Circuit
+from execution_layer.circuit_metadata import ProofSystem
 from _validator.models.request_type import RequestType
 
 

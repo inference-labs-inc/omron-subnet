@@ -1,0 +1,251 @@
+from __future__ import annotations
+import hashlib
+import json
+import os
+import shutil
+from typing import TYPE_CHECKING
+import subprocess
+import bittensor as bt
+import traceback
+
+from execution_layer.proof_handlers.base_handler import ProofSystemHandler
+from execution_layer.generic_input import GenericInput
+from constants import LOCAL_TEEONNX_PATH, ONE_HOUR
+from execution_layer.session_storage import DCAPSessionStorage
+
+if TYPE_CHECKING:
+    from execution_layer.verified_model_session import VerifiedModelSession
+
+SGX_ENCLAVE_PATH = "/dev/sgx_enclave"
+SGX_PROVISION_PATH = "/dev/sgx_provision"
+WORKSPACE_PATH = "/workspace/user"
+IMAGE_TAG = "sha-edeb481"
+SGX_IMAGE = f"ghcr.io/zkonduit/teeonnx-sgx:{IMAGE_TAG}"
+# flake8: noqa: E501
+EXPECTED_MRENCLAVE = "[97, 230, 108, 244, 156, 207, 32, 252, 33, 179, 107, 145, 201, 52, 165, 254, 21, 175, 13, 164, 221, 23, 245, 161, 243, 141, 134, 177, 89, 36, 102, 4]"
+
+
+def _check_sgx_device_access() -> bool:
+    """Check if SGX devices are accessible without sudo."""
+    try:
+        return os.access(SGX_ENCLAVE_PATH, os.R_OK | os.W_OK) and os.access(
+            SGX_PROVISION_PATH, os.R_OK | os.W_OK
+        )
+    except OSError:
+        return False
+
+
+def _needs_sudo_for_sgx() -> bool:
+    """Determine if sudo is needed for SGX device access."""
+    return not _check_sgx_device_access() and os.geteuid() != 0
+
+
+class DCAPHandler(ProofSystemHandler):
+    """
+    Handler for the DCAP proof system.
+    This class provides methods for generating and verifying proofs using DCAP (teeonnx).
+    """
+
+    def gen_input_file(self, session: VerifiedModelSession):
+        bt.logging.trace("Generating input file")
+        if session.inputs is None:
+            raise ValueError("Session inputs cannot be None when generating input file")
+        os.makedirs(os.path.dirname(session.session_storage.input_path), exist_ok=True)
+
+        input_data = session.inputs.data
+        teeonnx_format = {
+            "data": input_data.get("input_ids", input_data.get("data", [])),
+            "shapes": input_data.get("shapes", []),
+            "variables": input_data.get("variables", []),
+        }
+
+        with open(session.session_storage.input_path, "w", encoding="utf-8") as f:
+            json.dump(teeonnx_format, f)
+
+        model_dest = os.path.join(
+            session.session_storage.base_path, f"network_{session.model.id}.onnx"
+        )
+        if not os.path.exists(model_dest):
+            shutil.copy2(session.model.paths.compiled_model, model_dest)
+            bt.logging.trace(f"Copied model to {model_dest}")
+
+        bt.logging.trace(f"Generated input.json with data: {session.inputs.data}")
+
+    def gen_proof(self, session: VerifiedModelSession) -> tuple[str, str]:
+        try:
+            bt.logging.debug("Starting proof generation...")
+
+            self.generate_witness(session)
+            bt.logging.trace("Generating proof")
+
+            if not isinstance(session.session_storage, DCAPSessionStorage):
+                raise TypeError("Session storage must be a DCAPSessionStorage instance")
+
+            result = subprocess.run(
+                [
+                    LOCAL_TEEONNX_PATH,
+                    "prove",
+                    "--quote",
+                    session.session_storage.quote_path,
+                    "--proof",
+                    session.session_storage.proof_path,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            bt.logging.trace(
+                f"Proof generated: {session.session_storage.proof_path}, result: {result.stdout}"
+            )
+
+            with open(session.session_storage.proof_path, "r", encoding="utf-8") as f:
+                try:
+                    proof = json.load(f)
+                except json.JSONDecodeError:
+                    bt.logging.error(
+                        f"Failed to load proof from {session.session_storage.proof_path}"
+                    )
+                    raise
+
+            return json.dumps(proof), json.dumps(proof["instances"])
+
+        except Exception as e:
+            bt.logging.error(f"An error occurred during proof generation: {e}")
+            traceback.print_exc()
+            raise
+
+    def verify_proof(
+        self,
+        session: VerifiedModelSession,
+        validator_inputs: GenericInput,
+        proof: str | dict,
+    ) -> bool:
+        if not proof:
+            return False
+
+        if isinstance(proof, str):
+            proof_json = json.loads(proof)
+        else:
+            proof_json = proof
+
+        with open(session.session_storage.proof_path, "w", encoding="utf-8") as f:
+            json.dump(proof_json, f)
+
+        input_hash = hashlib.sha256(
+            json.dumps(
+                validator_inputs.data, sort_keys=True, separators=(",", ":")
+            ).encode("utf-8")
+        ).hexdigest()[:64]
+
+        with open(session.model.paths.compiled_model, "rb") as f:
+            try:
+                model_hash = hashlib.sha256(f.read()).hexdigest()[:64]
+            except Exception as e:
+                bt.logging.error(f"Failed to hash model: {e}")
+                raise
+
+        with open(session.session_storage.witness_path, "rb") as f:
+            try:
+                witness_hash = hashlib.sha256(f.read()).hexdigest()[:64]
+            except Exception as e:
+                bt.logging.error(f"Failed to hash witness: {e}")
+                raise
+
+        try:
+            result = subprocess.run(
+                [
+                    LOCAL_TEEONNX_PATH,
+                    "verify",
+                    session.session_storage.proof_path,
+                    "--input-hash",
+                    input_hash,
+                    "--model-hash",
+                    model_hash,
+                    "--output-hash",
+                    witness_hash,
+                    "--mrenclave",
+                    EXPECTED_MRENCLAVE,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            return "verified: true" in result.stdout
+        except subprocess.TimeoutExpired:
+            bt.logging.error("Verification process timed out after 60 seconds")
+            return False
+        except subprocess.CalledProcessError:
+            return False
+
+    def generate_witness(
+        self, session: VerifiedModelSession, return_content: bool = False
+    ) -> list | dict:
+        bt.logging.trace("Generating witness")
+
+        if not isinstance(session.session_storage, DCAPSessionStorage):
+            raise TypeError("Session storage must be a DCAPSessionStorage instance")
+
+        docker_cmd = ["docker", "run", "--rm"]
+        if _needs_sudo_for_sgx():
+            docker_cmd = ["sudo"] + docker_cmd
+
+        docker_cmd.extend(
+            [
+                "--device",
+                SGX_ENCLAVE_PATH,
+                "--device",
+                SGX_PROVISION_PATH,
+                "-v",
+                f"{session.session_storage.base_path}:{WORKSPACE_PATH}",
+                SGX_IMAGE,
+                "gen-output",
+                "--input",
+                os.path.join(
+                    WORKSPACE_PATH, os.path.basename(session.session_storage.input_path)
+                ),
+                "--model",
+                os.path.join(WORKSPACE_PATH, f"network_{session.model.id}.onnx"),
+                "--output",
+                os.path.join(
+                    WORKSPACE_PATH,
+                    os.path.basename(session.session_storage.witness_path),
+                ),
+                "--quote",
+                os.path.join(
+                    WORKSPACE_PATH, os.path.basename(session.session_storage.quote_path)
+                ),
+            ]
+        )
+
+        try:
+            result = subprocess.run(
+                docker_cmd, check=True, capture_output=True, text=True, timeout=ONE_HOUR
+            )
+        except subprocess.TimeoutExpired as e:
+            bt.logging.error(f"Docker command timed out after {ONE_HOUR} seconds: {e}")
+            raise
+        except subprocess.CalledProcessError as e:
+            bt.logging.error(f"Docker command failed: {e}")
+            raise
+
+        bt.logging.debug(f"Gen witness result: {result.stdout}")
+
+        # Always return parsed JSON content
+        try:
+            with open(session.session_storage.witness_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError, OSError) as e:
+            bt.logging.warning(
+                f"Failed to read witness file {session.session_storage.witness_path}: {e}"
+            )
+            try:
+                return json.loads(result.stdout)
+            except json.JSONDecodeError as json_err:
+                bt.logging.error(
+                    f"Failed to parse witness JSON from stdout: {json_err}"
+                )
+                raise RuntimeError(
+                    f"Unable to obtain valid witness JSON from file or stdout: {e}, {json_err}"
+                ) from json_err

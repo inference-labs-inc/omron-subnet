@@ -1,6 +1,7 @@
 from bittensor import logging
 from _validator.utils.proof_of_weights import ProofOfWeightsItem
-from execution_layer.circuit import Circuit, CircuitType
+from execution_layer.circuit import Circuit
+from execution_layer.circuit_metadata import CircuitType
 from constants import (
     BATCHED_PROOF_OF_WEIGHTS_MODEL_ID,
 )

@@ -1,12 +1,12 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from enum import Enum
 import torch
 import os
 import json
 import cli_parser
 from execution_layer.input_registry import InputRegistry
 from execution_layer.base_input import BaseInput
+from execution_layer.circuit_metadata import CircuitMetadata, ProofSystem
 from utils.metrics_logger import log_circuit_metrics
 from utils.gc_logging import gc_log_eval_metrics
 from constants import (
@@ -22,43 +22,6 @@ import re
 
 # trunk-ignore(pylint/E0611)
 from bittensor import logging, subtensor, Wallet
-
-
-class CircuitType(str, Enum):
-    """
-    Enum representing the type of circuit.
-    """
-
-    PROOF_OF_WEIGHTS = "proof_of_weights"
-    PROOF_OF_COMPUTATION = "proof_of_computation"
-
-
-class ProofSystem(str, Enum):
-    """
-    Enum representing supported proof systems.
-    """
-
-    # ZK Proof Systems
-    ZKML = "ZKML"
-    CIRCOM = "CIRCOM"
-    JOLT = "JOLT"
-    EZKL = "EZKL"
-
-    def __str__(self):
-        return self.value
-
-    @classmethod
-    def _missing_(cls, value):
-        if isinstance(value, str):
-            return cls(value.upper())
-        raise ValueError(f"Cannot convert {value} to {cls.__name__}")
-
-    def to_json(self):
-        return self.value
-
-    @classmethod
-    def from_json(cls, value):
-        return cls(value)
 
 
 @dataclass
@@ -101,7 +64,10 @@ class CircuitPaths:
                 f"model_{self.model_id}",
             )
         self.input = os.path.join(self.base_path, "input.json")
-        self.metadata = os.path.join(self.base_path, "metadata.json")
+        if os.path.exists(os.path.join(self.base_path, "metadata.toml")):
+            self.metadata = os.path.join(self.base_path, "metadata.toml")
+        else:
+            self.metadata = os.path.join(self.base_path, "metadata.json")
         self.compiled_model = os.path.join(self.base_path, "model.compiled")
         self.settings = os.path.join(self.base_path, "settings.json")
         self.witness = os.path.join(self.base_path, "witness.json")
@@ -121,50 +87,14 @@ class CircuitPaths:
             self.pk = os.path.join(self.external_base_path, "circuit.zkey")
             self.vk = os.path.join(self.base_path, "verification_key.json")
             self.compiled_model = os.path.join(self.base_path, "circuit.wasm")
-        elif proof_system == ProofSystem.JOLT:
-            self.compiled_model = os.path.join(
-                self.base_path, "target", "release", "circuit"
-            )
         elif proof_system == ProofSystem.EZKL:
             self.pk = os.path.join(self.external_base_path, "pk.key")
             self.vk = os.path.join(self.base_path, "vk.key")
             self.compiled_model = os.path.join(self.base_path, "model.compiled")
+        elif proof_system == ProofSystem.DCAP:
+            self.compiled_model = os.path.join(self.external_base_path, "network.onnx")
         else:
             raise ValueError(f"Proof system {proof_system} not supported")
-
-
-@dataclass
-class CircuitMetadata:
-    """
-    Metadata for a specific model, such as name, version, description, etc.
-    """
-
-    name: str
-    description: str
-    author: str
-    version: str
-    proof_system: str
-    type: CircuitType
-    external_files: dict[str, str]
-    netuid: int | None = None
-    weights_version: int | None = None
-    timeout: int | None = None
-    benchmark_choice_weight: float | None = None
-
-    @classmethod
-    def from_file(cls, metadata_path: str) -> CircuitMetadata:
-        """
-        Create a ModelMetadata instance from a JSON file.
-
-        Args:
-            metadata_path (str): Path to the metadata JSON file.
-
-        Returns:
-            ModelMetadata: An instance of ModelMetadata.
-        """
-        with open(metadata_path, "r", encoding="utf-8") as f:
-            metadata = json.load(f)
-        return cls(**metadata)
 
 
 @dataclass

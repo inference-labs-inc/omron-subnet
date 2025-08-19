@@ -18,7 +18,8 @@ from constants import (
     SINGLE_PROOF_OF_WEIGHTS_MODEL_ID,
 )
 from deployment_layer.circuit_store import circuit_store
-from execution_layer.circuit import Circuit, CircuitType
+from execution_layer.circuit import Circuit
+from execution_layer.circuit_metadata import CircuitType
 from execution_layer.generic_input import GenericInput
 from protocol import ProofOfWeightsSynapse, QueryZkProof
 from utils.wandb_logger import safe_log

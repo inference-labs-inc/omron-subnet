@@ -4,7 +4,7 @@ from typing import Dict, Optional
 import bittensor as bt
 
 import toml
-from execution_layer.circuit import ProofSystem
+from execution_layer.circuit_metadata import ProofSystem
 
 
 class QueryZkProof(bt.Synapse):
