@@ -118,7 +118,9 @@ class DCAPHandler(ProofSystemHandler):
             json.dump(proof_json, f)
 
         input_hash = hashlib.sha256(
-            json.dumps(validator_inputs.data, sort_keys=True).encode("utf-8")
+            json.dumps(
+                validator_inputs.data, sort_keys=True, separators=(",", ":")
+            ).encode("utf-8")
         ).hexdigest()[:64]
 
         with open(session.model.paths.compiled_model, "rb") as f:
@@ -206,7 +208,20 @@ class DCAPHandler(ProofSystemHandler):
 
         bt.logging.debug(f"Gen witness result: {result.stdout}")
 
-        if return_content:
+        # Always return parsed JSON content
+        try:
             with open(session.session_storage.witness_path, "r", encoding="utf-8") as f:
                 return json.load(f)
-        return result.stdout
+        except (FileNotFoundError, json.JSONDecodeError, OSError) as e:
+            bt.logging.warning(
+                f"Failed to read witness file {session.session_storage.witness_path}: {e}"
+            )
+            try:
+                return json.loads(result.stdout)
+            except json.JSONDecodeError as json_err:
+                bt.logging.error(
+                    f"Failed to parse witness JSON from stdout: {json_err}"
+                )
+                raise RuntimeError(
+                    f"Unable to obtain valid witness JSON from file or stdout: {e}, {json_err}"
+                ) from json_err

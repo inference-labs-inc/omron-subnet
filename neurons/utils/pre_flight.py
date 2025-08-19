@@ -91,9 +91,15 @@ def ensure_teeonnx_installed():
     """
     try:
         if os.path.exists(LOCAL_TEEONNX_PATH):
-            os.chmod(LOCAL_TEEONNX_PATH, 0o755)
-            bt.logging.info("teeonnx is already installed")
-            return
+            if os.access(LOCAL_TEEONNX_PATH, os.X_OK):
+                bt.logging.info("teeonnx is already installed and executable")
+                return
+            else:
+                bt.logging.warning(
+                    "teeonnx exists but is not executable; fixing permissions..."
+                )
+                os.chmod(LOCAL_TEEONNX_PATH, 0o750)
+                return
 
         os.makedirs(os.path.dirname(LOCAL_TEEONNX_PATH), exist_ok=True)
 
@@ -103,13 +109,13 @@ def ensure_teeonnx_installed():
                 "wget",
                 "https://github.com/zkonduit/teeonnx-p/releases/download/v23/teeonnx-zk-cpu-linux",
                 "-O",
-                f"{LOCAL_TEEONNX_PATH}",
+                LOCAL_TEEONNX_PATH,
             ],
             check=True,
         )
-        os.chmod(LOCAL_TEEONNX_PATH, 0o755)
+        os.chmod(LOCAL_TEEONNX_PATH, 0o750)
         bt.logging.info("teeonnx installed successfully")
-    except subprocess.CalledProcessError as e:
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
         bt.logging.error(f"Failed to install teeonnx: {e}")
         raise RuntimeError(
             "teeonnx installation failed. Please install it manually."

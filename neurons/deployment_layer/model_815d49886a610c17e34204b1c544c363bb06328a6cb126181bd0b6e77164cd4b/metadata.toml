@@ -1,5 +1,5 @@
 name = "Dishonest Advisor"
-description = "A dishonest advisor which provides generic cryptocurrency advise (NFA)"
+description = "A dishonest advisor that provides generic cryptocurrency advice (NFA)"
 author = "Inference Labs"
 version = "0.0.1"
 proof_system = "DCAP"
