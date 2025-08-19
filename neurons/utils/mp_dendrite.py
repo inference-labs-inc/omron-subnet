@@ -82,9 +82,11 @@ def process_server_response(
 ):
     if server_response.status == 200:
         server_synapse = local_synapse.__class__(**json_response)
-        for key in server_synapse.__dict__:
-            if hasattr(local_synapse, key) and key not in ["dendrite", "axon"]:
+        for key in local_synapse.model_dump().keys():
+            try:
                 setattr(local_synapse, key, getattr(server_synapse, key))
+            except Exception:
+                pass
     else:
         if local_synapse.axon is None:
             local_synapse.axon = bt.TerminalInfo()
