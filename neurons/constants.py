@@ -40,8 +40,6 @@ IGNORED_MODEL_HASHES = [
 VALIDATOR_REQUEST_TIMEOUT_SECONDS = 120
 # The maximum timespan allowed for miners to process through a circuit
 CIRCUIT_TIMEOUT_SECONDS = 60
-# Whether to penalize miners for missing resets
-RESET_PENALTY_ENABLED = False
 # An additional queueing time for external requests
 EXTERNAL_REQUEST_QUEUE_TIME_SECONDS = 10
 # Maximum number of concurrent requests that the validator will handle
@@ -74,8 +72,6 @@ FIELD_MODULUS = (
 )
 # Subnet tempo for epochs
 EPOCH_TEMPO = 360
-# Weight update buffer
-WEIGHT_UPDATE_BUFFER = 15
 # Whether on-chain proof of weights is enabled by default
 ONCHAIN_PROOF_OF_WEIGHTS_ENABLED = False
 # Frequency in terms of blocks at which proof of weights are posted
