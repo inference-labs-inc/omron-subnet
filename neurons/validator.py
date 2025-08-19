@@ -24,18 +24,10 @@ if __name__ == "__main__":
 
         tracer = VizTracer(
             output_file=f"validator_trace_{os.getpid()}.json",
-            log_func_entry=True,
-            log_func_args=True,
-            log_func_retval=True,
-            log_exception=True,
-            log_gc=True,
-            log_async=True,
-            log_multiprocess=True,
             max_stack_depth=50,
             min_duration=0,
             include_files=["neurons/", "_validator/", "utils/"],
             exclude_files=["venv/", "site-packages/"],
-            log_torch=False,
             verbose=1,
         )
 
