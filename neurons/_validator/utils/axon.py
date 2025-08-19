@@ -2,9 +2,12 @@ import traceback
 import bittensor as bt
 from aiohttp.client_exceptions import InvalidUrlClientError
 from _validator.core.request import Request
+from utils.lightning_dendrite import LightningDendrite
 
 
-async def query_single_axon(dendrite: bt.dendrite, request: Request) -> Request | None:
+async def query_single_axon(
+    dendrite: LightningDendrite | bt.dendrite, request: Request
+) -> Request | None:
     """
     Query a single axon with a request. Per Circuit query.
 

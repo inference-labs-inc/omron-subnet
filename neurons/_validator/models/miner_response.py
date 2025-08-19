@@ -92,23 +92,18 @@ class MinerResponse:
                         f"Miner at {response.uid} did not return public signals."
                     )
 
-            if isinstance(proof_content, str):
-                proof_size = len(proof_content)
+            if not proof_content:
+                proof_size = DEFAULT_PROOF_SIZE
             else:
-                if response.circuit.proof_system == ProofSystem.CIRCOM:
-                    proof_size = (
-                        sum(
-                            len(str(value))
-                            for key in ("pi_a", "pi_b", "pi_c")
-                            for element in proof_content.get(key, [])
-                            for value in (
-                                element if isinstance(element, list) else [element]
-                            )
-                        )
-                        if proof_content
-                        else DEFAULT_PROOF_SIZE
+                ps = response.circuit.proof_system
+                if ps == ProofSystem.CIRCOM:
+                    proof_size = sum(
+                        len(str(v))
+                        for k in ("pi_a", "pi_b", "pi_c")
+                        for e in proof_content.get(k, [])
+                        for v in (e if isinstance(e, list) else [e])
                     )
-                elif response.circuit.proof_system == ProofSystem.EZKL:
+                elif ps == ProofSystem.EZKL:
                     proof_size = len(proof_content["proof"])
                 else:
                     proof_size = DEFAULT_PROOF_SIZE
