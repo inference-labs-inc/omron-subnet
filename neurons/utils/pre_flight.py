@@ -98,7 +98,7 @@ def ensure_teeonnx_installed():
                 bt.logging.warning(
                     "teeonnx exists but is not executable; fixing permissions..."
                 )
-                os.chmod(LOCAL_TEEONNX_PATH, 0o750)
+                os.chmod(LOCAL_TEEONNX_PATH, 0o700)
                 return
 
         os.makedirs(os.path.dirname(LOCAL_TEEONNX_PATH), exist_ok=True)
@@ -113,7 +113,7 @@ def ensure_teeonnx_installed():
             ],
             check=True,
         )
-        os.chmod(LOCAL_TEEONNX_PATH, 0o750)
+        os.chmod(LOCAL_TEEONNX_PATH, 0o700)
         bt.logging.info("teeonnx installed successfully")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         bt.logging.error(f"Failed to install teeonnx: {e}")
