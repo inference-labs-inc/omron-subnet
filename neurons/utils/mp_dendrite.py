@@ -233,7 +233,53 @@ async def worker(
 ):
     chunk_size = len(axon_sig_pairs)
     connection_limit = min(MAX_CONCURRENT_CONNECTIONS, max(1, chunk_size))
-    conn = aiohttp.TCPConnector(limit=connection_limit)
+    conn = aiohttp.TCPConnector(limit=connection_limit, limit_per_host=10)
+
+    worker_timeout = timeout + 30
+
+    try:
+        result = await asyncio.wait_for(
+            _worker_inner(
+                ss58_address,
+                nonce,
+                uuid,
+                external_ip,
+                synapse_headers,
+                synapse_body,
+                axon_sig_pairs,
+                timeout,
+                synapse_class,
+                request_name,
+                conn,
+            ),
+            timeout=worker_timeout,
+        )
+        return result
+    except asyncio.TimeoutError:
+        bt.logging.error(f"Worker timed out after {worker_timeout}s")
+        error_synapses = []
+        for axon_dict, _ in axon_sig_pairs:
+            error_synapse = synapse_class(**synapse_body).from_headers(synapse_headers)
+            error_synapse.dendrite = bt.TerminalInfo(
+                status_code="408", status_message="Worker timeout"
+            )
+            error_synapses.append(error_synapse)
+        return error_synapses
+
+
+async def _worker_inner(
+    ss58_address: str,
+    nonce: int,
+    uuid: str,
+    external_ip: str,
+    synapse_headers: dict,
+    synapse_body: dict,
+    axon_sig_pairs: list,
+    timeout: float,
+    synapse_class: type,
+    request_name: str,
+    conn: aiohttp.TCPConnector,
+):
     async with aiohttp.ClientSession(connector=conn) as sessions:
         return await asyncio.gather(
             *(
@@ -269,20 +315,35 @@ def run_chunk(
     request_name: str,
 ):
     try:
-        return asyncio.run(
-            worker(
-                ss58_address,
-                nonce,
-                uuid,
-                external_ip,
-                synapse_headers,
-                synapse_body,
-                axon_sig_pairs,
-                timeout,
-                synapse_class,
-                request_name,
+        chunk_timeout = timeout + 60
+
+        import signal
+
+        def timeout_handler(signum, frame):
+            raise TimeoutError(f"Chunk process exceeded {chunk_timeout}s timeout")
+
+        # Set up timeout signal
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(int(chunk_timeout))
+
+        try:
+            result = asyncio.run(
+                worker(
+                    ss58_address,
+                    nonce,
+                    uuid,
+                    external_ip,
+                    synapse_headers,
+                    synapse_body,
+                    axon_sig_pairs,
+                    timeout,
+                    synapse_class,
+                    request_name,
+                )
             )
-        )
+            return result
+        finally:
+            signal.alarm(0)
     except Exception as e:
         error_synapses = []
         for axon_dict, _ in axon_sig_pairs:
@@ -387,7 +448,7 @@ def mp_forward(
 
         for future, chunk in chunk_futures:
             try:
-                chunk_results = future.result()
+                chunk_results = future.result(timeout=timeout + 90)
                 results.extend(chunk_results)
             except Exception as e:
                 for axon_dict, _ in chunk:
