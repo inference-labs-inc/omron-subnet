@@ -5,11 +5,14 @@ import time
 import asyncio
 import aiohttp
 import concurrent.futures
+import os
 from itertools import repeat
 from typing import Union, List
 
 import bittensor as bt
 from bittensor.core.settings import version_as_int
+
+MAX_CONCURRENT_CONNECTIONS = int(os.getenv("MP_DENDRITE_MAX_CONNECTIONS", 64))
 
 
 def silent_thread_hook(args):
@@ -32,7 +35,7 @@ def safe_monitor(self):
                 continue
             self.handle(record)
     except Exception:
-        pass
+        logging.exception("Exception occurred in safe_monitor")
 
 
 if hasattr(logging.handlers, "QueueListener"):
@@ -40,12 +43,9 @@ if hasattr(logging.handlers, "QueueListener"):
 
 
 def get_endpoint_url(external_ip: str, target_axon: bt.AxonInfo, request_name: str):
-    endpoint = (
-        f"0.0.0.0:{str(target_axon.port)}"
-        if target_axon.ip == str(external_ip)
-        else f"{target_axon.ip}:{str(target_axon.port)}"
-    )
-    return f"http://{endpoint}/{request_name}"
+    is_self = target_axon.ip in {str(external_ip), "127.0.0.1", "0.0.0.0", "localhost"}
+    endpoint_ip = "127.0.0.1" if is_self else target_axon.ip
+    return f"http://{endpoint_ip}:{str(target_axon.port)}/{request_name}"
 
 
 def preprocess_synapse_for_request(
@@ -199,7 +199,7 @@ async def call(
             f"dendrite | <-- | {synapse.get_total_size()} B | {synapse.name} | {synapse.axon.hotkey} | {synapse.axon.ip}:{str(synapse.axon.port)} | {synapse.dendrite.status_code} | {synapse.dendrite.status_message}"
         )
 
-        return synapse
+    return synapse
 
 
 async def worker(
@@ -214,7 +214,9 @@ async def worker(
     synapse_class: type,
     request_name: str,
 ):
-    conn = aiohttp.TCPConnector(limit=0)
+    chunk_size = len(axon_sig_pairs)
+    connection_limit = min(MAX_CONCURRENT_CONNECTIONS, max(1, chunk_size))
+    conn = aiohttp.TCPConnector(limit=connection_limit)
     async with aiohttp.ClientSession(connector=conn) as sessions:
         return await asyncio.gather(
             *(
@@ -265,7 +267,7 @@ def run_chunk(
             )
         )
     except EOFError:
-        pass
+        return None
 
 
 def sign(synapse: bt.Synapse, keypair: bt.Keypair):
@@ -368,7 +370,8 @@ class MultiprocessDendrite:
             else:
                 axon_infos.append(axon)
 
-        results = mp_forward(
+        results = await asyncio.to_thread(
+            mp_forward,
             keypair=self.wallet.hotkey,
             uuid=self.uuid,
             external_ip=self.external_ip,
