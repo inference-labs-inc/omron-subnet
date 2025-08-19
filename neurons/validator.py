@@ -24,9 +24,13 @@ if __name__ == "__main__":
 
         tracer = VizTracer(
             output_file=f"validator_trace_{os.getpid()}.json",
-            max_stack_depth=50,
+            tracer_entries=5000000,
+            max_stack_depth=100,
             min_duration=0,
-            include_files=["neurons/", "_validator/", "utils/"],
+            ignore_c_function=False,
+            ignore_frozen=False,
+            log_sparse=False,
+            log_async=True,
             verbose=1,
         )
 
