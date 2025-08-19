@@ -62,13 +62,19 @@ def safe_init(name=None, wallet=None, metagraph=None, config=None):
     try:
         bt.logging.debug("Attempting to initialize WandB")
         config_dict = {}
+        try:
+            config_dict["coldkey"] = getattr(
+                getattr(wallet, "coldkeypub", None), "ss58_address", None
+            )
+        except Exception as e:
+            bt.logging.debug(f"Failed to get ss58 for coldkeypub: {e}")
+            config_dict["coldkey"] = None
 
         if wallet and metagraph and config:
             config_dict.update(
                 {
                     "netuid": config.netuid,
                     "hotkey": wallet.hotkey.ss58_address,
-                    "coldkey": wallet.coldkeypub.ss58_address,
                     "uid": metagraph.hotkeys.index(wallet.hotkey.ss58_address),
                     "cpu_physical": psutil.cpu_count(logical=False),
                     "cpu_logical": psutil.cpu_count(logical=True),
