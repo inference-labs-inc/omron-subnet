@@ -330,98 +330,82 @@ class ValidatorLoop:
                 if VIZTRACER_AVAILABLE:
                     tracer = get_tracer()
                     if tracer:
-                        tracer.start_duration("request_pool_iteration")
-
-                try:
-                    message = await asyncio.get_event_loop().run_in_executor(
-                        self.thread_pool,
-                        lambda: self.competition_to_validator_queue.get(timeout=0.1),
-                    )
-                    if VIZTRACER_AVAILABLE:
-                        tracer = get_tracer()
-                        if tracer:
-                            tracer.add_instant(
-                                "competition_message_received",
-                                {"message": str(message)},
-                            )
-
-                    if message == ValidatorMessage.WINDDOWN:
-                        bt.logging.info(
-                            "Received winddown message, reducing concurrency to zero"
-                        )
-                        self.current_concurrency = 0
-                    elif message == ValidatorMessage.COMPETITION_COMPLETE:
-                        bt.logging.info(
-                            "Received competition complete message, restoring concurrency"
-                        )
-                        self.current_concurrency = MAX_CONCURRENT_REQUESTS
-                except Empty:
-                    bt.logging.trace("No messages in competition queue")
-                except Exception as e:
-                    bt.logging.error(f"Error in competition message handling: {e}")
-                    traceback.print_exc()
-
-                slots_available = self.current_concurrency - len(self.active_tasks)
-
-                if VIZTRACER_AVAILABLE:
-                    tracer = get_tracer()
-                    if tracer:
-                        tracer.add_instant(
-                            "request_pool_status",
-                            {
-                                "slots_available": slots_available,
-                                "active_tasks": len(self.active_tasks),
-                                "queryable_uids": len(self.queryable_uids),
-                                "processed_uids": len(self.processed_uids),
-                            },
-                        )
-
-                if slots_available > 0:
-                    available_uids = [
-                        uid
-                        for uid in self.queryable_uids
-                        if uid not in self.processed_uids
-                        and uid not in self.active_tasks
-                    ]
-
-                    for uid in available_uids[:slots_available]:
-                        request = self.request_pipeline.prepare_single_request(uid)
-                        if request:
-                            if VIZTRACER_AVAILABLE:
-                                tracer = get_tracer()
-                                if tracer:
-                                    tracer.add_instant(
-                                        "request_created",
-                                        {
-                                            "uid": uid,
-                                            "request_type": str(request.request_type),
-                                        },
-                                    )
-
-                            task = asyncio.create_task(
-                                self._process_single_request(request)
-                            )
-                            self.active_tasks[uid] = task
-                            task.add_done_callback(
-                                lambda t, uid=uid: self._handle_completed_task(t, uid)
-                            )
-
-                await asyncio.sleep(0)
-
-                if VIZTRACER_AVAILABLE:
-                    tracer = get_tracer()
-                    if tracer:
-                        tracer.stop_duration("request_pool_iteration")
-
+                        with tracer.log_event("request_pool_iteration"):
+                            await self._do_request_pool_iteration()
+                else:
+                    await self._do_request_pool_iteration()
             except Exception as e:
-                if VIZTRACER_AVAILABLE:
-                    tracer = get_tracer()
-                    if tracer:
-                        tracer.stop_duration("request_pool_iteration")
-
                 bt.logging.error(f"Error maintaining request pool: {e}")
                 traceback.print_exc()
                 await asyncio.sleep(EXCEPTION_DELAY_SECONDS)
+
+    async def _do_request_pool_iteration(self):
+        try:
+            message = await asyncio.get_event_loop().run_in_executor(
+                self.thread_pool,
+                lambda: self.competition_to_validator_queue.get(timeout=0.1),
+            )
+            if VIZTRACER_AVAILABLE:
+                tracer = get_tracer()
+                if tracer:
+                    tracer.add_variable("competition_message", str(message))
+
+            if message == ValidatorMessage.WINDDOWN:
+                bt.logging.info(
+                    "Received winddown message, reducing concurrency to zero"
+                )
+                self.current_concurrency = 0
+            elif message == ValidatorMessage.COMPETITION_COMPLETE:
+                bt.logging.info(
+                    "Received competition complete message, restoring concurrency"
+                )
+                self.current_concurrency = MAX_CONCURRENT_REQUESTS
+        except Empty:
+            bt.logging.trace("No messages in competition queue")
+        except Exception as e:
+            bt.logging.error(f"Error in competition message handling: {e}")
+            traceback.print_exc()
+
+        slots_available = self.current_concurrency - len(self.active_tasks)
+
+        if VIZTRACER_AVAILABLE:
+            tracer = get_tracer()
+            if tracer:
+                tracer.add_variable(
+                    "request_pool_status",
+                    {
+                        "slots_available": slots_available,
+                        "active_tasks": len(self.active_tasks),
+                        "queryable_uids": len(self.queryable_uids),
+                        "processed_uids": len(self.processed_uids),
+                    },
+                )
+
+        if slots_available > 0:
+            available_uids = [
+                uid
+                for uid in self.queryable_uids
+                if uid not in self.processed_uids and uid not in self.active_tasks
+            ]
+
+            for uid in available_uids[:slots_available]:
+                request = self.request_pipeline.prepare_single_request(uid)
+                if request:
+                    if VIZTRACER_AVAILABLE:
+                        tracer = get_tracer()
+                        if tracer:
+                            tracer.add_variable(
+                                "request_created",
+                                {"uid": uid, "request_type": str(request.request_type)},
+                            )
+
+                    task = asyncio.create_task(self._process_single_request(request))
+                    self.active_tasks[uid] = task
+                    task.add_done_callback(
+                        lambda t, uid=uid: self._handle_completed_task(t, uid)
+                    )
+
+        await asyncio.sleep(0)
 
     def _handle_completed_task(self, task: asyncio.Task, uid: int):
         try:
@@ -495,46 +479,46 @@ class ValidatorLoop:
         if VIZTRACER_AVAILABLE:
             tracer = get_tracer()
             if tracer:
-                tracer.start_duration(f"process_request_uid_{request.uid}")
+                with tracer.log_event(f"process_request_uid_{request.uid}"):
+                    return await self._do_process_request(request)
+        else:
+            return await self._do_process_request(request)
 
+    async def _do_process_request(self, request: Request) -> Request:
         try:
             if VIZTRACER_AVAILABLE:
                 tracer = get_tracer()
                 if tracer:
-                    tracer.add_instant("axon_query_start", {"uid": request.uid})
-
-            response = await asyncio.get_event_loop().run_in_executor(
-                self.thread_pool,
-                lambda: query_single_axon(self.config.dendrite, request),
-            )
-            response = await response
-
-            if VIZTRACER_AVAILABLE:
-                tracer = get_tracer()
-                if tracer:
-                    tracer.add_instant(
-                        "axon_response_received",
-                        {"uid": request.uid, "response_type": type(response).__name__},
-                    )
-
-            processed_response = await asyncio.get_event_loop().run_in_executor(
-                self.response_thread_pool,
-                self.response_processor.process_single_response,
-                response,
-            )
+                    with tracer.log_event(f"axon_query_uid_{request.uid}"):
+                        response = await asyncio.get_event_loop().run_in_executor(
+                            self.thread_pool,
+                            lambda: query_single_axon(self.config.dendrite, request),
+                        )
+                        response = await response
+            else:
+                response = await asyncio.get_event_loop().run_in_executor(
+                    self.thread_pool,
+                    lambda: query_single_axon(self.config.dendrite, request),
+                )
+                response = await response
 
             if VIZTRACER_AVAILABLE:
                 tracer = get_tracer()
                 if tracer:
-                    tracer.add_instant(
-                        "response_processed",
-                        {
-                            "uid": request.uid,
-                            "verification_result": getattr(
-                                processed_response, "verification_result", None
-                            ),
-                        },
-                    )
+                    with tracer.log_event(f"response_processing_uid_{request.uid}"):
+                        processed_response = (
+                            await asyncio.get_event_loop().run_in_executor(
+                                self.response_thread_pool,
+                                self.response_processor.process_single_response,
+                                response,
+                            )
+                        )
+            else:
+                processed_response = await asyncio.get_event_loop().run_in_executor(
+                    self.response_thread_pool,
+                    self.response_processor.process_single_response,
+                    response,
+                )
 
             if processed_response:
                 await self._handle_response(processed_response)
@@ -542,18 +526,13 @@ class ValidatorLoop:
             if VIZTRACER_AVAILABLE:
                 tracer = get_tracer()
                 if tracer:
-                    tracer.add_instant(
+                    tracer.add_variable(
                         "request_error", {"uid": request.uid, "error": str(e)}
                     )
 
             bt.logging.error(f"Error processing request for UID {request.uid}: {e}")
             traceback.print_exc()
             log_error("request_processing", "axon_query", str(e))
-        finally:
-            if VIZTRACER_AVAILABLE:
-                tracer = get_tracer()
-                if tracer:
-                    tracer.stop_duration(f"process_request_uid_{request.uid}")
         return request
 
     async def _handle_response(self, response: MinerResponse) -> None:

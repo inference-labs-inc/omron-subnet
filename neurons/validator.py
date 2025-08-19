@@ -25,12 +25,13 @@ if __name__ == "__main__":
         tracer = VizTracer(
             output_file=f"validator_trace_{os.getpid()}.json",
             tracer_entries=5000000,
-            max_stack_depth=100,
+            max_stack_depth=-1,
             min_duration=0,
-            ignore_c_function=False,
-            ignore_frozen=False,
-            log_sparse=False,
+            ignore_c_function=True,
+            ignore_frozen=True,
             log_async=True,
+            log_func_args=True,
+            log_func_retval=False,
             verbose=1,
         )
 
