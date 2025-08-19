@@ -27,7 +27,6 @@ if __name__ == "__main__":
             max_stack_depth=50,
             min_duration=0,
             include_files=["neurons/", "_validator/", "utils/"],
-            exclude_files=["venv/", "site-packages/"],
             verbose=1,
         )
 
