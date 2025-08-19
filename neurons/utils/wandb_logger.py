@@ -68,7 +68,9 @@ def safe_init(name=None, wallet=None, metagraph=None, config=None):
                 {
                     "netuid": config.netuid,
                     "hotkey": wallet.hotkey.ss58_address,
-                    "coldkey": wallet.coldkeypub.ss58_address,
+                    "coldkey": getattr(
+                        getattr(wallet, "coldkeypub", None), "ss58_address", None
+                    ),
                     "uid": metagraph.hotkeys.index(wallet.hotkey.ss58_address),
                     "cpu_physical": psutil.cpu_count(logical=False),
                     "cpu_logical": psutil.cpu_count(logical=True),
