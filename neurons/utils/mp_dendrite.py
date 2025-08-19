@@ -328,22 +328,45 @@ def mp_forward(
     results = []
 
     with concurrent.futures.ProcessPoolExecutor(nprocs) as executor:
-        intermediate_results = executor.map(
-            run_chunk,
-            repeat(ss58_address),
-            repeat(nonce),
-            repeat(uuid),
-            repeat(external_ip),
-            repeat(synapse.to_headers()),
-            repeat(synapse.model_dump()),
-            chunks,
-            repeat(timeout),
-            repeat(synapse.__class__),
-            repeat(request_name),
-        )
-        for chunk_results in intermediate_results:
-            if chunk_results:
-                results.extend(chunk_results)
+        chunk_futures = []
+        for i, chunk in enumerate(chunks):
+            future = executor.submit(
+                run_chunk,
+                ss58_address,
+                nonce,
+                uuid,
+                external_ip,
+                synapse.to_headers(),
+                synapse.model_dump(),
+                chunk,
+                timeout,
+                synapse.__class__,
+                request_name,
+            )
+            chunk_futures.append((future, chunk))
+
+        for future, chunk in chunk_futures:
+            try:
+                chunk_results = future.result()
+                if chunk_results:
+                    results.extend(chunk_results)
+                else:
+                    # Create error synapses for failed chunk
+                    for axon_dict, _ in chunk:
+                        error_synapse = synapse.model_copy()
+                        error_synapse.dendrite = bt.TerminalInfo(
+                            status_code="500", status_message="Process execution failed"
+                        )
+                        results.append(error_synapse)
+            except Exception as e:
+                # Create error synapses for exception in chunk
+                for axon_dict, _ in chunk:
+                    error_synapse = synapse.model_copy()
+                    error_synapse.dendrite = bt.TerminalInfo(
+                        status_code="500",
+                        status_message=f"Process execution error: {str(e)}",
+                    )
+                    results.append(error_synapse)
 
     return results
 
@@ -354,6 +377,22 @@ class MultiprocessDendrite:
         self.external_ip = external_ip or "127.0.0.1"
         self.uuid = str(time.time_ns())
         self.nprocs = nprocs
+
+    async def call(
+        self,
+        target_axon: Union[bt.AxonInfo, bt.Axon],
+        synapse: bt.Synapse,
+        timeout: float = 60.0,
+        deserialize: bool = True,
+        **kwargs,
+    ) -> bt.Synapse:
+        results = await self.forward(
+            axons=[target_axon],
+            synapse=synapse,
+            timeout=timeout,
+            deserialize=deserialize,
+        )
+        return results[0] if results else None
 
     async def forward(
         self,
