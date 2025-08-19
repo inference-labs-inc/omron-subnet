@@ -173,7 +173,7 @@ async def call(
 
     url = get_endpoint_url(external_ip, target_axon, request_name)
 
-    synapse = synapse_class().from_headers(synapse_headers)
+    synapse = synapse_class(**synapse_body).from_headers(synapse_headers)
 
     synapse = preprocess_synapse_for_request(
         ss58_address,
