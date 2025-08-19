@@ -72,16 +72,10 @@ STEAK = "🥩"
 FIELD_MODULUS = (
     21888242871839275222246405745257275088548364400416034343698204186575808495617
 )
-# Number of miner groups for reset events
-NUM_MINER_GROUPS = 8
 # Subnet tempo for epochs
 EPOCH_TEMPO = 360
 # Weight update buffer
 WEIGHT_UPDATE_BUFFER = 15
-# How close to the end of the epoch the boost is applied
-BOOST_BUFFER = 50
-# The window in blocks before an epoch boundary where a miner can reset.
-MINER_RESET_WINDOW_BLOCKS = 10
 # Whether on-chain proof of weights is enabled by default
 ONCHAIN_PROOF_OF_WEIGHTS_ENABLED = False
 # Frequency in terms of blocks at which proof of weights are posted
