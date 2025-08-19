@@ -10,7 +10,7 @@ import traceback
 
 from execution_layer.proof_handlers.base_handler import ProofSystemHandler
 from execution_layer.generic_input import GenericInput
-from constants import LOCAL_TEEONNX_PATH
+from constants import LOCAL_TEEONNX_PATH, ONE_HOUR
 from execution_layer.session_storage import DCAPSessionStorage
 
 if TYPE_CHECKING:
@@ -221,10 +221,10 @@ class DCAPHandler(ProofSystemHandler):
 
         try:
             result = subprocess.run(
-                docker_cmd, check=True, capture_output=True, text=True, timeout=300
+                docker_cmd, check=True, capture_output=True, text=True, timeout=ONE_HOUR
             )
         except subprocess.TimeoutExpired as e:
-            bt.logging.error(f"Docker command timed out after 300 seconds: {e}")
+            bt.logging.error(f"Docker command timed out after {ONE_HOUR} seconds: {e}")
             raise
         except subprocess.CalledProcessError as e:
             bt.logging.error(f"Docker command failed: {e}")
