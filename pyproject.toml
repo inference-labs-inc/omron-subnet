@@ -24,6 +24,7 @@ dependencies = [
   "onnxruntime>=1.21.0",
   "opencv-contrib-python-headless>=4.11.0.86",
   "opencv-python>=4.11.0.86",
+  "orjson>=3.11.2",
   "packaging==24.2",
   "pillow>=11.3.0",
   "prometheus_client==0.21.1",
@@ -38,6 +39,7 @@ dependencies = [
   "tqdm>=4.67.1",
   "urllib3>=2.3.0",
   "uvicorn==0.34.0",
+  "viztracer>=1.0.4",
   "wandb==0.21.0",
   "websocket-client>=1.8.0",
 ]

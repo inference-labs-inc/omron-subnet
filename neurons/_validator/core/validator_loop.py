@@ -10,6 +10,13 @@ import os
 
 import bittensor as bt
 
+try:
+    from viztracer import get_tracer
+
+    VIZTRACER_AVAILABLE = True
+except ImportError:
+    VIZTRACER_AVAILABLE = False
+
 from _validator.config import ValidatorConfig
 from _validator.api import ValidatorAPI
 from _validator.core.prometheus import (
@@ -313,13 +320,31 @@ class ValidatorLoop:
             self.recent_responses = []
 
     async def maintain_request_pool(self):
+        if VIZTRACER_AVAILABLE:
+            tracer = get_tracer()
+            if tracer:
+                tracer.add_instant("maintain_request_pool_start")
+
         while self._should_run:
             try:
+                if VIZTRACER_AVAILABLE:
+                    tracer = get_tracer()
+                    if tracer:
+                        tracer.add_instant("request_pool_iteration_start")
+
                 try:
                     message = await asyncio.get_event_loop().run_in_executor(
                         self.thread_pool,
                         lambda: self.competition_to_validator_queue.get(timeout=0.1),
                     )
+                    if VIZTRACER_AVAILABLE:
+                        tracer = get_tracer()
+                        if tracer:
+                            tracer.add_instant(
+                                "competition_message_received",
+                                {"message": str(message)},
+                            )
+
                     if message == ValidatorMessage.WINDDOWN:
                         bt.logging.info(
                             "Received winddown message, reducing concurrency to zero"
@@ -338,6 +363,19 @@ class ValidatorLoop:
 
                 slots_available = self.current_concurrency - len(self.active_tasks)
 
+                if VIZTRACER_AVAILABLE:
+                    tracer = get_tracer()
+                    if tracer:
+                        tracer.add_instant(
+                            "request_pool_status",
+                            {
+                                "slots_available": slots_available,
+                                "active_tasks": len(self.active_tasks),
+                                "queryable_uids": len(self.queryable_uids),
+                                "processed_uids": len(self.processed_uids),
+                            },
+                        )
+
                 if slots_available > 0:
                     available_uids = [
                         uid
@@ -349,6 +387,17 @@ class ValidatorLoop:
                     for uid in available_uids[:slots_available]:
                         request = self.request_pipeline.prepare_single_request(uid)
                         if request:
+                            if VIZTRACER_AVAILABLE:
+                                tracer = get_tracer()
+                                if tracer:
+                                    tracer.add_instant(
+                                        "request_created",
+                                        {
+                                            "uid": uid,
+                                            "request_type": str(request.request_type),
+                                        },
+                                    )
+
                             task = asyncio.create_task(
                                 self._process_single_request(request)
                             )
@@ -432,20 +481,63 @@ class ValidatorLoop:
         """
         Process a single request and return the response.
         """
+        if VIZTRACER_AVAILABLE:
+            tracer = get_tracer()
+            if tracer:
+                tracer.add_instant(
+                    "process_request_start",
+                    {"uid": request.uid, "request_type": str(request.request_type)},
+                )
+
         try:
+            if VIZTRACER_AVAILABLE:
+                tracer = get_tracer()
+                if tracer:
+                    tracer.add_instant("axon_query_start", {"uid": request.uid})
+
             response = await asyncio.get_event_loop().run_in_executor(
                 self.thread_pool,
                 lambda: query_single_axon(self.config.dendrite, request),
             )
             response = await response
+
+            if VIZTRACER_AVAILABLE:
+                tracer = get_tracer()
+                if tracer:
+                    tracer.add_instant(
+                        "axon_response_received",
+                        {"uid": request.uid, "response_type": type(response).__name__},
+                    )
+
             processed_response = await asyncio.get_event_loop().run_in_executor(
                 self.response_thread_pool,
                 self.response_processor.process_single_response,
                 response,
             )
+
+            if VIZTRACER_AVAILABLE:
+                tracer = get_tracer()
+                if tracer:
+                    tracer.add_instant(
+                        "response_processed",
+                        {
+                            "uid": request.uid,
+                            "verification_result": getattr(
+                                processed_response, "verification_result", None
+                            ),
+                        },
+                    )
+
             if processed_response:
                 await self._handle_response(processed_response)
         except Exception as e:
+            if VIZTRACER_AVAILABLE:
+                tracer = get_tracer()
+                if tracer:
+                    tracer.add_instant(
+                        "request_error", {"uid": request.uid, "error": str(e)}
+                    )
+
             bt.logging.error(f"Error processing request for UID {request.uid}: {e}")
             traceback.print_exc()
             log_error("request_processing", "axon_query", str(e))
@@ -458,6 +550,19 @@ class ValidatorLoop:
         Args:
             response (MinerResponse): The processed response to handle.
         """
+        if VIZTRACER_AVAILABLE:
+            tracer = get_tracer()
+            if tracer:
+                tracer.add_instant(
+                    "handle_response_start",
+                    {
+                        "uid": response.uid,
+                        "verification_result": response.verification_result,
+                        "response_time": getattr(response, "response_time", None),
+                        "request_type": str(response.request_type),
+                    },
+                )
+
         try:
             request_hash = response.input_hash
             if not response.verification_result:
@@ -466,7 +571,30 @@ class ValidatorLoop:
                 )
                 response.proof_size = DEFAULT_PROOF_SIZE
             self.recent_responses.append(response)
+
+            if VIZTRACER_AVAILABLE:
+                tracer = get_tracer()
+                if tracer:
+                    tracer.add_instant(
+                        "response_added_to_recent",
+                        {
+                            "uid": response.uid,
+                            "recent_count": len(self.recent_responses),
+                        },
+                    )
+
             if response.request_type == RequestType.RWR:
+                if VIZTRACER_AVAILABLE:
+                    tracer = get_tracer()
+                    if tracer:
+                        tracer.add_instant(
+                            "rwr_request_handling",
+                            {
+                                "uid": response.uid,
+                                "verification_result": response.verification_result,
+                            },
+                        )
+
                 if response.verification_result:
                     self.api.set_request_result(
                         request_hash,
@@ -486,6 +614,14 @@ class ValidatorLoop:
                     )
 
             if response.verification_result and response.save:
+                if VIZTRACER_AVAILABLE:
+                    tracer = get_tracer()
+                    if tracer:
+                        tracer.add_instant(
+                            "saving_proof_of_weights",
+                            {"uid": response.uid, "request_hash": request_hash},
+                        )
+
                 save_proof_of_weights(
                     public_signals=[response.public_json],
                     proof=[response.proof_content],
@@ -502,9 +638,30 @@ class ValidatorLoop:
             old_score = self.score_manager._get_safe_score(response.uid)
             self.score_manager.update_single_score(response, self.queryable_uids)
             new_score = self.score_manager._get_safe_score(response.uid)
+
+            if VIZTRACER_AVAILABLE:
+                tracer = get_tracer()
+                if tracer:
+                    tracer.add_instant(
+                        "score_updated",
+                        {
+                            "uid": response.uid,
+                            "old_score": old_score,
+                            "new_score": new_score,
+                        },
+                    )
+
             log_score_change(old_score, new_score)
 
         except Exception as e:
+            if VIZTRACER_AVAILABLE:
+                tracer = get_tracer()
+                if tracer:
+                    tracer.add_instant(
+                        "response_handling_error",
+                        {"uid": response.uid, "error": str(e)},
+                    )
+
             bt.logging.error(f"Error handling response: {e}")
             traceback.print_exc()
             log_error("response_handling", "response_processor", str(e))
