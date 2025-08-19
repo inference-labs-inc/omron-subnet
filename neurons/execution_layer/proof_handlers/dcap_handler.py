@@ -25,6 +25,21 @@ SGX_IMAGE = f"ghcr.io/zkonduit/teeonnx-sgx:{IMAGE_TAG}"
 EXPECTED_MRENCLAVE = "[97, 230, 108, 244, 156, 207, 32, 252, 33, 179, 107, 145, 201, 52, 165, 254, 21, 175, 13, 164, 221, 23, 245, 161, 243, 141, 134, 177, 89, 36, 102, 4]"
 
 
+def _check_sgx_device_access() -> bool:
+    """Check if SGX devices are accessible without sudo."""
+    try:
+        return os.access(SGX_ENCLAVE_PATH, os.R_OK | os.W_OK) and os.access(
+            SGX_PROVISION_PATH, os.R_OK | os.W_OK
+        )
+    except OSError:
+        return False
+
+
+def _needs_sudo_for_sgx() -> bool:
+    """Determine if sudo is needed for SGX device access."""
+    return not _check_sgx_device_access() and os.geteuid() != 0
+
+
 class DCAPHandler(ProofSystemHandler):
     """
     Handler for the DCAP proof system.
@@ -172,11 +187,12 @@ class DCAPHandler(ProofSystemHandler):
         if not isinstance(session.session_storage, DCAPSessionStorage):
             raise TypeError("Session storage must be a DCAPSessionStorage instance")
 
-        result = subprocess.run(
+        docker_cmd = ["docker", "run", "--rm"]
+        if _needs_sudo_for_sgx():
+            docker_cmd = ["sudo"] + docker_cmd
+
+        docker_cmd.extend(
             [
-                "sudo",
-                "docker",
-                "run",
                 "--device",
                 SGX_ENCLAVE_PATH,
                 "--device",
@@ -200,11 +216,19 @@ class DCAPHandler(ProofSystemHandler):
                 os.path.join(
                     WORKSPACE_PATH, os.path.basename(session.session_storage.quote_path)
                 ),
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
+            ]
         )
+
+        try:
+            result = subprocess.run(
+                docker_cmd, check=True, capture_output=True, text=True, timeout=300
+            )
+        except subprocess.TimeoutExpired as e:
+            bt.logging.error(f"Docker command timed out after 300 seconds: {e}")
+            raise
+        except subprocess.CalledProcessError as e:
+            bt.logging.error(f"Docker command failed: {e}")
+            raise
 
         bt.logging.debug(f"Gen witness result: {result.stdout}")
 
