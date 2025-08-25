@@ -148,12 +148,16 @@ class ValidatorAPI:
         try:
             if not await self.validate_connection(request.headers):
                 bt.logging.warning("Unauthorized proof submission attempt")
-                return Response(status_code=401)
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
-            body = await request.json()
+            try:
+                body = await request.json()
+            except Exception:
+                return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
+
             proof_data = body.get("proof")
             circuit_id = body.get("circuit_id")
-            public_signals = body.get("public_signals", "")
+            public_signals = body.get("public_signals")
             inputs = body.get("inputs", {})
 
             if not proof_data:
@@ -178,7 +182,9 @@ class ValidatorAPI:
                         {"error": "Proof verification failed"}, status_code=400
                     )
 
-                pps_url = self._upload_to_pps(proof_data, request.headers)
+                pps_url = self._upload_to_pps(
+                    proof_data, circuit_id, public_signals, inputs, request.headers
+                )
 
                 if pps_url:
                     return JSONResponse(
@@ -207,9 +213,14 @@ class ValidatorAPI:
         """
         Verify a proof using the circuit's proof handler.
         """
-        try:
+        inference_session = None
+        verification_result = False
 
-            validator_inputs = GenericInput(RequestType.RWR, inputs)
+        try:
+            inputs_copy = inputs.copy()
+            inputs_copy["public_signals"] = public_signals
+
+            validator_inputs = GenericInput(RequestType.RWR, inputs_copy)
 
             inference_session = VerifiedModelSession(
                 validator_inputs,
@@ -220,15 +231,18 @@ class ValidatorAPI:
                 validator_inputs, proof_data
             )
 
-            inference_session.end()
-            return verification_result
-
         except Exception as e:
             bt.logging.error(f"Proof verification error: {str(e)}")
             traceback.print_exc()
-            return False
+        finally:
+            if inference_session:
+                inference_session.end()
 
-    def _upload_to_pps(self, proof_data, headers) -> str | None:
+        return verification_result
+
+    def _upload_to_pps(
+        self, proof_data, circuit_id, public_signals, inputs, headers
+    ) -> str | None:
         """
         Upload verified proof to PPS and return URL.
         """
@@ -245,7 +259,9 @@ class ValidatorAPI:
 
             proof_json = {
                 "proof": proof_data,
-                "timestamp": headers.get("x-timestamp"),
+                "circuit_id": circuit_id,
+                "public_signals": public_signals,
+                "inputs": inputs,
                 "submitter_hotkey": hotkey_ss58,
                 "validator_hotkey": self.config.wallet.hotkey.ss58_address,
             }
