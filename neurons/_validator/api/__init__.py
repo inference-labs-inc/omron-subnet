@@ -283,7 +283,9 @@ class ValidatorAPI:
     def _get_routes(self) -> list[APIWebSocketRoute | APIRoute]:
         rpc_endpoint = APIWebSocketRoute("/rpc", self.handle_ws)
         get_circuits_endpoint = APIRoute("/circuits", self.get_circuits)
-        submit_proof_endpoint = APIRoute("/proof", self.submit_proof, methods=["POST"])
+        submit_proof_endpoint = APIRoute(
+            "/verify-and-upload", self.submit_proof, methods=["POST"]
+        )
         return [rpc_endpoint, get_circuits_endpoint, submit_proof_endpoint]
 
     async def handle_proof_of_weights(
