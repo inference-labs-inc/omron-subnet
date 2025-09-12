@@ -9,7 +9,7 @@ from fastapi import (
     Request,
     Response,
 )
-
+from proof_of_portfolio import verify
 from fastapi.responses import JSONResponse
 
 from jsonrpcserver import (
@@ -43,9 +43,6 @@ from OpenSSL import crypto
 from deployment_layer.circuit_store import circuit_store
 from _validator.utils.pps import ProofPublishingService
 from constants import PPS_URL, TESTNET_PPS_URL
-from execution_layer.verified_model_session import VerifiedModelSession
-from execution_layer.generic_input import GenericInput
-from _validator.models.request_type import RequestType
 
 app = FastAPI()
 
@@ -156,47 +153,39 @@ class ValidatorAPI:
                 return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
 
             proof_data = body.get("proof")
-            circuit_id = body.get("circuit_id")
             public_signals = body.get("public_signals")
-            inputs = body.get("inputs", {})
 
             if not proof_data:
                 return JSONResponse({"error": "Missing proof data"}, status_code=400)
-
-            if not circuit_id:
-                return JSONResponse({"error": "Missing circuit_id"}, status_code=400)
-
             try:
-                circuit = circuit_store.get_circuit(circuit_id)
-                if not circuit:
-                    return JSONResponse(
-                        {"error": f"Circuit {circuit_id} not found"}, status_code=400
-                    )
-
-                verification_result = self._verify_proof(
-                    circuit, proof_data, public_signals, inputs
-                )
+                verification_result = verify(proof_data, public_signals)
 
                 if not verification_result:
                     return JSONResponse(
                         {"error": "Proof verification failed"}, status_code=400
                     )
+            except Exception as e:
+                bt.logging.error(f"Uploaded proof failed to verify {e}")
+                return JSONResponse(
+                    {"error": "Proof verification failed"}, status_code=400
+                )
 
+            try:
                 pps_url = self._upload_to_pps(
-                    proof_data, circuit_id, public_signals, inputs, request.headers
+                    proof_data, public_signals, request.headers
                 )
 
                 if pps_url:
                     return JSONResponse(
                         {
-                            "success": True,
+                            "verified": True,
                             "url": pps_url,
-                            "message": "Proof verified and uploaded successfully",
                         }
                     )
                 else:
                     return JSONResponse(
-                        {"error": "Failed to upload proof to PPS"}, status_code=500
+                        {"verified": True, "error": "Failed to upload proof to PPS"},
+                        status_code=200,
                     )
 
             except Exception as e:
@@ -209,40 +198,7 @@ class ValidatorAPI:
             traceback.print_exc()
             return JSONResponse({"error": "Internal server error"}, status_code=500)
 
-    def _verify_proof(self, circuit, proof_data, public_signals, inputs) -> bool:
-        """
-        Verify a proof using the circuit's proof handler.
-        """
-        inference_session = None
-        verification_result = False
-
-        try:
-            inputs_copy = inputs.copy()
-            inputs_copy["public_signals"] = public_signals
-
-            validator_inputs = GenericInput(RequestType.RWR, inputs_copy)
-
-            inference_session = VerifiedModelSession(
-                validator_inputs,
-                circuit,
-            )
-
-            verification_result = inference_session.verify_proof(
-                validator_inputs, proof_data
-            )
-
-        except Exception as e:
-            bt.logging.error(f"Proof verification error: {str(e)}")
-            traceback.print_exc()
-        finally:
-            if inference_session:
-                inference_session.end()
-
-        return verification_result
-
-    def _upload_to_pps(
-        self, proof_data, circuit_id, public_signals, inputs, headers
-    ) -> str | None:
+    def _upload_to_pps(self, proof_data, public_signals, headers) -> str | None:
         """
         Upload verified proof to PPS and return URL.
         """
@@ -259,9 +215,7 @@ class ValidatorAPI:
 
             proof_json = {
                 "proof": proof_data,
-                "circuit_id": circuit_id,
                 "public_signals": public_signals,
-                "inputs": inputs,
                 "submitter_hotkey": hotkey_ss58,
                 "validator_hotkey": self.config.wallet.hotkey.ss58_address,
             }
