@@ -1613,7 +1613,7 @@ wheels = [
 
 [[package]]
 name = "proof-of-portfolio"
-version = "0.0.128"
+version = "0.0.129"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bittensor" },
@@ -1623,9 +1623,9 @@ dependencies = [
     { name = "scipy" },
     { name = "toml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d6/0c/6fe8100d07c2d36d3e449efd263aac50bec84b1ad1a61ee68c002f287da6/proof_of_portfolio-0.0.128.tar.gz", hash = "sha256:f19422c686b929f037549ba2678cc26afe37c2480070e3c2e3c96fce4ef29340", size = 40275744 }
+sdist = { url = "https://files.pythonhosted.org/packages/35/e5/eb409d8be11475bc2b7e56c67e471e666698bbba9a8e22a032d76c14a025/proof_of_portfolio-0.0.129.tar.gz", hash = "sha256:2d3924cc892dad6233eb0e153314b06a779a02d5e6cc859536bd41b4bca5b7e5", size = 40275713 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7f/9f/82528cdc3f31986aa50883d9740f0b0e9398e72432c21d43bb46e000149a/proof_of_portfolio-0.0.128-py3-none-any.whl", hash = "sha256:ac5e84555f62044d9fa42589d5d64fd28bfde8bfc0f9e7120f53818ac2b7ef40", size = 40307423 },
+    { url = "https://files.pythonhosted.org/packages/e5/b4/58599377b1e0b9c9e972f8e5414bdd653feb7c43c4868c4cde646ef093e9/proof_of_portfolio-0.0.129-py3-none-any.whl", hash = "sha256:66ab7e40f50752a3b0b7470279b1f3ee994f4427546fc6923d856219c1a309ee", size = 40307369 },
 ]
 
 [[package]]
