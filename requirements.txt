@@ -427,9 +427,9 @@ platformdirs==4.4.0 \
 prometheus-client==0.21.1 \
     --hash=sha256:252505a722ac04b0456be05c05f75f45d760c2911ffc45f2a06bcaed9f3ae3fb \
     --hash=sha256:594b45c410d6f4f8888940fe80b5cc2521b305a1fafe1c58609ef715a001f301
-proof-of-portfolio==0.0.132 \
-    --hash=sha256:42a0f5db2ab40a6eac548225e93fbdf69e64c7fa0b7cce2851f3abbd2c88bba1 \
-    --hash=sha256:ae909050e00d847bb9d2bda4a53af30ad0925377fe1aa50a2beb42a35e683fa5
+proof-of-portfolio==0.0.134 \
+    --hash=sha256:5accfe9d112ad850e41bc2a1cfd6677343cb9fe30a86113d59025adfac437d05 \
+    --hash=sha256:72ab80c99dafad3db410244738c0cbddd957a5e26a701885b0324c45a2e68a33
 propcache==0.3.2 \
     --hash=sha256:035e631be25d6975ed87ab23153db6a73426a48db688070d925aa27e996fe93c \
     --hash=sha256:0b504d29f3c47cf6b9e936c1852246c83d450e8e063d50562115a6be6d3a2535 \
