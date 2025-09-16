@@ -222,8 +222,8 @@ class ValidatorAPI:
 
             result = pps.publish_proof(proof_json, self.config.wallet.hotkey)
 
-            if result and "url" in result:
-                return result["url"]
+            if result and "gatewayUrl" in result:
+                return result["gatewayUrl"]
             elif result:
                 return f"{pps_url}/proof/{result.get('id', 'unknown')}"
 
