@@ -1,14 +1,14 @@
 from execution_layer.proof_handlers.circom_handler import CircomHandler
-from execution_layer.circuit import ProofSystem
-from execution_layer.proof_handlers.jolt_handler import JoltHandler
+from execution_layer.circuit_metadata import ProofSystem
 from execution_layer.proof_handlers.ezkl_handler import EZKLHandler
+from execution_layer.proof_handlers.dcap_handler import DCAPHandler
 
 
 class ProofSystemFactory:
     _handlers = {
         ProofSystem.CIRCOM: CircomHandler,
-        ProofSystem.JOLT: JoltHandler,
         ProofSystem.EZKL: EZKLHandler,
+        ProofSystem.DCAP: DCAPHandler,
     }
 
     @classmethod

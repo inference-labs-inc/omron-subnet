@@ -1,5 +1,4 @@
 import asyncio
-import json
 import os
 import subprocess
 import time
@@ -13,26 +12,19 @@ import ezkl
 import requests
 
 import cli_parser
-from constants import IGNORED_MODEL_HASHES
+from constants import (
+    IGNORED_MODEL_HASHES,
+    LOCAL_EZKL_PATH,
+    LOCAL_TEEONNX_PATH,
+    LOCAL_SNARKJS_PATH,
+    LOCAL_SNARKJS_INSTALL_DIR,
+    MINER_EXTERNAL_FILES,
+    VALIDATOR_EXTERNAL_FILES,
+)
+from execution_layer.circuit_metadata import CircuitMetadata
 
 from functools import partial
 from collections import OrderedDict
-
-LOCAL_SNARKJS_INSTALL_DIR = os.path.join(os.path.expanduser("~"), ".snarkjs")
-LOCAL_SNARKJS_PATH = os.path.join(
-    LOCAL_SNARKJS_INSTALL_DIR, "node_modules", ".bin", "snarkjs"
-)
-LOCAL_EZKL_PATH = os.path.join(os.path.expanduser("~"), ".ezkl", "ezkl")
-TOOLCHAIN = "nightly-2024-09-30"
-JOLT_VERSION = "dd9e5c4bcf36ffeb75a576351807f8d86c33ec66"
-
-MINER_EXTERNAL_FILES = [
-    "circuit.zkey",
-    "pk.key",
-]
-VALIDATOR_EXTERNAL_FILES = [
-    "circuit.zkey",
-]
 
 
 async def download_srs(logrows):
@@ -47,6 +39,10 @@ def run_shared_preflight_checks(role: Optional[Roles] = None):
     - Model files are synced up
     - Node.js >= 20 is installed
     - SnarkJS is installed
+    - teeonnx is installed (for DCAP)
+
+    Conditionals:
+    - If role is miner, check docker is installed
 
     Raises:
         Exception: If any of the pre-flight checks fail.
@@ -58,6 +54,10 @@ def run_shared_preflight_checks(role: Optional[Roles] = None):
             "Checking SnarkJS installation": ensure_snarkjs_installed,
             "Checking EZKL installation": ensure_ezkl_installed,
             "Syncing model files": partial(sync_model_files, role=role),
+            "Checking Docker installation": (
+                ensure_docker_installed if role == Roles.MINER else None
+            ),
+            "Checking teeonnx installation": ensure_teeonnx_installed,
         }
     )
 
@@ -69,6 +69,9 @@ def run_shared_preflight_checks(role: Optional[Roles] = None):
         _ = preflight_checks.pop("Syncing model files")
 
     for check_name, check_function in preflight_checks.items():
+        if check_function is None:
+            bt.logging.info(f" PreFlight | Skipping {check_name} check for {role}")
+            continue
         bt.logging.info(f" PreFlight | {check_name}")
         try:
             check_function()
@@ -80,6 +83,59 @@ def run_shared_preflight_checks(role: Optional[Roles] = None):
             raise e
 
     bt.logging.info(" PreFlight | Pre-flight checks completed.")
+
+
+def ensure_teeonnx_installed():
+    """
+    Ensure teeonnx prover / verifier binary is installed
+    """
+    try:
+        if os.path.exists(LOCAL_TEEONNX_PATH):
+            if os.access(LOCAL_TEEONNX_PATH, os.X_OK):
+                bt.logging.info("teeonnx is already installed and executable")
+                return
+            else:
+                bt.logging.warning(
+                    "teeonnx exists but is not executable; fixing permissions..."
+                )
+                os.chmod(LOCAL_TEEONNX_PATH, 0o700)
+                return
+
+        os.makedirs(os.path.dirname(LOCAL_TEEONNX_PATH), exist_ok=True)
+
+        # trunk-ignore(bandit/B605)
+        subprocess.run(
+            [
+                "wget",
+                "https://github.com/zkonduit/teeonnx-p/releases/download/v23/teeonnx-zk-cpu-linux",
+                "-O",
+                LOCAL_TEEONNX_PATH,
+            ],
+            check=True,
+        )
+        os.chmod(LOCAL_TEEONNX_PATH, 0o700)
+        bt.logging.info("teeonnx installed successfully")
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        bt.logging.error(f"Failed to install teeonnx: {e}")
+        raise RuntimeError(
+            "teeonnx installation failed. Please install it manually."
+        ) from e
+
+
+def ensure_docker_installed():
+    """
+    Ensure docker is installed
+    """
+    try:
+        subprocess.run(
+            ["docker", "--version"], check=True, capture_output=True, text=True
+        )
+        bt.logging.info("Docker is already installed")
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        bt.logging.error(f"Failed to verify Docker installation: {e}")
+        raise RuntimeError(
+            "Docker installation failed. Please install it manually."
+        ) from e
 
 
 def ensure_ezkl_installed():
@@ -175,24 +231,27 @@ def sync_model_files(role: Optional[Roles] = None):
     SYNC_LOG_PREFIX = "  SYNC  | "
 
     loop = asyncio.get_event_loop()
-    for logrows in range(1, 26):
-        if os.path.exists(
-            os.path.join(os.path.expanduser("~"), ".ezkl", "srs", f"kzg{logrows}.srs")
-        ):
-            bt.logging.info(
-                f"{SYNC_LOG_PREFIX}SRS for logrows={logrows} already exists, skipping..."
-            )
-            continue
+    if role == Roles.VALIDATOR:
+        for logrows in range(1, 26):
+            if os.path.exists(
+                os.path.join(
+                    os.path.expanduser("~"), ".ezkl", "srs", f"kzg{logrows}.srs"
+                )
+            ):
+                bt.logging.info(
+                    f"{SYNC_LOG_PREFIX}SRS for logrows={logrows} already exists, skipping..."
+                )
+                continue
 
-        try:
-            loop.run_until_complete(download_srs(logrows))
-            bt.logging.info(
-                f"{SYNC_LOG_PREFIX}Successfully downloaded SRS for logrows={logrows}"
-            )
-        except Exception as e:
-            bt.logging.error(
-                f"{SYNC_LOG_PREFIX}Failed to download SRS for logrows={logrows}: {e}"
-            )
+            try:
+                loop.run_until_complete(download_srs(logrows))
+                bt.logging.info(
+                    f"{SYNC_LOG_PREFIX}Successfully downloaded SRS for logrows={logrows}"
+                )
+            except Exception as e:
+                bt.logging.error(
+                    f"{SYNC_LOG_PREFIX}Failed to download SRS for logrows={logrows}: {e}"
+                )
 
     for model_hash in os.listdir(MODEL_DIR):
         if not model_hash.startswith("model_"):
@@ -205,25 +264,30 @@ def sync_model_files(role: Optional[Roles] = None):
             )
             continue
 
-        metadata_file = os.path.join(MODEL_DIR, model_hash, "metadata.json")
-        if not os.path.isfile(metadata_file):
+        model_dir = os.path.join(MODEL_DIR, model_hash)
+
+        circuit_metadata = None
+        for filename in ["metadata.json", "metadata.toml"]:
+            metadata_path = os.path.join(model_dir, filename)
+            if os.path.isfile(metadata_path):
+                try:
+                    circuit_metadata = CircuitMetadata.from_file(metadata_path)
+                    break
+                except Exception as e:
+                    bt.logging.error(
+                        SYNC_LOG_PREFIX
+                        + f"Failed to parse metadata from {metadata_path}: {e}"
+                    )
+                    continue
+
+        if circuit_metadata is None:
             bt.logging.error(
                 SYNC_LOG_PREFIX
-                + f"Metadata file not found at {metadata_file} for {model_hash}. Skipping sync for this model."
+                + f"No valid metadata file found in {model_dir} for {model_hash}. Skipping sync for this model."
             )
             continue
 
-        try:
-            with open(metadata_file, "r", encoding="utf-8") as f:
-                metadata = json.load(f)
-        except json.JSONDecodeError:
-            bt.logging.error(
-                SYNC_LOG_PREFIX + f"Failed to parse JSON from {metadata_file}"
-            )
-            continue
-
-        external_files = metadata.get("external_files", {})
-        for key, url in external_files.items():
+        for key, url in circuit_metadata.external_files.items():
             if (role == Roles.VALIDATOR and key not in VALIDATOR_EXTERNAL_FILES) or (
                 role == Roles.MINER and key not in MINER_EXTERNAL_FILES
             ):

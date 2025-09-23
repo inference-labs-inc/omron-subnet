@@ -1,7 +1,7 @@
 from _validator.models.base_rpc_request import RealWorldRequest
 from pydantic import Field
 from deployment_layer.circuit_store import circuit_store
-from execution_layer.circuit import CircuitType
+from execution_layer.circuit_metadata import CircuitType
 
 
 class ProofOfComputationRPCRequest(RealWorldRequest):

@@ -12,7 +12,7 @@ from attr import define, field
 from execution_layer.circuit import Circuit
 from execution_layer.proof_handlers.base_handler import ProofSystemHandler
 from execution_layer.proof_handlers.factory import ProofSystemFactory
-from execution_layer.session_storage import SessionStorage
+from execution_layer.session_storage import SessionStorage, SessionStorageFactory
 from execution_layer.base_input import BaseInput
 from execution_layer.generic_input import GenericInput
 
@@ -55,7 +55,17 @@ class VerifiedModelSession:
         self.model = model
         self.inputs = inputs
         self.session_id = str(uuid.uuid4())
-        self.session_storage = SessionStorage(self.model.id, self.session_id)
+        try:
+            self.session_storage = SessionStorageFactory.create_storage(
+                self.model.metadata.proof_system, self.model.id, self.session_id
+            )
+        except KeyError:
+            bt.logging.error(
+                f"Unsupported proof system: {self.model.metadata.proof_system}"
+            )
+            raise ValueError(
+                f"Unsupported proof system '{self.model.metadata.proof_system}' in model metadata"
+            )
         self.proof_handler = ProofSystemFactory.get_handler(
             self.model.metadata.proof_system
         )
@@ -90,12 +100,6 @@ class VerifiedModelSession:
             bt.logging.error(f"An error occurred during proof generation: {e}")
             traceback.print_exc()
             raise
-
-    def aggregate_proofs(self, proofs: list[str]) -> tuple[str, float]:
-        """
-        Aggregate multiple proofs into a single proof.
-        """
-        return self.proof_handler.aggregate_proofs(self, proofs)
 
     @staticmethod
     def _proof_worker(session: VerifiedModelSession) -> tuple[str, str]:
@@ -170,7 +174,6 @@ class VerifiedModelSession:
             self.session_storage.input_path,
             self.session_storage.witness_path,
             self.session_storage.proof_path,
-            self.session_storage.public_path,
         ):
             if os.path.exists(path):
                 os.remove(path)

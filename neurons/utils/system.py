@@ -97,5 +97,5 @@ def timeout_with_multiprocess_retry(seconds, retries=3):
 
 def get_temp_folder() -> str:
     if not os.path.exists(TEMP_FOLDER):
-        os.makedirs(TEMP_FOLDER, exist_ok=True)
+        os.makedirs(TEMP_FOLDER, mode=0o777, exist_ok=True)
     return TEMP_FOLDER
