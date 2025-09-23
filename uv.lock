@@ -1073,6 +1073,15 @@ wheels = [
 ]
 
 [[package]]
+name = "lightning"
+source = { directory = "neurons/utils/lightning" }
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [{ name = "maturin", specifier = ">=1.9.3" }]
+
+[[package]]
 name = "markdown-it-py"
 version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1138,6 +1147,27 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/99/5b/a36a337438a14116b16480db471ad061c36c3694df7c2084a0da7ba538b7/matplotlib_inline-0.1.7.tar.gz", hash = "sha256:8423b23ec666be3d16e16b60bdd8ac4e86e840ebd1dd11a30b9f117f2fa0ab90", size = 8159 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8f/8e/9ad090d3553c280a8060fbf6e24dc1c0c29704ee7d1c372f0c174aa59285/matplotlib_inline-0.1.7-py3-none-any.whl", hash = "sha256:df192d39a4ff8f21b1895d72e6a13f5fcc5099f00fa84384e0ea28c2cc0653ca", size = 9899 },
+]
+
+[[package]]
+name = "maturin"
+version = "1.9.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b5/41/09562a4e76bea332f140aa42e768ac45a1681f2d438e918ab23fad47ad67/maturin-1.9.3.tar.gz", hash = "sha256:267ac8d0471d1ee2320b8b2ee36f400a32cd2492d7becbd0d976bd3503c2f69b", size = 212713 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/59/59/3ca70205b55e722edab4b63867b175476ad1724fdedf59d03aebd27ebdf8/maturin-1.9.3-py3-none-linux_armv6l.whl", hash = "sha256:acbfbf9bf9f01dca27794de689e0f8bb85db600cf88662b3e44715aae8a5547e", size = 8275610 },
+    { url = "https://files.pythonhosted.org/packages/aa/12/f3bb90f1093eea1b9e4b2793be222aaccfd7c79c6d8f7f488082e0afb481/maturin-1.9.3-py3-none-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:7efca8a7155d9b4f00e85eb334ca2524acc61cf93193df1282060e24a36d09f7", size = 16067312 },
+    { url = "https://files.pythonhosted.org/packages/ac/2f/faf28bdfba79d565b2b348dabb4bd86b1471d516efb3b9a7c6eb2a4e11dc/maturin-1.9.3-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:d71e8ccfc96602b25ecca77074b4a3459f419ab29505e966b9f1e7cc316f7a3e", size = 8428325 },
+    { url = "https://files.pythonhosted.org/packages/50/68/f37c97657e98b24217495f44a8aab507bd4ba8be7d1512329950450243da/maturin-1.9.3-py3-none-manylinux_2_12_i686.manylinux2010_i686.musllinux_1_1_i686.whl", hash = "sha256:f29cb1068396ee0376cf5b9f4dce706bea9f768555831d44259b316e25ce311d", size = 8283900 },
+    { url = "https://files.pythonhosted.org/packages/0e/fb/d0297853d0071f7977d8bc1ddfcf4b0c36aa6db1123a1ee324962cf3525b/maturin-1.9.3-py3-none-manylinux_2_12_x86_64.manylinux2010_x86_64.musllinux_1_1_x86_64.whl", hash = "sha256:45d9909651a79186faf1bfaa0202204957870b30ce3bbd68516028f990a3cb38", size = 8795436 },
+    { url = "https://files.pythonhosted.org/packages/3d/96/1544cc829237424c9af7e474bc5fb707386e0f0e995d59077e230b3945e9/maturin-1.9.3-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.musllinux_1_1_aarch64.whl", hash = "sha256:b17d5a4fe513d92ae96d27c2bc5c12ea024a69d8b6ac27f79e67b19f0fd004fa", size = 8051821 },
+    { url = "https://files.pythonhosted.org/packages/9b/ae/308cef03d6e84dc6220fb6a1f564af94794ab8c1a9a70edd1a471451e762/maturin-1.9.3-py3-none-manylinux_2_17_armv7l.manylinux2014_armv7l.musllinux_1_1_armv7l.whl", hash = "sha256:8eab2457dc16194790cbdb11693ba13b8e130923a87fafa36d7c5800e587bf2b", size = 8134424 },
+    { url = "https://files.pythonhosted.org/packages/e9/06/8f83e0a50523c58f4162ace7bb9e82e62b6e8072883f966fe3c449c5bdef/maturin-1.9.3-py3-none-manylinux_2_17_ppc64le.manylinux2014_ppc64le.musllinux_1_1_ppc64le.whl", hash = "sha256:30dae97d78fd8dc0a5648bf3f051581ea3a3cbfd93e20a368d48d00c464e3b3a", size = 10585373 },
+    { url = "https://files.pythonhosted.org/packages/36/ed/08aa3ce61a3cd21bc065af2892ca18e475df2e84c64b57a8828cc24985d4/maturin-1.9.3-py3-none-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:bb9718d6bb7f2d539a5ff7891fe862fcaa9a75d4ea58176446030ecb5d903ceb", size = 8949689 },
+    { url = "https://files.pythonhosted.org/packages/88/c6/1c639c9f181f492c3d28c9fd77dae99f8570ff19464573e9386a1d28034c/maturin-1.9.3-py3-none-manylinux_2_39_riscv64.whl", hash = "sha256:68a70db3b08b39f849f1ef7d214bee94141883d095e171f94badddaf56b4d60d", size = 8545909 },
+    { url = "https://files.pythonhosted.org/packages/e2/d4/6be70e1df56c803bbfb3725418e84ef767de13c71908368dcc898068b0c3/maturin-1.9.3-py3-none-win32.whl", hash = "sha256:8c8ba5fb75827d037c6ccddda43a3cbcb428778cc6d3c6972785bb0b351f2786", size = 7265611 },
+    { url = "https://files.pythonhosted.org/packages/a6/59/42c83e3234a57b6132b2a875137818aabe79ec3621f08320ff52798fd352/maturin-1.9.3-py3-none-win_amd64.whl", hash = "sha256:3dbd698ddc8ebd415ed9f5558730677b6b07984e19769c8194c249145d19aa14", size = 8285724 },
+    { url = "https://files.pythonhosted.org/packages/e9/ea/cd66332cfb2c4f5a264c15da7f98333c63daa00180a03d0b188899b1be76/maturin-1.9.3-py3-none-win_arm64.whl", hash = "sha256:fb2ee86861e72495eb9afd83f3672de0e4061740247f14492703c189829e7928", size = 6926056 },
 ]
 
 [[package]]
@@ -1342,7 +1372,9 @@ dependencies = [
     { name = "fastapi" },
     { name = "gitpython" },
     { name = "jsonrpcserver" },
+    { name = "lightning" },
     { name = "matplotlib" },
+    { name = "maturin" },
     { name = "numpy" },
     { name = "onnxruntime" },
     { name = "opencv-contrib-python-headless" },
@@ -1392,7 +1424,9 @@ requires-dist = [
     { name = "fastapi", specifier = "==0.110.3" },
     { name = "gitpython", specifier = ">=3.1.44" },
     { name = "jsonrpcserver", specifier = ">=5.0.9" },
+    { name = "lightning", directory = "neurons/utils/lightning" },
     { name = "matplotlib", specifier = ">=3.10.1" },
+    { name = "maturin", specifier = ">=1.0.0" },
     { name = "numpy", specifier = "==2.0.2" },
     { name = "onnxruntime", specifier = ">=1.21.0" },
     { name = "opencv-contrib-python-headless", specifier = ">=4.11.0.86" },

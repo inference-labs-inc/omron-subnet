@@ -4,6 +4,7 @@ from constants import DEFAULT_NETUID, COMPETITION_SYNC_INTERVAL
 
 from utils import wandb_logger
 from _validator.config.api import ApiConfig
+from utils.lightning_dendrite import LightningDendrite
 
 
 class ValidatorConfig:
@@ -38,7 +39,7 @@ class ValidatorConfig:
             self.bt_config.netuid if self.bt_config.netuid else DEFAULT_NETUID
         )
         self.wallet = bt.wallet(config=self.bt_config)
-        self.dendrite = bt.dendrite(wallet=self.wallet)
+        self.dendrite = LightningDendrite(wallet=self.wallet)
         self.subtensor = bt.subtensor(config=self.bt_config)
         try:
             self.metagraph = self.subtensor.metagraph(self.subnet_uid)
