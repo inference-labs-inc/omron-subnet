@@ -1,3 +1,8 @@
+> [!IMPORTANT]
+> **Subnet 2 is now [Dani Labs](https://danilabs.ai/).**
+>
+> From all of us at Inference Labs: thank you to our community for years of feedback, collaboration, iteration, and for every proof along the way. We're grateful for everything we built together.
+
 <div align="center">
 
 # **Subnet 2 [τ, β]**
